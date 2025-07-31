@@ -14,6 +14,82 @@ export type Database = {
   }
   public: {
     Tables: {
+      huddle_members: {
+        Row: {
+          huddle_id: string
+          id: string
+          joined_at: string
+          last_read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          huddle_id: string
+          id?: string
+          joined_at?: string
+          last_read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          huddle_id?: string
+          id?: string
+          joined_at?: string
+          last_read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "huddle_members_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      huddles: {
+        Row: {
+          created_at: string
+          id: string
+          is_private: boolean | null
+          last_message_at: string | null
+          member_count: number | null
+          name: string
+          owner_id: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_private?: boolean | null
+          last_message_at?: string | null
+          member_count?: number | null
+          name: string
+          owner_id: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_private?: boolean | null
+          last_message_at?: string | null
+          member_count?: number | null
+          name?: string
+          owner_id?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "huddles_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_reactions: {
         Row: {
           created_at: string
@@ -51,10 +127,16 @@ export type Database = {
           author_id: string | null
           content: string
           created_at: string
+          delivery_status: string | null
+          huddle_id: string | null
           id: string
           is_agent_post: boolean | null
           is_spotlight: boolean | null
           media_url: string | null
+          message_type: string | null
+          poll_data: Json | null
+          scheduled_at: string | null
+          target_audience: string[] | null
           team_id: string | null
           updated_at: string
         }
@@ -62,10 +144,16 @@ export type Database = {
           author_id?: string | null
           content: string
           created_at?: string
+          delivery_status?: string | null
+          huddle_id?: string | null
           id?: string
           is_agent_post?: boolean | null
           is_spotlight?: boolean | null
           media_url?: string | null
+          message_type?: string | null
+          poll_data?: Json | null
+          scheduled_at?: string | null
+          target_audience?: string[] | null
           team_id?: string | null
           updated_at?: string
         }
@@ -73,14 +161,27 @@ export type Database = {
           author_id?: string | null
           content?: string
           created_at?: string
+          delivery_status?: string | null
+          huddle_id?: string | null
           id?: string
           is_agent_post?: boolean | null
           is_spotlight?: boolean | null
           media_url?: string | null
+          message_type?: string | null
+          poll_data?: Json | null
+          scheduled_at?: string | null
+          target_audience?: string[] | null
           team_id?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "posts_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "posts_team_id_fkey"
             columns: ["team_id"]
@@ -90,36 +191,125 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          phone_number: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          phone_number?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          phone_number?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       teams: {
         Row: {
           city: string
           conference: string | null
           created_at: string
+          description: string | null
           division: string | null
           id: string
+          league: string | null
           logo_url: string | null
           name: string
+          stats: Json | null
           updated_at: string
         }
         Insert: {
           city: string
           conference?: string | null
           created_at?: string
+          description?: string | null
           division?: string | null
           id?: string
+          league?: string | null
           logo_url?: string | null
           name: string
+          stats?: Json | null
           updated_at?: string
         }
         Update: {
           city?: string
           conference?: string | null
           created_at?: string
+          description?: string | null
           division?: string | null
           id?: string
+          league?: string | null
           logo_url?: string | null
           name?: string
+          stats?: Json | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      user_follows: {
+        Row: {
+          created_at: string
+          id: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_follows_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: []
       }
@@ -128,10 +318,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_role: {
+        Args: {
+          _user_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "member" | "huddle_owner"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -258,6 +458,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "member", "huddle_owner"],
+    },
   },
 } as const
