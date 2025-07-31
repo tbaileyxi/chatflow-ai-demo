@@ -30,13 +30,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (session?.user) {
           setTimeout(async () => {
             try {
-              const { data: roleData } = await supabase
-                .from('user_roles')
-                .select('role')
-                .eq('user_id', session.user.id)
-                .single();
+              console.log('Fetching role for user:', session.user.id);
               
-              setUserRole(roleData?.role || 'member');
+              // Use the security definer function to get current user role
+              const { data: roleData, error } = await supabase.rpc('get_current_user_role');
+              
+              if (error) {
+                console.error('Error calling get_current_user_role:', error);
+                // Fallback to direct query
+                const { data: fallbackData, error: fallbackError } = await supabase
+                  .from('user_roles')
+                  .select('role')
+                  .eq('user_id', session.user.id)
+                  .single();
+                
+                if (fallbackError) {
+                  console.error('Fallback query also failed:', fallbackError);
+                  setUserRole('member');
+                } else {
+                  console.log('Fallback role data:', fallbackData);
+                  setUserRole(fallbackData?.role || 'member');
+                }
+              } else {
+                console.log('Role data from function:', roleData);
+                setUserRole(roleData || 'member');
+              }
             } catch (error) {
               console.error('Error fetching user role:', error);
               setUserRole('member');
@@ -58,14 +76,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (session?.user) {
         const fetchRole = async () => {
           try {
-            const { data: roleData } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id)
-              .single();
+            console.log('Initial session - fetching role for user:', session.user.id);
             
-            setUserRole(roleData?.role || 'member');
+            // Use the security definer function to get current user role
+            const { data: roleData, error } = await supabase.rpc('get_current_user_role');
+            
+            if (error) {
+              console.error('Initial session - Error calling get_current_user_role:', error);
+              // Fallback to direct query
+              const { data: fallbackData, error: fallbackError } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', session.user.id)
+                .single();
+              
+              if (fallbackError) {
+                console.error('Initial session - Fallback query also failed:', fallbackError);
+                setUserRole('member');
+              } else {
+                console.log('Initial session - Fallback role data:', fallbackData);
+                setUserRole(fallbackData?.role || 'member');
+              }
+            } else {
+              console.log('Initial session - Role data from function:', roleData);
+              setUserRole(roleData || 'member');
+            }
           } catch (error) {
+            console.error('Initial session - Error fetching user role:', error);
             setUserRole('member');
           }
           setLoading(false);
