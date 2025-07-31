@@ -44,6 +44,27 @@ export const Huddle = () => {
     if (id) {
       fetchHuddle();
       fetchMessages();
+      
+      // Set up real-time subscription for messages
+      const channel = supabase
+        .channel('huddle-messages')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'huddle_messages',
+            filter: `huddle_id=eq.${id}`
+          },
+          () => {
+            fetchMessages(); // Refresh messages when new one is added
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [id]);
 
@@ -83,7 +104,7 @@ export const Huddle = () => {
           content,
           created_at,
           user_id,
-          profiles:user_id(display_name, avatar_url)
+          profiles!inner(display_name, avatar_url)
         `)
         .eq("huddle_id", id)
         .order("created_at", { ascending: true });

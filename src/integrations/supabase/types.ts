@@ -46,6 +46,30 @@ export type Database = {
           },
         ]
       }
+      huddle_messages: {
+        Row: {
+          content: string
+          created_at: string
+          huddle_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          huddle_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          huddle_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       huddles: {
         Row: {
           created_at: string
