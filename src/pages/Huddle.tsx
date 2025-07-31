@@ -25,10 +25,10 @@ interface Message {
   content: string;
   created_at: string;
   user_id: string;
-  profiles: {
+  profiles?: {
     display_name?: string;
     avatar_url?: string;
-  };
+  } | null;
 }
 
 export const Huddle = () => {
@@ -103,8 +103,7 @@ export const Huddle = () => {
           id,
           content,
           created_at,
-          user_id,
-          profiles!fk_huddle_messages_user_id(display_name, avatar_url)
+          user_id
         `)
         .eq("huddle_id", id)
         .order("created_at", { ascending: true });
