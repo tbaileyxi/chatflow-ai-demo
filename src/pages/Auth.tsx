@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Phone } from 'lucide-react';
-import { AdminLoginDialog } from '@/components/AdminLoginDialog';
+
 
 export const Auth = () => {
   const { user } = useAuth();
@@ -36,6 +36,18 @@ export const Auth = () => {
     return <Navigate to="/" replace />;
   }
 
+  const formatPhoneNumber = (phone: string) => {
+    // Remove all non-digits
+    const cleaned = phone.replace(/\D/g, '');
+    
+    // Add + if not present and number doesn't start with +
+    if (!phone.startsWith('+') && cleaned.length >= 10) {
+      return `+1${cleaned.slice(-10)}`; // Default to US format
+    }
+    
+    return phone.startsWith('+') ? phone : `+${cleaned}`;
+  };
+
   const sendVerificationCode = async () => {
     if (!phoneNumber.trim()) {
       toast({
@@ -46,10 +58,22 @@ export const Auth = () => {
       return;
     }
 
+    const formattedPhone = formatPhoneNumber(phoneNumber);
+    
+    // Basic validation
+    if (formattedPhone.length < 10) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid phone number",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({
-        phone: phoneNumber,
+        phone: formattedPhone,
         options: {
           shouldCreateUser: isSignUp
         }
@@ -57,15 +81,26 @@ export const Auth = () => {
 
       if (error) throw error;
       
+      // Update the phone number state to the formatted version
+      setPhoneNumber(formattedPhone);
       setSentCode(true);
       toast({
         title: "Code Sent",
         description: "Check your phone for the verification code",
       });
     } catch (error: any) {
+      console.error('SMS Error:', error);
+      let errorMessage = "Failed to send verification code";
+      
+      if (error.message?.includes('Twilio')) {
+        errorMessage = "SMS service is not properly configured. Please contact support.";
+      } else if (error.message?.includes('Invalid phone number')) {
+        errorMessage = "Please enter a valid phone number with country code";
+      }
+      
       toast({
         title: "Error",
-        description: error.message || "Failed to send verification code",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -140,9 +175,6 @@ export const Auth = () => {
                 >
                   {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
                 </Button>
-                <div>
-                  <AdminLoginDialog />
-                </div>
               </div>
             </div>
           ) : (

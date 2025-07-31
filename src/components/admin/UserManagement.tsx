@@ -11,7 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Users, Shield, Crown, Ban, Search, Calendar, Phone, Mail, UserX, UserCheck } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Shield, Crown, Ban, Search, Calendar, Phone, Mail, UserX, UserCheck, AlertTriangle } from 'lucide-react';
+import { FirstAdminSetup } from './FirstAdminSetup';
 
 interface User {
   id: string;
@@ -33,6 +34,7 @@ export const UserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasAdmin, setHasAdmin] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,6 +58,14 @@ export const UserManagement = () => {
 
   const fetchUsers = async () => {
     try {
+      // Check if any admin exists
+      const { data: adminRoles } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('role', 'admin');
+
+      setHasAdmin(adminRoles && adminRoles.length > 0);
+
       // Get all users from profiles table with new columns
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
@@ -303,6 +313,19 @@ export const UserManagement = () => {
     return (
       <div className="text-center py-8">
         <div className="text-muted-foreground">Loading users...</div>
+      </div>
+    );
+  }
+
+  // Show first admin setup if no admin exists
+  if (!hasAdmin) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold">User Management</h2>
+          <p className="text-muted-foreground">Set up your first admin to get started</p>
+        </div>
+        <FirstAdminSetup />
       </div>
     );
   }
