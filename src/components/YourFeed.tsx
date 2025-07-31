@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PostCard } from "@/components/PostCard";
-import { TeamSelector } from "@/components/TeamSelector";
+import { Button } from "@/components/ui/button";
 
 interface Post {
   id: string;
   content: string;
   media_url?: string;
+  poll_data?: any;
   created_at: string;
   team: {
     id: string;
@@ -61,6 +62,7 @@ export const YourFeed = () => {
           id,
           content,
           media_url,
+          poll_data,
           created_at,
           team:teams(id, name, logo_url),
           post_reactions(reaction_type)
@@ -91,7 +93,9 @@ export const YourFeed = () => {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6">
         <h3 className="text-xl font-semibold mb-4">Follow teams to see your feed</h3>
-        <TeamSelector onTeamsUpdated={setFollowedTeams} />
+        <Button onClick={() => window.location.href = '/teams'} className="mt-4">
+          Follow Teams
+        </Button>
       </div>
     );
   }
@@ -100,16 +104,21 @@ export const YourFeed = () => {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6">
         <h3 className="text-xl font-semibold mb-2">No posts yet</h3>
-        <p className="text-muted-foreground">Check back later for updates from your teams!</p>
-        <TeamSelector onTeamsUpdated={setFollowedTeams} className="mt-4" />
+        <p className="text-muted-foreground mb-4">Check back later for updates from your teams!</p>
+        <Button onClick={() => window.location.href = '/teams'}>
+          Follow More Teams
+        </Button>
       </div>
     );
   }
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="p-4 border-b border-border">
-        <TeamSelector onTeamsUpdated={setFollowedTeams} />
+      <div className="p-4 border-b border-border flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Your Feed</h2>
+        <Button variant="outline" size="sm" onClick={() => window.location.href = '/teams'}>
+          Follow Teams
+        </Button>
       </div>
       <div className="space-y-1">
         {posts.map((post) => (

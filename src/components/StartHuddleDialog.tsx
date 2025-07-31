@@ -99,6 +99,14 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
 
     setSubmitLoading(true);
     try {
+      console.log('Creating huddle with data:', {
+        name: formData.name.trim(),
+        owner_id: user.id,
+        team_id: formData.team_id,
+        is_private: true,
+        member_count: 1
+      });
+      
       // Create the huddle
       const { data: huddle, error: huddleError } = await supabase
         .from('huddles')

@@ -9,6 +9,7 @@ interface PostCardProps {
     id: string;
     content: string;
     media_url?: string;
+    poll_data?: any;
     created_at: string;
     team: {
       id: string;
@@ -68,6 +69,34 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
         {post.media_url && (
           <div className="mt-3 rounded-lg overflow-hidden">
             <img src={post.media_url} alt="Post media" className="w-full h-auto" />
+          </div>
+        )}
+        {post.poll_data && (
+          <div className="mt-3 space-y-2">
+            <div className="space-y-2">
+              {post.poll_data.options.map((option) => {
+                const totalVotes = post.poll_data!.options.reduce((sum, opt) => sum + opt.votes, 0);
+                const percentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0;
+                
+                return (
+                  <Button
+                    key={option.id}
+                    variant="outline"
+                    className="w-full justify-between h-auto p-3 relative overflow-hidden"
+                    onClick={() => console.log('Vote for:', option.text)}
+                  >
+                    <div 
+                      className="absolute inset-0 bg-primary/10 transition-all"
+                      style={{ width: `${percentage}%` }}
+                    />
+                    <span className="relative z-10">{option.text}</span>
+                    <span className="relative z-10 text-sm text-muted-foreground">
+                      {option.votes} ({Math.round(percentage)}%)
+                    </span>
+                  </Button>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
