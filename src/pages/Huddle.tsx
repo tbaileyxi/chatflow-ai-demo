@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Send, Users, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { MediaUpload } from "@/components/MediaUpload";
@@ -38,6 +39,12 @@ interface Message {
     username?: string;
     avatar_url?: string;
   } | null;
+  reactions?: {
+    [emoji: string]: {
+      count: number;
+      users: string[];
+    };
+  };
 }
 
 export const Huddle = () => {
@@ -48,6 +55,7 @@ export const Huddle = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [mediaDialogOpen, setMediaDialogOpen] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -158,6 +166,11 @@ export const Huddle = () => {
       })) || [];
 
       setMessages(messagesWithProfiles);
+      
+      // Fetch reactions for all messages
+      messagesWithProfiles.forEach(message => {
+        fetchMessageReactions(message.id);
+      });
     } catch (error) {
       console.error("Error fetching messages:", error);
     }
@@ -206,7 +219,14 @@ export const Huddle = () => {
 
       if (error) throw error;
       
-      // No need to fetch messages - real-time will handle it
+      // Close media dialog after successful upload
+      setMediaDialogOpen(false);
+      
+      toast({
+        title: "Success",
+        description: `${mediaType === 'image' ? 'Image' : 'Video'} sent successfully`,
+      });
+      
     } catch (error) {
       console.error("Error sending media:", error);
       toast({
@@ -214,6 +234,82 @@ export const Huddle = () => {
         description: "Failed to send media",
         variant: "destructive"
       });
+    }
+  };
+
+  const addReaction = async (messageId: string, emoji: string) => {
+    if (!user?.id) return;
+
+    try {
+      // Check if user already reacted with this emoji
+      const { data: existingReaction } = await supabase
+        .from("huddle_message_reactions")
+        .select("id")
+        .eq("message_id", messageId)
+        .eq("user_id", user.id)
+        .eq("emoji", emoji)
+        .single();
+
+      if (existingReaction) {
+        // Remove reaction
+        const { error } = await supabase
+          .from("huddle_message_reactions")
+          .delete()
+          .eq("id", existingReaction.id);
+
+        if (error) throw error;
+      } else {
+        // Add reaction
+        const { error } = await supabase
+          .from("huddle_message_reactions")
+          .insert({
+            message_id: messageId,
+            user_id: user.id,
+            emoji: emoji
+          });
+
+        if (error) throw error;
+      }
+
+      // Refresh reactions for this message
+      fetchMessageReactions(messageId);
+    } catch (error) {
+      console.error("Error handling reaction:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update reaction",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const fetchMessageReactions = async (messageId: string) => {
+    try {
+      const { data: reactions, error } = await supabase
+        .from("huddle_message_reactions")
+        .select("emoji, user_id")
+        .eq("message_id", messageId);
+
+      if (error) throw error;
+
+      // Group reactions by emoji
+      const reactionCounts: { [emoji: string]: { count: number; users: string[] } } = {};
+      reactions?.forEach((reaction) => {
+        if (!reactionCounts[reaction.emoji]) {
+          reactionCounts[reaction.emoji] = { count: 0, users: [] };
+        }
+        reactionCounts[reaction.emoji].count++;
+        reactionCounts[reaction.emoji].users.push(reaction.user_id);
+      });
+
+      // Update message with reactions
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, reactions: reactionCounts }
+          : msg
+      ));
+    } catch (error) {
+      console.error("Error fetching reactions:", error);
     }
   };
 
@@ -315,6 +411,29 @@ export const Huddle = () => {
                       </div>
                     )}
                   </div>
+                  
+                  {/* Emoji Reactions */}
+                  <div className="mt-2 space-y-1">
+                    <div className="flex gap-1">
+                      {['👍', '😂', '🔥'].map((emoji) => {
+                        const reactionData = message.reactions?.[emoji];
+                        const hasReacted = reactionData?.users.includes(user?.id || '');
+                        const count = reactionData?.count || 0;
+                        
+                        return (
+                          <Button
+                            key={emoji}
+                            variant={hasReacted ? "default" : "outline"}
+                            size="sm"
+                            className={`h-6 px-2 text-xs ${hasReacted ? 'bg-primary/20 text-primary' : ''}`}
+                            onClick={() => addReaction(message.id, emoji)}
+                          >
+                            {emoji} {count > 0 && count}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             );
@@ -331,13 +450,17 @@ export const Huddle = () => {
             placeholder="Type a message..."
             className="flex-1"
           />
-          <Dialog>
+          <Dialog open={mediaDialogOpen} onOpenChange={setMediaDialogOpen}>
             <DialogTrigger asChild>
               <Button type="button" variant="outline" size="icon">
                 <Plus className="w-4 h-4" />
               </Button>
             </DialogTrigger>
             <DialogContent className="w-full max-w-md">
+              <VisuallyHidden>
+                <DialogTitle>Upload Media</DialogTitle>
+                <DialogDescription>Upload an image or video to share in the chat</DialogDescription>
+              </VisuallyHidden>
               <MediaUpload
                 onMediaSelected={sendMediaMessage}
                 bucket="chat-media"

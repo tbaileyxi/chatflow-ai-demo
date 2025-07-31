@@ -259,15 +259,7 @@ export const BroadcastCenter = () => {
       for (const audience of targetAudience) {
         try {
           if (audience === 'team_feed') {
-            // Team Feed includes Side Huddles automatically
-            const huddleResult = await broadcastToHuddles(basePostData);
-            deliveryResults.push({
-              channel: 'Side Huddles',
-              status: huddleResult.success ? 'delivered' : 'failed',
-              error: huddleResult.error
-            });
-
-            // Also create regular team feed post
+            // Only create regular team feed post - DO NOT broadcast to huddles
             const postData = {
               ...basePostData,
               target_audience: ['team_feed']
@@ -291,7 +283,19 @@ export const BroadcastCenter = () => {
               is_team_agent_message: true
             });
             deliveryResults.push({
-              channel: 'Team Agent Messages',
+              channel: 'Team Agent Messages (All Huddles)',
+              status: huddleResult.success ? 'delivered' : 'failed',
+              error: huddleResult.error
+            });
+          } else if (audience === 'side_huddles') {
+            // SEPARATE option for broadcasting to huddles only
+            const huddleResult = await broadcastToHuddles({
+              ...basePostData,
+              author_id: '00000000-0000-0000-0000-000000000000', // TEAM AGENT user_id
+              is_team_agent_message: true
+            });
+            deliveryResults.push({
+              channel: 'Side Huddles',
               status: huddleResult.success ? 'delivered' : 'failed',
               error: huddleResult.error
             });
@@ -556,7 +560,7 @@ export const BroadcastCenter = () => {
                   }
                 />
                 <Label htmlFor="team_feed" className="font-medium">Team Feed</Label>
-                <span className="text-xs text-muted-foreground">(includes Side Huddles)</span>
+                <span className="text-xs text-muted-foreground">(public posts only)</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Checkbox
@@ -577,8 +581,19 @@ export const BroadcastCenter = () => {
                     handleAudienceChange('team_agent', checked as boolean)
                   }
                 />
-                <Label htmlFor="team_agent" className="font-medium">Team Agent</Label>
-                <span className="text-xs text-muted-foreground">(official team messages)</span>
+                <Label htmlFor="team_agent" className="font-medium">Team Agent to Huddles</Label>
+                <span className="text-xs text-muted-foreground">(official messages to all huddles)</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="side_huddles"
+                  checked={targetAudience.includes('side_huddles')}
+                  onCheckedChange={(checked) => 
+                    handleAudienceChange('side_huddles', checked as boolean)
+                  }
+                />
+                <Label htmlFor="side_huddles" className="font-medium">Side Huddles</Label>
+                <span className="text-xs text-muted-foreground">(broadcast to huddles only)</span>
               </div>
             </div>
           </div>
