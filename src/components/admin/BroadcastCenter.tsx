@@ -192,9 +192,7 @@ export const BroadcastCenter = () => {
               user_id: postData.author_id,
               media_url: postData.media_url,
               media_type: postData.media_url ? 
-                (postData.message_type === 'upload' ? 
-                  (postData.media_url.includes('.mp4') || postData.media_url.includes('.mov') || postData.media_url.includes('.avi') ? 'video' : 'image') 
-                  : 'text') 
+                (postData.media_url.includes('.mp4') || postData.media_url.includes('.mov') || postData.media_url.includes('.webm') || postData.media_url.includes('.avi') ? 'video' : 'image') 
                 : 'text',
               is_team_agent_message: postData.is_team_agent_message || false
             });
@@ -222,6 +220,9 @@ export const BroadcastCenter = () => {
       });
       return;
     }
+
+    // Prevent double submission
+    if (loading) return;
 
     setLoading(true);
     setDeliveryStatus([]);
@@ -299,16 +300,13 @@ export const BroadcastCenter = () => {
               status: huddleResult.success ? 'delivered' : 'failed',
               error: huddleResult.error
             });
-          } else {
-            // Regular post for Spotlight
+          } else if (audience === 'spotlight') {
+            // Spotlight post - ensure single insertion
             const postData = {
               ...basePostData,
-              target_audience: [audience]
+              is_spotlight: true,
+              target_audience: ['spotlight']
             };
-
-            if (audience === 'spotlight') {
-              postData.is_spotlight = true;
-            }
 
             const { error } = await supabase
               .from('posts')
@@ -317,7 +315,7 @@ export const BroadcastCenter = () => {
             if (error) throw error;
 
             deliveryResults.push({
-              channel: audience === 'spotlight' ? 'Spotlight' : audience,
+              channel: 'Spotlight',
               status: 'delivered'
             });
           }
@@ -349,8 +347,10 @@ export const BroadcastCenter = () => {
         setEmbedCode('');
         setMediaUrl('');
         setMediaType(null);
-        
         setTargetAudience(['team_feed']);
+        
+        // Delay hiding delivery status to let user see results
+        setTimeout(() => setShowDeliveryStatus(false), 3000);
       } else {
         toast({
           title: "Broadcast Failed",

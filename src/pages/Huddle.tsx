@@ -415,7 +415,7 @@ export const Huddle = () => {
                 </div>
                 
                 {/* Emoji Reactions - Outside message bubble for proper alignment */}
-                <div className={`mt-2 ${isCurrentUser && !isTeamAgent ? 'flex justify-end' : 'flex justify-start'}`}>
+                <div className={`mt-2 ${isCurrentUser ? 'flex justify-end' : 'flex justify-start'}`}>
                   <div className="flex gap-1">
                     {['👍', '😂', '🔥'].map((emoji) => {
                       const reactionData = message.reactions?.[emoji];
