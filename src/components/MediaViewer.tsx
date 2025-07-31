@@ -38,11 +38,13 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
     }
   };
 
-  const handleVideoLoad = (video: HTMLVideoElement) => {
+  const handleVideoLoad = (video: HTMLVideoElement | null) => {
     setVideoRef(video);
-    video.addEventListener('play', () => setIsPlaying(true));
-    video.addEventListener('pause', () => setIsPlaying(false));
-    video.addEventListener('ended', () => setIsPlaying(false));
+    if (video) {
+      video.addEventListener('play', () => setIsPlaying(true));
+      video.addEventListener('pause', () => setIsPlaying(false));
+      video.addEventListener('ended', () => setIsPlaying(false));
+    }
   };
 
   if (mediaType === 'image') {
