@@ -184,20 +184,39 @@ export const BroadcastCenter = () => {
 
       // Check if side_huddles is in target audience
       if (targetAudience.includes('side_huddles') && huddles?.length) {
-        // Insert post with huddle_id for each huddle
+        // Create actual huddle messages for each huddle
         for (const huddle of huddles) {
-          const { error: huddlePostError } = await supabase
-            .from('posts')
+          const { error: huddleMessageError } = await supabase
+            .from('huddle_messages')
             .insert({
-              ...postData,
+              content: postData.content,
               huddle_id: huddle.id,
-              target_audience: ['side_huddles']
+              user_id: postData.author_id,
+              media_url: postData.media_url,
+              media_type: postData.media_url ? 
+                (postData.message_type === 'upload' ? 
+                  (postData.media_url.includes('.mp4') || postData.media_url.includes('.mov') || postData.media_url.includes('.avi') ? 'video' : 'image') 
+                  : 'text') 
+                : 'text'
             });
 
-          if (huddlePostError) {
-            console.error(`Failed to broadcast to huddle ${huddle.name}:`, huddlePostError);
+          if (huddleMessageError) {
+            console.error(`Failed to broadcast to huddle ${huddle.name}:`, huddleMessageError);
             return { success: false, error: `Failed to broadcast to huddle: ${huddle.name}` };
           }
+        }
+
+        // Also create a post entry for tracking purposes
+        const { error: postError } = await supabase
+          .from('posts')
+          .insert({
+            ...postData,
+            target_audience: ['side_huddles']
+          });
+
+        if (postError) {
+          console.error('Failed to create tracking post:', postError);
+          // Don't fail the entire operation for tracking post failure
         }
       }
 
