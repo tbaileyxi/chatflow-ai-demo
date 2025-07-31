@@ -29,7 +29,12 @@ const App = () => (
               <header className="h-12 flex items-center border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
                 <SidebarTrigger className="ml-2" />
                 <div className="ml-4 flex-1">
-                  <h1 className="text-lg font-semibold text-foreground">Side Huddle</h1>
+                  <button 
+                    onClick={() => window.location.href = '/'}
+                    className="text-lg font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
+                  >
+                    Side Huddle
+                  </button>
                 </div>
               </header>
               <div className="flex-1 overflow-hidden">{/* Overflow container */}

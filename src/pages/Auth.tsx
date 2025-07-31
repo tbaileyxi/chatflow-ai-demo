@@ -18,10 +18,15 @@ export const Auth = () => {
 
   if (user) {
     // Check for pending huddle join
-    const pendingHuddleId = localStorage.getItem('pendingHuddleJoin');
-    if (pendingHuddleId) {
+    const pendingJoinData = localStorage.getItem('pendingHuddleJoin');
+    if (pendingJoinData) {
       localStorage.removeItem('pendingHuddleJoin');
-      return <Navigate to={`/join-huddle/${pendingHuddleId}`} replace />;
+      try {
+        const joinData = JSON.parse(pendingJoinData);
+        return <Navigate to={`/join-huddle/${joinData.huddleId}`} replace />;
+      } catch (error) {
+        console.error('Error parsing pending join data:', error);
+      }
     }
     return <Navigate to="/" replace />;
   }

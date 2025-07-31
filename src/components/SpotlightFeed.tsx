@@ -163,7 +163,7 @@ export const SpotlightFeed = () => {
                 <MediaViewer
                   mediaUrl={message.media_url}
                   mediaType={message.media_type === 'video' ? 'video' : 'image'}
-                  className="max-w-md rounded-lg"
+                  className="max-w-xs rounded-lg"
                 />
               </div>
             )}

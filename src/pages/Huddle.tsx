@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { MediaUpload } from "@/components/MediaUpload";
 import { MediaViewer } from "@/components/MediaViewer";
 import { InviteButton } from "@/components/InviteButton";
+import { CollapsibleMemberList } from "@/components/CollapsibleMemberList";
 
 interface HuddleData {
   id: string;
@@ -31,6 +32,7 @@ interface Message {
   user_id: string;
   media_url?: string;
   media_type?: string;
+  is_team_agent_message?: boolean;
   profiles?: {
     display_name?: string;
     username?: string;
@@ -113,7 +115,8 @@ export const Huddle = () => {
           created_at,
           user_id,
           media_url,
-          media_type
+          media_type,
+          is_team_agent_message
         `)
         .eq("huddle_id", id)
         .order("created_at", { ascending: true });
@@ -239,7 +242,12 @@ export const Huddle = () => {
               </p>
             </div>
           </div>
-          <InviteButton huddleId={huddle.id} />
+          <div className="flex items-center gap-2">
+            <InviteButton huddleId={huddle.id} />
+          </div>
+        </div>
+        <div className="mt-3">
+          <CollapsibleMemberList huddleId={huddle.id} />
         </div>
       </div>
 
@@ -260,14 +268,14 @@ export const Huddle = () => {
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-medium text-sm">
-                    {message.profiles?.display_name || message.profiles?.username || 'Anonymous'}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(message.created_at).toLocaleTimeString()}
-                  </span>
-                </div>
+                 <div className="flex items-center gap-2 mb-1">
+                   <span className="font-medium text-sm">
+                     {message.is_team_agent_message ? 'TEAM AGENT' : (message.profiles?.display_name || message.profiles?.username || 'Anonymous')}
+                   </span>
+                   <span className="text-xs text-muted-foreground">
+                     {new Date(message.created_at).toLocaleTimeString()}
+                   </span>
+                 </div>
                 <p className="text-sm">{message.content}</p>
                 {message.media_url && message.media_type && (
                   <div className="mt-2">

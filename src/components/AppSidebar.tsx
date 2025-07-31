@@ -157,13 +157,16 @@ export function AppSidebar() {
                             {!isCollapsed && (
                               <div className="flex gap-1 items-center">
                                 <div className="flex items-center gap-1">
-                                  <Users className="w-3 h-3 text-muted-foreground" />
+                                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
                                   <span className="text-xs text-muted-foreground">{huddle.member_count}</span>
                                 </div>
                                 {huddle.unread_count > 0 && (
-                                  <Badge variant="destructive" className="text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full">
-                                    {huddle.unread_count}
-                                  </Badge>
+                                  <div className="flex items-center gap-1">
+                                    <MessageSquare className="w-3 h-3 text-destructive" />
+                                    <Badge variant="destructive" className="text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full">
+                                      {huddle.unread_count}
+                                    </Badge>
+                                  </div>
                                 )}
                               </div>
                             )}
