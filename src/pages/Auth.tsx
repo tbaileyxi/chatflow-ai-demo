@@ -20,12 +20,13 @@ export const Auth = () => {
     // Check for pending huddle join
     const pendingJoinData = localStorage.getItem('pendingHuddleJoin');
     if (pendingJoinData) {
-      localStorage.removeItem('pendingHuddleJoin');
       try {
         const joinData = JSON.parse(pendingJoinData);
+        // Navigate to the original invite link to complete the flow
         return <Navigate to={`/join-huddle/${joinData.huddleId}`} replace />;
       } catch (error) {
         console.error('Error parsing pending join data:', error);
+        localStorage.removeItem('pendingHuddleJoin');
       }
     }
     return <Navigate to="/" replace />;
