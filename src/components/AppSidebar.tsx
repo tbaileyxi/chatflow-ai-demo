@@ -16,7 +16,8 @@ interface Huddle {
 }
 
 export function AppSidebar() {
-  const { collapsed } = useSidebar();
+  const { state } = useSidebar();
+  const isCollapsed = state === 'collapsed';
   const { user, isAdmin, signOut } = useAuth();
   const [huddles, setHuddles] = useState<Huddle[]>([]);
 
@@ -54,7 +55,7 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar className={collapsed ? 'w-14' : 'w-64'} collapsible>
+    <Sidebar className={isCollapsed ? 'w-14' : 'w-64'} collapsible="icon">
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
@@ -65,7 +66,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} className="flex items-center gap-3">
                       <item.icon className="w-4 h-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                      {!isCollapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -79,8 +80,8 @@ export function AppSidebar() {
             <Separator />
             <SidebarGroup>
               <SidebarGroupLabel className="flex items-center justify-between">
-                {!collapsed && 'Side Huddles'}
-                {!collapsed && (
+                {!isCollapsed && 'Side Huddles'}
+                {!isCollapsed && (
                   <Button size="sm" variant="ghost">
                     <Plus className="w-4 h-4" />
                   </Button>
@@ -89,7 +90,7 @@ export function AppSidebar() {
               <SidebarGroupContent>
                 <SidebarMenu>
                   {huddles.length === 0 ? (
-                    !collapsed && (
+                    !isCollapsed && (
                       <div className="p-4 text-center text-sm text-muted-foreground">
                         <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
                         <p>No huddles yet</p>
@@ -106,9 +107,9 @@ export function AppSidebar() {
                           <NavLink to={`/huddle/${huddle.id}`} className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <MessageSquare className="w-4 h-4" />
-                              {!collapsed && <span className="truncate">{huddle.name}</span>}
+                              {!isCollapsed && <span className="truncate">{huddle.name}</span>}
                             </div>
-                            {!collapsed && (
+                            {!isCollapsed && (
                               <div className="flex gap-1">
                                 <Badge variant="secondary" className="text-xs">
                                   {huddle.member_count}
@@ -140,7 +141,7 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <SidebarMenuButton onClick={signOut}>
                       <LogOut className="w-4 h-4" />
-                      {!collapsed && <span>Sign Out</span>}
+                      {!isCollapsed && <span>Sign Out</span>}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>
