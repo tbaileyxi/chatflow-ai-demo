@@ -52,6 +52,8 @@ export type Database = {
           created_at: string
           huddle_id: string
           id: string
+          media_type: string | null
+          media_url: string | null
           user_id: string
         }
         Insert: {
@@ -59,6 +61,8 @@ export type Database = {
           created_at?: string
           huddle_id: string
           id?: string
+          media_type?: string | null
+          media_url?: string | null
           user_id: string
         }
         Update: {
@@ -66,6 +70,8 @@ export type Database = {
           created_at?: string
           huddle_id?: string
           id?: string
+          media_type?: string | null
+          media_url?: string | null
           user_id?: string
         }
         Relationships: []
@@ -176,6 +182,7 @@ export type Database = {
           content: string
           created_at: string
           delivery_status: string | null
+          embed_code: string | null
           huddle_id: string | null
           id: string
           is_agent_post: boolean | null
@@ -193,6 +200,7 @@ export type Database = {
           content: string
           created_at?: string
           delivery_status?: string | null
+          embed_code?: string | null
           huddle_id?: string | null
           id?: string
           is_agent_post?: boolean | null
@@ -210,6 +218,7 @@ export type Database = {
           content?: string
           created_at?: string
           delivery_status?: string | null
+          embed_code?: string | null
           huddle_id?: string | null
           id?: string
           is_agent_post?: boolean | null
