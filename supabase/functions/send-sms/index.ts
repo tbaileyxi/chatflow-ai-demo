@@ -27,11 +27,18 @@ serve(async (req) => {
     console.log('Twilio config check:', {
       hasSid: !!twilioAccountSid,
       hasToken: !!twilioAuthToken,
-      hasPhone: !!twilioPhoneNumber
+      hasPhone: !!twilioPhoneNumber,
+      sidLength: twilioAccountSid?.length || 0,
+      tokenLength: twilioAuthToken?.length || 0
     })
 
     if (!twilioAccountSid || !twilioAuthToken || !twilioPhoneNumber) {
-      throw new Error('Twilio credentials not configured')
+      console.error('Missing Twilio credentials:', {
+        hasSid: !!twilioAccountSid,
+        hasToken: !!twilioAuthToken,
+        hasPhone: !!twilioPhoneNumber
+      })
+      throw new Error('Twilio credentials not configured. Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in Supabase Edge Functions secrets.')
     }
 
     const message = `Your Side Huddle verification code is: ${verification_code}`
