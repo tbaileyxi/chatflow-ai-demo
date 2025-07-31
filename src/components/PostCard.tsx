@@ -196,7 +196,8 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
         {/* Media/Embed Display */}
         {post.media_url && (
           <div className="mt-3 rounded-lg overflow-hidden">
-            {post.media_url.includes('youtube.com') || post.media_url.includes('youtu.be') ? (
+            {/* Handle YouTube URLs */}
+            {(post.media_url.includes('youtube.com') || post.media_url.includes('youtu.be')) ? (
               <div className="aspect-video">
                 <iframe
                   src={post.media_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
@@ -206,7 +207,13 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
                   title="Video content"
                 />
               </div>
-            ) : post.media_url.includes('embed') || post.media_url.includes('iframe') ? (
+            ) : /* Handle embed codes (iframe/script tags) */
+            post.media_url.includes('<iframe') || post.media_url.includes('<script') ? (
+              <div className="aspect-video">
+                <div dangerouslySetInnerHTML={{ __html: post.media_url }} />
+              </div>
+            ) : /* Handle direct embed URLs */
+            post.media_url.includes('embed') || post.media_url.includes('iframe') ? (
               <div className="aspect-video">
                 <iframe
                   src={post.media_url}
@@ -216,8 +223,32 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
                   title="Embedded content"
                 />
               </div>
-            ) : (
+            ) : /* Handle video files */
+            (post.media_url.includes('.mp4') || post.media_url.includes('.webm') || post.media_url.includes('.ogg')) ? (
+              <video controls className="w-full h-auto">
+                <source src={post.media_url} type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+            ) : /* Handle images */
+            (post.media_url.includes('.jpg') || post.media_url.includes('.jpeg') || post.media_url.includes('.png') || post.media_url.includes('.gif') || post.media_url.includes('.webp')) ? (
               <img src={post.media_url} alt="Post media" className="w-full h-auto" />
+            ) : /* Fallback for other URLs - try as image first, then iframe */
+            (
+              <div>
+                <img 
+                  src={post.media_url} 
+                  alt="Post media" 
+                  className="w-full h-auto"
+                  onError={(e) => {
+                    // If image fails, try as iframe
+                    const target = e.target as HTMLImageElement;
+                    const parent = target.parentElement;
+                    if (parent) {
+                      parent.innerHTML = `<div class="aspect-video"><iframe src="${post.media_url}" class="w-full h-full" frameborder="0" title="Embedded content"></iframe></div>`;
+                    }
+                  }}
+                />
+              </div>
             )}
           </div>
         )}

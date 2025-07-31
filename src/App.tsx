@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import { Admin } from "./pages/Admin";
 import { Auth } from "./pages/Auth";
 import { TeamDirectory } from "./pages/TeamDirectory";
+import { Huddle } from "./pages/Huddle";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/teams" element={<TeamDirectory />} />
+                <Route path="/huddle/:id" element={<Huddle />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </div>
