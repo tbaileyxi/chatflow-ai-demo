@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Home, Users, MessageSquare, Plus, Settings, LogOut } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { Home, Users, MessageSquare, Plus, Settings, LogOut, Menu } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -17,7 +17,8 @@ interface Huddle {
 }
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, setOpenMobile } = useSidebar();
+  const navigate = useNavigate();
   const isCollapsed = state === 'collapsed';
   const { user, isAdmin, signOut } = useAuth();
   const [huddles, setHuddles] = useState<Huddle[]>([]);
@@ -55,20 +56,39 @@ export function AppSidebar() {
     menuItems.push({ title: 'Admin Panel', url: '/admin', icon: Settings });
   }
 
+  const handleNavClick = (url: string) => {
+    navigate(url);
+    // Auto-collapse sidebar on mobile after navigation
+    if (window.innerWidth < 768) {
+      setOpenMobile(false);
+    }
+  };
+
   return (
-    <Sidebar className={isCollapsed ? 'w-14' : 'w-64'} collapsible="icon">
-      <SidebarContent>
+    <Sidebar 
+      className={`${isCollapsed ? 'w-14' : 'w-64'} transition-all duration-300 ease-in-out`} 
+      collapsible="icon"
+    >
+      <SidebarContent className="bg-sidebar border-sidebar-border">
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sidebar-foreground font-semibold">
+            Navigation
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} className="flex items-center gap-3">
+                  <SidebarMenuButton 
+                    asChild 
+                    className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200"
+                  >
+                    <button 
+                      onClick={() => handleNavClick(item.url)}
+                      className="flex items-center gap-3 w-full text-left"
+                    >
                       <item.icon className="w-4 h-4" />
-                      {!isCollapsed && <span>{item.title}</span>}
-                    </NavLink>
+                      {!isCollapsed && <span className="font-medium">{item.title}</span>}
+                    </button>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -78,15 +98,19 @@ export function AppSidebar() {
 
         {user && (
           <>
-            <Separator />
+            <Separator className="bg-sidebar-border" />
             <SidebarGroup>
-              <SidebarGroupLabel className="flex items-center justify-between">
+              <SidebarGroupLabel className="flex items-center justify-between text-sidebar-foreground font-semibold">
                 {!isCollapsed && 'Side Huddles'}
                 {!isCollapsed && (
                   <StartHuddleDialog 
                     onHuddleCreated={fetchUserHuddles}
                     trigger={
-                      <Button size="sm" variant="ghost">
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="h-6 w-6 p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      >
                         <Plus className="w-4 h-4" />
                       </Button>
                     }
@@ -97,13 +121,17 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {huddles.length === 0 ? (
                     !isCollapsed && (
-                      <div className="p-4 text-center text-sm text-muted-foreground">
+                      <div className="p-4 text-center text-sm text-sidebar-foreground/70">
                         <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                        <p>No huddles yet</p>
+                        <p className="mb-3">No huddles yet</p>
                         <StartHuddleDialog 
                           onHuddleCreated={fetchUserHuddles}
                           trigger={
-                            <Button size="sm" variant="outline" className="mt-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                            >
                               <Plus className="w-4 h-4 mr-2" />
                               Start Huddle
                             </Button>
@@ -114,15 +142,21 @@ export function AppSidebar() {
                   ) : (
                     huddles.map((huddle) => (
                       <SidebarMenuItem key={huddle.id}>
-                        <SidebarMenuButton asChild>
-                          <NavLink to={`/huddle/${huddle.id}`} className="flex items-center justify-between">
+                        <SidebarMenuButton 
+                          asChild
+                          className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200"
+                        >
+                          <button 
+                            onClick={() => handleNavClick(`/huddle/${huddle.id}`)}
+                            className="flex items-center justify-between w-full text-left"
+                          >
                             <div className="flex items-center gap-3">
                               <MessageSquare className="w-4 h-4" />
-                              {!isCollapsed && <span className="truncate">{huddle.name}</span>}
+                              {!isCollapsed && <span className="truncate font-medium">{huddle.name}</span>}
                             </div>
                             {!isCollapsed && (
                               <div className="flex gap-1">
-                                <Badge variant="secondary" className="text-xs">
+                                <Badge variant="secondary" className="text-xs bg-sidebar-accent text-sidebar-accent-foreground">
                                   {huddle.member_count}
                                 </Badge>
                                 {huddle.unread_count > 0 && (
@@ -132,7 +166,7 @@ export function AppSidebar() {
                                 )}
                               </div>
                             )}
-                          </NavLink>
+                          </button>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     ))
@@ -145,14 +179,17 @@ export function AppSidebar() {
 
         {user && (
           <>
-            <Separator />
+            <Separator className="bg-sidebar-border" />
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>
-                    <SidebarMenuButton onClick={signOut}>
+                    <SidebarMenuButton 
+                      onClick={signOut}
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors duration-200"
+                    >
                       <LogOut className="w-4 h-4" />
-                      {!isCollapsed && <span>Sign Out</span>}
+                      {!isCollapsed && <span className="font-medium">Sign Out</span>}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>

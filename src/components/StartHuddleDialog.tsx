@@ -35,6 +35,7 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
     name: '',
     team_id: ''
   });
+  const [submitLoading, setSubmitLoading] = useState(false);
 
   const fetchTeams = async () => {
     if (teamsLoaded) return;
@@ -69,22 +70,40 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user || !formData.name || !formData.team_id) {
+    if (!formData.name.trim()) {
       toast({
-        title: "Error",
-        description: "Please fill in all fields",
+        title: "Validation Error",
+        description: "Please enter a huddle name",
         variant: "destructive"
       });
       return;
     }
 
-    setLoading(true);
+    if (!formData.team_id) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a team",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!user?.id) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to create a huddle",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSubmitLoading(true);
     try {
       // Create the huddle
       const { data: huddle, error: huddleError } = await supabase
         .from('huddles')
         .insert({
-          name: formData.name,
+          name: formData.name.trim(),
           owner_id: user.id,
           team_id: formData.team_id,
           is_private: true,
@@ -93,7 +112,9 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
         .select()
         .single();
 
-      if (huddleError) throw huddleError;
+      if (huddleError) {
+        throw new Error(`Failed to create huddle: ${huddleError.message}`);
+      }
 
       // Add creator as first member
       const { error: memberError } = await supabase
@@ -103,27 +124,15 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
           user_id: user.id
         });
 
-      if (memberError) throw memberError;
-
-      // Update user role to huddle_owner if not already admin
-      const { data: currentRole } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!currentRole || currentRole.role === 'member') {
-        await supabase
-          .from('user_roles')
-          .upsert({
-            user_id: user.id,
-            role: 'huddle_owner'
-          });
+      if (memberError) {
+        // Clean up the huddle if member insertion fails
+        await supabase.from('huddles').delete().eq('id', huddle.id);
+        throw new Error(`Failed to add member: ${memberError.message}`);
       }
 
       toast({
         title: "Success!",
-        description: `Created ${formData.name} huddle`,
+        description: `Created "${formData.name}" huddle successfully!`,
       });
 
       setFormData({ name: '', team_id: '' });
@@ -131,13 +140,14 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
       onHuddleCreated?.();
     } catch (error) {
       console.error('Error creating huddle:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create huddle';
       toast({
         title: "Error",
-        description: "Failed to create huddle",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setSubmitLoading(false);
     }
   };
 
@@ -216,11 +226,30 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
           </Card>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setOpen(false)}
+              disabled={submitLoading}
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Creating...' : 'Create Huddle'}
+            <Button 
+              type="submit" 
+              disabled={submitLoading}
+              className="bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitLoading ? (
+                <>
+                  <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Huddle
+                </>
+              )}
             </Button>
           </div>
         </form>

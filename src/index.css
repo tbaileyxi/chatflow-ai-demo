@@ -8,100 +8,95 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Side Huddle Sports Theme - Dark Mode First */
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Black/Slate Background with Bright Yellow Accents */
+    --background: 210 11% 11%;
+    --foreground: 45 93% 47%;
 
-    --card: 217.2 32.6% 17.5%;
-    --card-foreground: 210 40% 98%;
+    --card: 215 16% 15%;
+    --card-foreground: 45 93% 47%;
 
-    --popover: 217.2 32.6% 17.5%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 215 16% 15%;
+    --popover-foreground: 45 93% 47%;
 
-    /* Sports-themed primary - NFL green */
-    --primary: 120 100% 25%;
-    --primary-foreground: 0 0% 100%;
+    /* Bright Yellow Primary */
+    --primary: 45 93% 47%;
+    --primary-foreground: 210 11% 11%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 215 19% 20%;
+    --secondary-foreground: 45 93% 47%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 215 19% 20%;
+    --muted-foreground: 215 15% 65%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 215 19% 20%;
+    --accent-foreground: 45 93% 47%;
 
-    /* Fire button color */
-    --destructive: 14 100% 57%;
+    /* Red for destructive actions */
+    --destructive: 0 84% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 120 100% 25%;
+    --border: 215 19% 20%;
+    --input: 215 19% 20%;
+    --ring: 45 93% 47%;
 
-    /* Sports UI elements */
-    --huddle-primary: 240 100% 50%;
-    --huddle-secondary: 280 100% 45%;
-    --spotlight: 45 100% 50%;
-    --like-button: 220 100% 60%;
+    /* Sports UI elements with yellow theme */
+    --huddle-primary: 45 93% 47%;
+    --huddle-secondary: 45 85% 55%;
+    --spotlight: 45 93% 47%;
+    --like-button: 45 93% 47%;
     --fire-button: 14 100% 57%;
 
-    --radius: 1rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Sidebar with same dark/yellow theme */
+    --sidebar-background: 210 11% 11%;
+    --sidebar-foreground: 45 93% 47%;
+    --sidebar-primary: 45 93% 47%;
+    --sidebar-primary-foreground: 210 11% 11%;
+    --sidebar-accent: 215 19% 20%;
+    --sidebar-accent-foreground: 45 93% 47%;
+    --sidebar-border: 215 19% 20%;
+    --sidebar-ring: 45 93% 47%;
   }
 
   .light {
-    /* Light mode for Side Huddle */
+    /* Light mode maintains yellow accent theme */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 210 11% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 210 11% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 210 11% 11%;
 
-    --primary: 120 100% 25%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 45 93% 47%;
+    --primary-foreground: 210 11% 11%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 210 11% 11%;
 
-    --muted: 210 40% 96.1%;
+    --muted: 210 40% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 210 11% 11%;
 
-    --destructive: 14 100% 57%;
+    --destructive: 0 84% 50%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 120 100% 25%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --ring: 45 93% 47%;
+    
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 210 11% 11%;
+    --sidebar-primary: 45 93% 47%;
+    --sidebar-primary-foreground: 210 11% 11%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 210 11% 11%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-ring: 45 93% 47%;
   }
 }
 
@@ -111,6 +106,7 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   }
 }

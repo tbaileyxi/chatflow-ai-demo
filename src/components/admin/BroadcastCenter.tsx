@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { FileUpload } from '@/components/FileUpload';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Send, Clock, Upload, Link, MessageSquare, BarChart3 } from 'lucide-react';
 
@@ -20,6 +21,8 @@ interface Team {
 }
 
 export const BroadcastCenter = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTeam, setSelectedTeam] = useState('');
   const [messageType, setMessageType] = useState('text');
@@ -30,7 +33,6 @@ export const BroadcastCenter = () => {
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [embedUrl, setEmbedUrl] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const { toast } = useToast();
 
   useEffect(() => {
     fetchTeams();
@@ -79,10 +81,29 @@ export const BroadcastCenter = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!selectedTeam || !content.trim()) {
+    // Validation
+    if (!content.trim()) {
       toast({
-        title: "Error",
-        description: "Please select a team and enter message content",
+        title: "Validation Error",
+        description: "Please enter message content",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!selectedTeam) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a team",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!user?.id) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to send messages",
         variant: "destructive"
       });
       return;
@@ -95,7 +116,7 @@ export const BroadcastCenter = () => {
         const validOptions = pollOptions.filter(option => option.trim());
         if (validOptions.length < 2) {
           toast({
-            title: "Error",
+            title: "Validation Error",
             description: "Poll must have at least 2 options",
             variant: "destructive"
           });
@@ -104,31 +125,37 @@ export const BroadcastCenter = () => {
         }
         pollData = {
           question: content,
-          options: validOptions.map(option => ({ text: option, votes: 0 }))
+          options: validOptions.map((option, index) => ({ 
+            id: index, 
+            text: option, 
+            votes: 0 
+          }))
         };
       }
 
       const postData = {
         content,
         team_id: selectedTeam,
+        author_id: user.id,
         message_type: messageType,
         target_audience: targetAudience,
         is_spotlight: isSpotlight,
         is_agent_post: true,
         poll_data: pollData,
-        media_url: messageType === 'embed' ? embedUrl : null
+        media_url: messageType === 'embed' && embedUrl.trim() ? embedUrl : null
       };
 
       const { error } = await supabase
         .from('posts')
         .insert(postData);
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(`Database error: ${error.message}`);
+      }
 
       toast({
         title: "Success",
         description: "Message sent successfully!",
-        variant: "default"
       });
 
       // Reset form
@@ -140,9 +167,10 @@ export const BroadcastCenter = () => {
       setTargetAudience(['team_feed']);
     } catch (error) {
       console.error('Error sending message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
       toast({
         title: "Error",
-        description: "Failed to send message",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -328,12 +356,21 @@ export const BroadcastCenter = () => {
             <Button 
               onClick={handleSendMessage} 
               disabled={loading}
-              className="flex items-center gap-2"
+              className="bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              <Send className="w-4 h-4" />
-              {loading ? 'Sending...' : 'Send Now'}
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  Send Now
+                </>
+              )}
             </Button>
-            <Button variant="outline" className="flex items-center gap-2">
+            <Button variant="outline" disabled={loading} className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
               Schedule
             </Button>
