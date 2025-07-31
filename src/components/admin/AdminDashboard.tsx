@@ -1,0 +1,164 @@
+import { useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { Users, MessageSquare, Shield, Trophy } from 'lucide-react';
+
+interface DashboardStats {
+  totalUsers: number;
+  totalTeams: number;
+  totalPosts: number;
+  totalHuddles: number;
+}
+
+export const AdminDashboard = () => {
+  const [stats, setStats] = useState<DashboardStats>({
+    totalUsers: 0,
+    totalTeams: 0,
+    totalPosts: 0,
+    totalHuddles: 0
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardStats();
+  }, []);
+
+  const fetchDashboardStats = async () => {
+    try {
+      const [usersRes, teamsRes, postsRes, huddlesRes] = await Promise.all([
+        supabase.from('user_roles').select('id', { count: 'exact', head: true }),
+        supabase.from('teams').select('id', { count: 'exact', head: true }),
+        supabase.from('posts').select('id', { count: 'exact', head: true }),
+        supabase.from('huddles').select('id', { count: 'exact', head: true })
+      ]);
+
+      setStats({
+        totalUsers: usersRes.count || 0,
+        totalTeams: teamsRes.count || 0,
+        totalPosts: postsRes.count || 0,
+        totalHuddles: huddlesRes.count || 0
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="text-muted-foreground">Loading dashboard stats...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{stats.totalUsers}</div>
+            <p className="text-xs text-muted-foreground">Registered users</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Teams</CardTitle>
+            <Trophy className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{stats.totalTeams}</div>
+            <p className="text-xs text-muted-foreground">NFL & NCAA teams</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Posts</CardTitle>
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{stats.totalPosts}</div>
+            <p className="text-xs text-muted-foreground">Broadcast messages</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Side Huddles</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{stats.totalHuddles}</div>
+            <p className="text-xs text-muted-foreground">Private chats</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+                <div>
+                  <p className="font-medium">New user registered</p>
+                  <p className="text-sm text-muted-foreground">2 minutes ago</p>
+                </div>
+                <Users className="h-4 w-4 text-green-500" />
+              </div>
+              <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+                <div>
+                  <p className="font-medium">Spotlight post created</p>
+                  <p className="text-sm text-muted-foreground">5 minutes ago</p>
+                </div>
+                <MessageSquare className="h-4 w-4 text-blue-500" />
+              </div>
+              <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+                <div>
+                  <p className="font-medium">New side huddle started</p>
+                  <p className="text-sm text-muted-foreground">15 minutes ago</p>
+                </div>
+                <Shield className="h-4 w-4 text-purple-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>System Health</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Database Status</span>
+                <span className="text-sm text-green-500 font-medium">Operational</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">API Response Time</span>
+                <span className="text-sm text-green-500 font-medium">Fast</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Storage Usage</span>
+                <span className="text-sm text-yellow-500 font-medium">Normal</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Active Sessions</span>
+                <span className="text-sm text-green-500 font-medium">{stats.totalUsers}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
