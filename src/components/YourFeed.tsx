@@ -36,8 +36,21 @@ export const YourFeed = () => {
   }, [followedTeams]);
 
   const fetchFollowedTeams = async () => {
-    // For now, simulate followed teams - will connect to user auth later
-    setFollowedTeams(["teams-1", "teams-2", "teams-3"]);
+    try {
+      // Get actual followed teams from user_follows table
+      const { data, error } = await supabase
+        .from('user_follows')
+        .select('team_id')
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id);
+
+      if (error) throw error;
+      
+      const teamIds = data?.map(follow => follow.team_id) || [];
+      setFollowedTeams(teamIds);
+    } catch (error) {
+      console.error('Error fetching followed teams:', error);
+      setFollowedTeams([]);
+    }
   };
 
   const fetchPosts = async () => {

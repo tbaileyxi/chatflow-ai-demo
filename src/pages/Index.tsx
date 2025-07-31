@@ -24,9 +24,6 @@ const Index = () => {
       <div className="flex-1 flex flex-col">
         <FeedTabs />
       </div>
-
-      {/* Bottom Huddle Bar */}
-      <HuddleBar />
     </div>
   );
 };

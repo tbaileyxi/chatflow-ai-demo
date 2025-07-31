@@ -39,19 +39,27 @@ export const UserManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
+      // First get all users from auth.users via the profiles table
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          user_roles!left(role)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      
-      const usersWithRoles = data?.map(user => ({
+      if (profilesError) throw profilesError;
+
+      // Then get roles for these users
+      const userIds = profiles?.map(p => p.user_id) || [];
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', userIds);
+
+      if (rolesError) throw rolesError;
+
+      // Combine the data
+      const usersWithRoles = profiles?.map(user => ({
         ...user,
-        role: (user as any).user_roles?.[0]?.role || 'member'
+        role: roles?.find(r => r.user_id === user.user_id)?.role || 'member'
       })) || [];
       
       setUsers(usersWithRoles);
