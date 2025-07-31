@@ -90,6 +90,30 @@ export type Database = {
           },
         ]
       }
+      poll_votes: {
+        Row: {
+          created_at: string | null
+          id: string
+          option_id: number
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          option_id: number
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          option_id?: number
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_reactions: {
         Row: {
           created_at: string
@@ -327,6 +351,10 @@ export type Database = {
           _user_id: string
           _role: Database["public"]["Enums"]["app_role"]
         }
+        Returns: boolean
+      }
+      is_huddle_member: {
+        Args: { _huddle_id: string; _user_id: string }
         Returns: boolean
       }
     }

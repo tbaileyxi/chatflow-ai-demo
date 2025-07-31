@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Heart, Flame, MessageCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 interface PostCardProps {
   post: {
@@ -24,14 +27,137 @@ interface PostCardProps {
 }
 
 export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [reactions, setReactions] = useState(post.post_reactions);
+  const [pollVotes, setPollVotes] = useState<any[]>([]);
+  const [userVote, setUserVote] = useState<number | null>(null);
 
   const likeCount = reactions.filter(r => r.reaction_type === 'like').length;
   const fireCount = reactions.filter(r => r.reaction_type === 'fire').length;
 
+  // Fetch poll votes if this is a poll
+  useEffect(() => {
+    if (post.poll_data) {
+      fetchPollVotes();
+    }
+  }, [post.id, post.poll_data]);
+
+  const fetchPollVotes = async () => {
+    try {
+      const { data: votes, error } = await supabase
+        .from('poll_votes')
+        .select('*')
+        .eq('post_id', post.id);
+
+      if (error) throw error;
+      setPollVotes(votes || []);
+      
+      // Check if current user has voted
+      if (user) {
+        const userVoteRecord = votes?.find(v => v.user_id === user.id);
+        setUserVote(userVoteRecord?.option_id || null);
+      }
+    } catch (error) {
+      console.error('Error fetching poll votes:', error);
+    }
+  };
+
   const handleReaction = async (type: 'like' | 'fire') => {
-    // TODO: Implement reaction logic with user authentication
-    console.log(`${type} reaction on post ${post.id}`);
+    if (!user?.id) {
+      toast({
+        title: "Please sign in",
+        description: "You need to be logged in to react to posts",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Check if user already reacted with this type
+      const existingReaction = reactions.find(r => r.reaction_type === type);
+      
+      if (existingReaction) {
+        // Remove reaction
+        const { error } = await supabase
+          .from('post_reactions')
+          .delete()
+          .eq('post_id', post.id)
+          .eq('user_id', user.id)
+          .eq('reaction_type', type);
+
+        if (error) throw error;
+        
+        setReactions(prev => prev.filter(r => !(r.reaction_type === type)));
+      } else {
+        // Add reaction
+        const { error } = await supabase
+          .from('post_reactions')
+          .insert({
+            post_id: post.id,
+            user_id: user.id,
+            reaction_type: type
+          });
+
+        if (error) throw error;
+        
+        setReactions(prev => [...prev, { reaction_type: type }]);
+      }
+    } catch (error) {
+      console.error('Error handling reaction:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update reaction",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handlePollVote = async (optionId: number) => {
+    if (!user?.id) {
+      toast({
+        title: "Please sign in",
+        description: "You need to be logged in to vote",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      if (userVote === optionId) {
+        // Remove vote
+        const { error } = await supabase
+          .from('poll_votes')
+          .delete()
+          .eq('post_id', post.id)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+        setUserVote(null);
+      } else {
+        // Add or update vote
+        const { error } = await supabase
+          .from('poll_votes')
+          .upsert({
+            post_id: post.id,
+            user_id: user.id,
+            option_id: optionId
+          });
+
+        if (error) throw error;
+        setUserVote(optionId);
+      }
+      
+      // Refresh poll votes
+      await fetchPollVotes();
+    } catch (error) {
+      console.error('Error voting:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit vote",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -66,24 +192,52 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
       {/* Post Content */}
       <div className="mb-3">
         <p className="text-foreground leading-relaxed">{post.content}</p>
+        
+        {/* Media/Embed Display */}
         {post.media_url && (
           <div className="mt-3 rounded-lg overflow-hidden">
-            <img src={post.media_url} alt="Post media" className="w-full h-auto" />
+            {post.media_url.includes('youtube.com') || post.media_url.includes('youtu.be') ? (
+              <div className="aspect-video">
+                <iframe
+                  src={post.media_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                  className="w-full h-full"
+                  frameBorder="0"
+                  allowFullScreen
+                  title="Video content"
+                />
+              </div>
+            ) : post.media_url.includes('embed') || post.media_url.includes('iframe') ? (
+              <div className="aspect-video">
+                <iframe
+                  src={post.media_url}
+                  className="w-full h-full"
+                  frameBorder="0"
+                  allowFullScreen
+                  title="Embedded content"
+                />
+              </div>
+            ) : (
+              <img src={post.media_url} alt="Post media" className="w-full h-auto" />
+            )}
           </div>
         )}
+        
+        {/* Poll Display */}
         {post.poll_data && (
           <div className="mt-3 space-y-2">
             <div className="space-y-2">
-              {post.poll_data.options.map((option) => {
-                const totalVotes = post.poll_data!.options.reduce((sum, opt) => sum + opt.votes, 0);
-                const percentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0;
+              {post.poll_data.options?.map((option: any) => {
+                const optionVotes = pollVotes.filter(v => v.option_id === option.id).length;
+                const totalVotes = pollVotes.length;
+                const percentage = totalVotes > 0 ? (optionVotes / totalVotes) * 100 : 0;
+                const isSelected = userVote === option.id;
                 
                 return (
                   <Button
                     key={option.id}
-                    variant="outline"
+                    variant={isSelected ? "default" : "outline"}
                     className="w-full justify-between h-auto p-3 relative overflow-hidden"
-                    onClick={() => console.log('Vote for:', option.text)}
+                    onClick={() => handlePollVote(option.id)}
                   >
                     <div 
                       className="absolute inset-0 bg-primary/10 transition-all"
@@ -91,11 +245,14 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
                     />
                     <span className="relative z-10">{option.text}</span>
                     <span className="relative z-10 text-sm text-muted-foreground">
-                      {option.votes} ({Math.round(percentage)}%)
+                      {optionVotes} ({Math.round(percentage)}%)
                     </span>
                   </Button>
                 );
               })}
+              <p className="text-xs text-muted-foreground text-center">
+                {pollVotes.length} total votes
+              </p>
             </div>
           </div>
         )}

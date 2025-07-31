@@ -6,6 +6,7 @@ interface Post {
   id: string;
   content: string;
   media_url?: string;
+  poll_data?: any;
   created_at: string;
   team: {
     id: string;
@@ -33,6 +34,7 @@ export const SpotlightFeed = () => {
           id,
           content,
           media_url,
+          poll_data,
           created_at,
           team:teams(id, name, logo_url),
           post_reactions(reaction_type)
