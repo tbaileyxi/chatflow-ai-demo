@@ -77,6 +77,11 @@ export const YourFeed = () => {
 
   const fetchPosts = async () => {
     try {
+      if (followedTeams.length === 0) {
+        setPosts([]);
+        return;
+      }
+
       const { data: posts, error } = await supabase
         .from("posts")
         .select(`
@@ -85,13 +90,15 @@ export const YourFeed = () => {
           media_url,
           poll_data,
           created_at,
+          target_audience,
           team:teams(id, name, logo_url),
           post_reactions(reaction_type)
         `)
         .in("team_id", followedTeams)
-        .eq("is_spotlight", false)
+        .contains("target_audience", ["team_feed"])
+        .eq("delivery_status", "sent")
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(15);
 
       if (error) throw error;
       setPosts(posts || []);

@@ -651,6 +651,17 @@ export const BroadcastCenter = () => {
               </div>
               <div className="flex items-center space-x-2">
                 <Checkbox
+                  id="team_feed"
+                  checked={targetAudience.includes('team_feed')}
+                  onCheckedChange={(checked) => 
+                    handleAudienceChange('team_feed', checked as boolean)
+                  }
+                />
+                <Label htmlFor="team_feed" className="font-medium">Followed Teams Feed</Label>
+                <span className="text-xs text-muted-foreground">(sends to users who follow this team)</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
                   id="team_agent"
                   checked={targetAudience.includes('team_agent')}
                   onCheckedChange={(checked) => 

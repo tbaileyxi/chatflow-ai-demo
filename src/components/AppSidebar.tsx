@@ -34,14 +34,28 @@ export function AppSidebar() {
       const { data } = await supabase
         .from('huddle_members')
         .select(`
-          huddle:huddles(id, name, member_count)
+          huddle:huddles(id, name, member_count),
+          last_read_at
         `)
         .eq('user_id', user?.id);
 
-      setHuddles(data?.map(item => ({
-        ...item.huddle,
-        unread_count: Math.floor(Math.random() * 5) // Mock unread count
-      })) || []);
+      // Get unread message counts for each huddle
+      const huddlesWithUnread = await Promise.all(
+        (data || []).map(async (item) => {
+          const { count } = await supabase
+            .from('huddle_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('huddle_id', item.huddle.id)
+            .gt('created_at', item.last_read_at || '1970-01-01');
+
+          return {
+            ...item.huddle,
+            unread_count: count || 0
+          };
+        })
+      );
+
+      setHuddles(huddlesWithUnread);
     } catch (error) {
       console.error('Error fetching huddles:', error);
     }
@@ -156,18 +170,18 @@ export function AppSidebar() {
                             </div>
                             {!isCollapsed && (
                               <div className="flex gap-1 items-center">
-                                <div className="flex items-center gap-1">
-                                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                  <span className="text-xs text-muted-foreground">{huddle.member_count}</span>
-                                </div>
-                                {huddle.unread_count > 0 && (
-                                  <div className="flex items-center gap-1">
-                                    <MessageSquare className="w-3 h-3 text-destructive" />
-                                    <Badge variant="destructive" className="text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full">
-                                      {huddle.unread_count}
-                                    </Badge>
-                                  </div>
-                                )}
+                               <div className="flex items-center gap-1">
+                                   <Users className="w-3 h-3 text-muted-foreground" />
+                                   <span className="text-xs text-muted-foreground">{huddle.member_count}</span>
+                                 </div>
+                                 {huddle.unread_count > 0 && (
+                                   <div className="flex items-center gap-1">
+                                     <MessageSquare className="w-3 h-3 text-destructive" />
+                                     <Badge variant="destructive" className="text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full">
+                                       {huddle.unread_count}
+                                     </Badge>
+                                   </div>
+                                 )}
                               </div>
                             )}
                           </button>

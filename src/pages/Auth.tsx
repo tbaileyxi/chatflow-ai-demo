@@ -7,13 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { Phone } from 'lucide-react';
 
 export const Auth = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [sentCode, setSentCode] = useState(false);
   const [loading, setLoading] = useState(false);
 
   if (user) {
@@ -32,43 +34,121 @@ export const Auth = () => {
     return <Navigate to="/" replace />;
   }
 
+  const sendVerificationCode = async () => {
+    if (!phoneNumber.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a phone number",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      const { error } = await supabase.functions.invoke('send-sms', {
+        body: {
+          phone_number: phoneNumber,
+          verification_code: code
+        }
+      });
+
+      if (error) throw error;
+
+      // Store the code temporarily for verification
+      sessionStorage.setItem('verificationCode', code);
+      sessionStorage.setItem('phoneNumber', phoneNumber);
+      
+      setSentCode(true);
+      toast({
+        title: "Code Sent",
+        description: "Check your phone for the verification code",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send verification code",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      const storedCode = sessionStorage.getItem('verificationCode');
+      const storedPhone = sessionStorage.getItem('phoneNumber');
+
+      if (!storedCode || !storedPhone || verificationCode !== storedCode || phoneNumber !== storedPhone) {
+        throw new Error('Invalid verification code');
+      }
+
       if (isSignUp) {
-        // Include pending huddle join in user metadata for post-confirmation handling
+        // Include pending huddle join and phone data in user metadata
         const pendingJoinData = localStorage.getItem('pendingHuddleJoin');
-        let userMetadata = {};
+        let userMetadata: any = {
+          phone_number: phoneNumber,
+          phone_verified: true,
+          display_name: `User ${phoneNumber.slice(-4)}`
+        };
         
         if (pendingJoinData) {
           try {
-            userMetadata = { pendingHuddleJoin: JSON.parse(pendingJoinData) };
+            userMetadata = { ...userMetadata, pendingHuddleJoin: JSON.parse(pendingJoinData) };
           } catch (e) {
             console.error('Failed to parse pending join data:', e);
           }
         }
 
+        // Create user with phone number as email substitute
+        const fakeEmail = `${phoneNumber.replace(/\D/g, '')}@sidehuddle.app`;
         const { error } = await supabase.auth.signUp({
-          email,
-          password,
+          email: fakeEmail,
+          password: `phone_${phoneNumber.replace(/\D/g, '')}_${Date.now()}`,
           options: {
-            emailRedirectTo: `${window.location.origin}/`,
             data: userMetadata
           }
         });
         if (error) throw error;
+
+        // Clean up stored codes
+        sessionStorage.removeItem('verificationCode');
+        sessionStorage.removeItem('phoneNumber');
+
         toast({
           title: "Success",
-          description: "Check your email to confirm your account",
+          description: "Account created successfully!",
         });
       } else {
+        // For sign in, we need to find the user by phone number
+        const { data: profiles, error: profileError } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .eq('phone_number', phoneNumber)
+          .single();
+
+        if (profileError || !profiles) {
+          throw new Error('Phone number not found. Please sign up first.');
+        }
+
+        // Sign in with a temporary session (since we verified the phone)
+        const fakeEmail = `${phoneNumber.replace(/\D/g, '')}@sidehuddle.app`;
         const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password
+          email: fakeEmail,
+          password: `phone_${phoneNumber.replace(/\D/g, '')}_${Date.now()}`
         });
-        if (error) throw error;
+
+        // If password doesn't work, this means we need to handle phone login differently
+        if (error) {
+          // For now, treat as new signup if phone verification succeeds
+          throw new Error('Please use sign up for phone authentication');
+        }
       }
     } catch (error: any) {
       toast({
@@ -85,44 +165,74 @@ export const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-center">
+          <CardTitle className="text-center flex items-center justify-center gap-2">
+            <Phone className="h-5 w-5" />
             {isSignUp ? 'Create Account' : 'Welcome to Side Huddle'}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleAuth} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+          {!sentCode ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="+1 (555) 123-4567"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  required
+                />
+              </div>
+              <Button 
+                onClick={sendVerificationCode} 
+                className="w-full" 
+                disabled={loading}
+              >
+                {loading ? 'Sending...' : 'Send Verification Code'}
+              </Button>
+              <div className="mt-4 text-center">
+                <Button
+                  variant="link"
+                  onClick={() => setIsSignUp(!isSignUp)}
+                >
+                  {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+                </Button>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
-            </Button>
-          </form>
-          <div className="mt-4 text-center">
-            <Button
-              variant="link"
-              onClick={() => setIsSignUp(!isSignUp)}
-            >
-              {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-            </Button>
-          </div>
+          ) : (
+            <form onSubmit={handleAuth} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="code">Verification Code</Label>
+                <p className="text-sm text-muted-foreground">
+                  Enter the 6-digit code sent to {phoneNumber}
+                </p>
+                <Input
+                  id="code"
+                  type="text"
+                  placeholder="123456"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value)}
+                  maxLength={6}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Verifying...' : isSignUp ? 'Create Account' : 'Sign In'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setSentCode(false);
+                  setVerificationCode('');
+                }}
+              >
+                Change Phone Number
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>

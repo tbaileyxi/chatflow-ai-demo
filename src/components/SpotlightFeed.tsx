@@ -61,8 +61,9 @@ export const SpotlightFeed = () => {
           post_reactions(reaction_type)
         `)
         .eq("is_spotlight", true)
+        .eq("delivery_status", "sent")
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (error) throw error;
       setPosts(posts || []);
@@ -73,7 +74,7 @@ export const SpotlightFeed = () => {
 
   const fetchAgentMessages = async () => {
     try {
-      // Get team agent messages from huddles
+      // Get team agent messages that are meant for spotlight (unique ones only)
       const { data: messages, error: messagesError } = await supabase
         .from('huddle_messages')
         .select(`
@@ -104,17 +105,27 @@ export const SpotlightFeed = () => {
           `)
           .in('id', huddleIds);
 
-        // Combine data
-        const enrichedMessages: AgentMessage[] = messages.map(message => {
-          const huddle = huddles?.find(h => h.id === message.huddle_id);
-          return {
-            ...message,
-            huddle_name: huddle?.name || 'Unknown Huddle',
-            team_name: huddle?.team?.name || 'Unknown Team',
-            is_agent: true,
-            is_team_agent_message: message.is_team_agent_message
-          };
-        });
+        // Combine data and deduplicate by content to avoid showing the same message multiple times
+        const seenContent = new Set();
+        const enrichedMessages: AgentMessage[] = messages
+          .map(message => {
+            const huddle = huddles?.find(h => h.id === message.huddle_id);
+            return {
+              ...message,
+              huddle_name: huddle?.name || 'Unknown Huddle',
+              team_name: huddle?.team?.name || 'Unknown Team',
+              is_agent: true,
+              is_team_agent_message: message.is_team_agent_message
+            };
+          })
+          .filter(message => {
+            const contentKey = `${message.content}-${message.team_name}`;
+            if (seenContent.has(contentKey)) {
+              return false;
+            }
+            seenContent.add(contentKey);
+            return true;
+          });
 
         setAgentMessages(enrichedMessages);
       }

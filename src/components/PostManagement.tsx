@@ -175,7 +175,18 @@ export function PostManagement() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Delete Post</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Are you sure you want to delete this post? This action cannot be undone.
+                          <div className="space-y-2">
+                            <p>Are you sure you want to delete this post? This action cannot be undone.</p>
+                            <div className="p-3 bg-muted rounded-lg">
+                              <p className="text-sm font-medium">Post Preview:</p>
+                              <p className="text-sm mt-1 line-clamp-3">{post.content}</p>
+                              <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                                <span>Created: {new Date(post.created_at).toLocaleDateString()}</span>
+                                <span>Type: {post.message_type}</span>
+                                <span>Status: {post.delivery_status}</span>
+                              </div>
+                            </div>
+                          </div>
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
