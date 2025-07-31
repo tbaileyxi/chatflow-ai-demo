@@ -15,7 +15,9 @@ import { MediaViewer } from '@/components/MediaViewer';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Send, Clock, Upload, Link, MessageSquare, BarChart3, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
+import { Send, Clock, Upload, Link, MessageSquare, BarChart3, CheckCircle, AlertCircle, Loader2, X, Calendar } from 'lucide-react';
+import { ScheduleDialog } from '@/components/ScheduleDialog';
+import { PostManagement } from '@/components/PostManagement';
 
 interface Team {
   id: string;
@@ -46,6 +48,8 @@ export const BroadcastCenter = () => {
   const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus[]>([]);
   const [showDeliveryStatus, setShowDeliveryStatus] = useState(false);
   const [embedPreview, setEmbedPreview] = useState('');
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
 
   useEffect(() => {
     fetchTeams();
@@ -371,6 +375,78 @@ export const BroadcastCenter = () => {
     }
   };
 
+  const handleScheduleBroadcast = async (scheduledAt: Date) => {
+    const validationError = validateForm();
+    if (validationError) {
+      toast({
+        title: "Validation Error",
+        description: validationError,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      let pollData = null;
+      if (messageType === 'poll') {
+        const validOptions = pollOptions.filter(option => option.trim());
+        pollData = {
+          question: content,
+          options: validOptions.map((option, index) => ({ 
+            id: index, 
+            text: option, 
+            votes: 0 
+          }))
+        };
+      }
+
+      const postData = {
+        content: content || (mediaType === 'image' ? 'Shared an image' : mediaType === 'video' ? 'Shared a video' : ''),
+        team_id: selectedTeam,
+        author_id: user.id,
+        message_type: messageType,
+        is_spotlight: targetAudience.includes('spotlight'),
+        is_agent_post: true,
+        poll_data: pollData,
+        media_url: messageType === 'upload' ? mediaUrl : null,
+        embed_code: messageType === 'embed' ? embedCode : null,
+        scheduled_at: scheduledAt.toISOString(),
+        delivery_status: 'scheduled',
+        target_audience: targetAudience
+      };
+
+      const { error } = await supabase
+        .from('posts')
+        .insert(postData);
+
+      if (error) throw error;
+
+      toast({
+        title: "Broadcast Scheduled",
+        description: `Message scheduled for ${scheduledAt.toLocaleString()}`,
+      });
+
+      // Reset form
+      setContent('');
+      setPollOptions(['', '']);
+      setEmbedCode('');
+      setMediaUrl('');
+      setMediaType(null);
+      setTargetAudience(['team_feed']);
+      
+    } catch (error: any) {
+      console.error('Error scheduling message:', error);
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to schedule message',
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -645,13 +721,24 @@ export const BroadcastCenter = () => {
                 </>
               )}
             </Button>
-            <Button variant="outline" disabled={loading} className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
+            <Button variant="outline" disabled={loading} className="flex items-center gap-2" onClick={() => setScheduleDialogOpen(true)}>
+              <Calendar className="w-4 h-4" />
               Schedule
             </Button>
           </div>
         </CardContent>
       </Card>
+      
+      {/* Post Management Section */}
+      <PostManagement />
+      
+      {/* Schedule Dialog */}
+      <ScheduleDialog
+        open={scheduleDialogOpen}
+        onOpenChange={setScheduleDialogOpen}
+        onSchedule={handleScheduleBroadcast}
+        loading={loading}
+      />
     </div>
   );
 };
