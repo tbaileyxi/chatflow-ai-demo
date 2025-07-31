@@ -112,7 +112,9 @@ export const Auth = () => {
         }
 
         // Create user with phone number as email substitute
-        const fakeEmail = `${phoneNumber.replace(/\D/g, '')}@sidehuddle.app`;
+        // Ensure email is valid format by using only the last 10 digits
+        const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+        const fakeEmail = `user${cleanPhone}@sidehuddle.app`;
         const { error } = await supabase.auth.signUp({
           email: fakeEmail,
           password: `phone_${phoneNumber.replace(/\D/g, '')}_verified`,
@@ -149,7 +151,8 @@ export const Auth = () => {
         }
 
         // Sign in with the consistent password format
-        const fakeEmail = `${phoneNumber.replace(/\D/g, '')}@sidehuddle.app`;
+        const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+        const fakeEmail = `user${cleanPhone}@sidehuddle.app`;
         const { error } = await supabase.auth.signInWithPassword({
           email: fakeEmail,
           password: `phone_${phoneNumber.replace(/\D/g, '')}_verified`
