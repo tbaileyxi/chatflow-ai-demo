@@ -115,9 +115,10 @@ export const Auth = () => {
         const fakeEmail = `${phoneNumber.replace(/\D/g, '')}@sidehuddle.app`;
         const { error } = await supabase.auth.signUp({
           email: fakeEmail,
-          password: `phone_${phoneNumber.replace(/\D/g, '')}_${Date.now()}`,
+          password: `phone_${phoneNumber.replace(/\D/g, '')}_verified`,
           options: {
-            data: userMetadata
+            data: userMetadata,
+            emailRedirectTo: `${window.location.origin}/`
           }
         });
         if (error) throw error;
@@ -131,29 +132,46 @@ export const Auth = () => {
           description: "Account created successfully!",
         });
       } else {
-        // For sign in, we need to find the user by phone number
-        const { data: profiles, error: profileError } = await supabase
+        // For sign in, check if profile exists, if not suggest signup
+        const { data: profiles } = await supabase
           .from('profiles')
           .select('user_id')
           .eq('phone_number', phoneNumber)
-          .single();
+          .maybeSingle();
 
-        if (profileError || !profiles) {
-          throw new Error('Phone number not found. Please sign up first.');
+        if (!profiles) {
+          toast({
+            title: "Phone not found",
+            description: "Please sign up first or switch to Sign Up mode",
+            variant: "destructive"
+          });
+          return;
         }
 
-        // Sign in with a temporary session (since we verified the phone)
+        // Sign in with the consistent password format
         const fakeEmail = `${phoneNumber.replace(/\D/g, '')}@sidehuddle.app`;
         const { error } = await supabase.auth.signInWithPassword({
           email: fakeEmail,
-          password: `phone_${phoneNumber.replace(/\D/g, '')}_${Date.now()}`
+          password: `phone_${phoneNumber.replace(/\D/g, '')}_verified`
         });
 
-        // If password doesn't work, this means we need to handle phone login differently
         if (error) {
-          // For now, treat as new signup if phone verification succeeds
-          throw new Error('Please use sign up for phone authentication');
+          toast({
+            title: "Sign in failed",
+            description: "Please try signing up instead",
+            variant: "destructive"
+          });
+          return;
         }
+
+        // Clean up stored codes
+        sessionStorage.removeItem('verificationCode');
+        sessionStorage.removeItem('phoneNumber');
+
+        toast({
+          title: "Success", 
+          description: "Signed in successfully!",
+        });
       }
     } catch (error: any) {
       toast({
