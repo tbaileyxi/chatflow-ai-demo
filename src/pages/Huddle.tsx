@@ -104,7 +104,7 @@ export const Huddle = () => {
           content,
           created_at,
           user_id,
-          profiles!inner(display_name, avatar_url)
+          profiles!fk_huddle_messages_user_id(display_name, avatar_url)
         `)
         .eq("huddle_id", id)
         .order("created_at", { ascending: true });
