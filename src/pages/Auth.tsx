@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import { Phone } from 'lucide-react';
 export const Auth = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isSignUp, setIsSignUp] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
@@ -118,6 +119,11 @@ export const Auth = () => {
           title: "Success",
           description: "Account created successfully!",
         });
+        
+        // Manual redirect after a short delay to allow auth state to update
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 1000);
       } else {
         // For sign in with phone
         const { error } = await supabase.auth.signInWithPassword({
@@ -142,6 +148,11 @@ export const Auth = () => {
           title: "Success", 
           description: "Signed in successfully!",
         });
+        
+        // Manual redirect after a short delay to allow auth state to update
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 1000);
       }
     } catch (error: any) {
       toast({
