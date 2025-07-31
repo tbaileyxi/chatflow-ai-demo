@@ -5,10 +5,11 @@ import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { BroadcastCenter } from '@/components/admin/BroadcastCenter';
 import { TeamManagement } from '@/components/admin/TeamManagement';
 import { UserManagement } from '@/components/admin/UserManagement';
+import { FirstAdminSetup } from '@/components/admin/FirstAdminSetup';
 import { BarChart3, Radio, Users, Shield } from 'lucide-react';
 
 export const Admin = () => {
-  const { isAdmin, loading } = useAuth();
+  const { isAdmin, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -18,8 +19,9 @@ export const Admin = () => {
     );
   }
 
-  if (!isAdmin) {
-    return <Navigate to="/" replace />;
+  // Allow access if user is logged in (for first admin setup)
+  if (!user) {
+    return <Navigate to="/auth" replace />;
   }
 
   return (
@@ -32,42 +34,46 @@ export const Admin = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6">
-        <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" />
-              Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="broadcast" className="flex items-center gap-2">
-              <Radio className="w-4 h-4" />
-              Broadcast
-            </TabsTrigger>
-            <TabsTrigger value="teams" className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              Teams
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-2">
-              <Shield className="w-4 h-4" />
-              Users
-            </TabsTrigger>
-          </TabsList>
+        {!isAdmin ? (
+          <FirstAdminSetup />
+        ) : (
+          <Tabs defaultValue="dashboard" className="space-y-6">
+            <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+              <TabsTrigger value="dashboard" className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="broadcast" className="flex items-center gap-2">
+                <Radio className="w-4 h-4" />
+                Broadcast
+              </TabsTrigger>
+              <TabsTrigger value="teams" className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Teams
+              </TabsTrigger>
+              <TabsTrigger value="users" className="flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                Users
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="dashboard">
-            <AdminDashboard />
-          </TabsContent>
+            <TabsContent value="dashboard">
+              <AdminDashboard />
+            </TabsContent>
 
-          <TabsContent value="broadcast">
-            <BroadcastCenter />
-          </TabsContent>
+            <TabsContent value="broadcast">
+              <BroadcastCenter />
+            </TabsContent>
 
-          <TabsContent value="teams">
-            <TeamManagement />
-          </TabsContent>
+            <TabsContent value="teams">
+              <TeamManagement />
+            </TabsContent>
 
-          <TabsContent value="users">
-            <UserManagement />
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="users">
+              <UserManagement />
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
     </div>
   );
