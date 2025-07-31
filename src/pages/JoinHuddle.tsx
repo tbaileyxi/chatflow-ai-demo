@@ -86,8 +86,13 @@ export const JoinHuddle = () => {
 
   const handleJoinHuddle = async () => {
     if (!user) {
-      // Store the intended huddle ID in localStorage for after login
-      localStorage.setItem('pendingHuddleJoin', huddleId!);
+      // Store comprehensive join data for post-authentication redirect
+      localStorage.setItem('pendingHuddleJoin', JSON.stringify({
+        huddleId: huddleId!,
+        huddleName: huddle?.name || 'Unknown Huddle',
+        teamName: huddle?.teams?.name || 'Unknown Team',
+        timestamp: Date.now()
+      }));
       toast({
         title: "Sign in required",
         description: "Redirecting to sign in page...",
@@ -122,6 +127,9 @@ export const JoinHuddle = () => {
 
       if (updateError) throw updateError;
 
+      // Clear any pending join data
+      localStorage.removeItem('pendingHuddleJoin');
+
       toast({
         title: "Welcome to the huddle!",
         description: `You've successfully joined ${huddle.name}`,
@@ -134,6 +142,7 @@ export const JoinHuddle = () => {
           title: "Already a member",
           description: "You're already a member of this huddle.",
         });
+        localStorage.removeItem('pendingHuddleJoin');
         navigate(`/huddle/${huddle.id}`);
       } else {
         toast({

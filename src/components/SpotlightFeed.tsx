@@ -4,6 +4,7 @@ import { PostCard } from "@/components/PostCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageSquare, Crown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { MediaViewer } from "@/components/MediaViewer";
 
 interface Post {
   id: string;
@@ -32,6 +33,7 @@ interface AgentMessage {
   huddle_name: string;
   team_name: string;
   is_agent: boolean;
+  is_team_agent_message?: boolean;
 }
 
 export const SpotlightFeed = () => {
@@ -71,67 +73,50 @@ export const SpotlightFeed = () => {
 
   const fetchAgentMessages = async () => {
     try {
-      // Get agent posts that were broadcast to huddles
-      const { data: agentPosts, error: postsError } = await supabase
-        .from("posts")
+      // Get team agent messages from huddles
+      const { data: messages, error: messagesError } = await supabase
+        .from('huddle_messages')
         .select(`
           id,
           content,
           media_url,
+          media_type,
           created_at,
-          team_id,
-          author_id
+          user_id,
+          huddle_id,
+          is_team_agent_message
         `)
-        .eq("is_agent_post", true)
-        .in("target_audience", [["side_huddles"]])
-        .order("created_at", { ascending: false })
+        .eq('is_team_agent_message', true)
+        .order('created_at', { ascending: false })
         .limit(10);
 
-      if (postsError) throw postsError;
+      if (messagesError) throw messagesError;
 
-      if (agentPosts && agentPosts.length > 0) {
-        // Get corresponding huddle messages
-        const { data: messages, error: messagesError } = await supabase
-          .from('huddle_messages')
+      if (messages && messages.length > 0) {
+        // Get huddle and team details
+        const huddleIds = [...new Set(messages.map(m => m.huddle_id))];
+        const { data: huddles } = await supabase
+          .from('huddles')
           .select(`
             id,
-            content,
-            media_url,
-            media_type,
-            created_at,
-            user_id,
-            huddle_id
+            name,
+            team:teams(name)
           `)
-          .in('user_id', [...new Set(agentPosts.map(p => p.author_id))])
-          .order('created_at', { ascending: false });
+          .in('id', huddleIds);
 
-        if (messagesError) throw messagesError;
+        // Combine data
+        const enrichedMessages: AgentMessage[] = messages.map(message => {
+          const huddle = huddles?.find(h => h.id === message.huddle_id);
+          return {
+            ...message,
+            huddle_name: huddle?.name || 'Unknown Huddle',
+            team_name: huddle?.team?.name || 'Unknown Team',
+            is_agent: true,
+            is_team_agent_message: message.is_team_agent_message
+          };
+        });
 
-        if (messages && messages.length > 0) {
-          // Get huddle and team details
-          const huddleIds = [...new Set(messages.map(m => m.huddle_id))];
-          const { data: huddles } = await supabase
-            .from('huddles')
-            .select(`
-              id,
-              name,
-              team:teams(name)
-            `)
-            .in('id', huddleIds);
-
-          // Combine data
-          const enrichedMessages: AgentMessage[] = messages.map(message => {
-            const huddle = huddles?.find(h => h.id === message.huddle_id);
-            return {
-              ...message,
-              huddle_name: huddle?.name || 'Unknown Huddle',
-              team_name: huddle?.team?.name || 'Unknown Team',
-              is_agent: true
-            };
-          });
-
-          setAgentMessages(enrichedMessages);
-        }
+        setAgentMessages(enrichedMessages);
       }
     } catch (error) {
       console.error("Error fetching agent messages:", error);
@@ -164,7 +149,9 @@ export const SpotlightFeed = () => {
           <Crown className="w-5 h-5 text-amber-500 mt-1" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className="font-medium text-sm text-amber-600">Official Message</span>
+              <span className="font-medium text-sm text-amber-600">
+                {message.is_team_agent_message ? 'TEAM AGENT' : 'Official Message'}
+              </span>
               <span className="text-xs text-muted-foreground">in</span>
               <span className="text-sm font-medium text-primary">{message.huddle_name}</span>
               <span className="text-xs text-muted-foreground">•</span>
@@ -172,8 +159,12 @@ export const SpotlightFeed = () => {
             </div>
             <p className="text-sm text-foreground/80 line-clamp-3">{message.content}</p>
             {message.media_url && (
-              <div className="text-xs text-muted-foreground mt-1">
-                {message.media_type === 'image' ? '📷 Image' : '🎥 Video'}
+              <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                <MediaViewer
+                  mediaUrl={message.media_url}
+                  mediaType={message.media_type === 'video' ? 'video' : 'image'}
+                  className="max-w-md rounded-lg"
+                />
               </div>
             )}
             <span className="text-xs text-muted-foreground">

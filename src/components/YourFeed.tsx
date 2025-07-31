@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageSquare, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { MediaViewer } from "@/components/MediaViewer";
 
 interface Post {
   id: string;
@@ -35,6 +36,7 @@ interface HuddleMessage {
   display_name?: string;
   username?: string;
   avatar_url?: string;
+  is_team_agent_message?: boolean;
 }
 
 export const YourFeed = () => {
@@ -127,7 +129,8 @@ export const YourFeed = () => {
           media_type,
           created_at,
           user_id,
-          huddle_id
+          huddle_id,
+          is_team_agent_message
         `)
         .in('huddle_id', huddleIds)
         .order('created_at', { ascending: false })
@@ -161,7 +164,7 @@ export const YourFeed = () => {
             ...message,
             huddle_name: huddle?.name || 'Unknown Huddle',
             team_name: huddle?.team?.name || 'Unknown Team',
-            display_name: profile?.display_name,
+            display_name: message.is_team_agent_message ? 'TEAM AGENT' : profile?.display_name,
             username: profile?.username,
             avatar_url: profile?.avatar_url
           };
@@ -215,8 +218,12 @@ export const YourFeed = () => {
             </div>
             <p className="text-sm text-foreground/80 line-clamp-2">{message.content}</p>
             {message.media_url && (
-              <div className="text-xs text-muted-foreground mt-1">
-                {message.media_type === 'image' ? '📷 Image' : '🎥 Video'}
+              <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                <MediaViewer
+                  mediaUrl={message.media_url}
+                  mediaType={message.media_type === 'video' ? 'video' : 'image'}
+                  className="max-w-xs rounded-lg"
+                />
               </div>
             )}
             <span className="text-xs text-muted-foreground">

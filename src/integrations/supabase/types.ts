@@ -52,6 +52,7 @@ export type Database = {
           created_at: string
           huddle_id: string
           id: string
+          is_team_agent_message: boolean | null
           media_type: string | null
           media_url: string | null
           user_id: string
@@ -61,6 +62,7 @@ export type Database = {
           created_at?: string
           huddle_id: string
           id?: string
+          is_team_agent_message?: boolean | null
           media_type?: string | null
           media_url?: string | null
           user_id: string
@@ -70,6 +72,7 @@ export type Database = {
           created_at?: string
           huddle_id?: string
           id?: string
+          is_team_agent_message?: boolean | null
           media_type?: string | null
           media_url?: string | null
           user_id?: string
@@ -187,6 +190,7 @@ export type Database = {
           id: string
           is_agent_post: boolean | null
           is_spotlight: boolean | null
+          is_team_agent_message: boolean | null
           media_url: string | null
           message_type: string | null
           poll_data: Json | null
@@ -205,6 +209,7 @@ export type Database = {
           id?: string
           is_agent_post?: boolean | null
           is_spotlight?: boolean | null
+          is_team_agent_message?: boolean | null
           media_url?: string | null
           message_type?: string | null
           poll_data?: Json | null
@@ -223,6 +228,7 @@ export type Database = {
           id?: string
           is_agent_post?: boolean | null
           is_spotlight?: boolean | null
+          is_team_agent_message?: boolean | null
           media_url?: string | null
           message_type?: string | null
           poll_data?: Json | null

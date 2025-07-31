@@ -38,7 +38,6 @@ export const BroadcastCenter = () => {
   const [messageType, setMessageType] = useState('text');
   const [content, setContent] = useState('');
   const [targetAudience, setTargetAudience] = useState<string[]>(['team_feed']);
-  const [isSpotlight, setIsSpotlight] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [embedCode, setEmbedCode] = useState('');
@@ -260,7 +259,7 @@ export const BroadcastCenter = () => {
         team_id: selectedTeam,
         author_id: user.id,
         message_type: messageType,
-        is_spotlight: isSpotlight,
+        is_spotlight: targetAudience.includes('spotlight'),
         is_agent_post: true,
         poll_data: pollData,
         media_url: messageType === 'upload' ? mediaUrl : null,
@@ -328,7 +327,7 @@ export const BroadcastCenter = () => {
         setEmbedCode('');
         setMediaUrl('');
         setMediaType(null);
-        setIsSpotlight(false);
+        
         setTargetAudience(['team_feed']);
       } else {
         toast({
@@ -550,15 +549,6 @@ export const BroadcastCenter = () => {
             </div>
           </div>
 
-          {/* Spotlight Toggle */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="spotlight-toggle"
-              checked={isSpotlight}
-              onCheckedChange={(checked) => setIsSpotlight(checked as boolean)}
-            />
-            <Label htmlFor="spotlight-toggle">Add to Spotlight Feed</Label>
-          </div>
 
           {/* Delivery Status */}
           {showDeliveryStatus && deliveryStatus.length > 0 && (
