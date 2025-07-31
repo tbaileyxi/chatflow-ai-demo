@@ -7,17 +7,27 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { FileUpload } from '@/components/FileUpload';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { MediaUpload } from '@/components/MediaUpload';
+import { MediaViewer } from '@/components/MediaViewer';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Send, Clock, Upload, Link, MessageSquare, BarChart3 } from 'lucide-react';
+import { Send, Clock, Upload, Link, MessageSquare, BarChart3, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
 
 interface Team {
   id: string;
   name: string;
   city: string;
   league: string;
+}
+
+interface DeliveryStatus {
+  channel: string;
+  status: 'pending' | 'delivered' | 'failed';
+  error?: string;
 }
 
 export const BroadcastCenter = () => {
@@ -31,12 +41,25 @@ export const BroadcastCenter = () => {
   const [isSpotlight, setIsSpotlight] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pollOptions, setPollOptions] = useState(['', '']);
-  const [embedUrl, setEmbedUrl] = useState('');
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [embedCode, setEmbedCode] = useState('');
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
+  const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus[]>([]);
+  const [showDeliveryStatus, setShowDeliveryStatus] = useState(false);
+  const [embedPreview, setEmbedPreview] = useState('');
 
   useEffect(() => {
     fetchTeams();
   }, []);
+
+  // Generate embed preview when embed code changes
+  useEffect(() => {
+    if (embedCode.trim()) {
+      generateEmbedPreview(embedCode);
+    } else {
+      setEmbedPreview('');
+    }
+  }, [embedCode]);
 
   const fetchTeams = async () => {
     try {
@@ -55,6 +78,30 @@ export const BroadcastCenter = () => {
         description: "Failed to load teams",
         variant: "destructive"
       });
+    }
+  };
+
+  const generateEmbedPreview = (code: string) => {
+    // Extract common embed patterns
+    if (code.includes('twitter.com') || code.includes('x.com')) {
+      const urlMatch = code.match(/https?:\/\/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/);
+      if (urlMatch) {
+        setEmbedPreview(`Twitter post: ${urlMatch[0]}`);
+      }
+    } else if (code.includes('youtube.com') || code.includes('youtu.be')) {
+      const urlMatch = code.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
+      if (urlMatch) {
+        setEmbedPreview(`YouTube video: ${urlMatch[0]}`);
+      }
+    } else if (code.includes('instagram.com')) {
+      const urlMatch = code.match(/https?:\/\/(?:www\.)?instagram\.com\/p\/[^\/]+/);
+      if (urlMatch) {
+        setEmbedPreview(`Instagram post: ${urlMatch[0]}`);
+      }
+    } else if (code.includes('<iframe')) {
+      setEmbedPreview('Custom embed code detected');
+    } else {
+      setEmbedPreview('');
     }
   };
 
@@ -80,49 +127,105 @@ export const BroadcastCenter = () => {
     }
   };
 
-  const handleSendMessage = async () => {
-    // Validation
-    if (!content.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter message content",
-        variant: "destructive"
-      });
-      return;
+  const handleMediaSelected = (url: string, type: 'image' | 'video') => {
+    setMediaUrl(url);
+    setMediaType(type);
+  };
+
+  const clearMedia = () => {
+    setMediaUrl('');
+    setMediaType(null);
+  };
+
+  const validateForm = (): string | null => {
+    if (!content.trim() && !mediaUrl && messageType !== 'upload') {
+      return 'Please enter message content or upload media';
     }
 
     if (!selectedTeam) {
-      toast({
-        title: "Validation Error",
-        description: "Please select a team",
-        variant: "destructive"
-      });
-      return;
+      return 'Please select a team';
     }
 
     if (!user?.id) {
+      return 'You must be logged in to send messages';
+    }
+
+    if (messageType === 'poll') {
+      const validOptions = pollOptions.filter(option => option.trim());
+      if (validOptions.length < 2) {
+        return 'Poll must have at least 2 options';
+      }
+    }
+
+    if (messageType === 'embed' && !embedCode.trim()) {
+      return 'Please enter embed code';
+    }
+
+    if (messageType === 'upload' && !mediaUrl) {
+      return 'Please upload a file';
+    }
+
+    if (targetAudience.length === 0) {
+      return 'Please select at least one target audience';
+    }
+
+    return null;
+  };
+
+  const broadcastToHuddles = async (postData: any) => {
+    try {
+      // Get all huddles for the selected team
+      const { data: huddles, error: huddlesError } = await supabase
+        .from('huddles')
+        .select('id, name')
+        .eq('team_id', selectedTeam);
+
+      if (huddlesError) throw huddlesError;
+
+      // Check if side_huddles is in target audience
+      if (targetAudience.includes('side_huddles') && huddles?.length) {
+        // Insert post with huddle_id for each huddle
+        for (const huddle of huddles) {
+          const { error: huddlePostError } = await supabase
+            .from('posts')
+            .insert({
+              ...postData,
+              huddle_id: huddle.id,
+              target_audience: ['side_huddles']
+            });
+
+          if (huddlePostError) {
+            console.error(`Failed to broadcast to huddle ${huddle.name}:`, huddlePostError);
+            return { success: false, error: `Failed to broadcast to huddle: ${huddle.name}` };
+          }
+        }
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  };
+
+  const handleSendMessage = async () => {
+    const validationError = validateForm();
+    if (validationError) {
       toast({
-        title: "Authentication Error",
-        description: "You must be logged in to send messages",
+        title: "Validation Error",
+        description: validationError,
         variant: "destructive"
       });
       return;
     }
 
     setLoading(true);
+    setDeliveryStatus([]);
+    setShowDeliveryStatus(true);
+
     try {
       let pollData = null;
       if (messageType === 'poll') {
         const validOptions = pollOptions.filter(option => option.trim());
-        if (validOptions.length < 2) {
-          toast({
-            title: "Validation Error",
-            description: "Poll must have at least 2 options",
-            variant: "destructive"
-          });
-          setLoading(false);
-          return;
-        }
         pollData = {
           question: content,
           options: validOptions.map((option, index) => ({ 
@@ -133,44 +236,94 @@ export const BroadcastCenter = () => {
         };
       }
 
-      const postData = {
-        content,
+      const basePostData = {
+        content: content || (mediaType === 'image' ? 'Shared an image' : mediaType === 'video' ? 'Shared a video' : ''),
         team_id: selectedTeam,
         author_id: user.id,
         message_type: messageType,
-        target_audience: targetAudience,
         is_spotlight: isSpotlight,
         is_agent_post: true,
         poll_data: pollData,
-        media_url: messageType === 'embed' && embedUrl.trim() ? embedUrl : null
+        media_url: messageType === 'upload' ? mediaUrl : null,
+        embed_code: messageType === 'embed' ? embedCode : null
       };
 
-      const { error } = await supabase
-        .from('posts')
-        .insert(postData);
+      const deliveryResults: DeliveryStatus[] = [];
 
-      if (error) {
-        throw new Error(`Database error: ${error.message}`);
+      // Handle different target audiences
+      for (const audience of targetAudience) {
+        try {
+          if (audience === 'side_huddles') {
+            const huddleResult = await broadcastToHuddles(basePostData);
+            deliveryResults.push({
+              channel: 'Side Huddles',
+              status: huddleResult.success ? 'delivered' : 'failed',
+              error: huddleResult.error
+            });
+          } else {
+            // Regular post to main feeds
+            const postData = {
+              ...basePostData,
+              target_audience: [audience]
+            };
+
+            const { error } = await supabase
+              .from('posts')
+              .insert(postData);
+
+            if (error) throw error;
+
+            deliveryResults.push({
+              channel: audience === 'team_feed' ? 'Team Feed' : 
+                       audience === 'team_agent' ? 'Team Agent' : 
+                       audience === 'spotlight' ? 'Spotlight' : audience,
+              status: 'delivered'
+            });
+          }
+        } catch (error: any) {
+          deliveryResults.push({
+            channel: audience === 'team_feed' ? 'Team Feed' : 
+                     audience === 'team_agent' ? 'Team Agent' : 
+                     audience === 'spotlight' ? 'Spotlight' : 
+                     audience === 'side_huddles' ? 'Side Huddles' : audience,
+            status: 'failed',
+            error: error.message
+          });
+        }
       }
 
-      toast({
-        title: "Success",
-        description: "Message sent successfully!",
-      });
+      setDeliveryStatus(deliveryResults);
 
-      // Reset form
-      setContent('');
-      setPollOptions(['', '']);
-      setEmbedUrl('');
-      setSelectedFiles([]);
-      setIsSpotlight(false);
-      setTargetAudience(['team_feed']);
-    } catch (error) {
+      const successCount = deliveryResults.filter(r => r.status === 'delivered').length;
+      const failureCount = deliveryResults.filter(r => r.status === 'failed').length;
+
+      if (successCount > 0) {
+        toast({
+          title: "Broadcast Complete",
+          description: `Successfully delivered to ${successCount} channel${successCount > 1 ? 's' : ''}${failureCount > 0 ? `, ${failureCount} failed` : ''}`,
+        });
+
+        // Reset form on success
+        setContent('');
+        setPollOptions(['', '']);
+        setEmbedCode('');
+        setMediaUrl('');
+        setMediaType(null);
+        setIsSpotlight(false);
+        setTargetAudience(['team_feed']);
+      } else {
+        toast({
+          title: "Broadcast Failed",
+          description: "Failed to deliver to any channels",
+          variant: "destructive"
+        });
+      }
+
+    } catch (error: any) {
       console.error('Error sending message:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
       toast({
         title: "Error",
-        description: errorMessage,
+        description: error.message || 'Failed to send message',
         variant: "destructive"
       });
     } finally {
@@ -245,18 +398,24 @@ export const BroadcastCenter = () => {
           </div>
 
           {/* Content Input */}
-          <div className="space-y-2">
-            <Label htmlFor="content">
-              {messageType === 'poll' ? 'Poll Question' : 'Message Content'}
-            </Label>
-            <Textarea
-              id="content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder={messageType === 'poll' ? 'What would you like to ask?' : 'Enter your message...'}
-              rows={4}
-            />
-          </div>
+          {messageType !== 'upload' && (
+            <div className="space-y-2">
+              <Label htmlFor="content">
+                {messageType === 'poll' ? 'Poll Question' : 'Message Content'}
+              </Label>
+              <Textarea
+                id="content"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder={
+                  messageType === 'poll' ? 'What would you like to ask?' : 
+                  messageType === 'embed' ? 'Optional caption for your embed...' :
+                  'Enter your message...'
+                }
+                rows={4}
+              />
+            </div>
+          )}
 
           {/* Poll Options */}
           {messageType === 'poll' && (
@@ -276,7 +435,7 @@ export const BroadcastCenter = () => {
                         onClick={() => removePollOption(index)}
                         size="sm"
                       >
-                        Remove
+                        <X className="w-4 h-4" />
                       </Button>
                     )}
                   </div>
@@ -288,28 +447,61 @@ export const BroadcastCenter = () => {
             </div>
           )}
 
-          {/* Embed URL */}
+          {/* Embed Code */}
           {messageType === 'embed' && (
-            <div className="space-y-2">
-              <Label htmlFor="embed-url">X/Twitter Post URL</Label>
-              <Input
-                id="embed-url"
-                value={embedUrl}
-                onChange={(e) => setEmbedUrl(e.target.value)}
-                placeholder="https://x.com/user/status/123456789"
+            <div className="space-y-3">
+              <Label htmlFor="embed-code">Embed Code</Label>
+              <Textarea
+                id="embed-code"
+                value={embedCode}
+                onChange={(e) => setEmbedCode(e.target.value)}
+                placeholder="Paste Twitter embed code, YouTube embed, Instagram embed, or custom HTML..."
+                rows={6}
               />
+              {embedPreview && (
+                <Alert>
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Preview: {embedPreview}
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
           )}
 
           {/* Upload Section */}
           {messageType === 'upload' && (
-            <div className="space-y-2">
-              <Label>File Upload</Label>
-              <FileUpload 
-                onFilesSelected={setSelectedFiles}
-                multiple={false}
-                maxSize={25}
-              />
+            <div className="space-y-3">
+              <Label>Media Upload</Label>
+              {mediaUrl ? (
+                <div className="space-y-3">
+                  <MediaViewer
+                    mediaUrl={mediaUrl}
+                    mediaType={mediaType!}
+                    className="max-w-md"
+                    showLightbox={false}
+                  />
+                  <div className="flex gap-2">
+                    <Badge variant="secondary">
+                      {mediaType === 'image' ? 'Image' : 'Video'} uploaded
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearMedia}
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <MediaUpload
+                  onMediaSelected={handleMediaSelected}
+                  bucket="broadcast-media"
+                  showPreview={false}
+                />
+              )}
             </div>
           )}
 
@@ -342,12 +534,37 @@ export const BroadcastCenter = () => {
           {/* Spotlight Toggle */}
           <div className="flex items-center space-x-2">
             <Checkbox
-              id="spotlight"
+              id="spotlight-toggle"
               checked={isSpotlight}
               onCheckedChange={(checked) => setIsSpotlight(checked as boolean)}
             />
-            <Label htmlFor="spotlight">Add to Spotlight Feed</Label>
+            <Label htmlFor="spotlight-toggle">Add to Spotlight Feed</Label>
           </div>
+
+          {/* Delivery Status */}
+          {showDeliveryStatus && deliveryStatus.length > 0 && (
+            <Alert>
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="space-y-2">
+                  <div className="font-medium">Delivery Status:</div>
+                  {deliveryStatus.map((status, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      {status.status === 'delivered' ? (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                      )}
+                      <span className="text-sm">
+                        {status.channel}: {status.status}
+                        {status.error && ` - ${status.error}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Separator />
 
@@ -356,17 +573,17 @@ export const BroadcastCenter = () => {
             <Button 
               onClick={handleSendMessage} 
               disabled={loading}
-              className="bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="flex items-center gap-2"
             >
               {loading ? (
                 <>
-                  <div className="w-4 h-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                  Sending...
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Broadcasting...
                 </>
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  Send Now
+                  Broadcast Now
                 </>
               )}
             </Button>

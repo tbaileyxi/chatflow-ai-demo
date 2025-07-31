@@ -6,8 +6,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Send, Users } from "lucide-react";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Send, Users, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { MediaUpload } from "@/components/MediaUpload";
+import { MediaViewer } from "@/components/MediaViewer";
+import { InviteButton } from "@/components/InviteButton";
 
 interface HuddleData {
   id: string;
@@ -25,6 +29,8 @@ interface Message {
   content: string;
   created_at: string;
   user_id: string;
+  media_url?: string;
+  media_type?: string;
   profiles?: {
     display_name?: string;
     avatar_url?: string;
@@ -103,7 +109,9 @@ export const Huddle = () => {
           id,
           content,
           created_at,
-          user_id
+          user_id,
+          media_url,
+          media_type
         `)
         .eq("huddle_id", id)
         .order("created_at", { ascending: true });
@@ -142,6 +150,33 @@ export const Huddle = () => {
     }
   };
 
+  const sendMediaMessage = async (mediaUrl: string, mediaType: 'image' | 'video') => {
+    if (!user?.id) return;
+
+    try {
+      const { error } = await supabase
+        .from("huddle_messages")
+        .insert({
+          huddle_id: id,
+          user_id: user.id,
+          content: mediaType === 'image' ? 'Shared an image' : 'Shared a video',
+          media_url: mediaUrl,
+          media_type: mediaType
+        });
+
+      if (error) throw error;
+      
+      fetchMessages(); // Refresh messages
+    } catch (error) {
+      console.error("Error sending media:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send media",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -165,23 +200,26 @@ export const Huddle = () => {
     <div className="flex flex-col h-full">
       {/* Huddle Header */}
       <div className="p-4 border-b bg-card">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-            {huddle.team.logo_url ? (
-              <img src={huddle.team.logo_url} alt={huddle.team.name} className="w-8 h-8 rounded-full" />
-            ) : (
-              <span className="text-primary font-bold text-sm">
-                {huddle.team.name.substring(0, 2).toUpperCase()}
-              </span>
-            )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+              {huddle.team.logo_url ? (
+                <img src={huddle.team.logo_url} alt={huddle.team.name} className="w-8 h-8 rounded-full" />
+              ) : (
+                <span className="text-primary font-bold text-sm">
+                  {huddle.team.name.substring(0, 2).toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div>
+              <h2 className="font-bold text-lg">{huddle.name}</h2>
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <Users className="w-4 h-4" />
+                {huddle.team.name} Side Huddle
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="font-bold text-lg">{huddle.name}</h2>
-            <p className="text-sm text-muted-foreground flex items-center gap-1">
-              <Users className="w-4 h-4" />
-              {huddle.team.name} Side Huddle
-            </p>
-          </div>
+          <InviteButton huddleId={huddle.id} />
         </div>
       </div>
 
@@ -210,6 +248,15 @@ export const Huddle = () => {
                   </span>
                 </div>
                 <p className="text-sm">{message.content}</p>
+                {message.media_url && message.media_type && (
+                  <div className="mt-2">
+                    <MediaViewer
+                      mediaUrl={message.media_url}
+                      mediaType={message.media_type as 'image' | 'video'}
+                      className="max-w-xs"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           ))
@@ -218,13 +265,27 @@ export const Huddle = () => {
 
       {/* Message Input */}
       <Card className="m-4 p-3 border-0 border-t border-border rounded-none">
-        <form onSubmit={sendMessage} className="flex gap-2">
+        <form onSubmit={sendMessage} className="flex gap-2 mb-2">
           <Input
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Type a message..."
             className="flex-1"
           />
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button type="button" variant="outline" size="icon">
+                <Plus className="w-4 h-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="w-full max-w-md">
+              <MediaUpload
+                onMediaSelected={sendMediaMessage}
+                bucket="chat-media"
+                showPreview={true}
+              />
+            </DialogContent>
+          </Dialog>
           <Button type="submit" disabled={!newMessage.trim()}>
             <Send className="w-4 h-4" />
           </Button>
