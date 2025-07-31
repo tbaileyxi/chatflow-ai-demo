@@ -10,6 +10,7 @@ import { Admin } from "./pages/Admin";
 import { Auth } from "./pages/Auth";
 import { TeamDirectory } from "./pages/TeamDirectory";
 import { Huddle } from "./pages/Huddle";
+import { JoinHuddle } from "./pages/JoinHuddle";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/teams" element={<TeamDirectory />} />
                 <Route path="/huddle/:id" element={<Huddle />} />
+                <Route path="/join-huddle/:huddleId" element={<JoinHuddle />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </div>

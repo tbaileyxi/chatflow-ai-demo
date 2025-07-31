@@ -6,12 +6,15 @@ import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { MediaViewer } from "@/components/MediaViewer";
 
 interface PostCardProps {
   post: {
     id: string;
     content: string;
     media_url?: string;
+    embed_code?: string;
+    message_type?: string;
     poll_data?: any;
     created_at: string;
     team: {
@@ -193,11 +196,34 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
       <div className="mb-3">
         <p className="text-foreground leading-relaxed">{post.content}</p>
         
-        {/* Media/Embed Display */}
-        {post.media_url && (
+        {/* Embed Code Display */}
+        {post.embed_code && (
           <div className="mt-3 rounded-lg overflow-hidden">
-            {/* Handle YouTube URLs */}
-            {(post.media_url.includes('youtube.com') || post.media_url.includes('youtu.be')) ? (
+            <div dangerouslySetInnerHTML={{ __html: post.embed_code }} />
+          </div>
+        )}
+
+        {/* Media Display */}
+        {post.media_url && !post.embed_code && (
+          <div className="mt-3 rounded-lg overflow-hidden">
+            {/* Check if it's a direct media file for MediaViewer */}
+            {(post.media_url.includes('.jpg') || post.media_url.includes('.jpeg') || 
+              post.media_url.includes('.png') || post.media_url.includes('.gif') || 
+              post.media_url.includes('.webp')) ? (
+              <MediaViewer
+                mediaUrl={post.media_url}
+                mediaType="image"
+                className="w-full"
+              />
+            ) : (post.media_url.includes('.mp4') || post.media_url.includes('.webm') || 
+                   post.media_url.includes('.ogg') || post.media_url.includes('.mov')) ? (
+              <MediaViewer
+                mediaUrl={post.media_url}
+                mediaType="video"
+                className="w-full"
+              />
+            ) : /* Handle YouTube URLs */
+            (post.media_url.includes('youtube.com') || post.media_url.includes('youtu.be')) ? (
               <div className="aspect-video">
                 <iframe
                   src={post.media_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
@@ -207,12 +233,7 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
                   title="Video content"
                 />
               </div>
-            ) : /* Handle embed codes (iframe/script tags) */
-            post.media_url.includes('<iframe') || post.media_url.includes('<script') ? (
-              <div className="aspect-video">
-                <div dangerouslySetInnerHTML={{ __html: post.media_url }} />
-              </div>
-            ) : /* Handle direct embed URLs */
+            ) : /* Handle embed URLs */
             post.media_url.includes('embed') || post.media_url.includes('iframe') ? (
               <div className="aspect-video">
                 <iframe
@@ -223,16 +244,7 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
                   title="Embedded content"
                 />
               </div>
-            ) : /* Handle video files */
-            (post.media_url.includes('.mp4') || post.media_url.includes('.webm') || post.media_url.includes('.ogg')) ? (
-              <video controls className="w-full h-auto">
-                <source src={post.media_url} type="video/mp4" />
-                Your browser does not support the video tag.
-              </video>
-            ) : /* Handle images */
-            (post.media_url.includes('.jpg') || post.media_url.includes('.jpeg') || post.media_url.includes('.png') || post.media_url.includes('.gif') || post.media_url.includes('.webp')) ? (
-              <img src={post.media_url} alt="Post media" className="w-full h-auto" />
-            ) : /* Fallback for other URLs - try as image first, then iframe */
+            ) : /* Fallback - try as image first, then iframe */
             (
               <div>
                 <img 
