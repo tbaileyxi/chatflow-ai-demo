@@ -95,34 +95,19 @@ export const Auth = () => {
       }
 
       if (isSignUp) {
-        // Include pending huddle join and phone data in user metadata
-        const pendingJoinData = localStorage.getItem('pendingHuddleJoin');
-        let userMetadata: any = {
-          phone_number: phoneNumber,
-          phone_verified: true,
-          display_name: `User ${phoneNumber.slice(-4)}`
-        };
-        
-        if (pendingJoinData) {
-          try {
-            userMetadata = { ...userMetadata, pendingHuddleJoin: JSON.parse(pendingJoinData) };
-          } catch (e) {
-            console.error('Failed to parse pending join data:', e);
-          }
-        }
-
-        // Create user with phone number as email substitute
-        // Ensure email is valid format by using only the last 10 digits
-        const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
-        const fakeEmail = `user${cleanPhone}@sidehuddle.app`;
+        // Use Supabase's native phone authentication
         const { error } = await supabase.auth.signUp({
-          email: fakeEmail,
-          password: `phone_${phoneNumber.replace(/\D/g, '')}_verified`,
+          phone: phoneNumber,
+          password: verificationCode, // Use the verification code as password
           options: {
-            data: userMetadata,
-            emailRedirectTo: `${window.location.origin}/`
+            data: {
+              phone_number: phoneNumber,
+              phone_verified: true,
+              display_name: `User ${phoneNumber.slice(-4)}`
+            }
           }
         });
+        
         if (error) throw error;
 
         // Clean up stored codes
@@ -134,33 +119,15 @@ export const Auth = () => {
           description: "Account created successfully!",
         });
       } else {
-        // For sign in, check if profile exists, if not suggest signup
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('user_id')
-          .eq('phone_number', phoneNumber)
-          .maybeSingle();
-
-        if (!profiles) {
-          toast({
-            title: "Phone not found",
-            description: "Please sign up first or switch to Sign Up mode",
-            variant: "destructive"
-          });
-          return;
-        }
-
-        // Sign in with the consistent password format
-        const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
-        const fakeEmail = `user${cleanPhone}@sidehuddle.app`;
+        // For sign in with phone
         const { error } = await supabase.auth.signInWithPassword({
-          email: fakeEmail,
-          password: `phone_${phoneNumber.replace(/\D/g, '')}_verified`
+          phone: phoneNumber,
+          password: verificationCode
         });
 
         if (error) {
           toast({
-            title: "Sign in failed",
+            title: "Sign in failed", 
             description: "Please try signing up instead",
             variant: "destructive"
           });
