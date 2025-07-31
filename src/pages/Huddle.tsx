@@ -54,9 +54,9 @@ export const Huddle = () => {
       fetchHuddle();
       fetchMessages();
       
-      // Set up real-time subscription for messages
+      // Set up real-time subscription for messages with better performance
       const channel = supabase
-        .channel('huddle-messages')
+        .channel(`huddle-messages-${id}`)
         .on(
           'postgres_changes',
           {
@@ -65,8 +65,9 @@ export const Huddle = () => {
             table: 'huddle_messages',
             filter: `huddle_id=eq.${id}`
           },
-          () => {
-            fetchMessages(); // Refresh messages when new one is added
+          (payload) => {
+            // Add new message directly instead of refetching all
+            addNewMessage(payload.new as any);
           }
         )
         .subscribe();
@@ -76,6 +77,22 @@ export const Huddle = () => {
       };
     }
   }, [id]);
+
+  const addNewMessage = async (newMessageData: any) => {
+    // Fetch profile for the new message if not already available
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("user_id, display_name, username, avatar_url")
+      .eq("user_id", newMessageData.user_id)
+      .single();
+
+    const messageWithProfile = {
+      ...newMessageData,
+      profiles: profileData
+    };
+
+    setMessages(prev => [...prev, messageWithProfile]);
+  };
 
   const fetchHuddle = async () => {
     try {
@@ -162,7 +179,7 @@ export const Huddle = () => {
       if (error) throw error;
       
       setNewMessage("");
-      fetchMessages(); // Refresh messages
+      // No need to fetch messages - real-time will handle it
     } catch (error) {
       console.error("Error sending message:", error);
       toast({
@@ -189,7 +206,7 @@ export const Huddle = () => {
 
       if (error) throw error;
       
-      fetchMessages(); // Refresh messages
+      // No need to fetch messages - real-time will handle it
     } catch (error) {
       console.error("Error sending media:", error);
       toast({
@@ -258,37 +275,50 @@ export const Huddle = () => {
             <p className="text-muted-foreground">No messages yet. Start the conversation!</p>
           </div>
         ) : (
-          messages.map((message) => (
-            <div key={message.id} className="flex gap-3">
-              <Avatar className="w-8 h-8">
-                <AvatarImage src={message.profiles?.avatar_url} />
-                <AvatarFallback>
-                  {(message.profiles?.display_name || message.profiles?.username) ? 
-                    (message.profiles.display_name || message.profiles.username)!.substring(0, 2).toUpperCase() : 'U'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                 <div className="flex items-center gap-2 mb-1">
-                   <span className="font-medium text-sm">
-                     {message.is_team_agent_message ? 'TEAM AGENT' : (message.profiles?.display_name || message.profiles?.username || 'Anonymous')}
-                   </span>
-                   <span className="text-xs text-muted-foreground">
-                     {new Date(message.created_at).toLocaleTimeString()}
-                   </span>
-                 </div>
-                <p className="text-sm">{message.content}</p>
-                {message.media_url && message.media_type && (
-                  <div className="mt-2">
-                    <MediaViewer
-                      mediaUrl={message.media_url}
-                      mediaType={message.media_type as 'image' | 'video'}
-                      className="max-w-xs"
-                    />
+          messages.map((message) => {
+            const isCurrentUser = message.user_id === user?.id;
+            const isTeamAgent = message.is_team_agent_message;
+            
+            return (
+              <div 
+                key={message.id} 
+                className={`flex gap-3 ${isCurrentUser && !isTeamAgent ? 'flex-row-reverse' : ''}`}
+              >
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src={message.profiles?.avatar_url} />
+                  <AvatarFallback>
+                    {isTeamAgent ? 'TA' : 
+                     (message.profiles?.display_name || message.profiles?.username) ? 
+                     (message.profiles.display_name || message.profiles.username)!.substring(0, 2).toUpperCase() : 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className={`flex-1 ${isCurrentUser && !isTeamAgent ? 'text-right' : ''}`}>
+                  <div className={`flex items-center gap-2 mb-1 ${isCurrentUser && !isTeamAgent ? 'justify-end' : ''}`}>
+                    <span className="font-medium text-sm">
+                      {isTeamAgent ? 'TEAM AGENT' : 
+                       isCurrentUser ? 'You' : 
+                       (message.profiles?.display_name || message.profiles?.username || 'Anonymous')}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(message.created_at).toLocaleTimeString()}
+                    </span>
                   </div>
-                )}
+                  <div className={`${isCurrentUser && !isTeamAgent ? 'bg-primary text-primary-foreground p-3 rounded-lg inline-block' : ''}`}>
+                    <p className="text-sm">{message.content}</p>
+                    {message.media_url && message.media_type && (
+                      <div className="mt-2">
+                        <MediaViewer
+                          mediaUrl={message.media_url}
+                          mediaType={message.media_type as 'image' | 'video'}
+                          className="max-w-xs"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

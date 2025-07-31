@@ -38,11 +38,24 @@ export const Auth = () => {
 
     try {
       if (isSignUp) {
+        // Include pending huddle join in user metadata for post-confirmation handling
+        const pendingJoinData = localStorage.getItem('pendingHuddleJoin');
+        let userMetadata = {};
+        
+        if (pendingJoinData) {
+          try {
+            userMetadata = { pendingHuddleJoin: JSON.parse(pendingJoinData) };
+          } catch (e) {
+            console.error('Failed to parse pending join data:', e);
+          }
+        }
+
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/`
+            emailRedirectTo: `${window.location.origin}/`,
+            data: userMetadata
           }
         });
         if (error) throw error;
