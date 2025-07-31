@@ -105,7 +105,7 @@ export const SpotlightFeed = () => {
           `)
           .in('id', huddleIds);
 
-        // Combine data and deduplicate by content to avoid showing the same message multiple times
+        // Combine data and deduplicate by content AND huddle to avoid showing the same message multiple times
         const seenContent = new Set();
         const enrichedMessages: AgentMessage[] = messages
           .map(message => {
@@ -119,7 +119,8 @@ export const SpotlightFeed = () => {
             };
           })
           .filter(message => {
-            const contentKey = `${message.content}-${message.team_name}`;
+            // More strict deduplication: include message ID, content, team, and huddle
+            const contentKey = `${message.id}-${message.content}-${message.team_name}-${message.huddle_id}`;
             if (seenContent.has(contentKey)) {
               return false;
             }

@@ -420,11 +420,11 @@ export const Huddle = () => {
                     
                     {/* Media content */}
                     {message.media_url && message.media_type && (
-                      <div className="mt-2">
+                      <div className="mt-2 max-w-xs">
                         <MediaViewer
                           mediaUrl={message.media_url}
                           mediaType={message.media_type as 'image' | 'video'}
-                          className="max-w-sm rounded-lg"
+                          className="w-full h-auto rounded-lg"
                         />
                       </div>
                     )}

@@ -18,9 +18,17 @@ serve(async (req) => {
   try {
     const { phone_number, verification_code }: SMSRequest = await req.json()
     
+    console.log('SMS request received for phone:', phone_number)
+    
     const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
     const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN')
     const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER')
+
+    console.log('Twilio config check:', {
+      hasSid: !!twilioAccountSid,
+      hasToken: !!twilioAuthToken,
+      hasPhone: !!twilioPhoneNumber
+    })
 
     if (!twilioAccountSid || !twilioAuthToken || !twilioPhoneNumber) {
       throw new Error('Twilio credentials not configured')
@@ -43,10 +51,12 @@ serve(async (req) => {
 
     if (!response.ok) {
       const error = await response.text()
-      throw new Error(`Twilio API error: ${error}`)
+      console.error('Twilio API error:', response.status, error)
+      throw new Error(`Twilio API error: ${response.status} - ${error}`)
     }
 
     const result = await response.json()
+    console.log('SMS sent successfully:', result.sid)
 
     return new Response(
       JSON.stringify({ success: true, message_sid: result.sid }),
@@ -57,8 +67,12 @@ serve(async (req) => {
     )
 
   } catch (error) {
+    console.error('SMS function error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message || 'Failed to send SMS',
+        details: error.toString()
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500 

@@ -52,7 +52,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
       <img
         src={mediaUrl}
         alt="Media"
-        className={`rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity ${className}`}
+        className={`w-full h-auto rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity ${className}`}
       />
     );
 

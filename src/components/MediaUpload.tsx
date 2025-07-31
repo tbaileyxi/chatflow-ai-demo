@@ -41,15 +41,19 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
 
   const validateFile = (file: File): string | null => {
     const maxSize = 50 * 1024 * 1024; // 50MB
-    const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    const videoTypes = ['video/mp4', 'video/mov', 'video/avi', 'video/webm'];
+    const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
+    const videoTypes = ['video/mp4', 'video/mov', 'video/avi', 'video/webm', 'video/quicktime'];
     
     if (file.size > maxSize) {
       return 'File size must be less than 50MB';
     }
     
-    if (!imageTypes.includes(file.type) && !videoTypes.includes(file.type)) {
-      return 'File must be an image (JPG, PNG, GIF, WebP) or video (MP4, MOV, AVI, WebM)';
+    // More lenient validation for mobile uploads
+    const isImage = file.type.startsWith('image/') || imageTypes.includes(file.type);
+    const isVideo = file.type.startsWith('video/') || videoTypes.includes(file.type);
+    
+    if (!isImage && !isVideo) {
+      return 'File must be an image or video';
     }
     
     return null;
@@ -179,7 +183,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
       <input
         ref={videoCameraInputRef}
         type="file"
-        accept="video/*"
+        accept="video/*,video/mp4,video/mov,video/quicktime"
         capture="environment"
         onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
         style={{ display: 'none' }}
