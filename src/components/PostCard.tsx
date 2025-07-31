@@ -326,6 +326,11 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
             variant="ghost"
             size="sm"
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              // Navigate to team's main huddle for replies
+              const teamHuddle = `/huddle/team-${post.team.id}`;
+              window.location.href = teamHuddle;
+            }}
           >
             <MessageCircle className="w-4 h-4" />
             <span className="text-sm">Reply</span>

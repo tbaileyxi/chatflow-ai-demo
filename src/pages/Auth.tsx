@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Phone } from 'lucide-react';
+import { AdminLoginDialog } from '@/components/AdminLoginDialog';
 
 export const Auth = () => {
   const { user } = useAuth();
@@ -132,13 +133,16 @@ export const Auth = () => {
               >
                 {loading ? 'Sending...' : 'Send Verification Code'}
               </Button>
-              <div className="mt-4 text-center">
+              <div className="mt-4 text-center space-y-2">
                 <Button
                   variant="link"
                   onClick={() => setIsSignUp(!isSignUp)}
                 >
                   {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
                 </Button>
+                <div>
+                  <AdminLoginDialog />
+                </div>
               </div>
             </div>
           ) : (

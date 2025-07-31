@@ -42,18 +42,18 @@ export const CollapsibleMemberList = ({ huddleId }: CollapsibleMemberListProps) 
       if (!data) return;
 
       // Get profiles separately
-      const userIds = data.map(m => m.user_id);
+      const uniqueUserIds = [...new Set(data.map(m => m.user_id))];
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, display_name, username, avatar_url')
-        .in('user_id', userIds);
+        .in('user_id', uniqueUserIds);
 
       // Mock online status for now (in a real app, you'd use presence or last_seen)
-      const membersWithStatus = data?.map(member => ({
-        user_id: member.user_id,
-        profiles: profiles?.find(p => p.user_id === member.user_id) || null,
+      const membersWithStatus = uniqueUserIds.map(userId => ({
+        user_id: userId,
+        profiles: profiles?.find(p => p.user_id === userId) || null,
         online: Math.random() > 0.5 // Mock online status
-      })) || [];
+      }));
 
       setMembers(membersWithStatus);
     } catch (error) {

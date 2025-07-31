@@ -62,6 +62,11 @@ export const Huddle = () => {
       fetchHuddle();
       fetchMessages();
       
+      // Auto-scroll to bottom on mount for mobile UX
+      setTimeout(() => {
+        window.scrollTo(0, document.body.scrollHeight);
+      }, 100);
+      
       // Set up real-time subscription for messages with better performance
       const channel = supabase
         .channel(`huddle-messages-${id}`)
@@ -76,6 +81,10 @@ export const Huddle = () => {
           (payload) => {
             // Add new message directly instead of refetching all
             addNewMessage(payload.new as any);
+            // Auto-scroll to bottom on new message
+            setTimeout(() => {
+              window.scrollTo(0, document.body.scrollHeight);
+            }, 100);
           }
         )
         .subscribe();

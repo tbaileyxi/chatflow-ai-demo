@@ -42,6 +42,15 @@ export function AppSidebar() {
       // Get unread message counts for each huddle
       const huddlesWithUnread = await Promise.all(
         (data || []).map(async (item) => {
+          // Update last_read_at when viewing huddle
+          if (window.location.pathname === `/huddle/${item.huddle.id}`) {
+            await supabase
+              .from('huddle_members')
+              .update({ last_read_at: new Date().toISOString() })
+              .eq('huddle_id', item.huddle.id)
+              .eq('user_id', user?.id);
+          }
+
           const { count } = await supabase
             .from('huddle_messages')
             .select('*', { count: 'exact', head: true })
