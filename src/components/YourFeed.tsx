@@ -105,21 +105,36 @@ export const YourFeed = () => {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) return;
 
-      // Get user's huddles
-      const { data: userHuddles, error: huddlesError } = await supabase
-        .from('huddle_members')
-        .select('huddle_id')
+      // CRITICAL FIX: Only fetch team agent broadcast messages from followed teams
+      // Get user's followed teams first
+      const { data: userFollows, error: followsError } = await supabase
+        .from('user_follows')
+        .select('team_id')
         .eq('user_id', user.user.id);
+
+      if (followsError) throw followsError;
+
+      const followedTeamIds = userFollows?.map(f => f.team_id) || [];
+      if (followedTeamIds.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      // Get huddles for followed teams only
+      const { data: teamHuddles, error: huddlesError } = await supabase
+        .from('huddles')
+        .select('id, name, team_id, team:teams(name)')
+        .in('team_id', followedTeamIds);
 
       if (huddlesError) throw huddlesError;
 
-      const huddleIds = userHuddles?.map(h => h.huddle_id) || [];
+      const huddleIds = teamHuddles?.map(h => h.id) || [];
       if (huddleIds.length === 0) {
         setLoading(false);
         return;
       }
 
-      // Get recent messages from user's huddles
+      // ONLY get team agent messages (broadcasts) - NO private user messages
       const { data: messages, error: messagesError } = await supabase
         .from('huddle_messages')
         .select(`
@@ -133,40 +148,23 @@ export const YourFeed = () => {
           is_team_agent_message
         `)
         .in('huddle_id', huddleIds)
+        .eq('is_team_agent_message', true)  // CRITICAL: Only team agent messages
         .order('created_at', { ascending: false })
         .limit(10);
 
       if (messagesError) throw messagesError;
 
       if (messages && messages.length > 0) {
-        // Get huddle details
-        const { data: huddles } = await supabase
-          .from('huddles')
-          .select(`
-            id,
-            name,
-            team:teams(name)
-          `)
-          .in('id', [...new Set(messages.map(m => m.huddle_id))]);
-
-        // Get user profiles
-        const userIds = [...new Set(messages.map(m => m.user_id))];
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('user_id, display_name, username, avatar_url')
-          .in('user_id', userIds);
-
-        // Combine data
+        // Combine data with huddle info already fetched
         const enrichedMessages: HuddleMessage[] = messages.map(message => {
-          const huddle = huddles?.find(h => h.id === message.huddle_id);
-          const profile = profiles?.find(p => p.user_id === message.user_id);
+          const huddle = teamHuddles?.find(h => h.id === message.huddle_id);
           return {
             ...message,
             huddle_name: huddle?.name || 'Unknown Huddle',
             team_name: huddle?.team?.name || 'Unknown Team',
-            display_name: message.is_team_agent_message ? 'TEAM AGENT' : profile?.display_name,
-            username: profile?.username,
-            avatar_url: profile?.avatar_url
+            display_name: 'TEAM AGENT',
+            username: 'team_agent',
+            avatar_url: null
           };
         });
 

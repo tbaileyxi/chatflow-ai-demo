@@ -283,7 +283,7 @@ export const BroadcastCenter = () => {
               is_team_agent_message: true
             });
             deliveryResults.push({
-              channel: 'Team Agent Messages (All Huddles)',
+              channel: 'Team Agent Messages',
               status: huddleResult.success ? 'delivered' : 'failed',
               error: huddleResult.error
             });

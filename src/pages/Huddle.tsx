@@ -412,27 +412,28 @@ export const Huddle = () => {
                     )}
                   </div>
                   
-                  {/* Emoji Reactions */}
-                  <div className="mt-2 space-y-1">
-                    <div className="flex gap-1">
-                      {['👍', '😂', '🔥'].map((emoji) => {
-                        const reactionData = message.reactions?.[emoji];
-                        const hasReacted = reactionData?.users.includes(user?.id || '');
-                        const count = reactionData?.count || 0;
-                        
-                        return (
-                          <Button
-                            key={emoji}
-                            variant={hasReacted ? "default" : "outline"}
-                            size="sm"
-                            className={`h-6 px-2 text-xs ${hasReacted ? 'bg-primary/20 text-primary' : ''}`}
-                            onClick={() => addReaction(message.id, emoji)}
-                          >
-                            {emoji} {count > 0 && count}
-                          </Button>
-                        );
-                      })}
-                    </div>
+                </div>
+                
+                {/* Emoji Reactions - Outside message bubble for proper alignment */}
+                <div className={`mt-2 ${isCurrentUser && !isTeamAgent ? 'flex justify-end' : 'flex justify-start'}`}>
+                  <div className="flex gap-1">
+                    {['👍', '😂', '🔥'].map((emoji) => {
+                      const reactionData = message.reactions?.[emoji];
+                      const hasReacted = reactionData?.users.includes(user?.id || '');
+                      const count = reactionData?.count || 0;
+                      
+                      return (
+                        <Button
+                          key={emoji}
+                          variant={hasReacted ? "default" : "outline"}
+                          size="sm"
+                          className={`h-6 px-2 text-xs ${hasReacted ? 'bg-primary/20 text-primary' : ''}`}
+                          onClick={() => addReaction(message.id, emoji)}
+                        >
+                          {emoji} {count > 0 && count}
+                        </Button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
