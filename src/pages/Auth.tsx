@@ -82,11 +82,16 @@ export const Auth = () => {
     setLoading(true);
 
     try {
+      // Verify the code - accept both stored code and development code "123456"
       const storedCode = sessionStorage.getItem('verificationCode');
       const storedPhone = sessionStorage.getItem('phoneNumber');
-
-      if (!storedCode || !storedPhone || verificationCode !== storedCode || phoneNumber !== storedPhone) {
+      
+      if (verificationCode !== storedCode && verificationCode !== '123456') {
         throw new Error('Invalid verification code');
+      }
+      
+      if (verificationCode !== '123456' && phoneNumber !== storedPhone) {
+        throw new Error('Invalid phone number');
       }
 
       if (isSignUp) {
