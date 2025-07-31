@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
+import { StartHuddleDialog } from '@/components/StartHuddleDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -82,9 +83,14 @@ export function AppSidebar() {
               <SidebarGroupLabel className="flex items-center justify-between">
                 {!isCollapsed && 'Side Huddles'}
                 {!isCollapsed && (
-                  <Button size="sm" variant="ghost">
-                    <Plus className="w-4 h-4" />
-                  </Button>
+                  <StartHuddleDialog 
+                    onHuddleCreated={fetchUserHuddles}
+                    trigger={
+                      <Button size="sm" variant="ghost">
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    }
+                  />
                 )}
               </SidebarGroupLabel>
               <SidebarGroupContent>
@@ -94,10 +100,15 @@ export function AppSidebar() {
                       <div className="p-4 text-center text-sm text-muted-foreground">
                         <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
                         <p>No huddles yet</p>
-                        <Button size="sm" variant="outline" className="mt-2">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Start Huddle
-                        </Button>
+                        <StartHuddleDialog 
+                          onHuddleCreated={fetchUserHuddles}
+                          trigger={
+                            <Button size="sm" variant="outline" className="mt-2">
+                              <Plus className="w-4 h-4 mr-2" />
+                              Start Huddle
+                            </Button>
+                          }
+                        />
                       </div>
                     )
                   ) : (

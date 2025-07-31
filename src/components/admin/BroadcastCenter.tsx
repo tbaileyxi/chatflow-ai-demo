@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
+import { FileUpload } from '@/components/FileUpload';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Send, Clock, Upload, Link, MessageSquare, BarChart3 } from 'lucide-react';
@@ -28,6 +29,7 @@ export const BroadcastCenter = () => {
   const [loading, setLoading] = useState(false);
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [embedUrl, setEmbedUrl] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -133,6 +135,7 @@ export const BroadcastCenter = () => {
       setContent('');
       setPollOptions(['', '']);
       setEmbedUrl('');
+      setSelectedFiles([]);
       setIsSpotlight(false);
       setTargetAudience(['team_feed']);
     } catch (error) {
@@ -274,11 +277,11 @@ export const BroadcastCenter = () => {
           {messageType === 'upload' && (
             <div className="space-y-2">
               <Label>File Upload</Label>
-              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
-                <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-muted-foreground">Click to upload or drag and drop</p>
-                <p className="text-xs text-muted-foreground">PNG, JPG, MP4 up to 10MB</p>
-              </div>
+              <FileUpload 
+                onFilesSelected={setSelectedFiles}
+                multiple={false}
+                maxSize={25}
+              />
             </div>
           )}
 
