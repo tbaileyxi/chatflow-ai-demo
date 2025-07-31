@@ -47,20 +47,14 @@ export const Auth = () => {
 
     setLoading(true);
     try {
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      const { error } = await supabase.functions.invoke('send-sms', {
-        body: {
-          phone_number: phoneNumber,
-          verification_code: code
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: phoneNumber,
+        options: {
+          shouldCreateUser: isSignUp
         }
       });
 
       if (error) throw error;
-
-      // Store the code temporarily for verification
-      sessionStorage.setItem('verificationCode', code);
-      sessionStorage.setItem('phoneNumber', phoneNumber);
       
       setSentCode(true);
       toast({
@@ -83,77 +77,20 @@ export const Auth = () => {
     setLoading(true);
 
     try {
-      // Verify the code - accept both stored code and development code "123456"
-      const storedCode = sessionStorage.getItem('verificationCode');
-      const storedPhone = sessionStorage.getItem('phoneNumber');
+      const { error } = await supabase.auth.verifyOtp({
+        phone: phoneNumber,
+        token: verificationCode,
+        type: 'sms'
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Successfully authenticated!",
+      });
       
-      if (verificationCode !== storedCode && verificationCode !== '123456') {
-        throw new Error('Invalid verification code');
-      }
-      
-      if (verificationCode !== '123456' && phoneNumber !== storedPhone) {
-        throw new Error('Invalid phone number');
-      }
-
-      if (isSignUp) {
-        // Use Supabase's native phone authentication
-        const { error } = await supabase.auth.signUp({
-          phone: phoneNumber,
-          password: verificationCode, // Use the verification code as password
-          options: {
-            data: {
-              phone_number: phoneNumber,
-              phone_verified: true,
-              display_name: `User ${phoneNumber.slice(-4)}`
-            }
-          }
-        });
-        
-        if (error) throw error;
-
-        // Clean up stored codes
-        sessionStorage.removeItem('verificationCode');
-        sessionStorage.removeItem('phoneNumber');
-
-        toast({
-          title: "Success",
-          description: "Account created successfully!",
-        });
-        
-        // Manual redirect after a short delay to allow auth state to update
-        setTimeout(() => {
-          navigate('/', { replace: true });
-        }, 1000);
-      } else {
-        // For sign in with phone
-        const { error } = await supabase.auth.signInWithPassword({
-          phone: phoneNumber,
-          password: verificationCode
-        });
-
-        if (error) {
-          toast({
-            title: "Sign in failed", 
-            description: "Please try signing up instead",
-            variant: "destructive"
-          });
-          return;
-        }
-
-        // Clean up stored codes
-        sessionStorage.removeItem('verificationCode');
-        sessionStorage.removeItem('phoneNumber');
-
-        toast({
-          title: "Success", 
-          description: "Signed in successfully!",
-        });
-        
-        // Manual redirect after a short delay to allow auth state to update
-        setTimeout(() => {
-          navigate('/', { replace: true });
-        }, 1000);
-      }
+      // Auth state will automatically redirect via useAuth
     } catch (error: any) {
       toast({
         title: "Error",
