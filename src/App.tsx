@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import Index from "./pages/Index";
 import { Admin } from "./pages/Admin";
 import { Auth } from "./pages/Auth";
+import { Profile } from "./pages/Profile";
 import { TeamDirectory } from "./pages/TeamDirectory";
 import { Huddle } from "./pages/Huddle";
 import { JoinHuddle } from "./pages/JoinHuddle";
@@ -36,6 +37,7 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/profile" element={<Profile />} />
                 <Route path="/teams" element={<TeamDirectory />} />
                 <Route path="/huddle/:id" element={<Huddle />} />
                 <Route path="/join-huddle/:huddleId" element={<JoinHuddle />} />

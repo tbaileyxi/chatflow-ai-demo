@@ -17,6 +17,12 @@ export const Auth = () => {
   const [loading, setLoading] = useState(false);
 
   if (user) {
+    // Check for pending huddle join
+    const pendingHuddleId = localStorage.getItem('pendingHuddleJoin');
+    if (pendingHuddleId) {
+      localStorage.removeItem('pendingHuddleJoin');
+      return <Navigate to={`/join-huddle/${pendingHuddleId}`} replace />;
+    }
     return <Navigate to="/" replace />;
   }
 

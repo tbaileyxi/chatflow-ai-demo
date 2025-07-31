@@ -33,6 +33,7 @@ interface Message {
   media_type?: string;
   profiles?: {
     display_name?: string;
+    username?: string;
     avatar_url?: string;
   } | null;
 }
@@ -103,7 +104,8 @@ export const Huddle = () => {
 
   const fetchMessages = async () => {
     try {
-      const { data, error } = await supabase
+      // First get messages
+      const { data: messagesData, error: messagesError } = await supabase
         .from("huddle_messages")
         .select(`
           id,
@@ -116,8 +118,26 @@ export const Huddle = () => {
         .eq("huddle_id", id)
         .order("created_at", { ascending: true });
 
-      if (error) throw error;
-      setMessages(data || []);
+      if (messagesError) throw messagesError;
+
+      // Get unique user IDs
+      const userIds = [...new Set(messagesData?.map(m => m.user_id) || [])];
+      
+      // Get profiles for these users
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("user_id, display_name, username, avatar_url")
+        .in("user_id", userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Map profiles to messages
+      const messagesWithProfiles = messagesData?.map(message => ({
+        ...message,
+        profiles: profilesData?.find(p => p.user_id === message.user_id) || null
+      })) || [];
+
+      setMessages(messagesWithProfiles);
     } catch (error) {
       console.error("Error fetching messages:", error);
     }
@@ -235,13 +255,14 @@ export const Huddle = () => {
               <Avatar className="w-8 h-8">
                 <AvatarImage src={message.profiles?.avatar_url} />
                 <AvatarFallback>
-                  {message.profiles?.display_name ? message.profiles.display_name.substring(0, 2).toUpperCase() : 'U'}
+                  {(message.profiles?.display_name || message.profiles?.username) ? 
+                    (message.profiles.display_name || message.profiles.username)!.substring(0, 2).toUpperCase() : 'U'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="font-medium text-sm">
-                    {message.profiles?.display_name || 'Anonymous'}
+                    {message.profiles?.display_name || message.profiles?.username || 'Anonymous'}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {new Date(message.created_at).toLocaleTimeString()}

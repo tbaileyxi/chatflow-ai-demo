@@ -86,10 +86,11 @@ export const JoinHuddle = () => {
 
   const handleJoinHuddle = async () => {
     if (!user) {
+      // Store the intended huddle ID in localStorage for after login
+      localStorage.setItem('pendingHuddleJoin', huddleId!);
       toast({
         title: "Sign in required",
-        description: "Please sign in to join this huddle.",
-        variant: "destructive"
+        description: "Redirecting to sign in page...",
       });
       navigate('/auth');
       return;

@@ -64,6 +64,21 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
           </DialogTrigger>
           <DialogContent className="max-w-4xl w-full p-0 bg-black/90">
             <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-4 right-4 z-10 bg-black/50 text-white hover:bg-black/70 rounded-full w-8 h-8 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const dialog = e.currentTarget.closest('[role="dialog"]');
+                  if (dialog) {
+                    const event = new KeyboardEvent('keydown', { key: 'Escape' });
+                    dialog.dispatchEvent(event);
+                  }
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
               <img
                 src={mediaUrl}
                 alt="Media"
@@ -125,6 +140,21 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
           </DialogTrigger>
           <DialogContent className="max-w-4xl w-full p-0 bg-black/90">
             <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-4 right-4 z-10 bg-black/50 text-white hover:bg-black/70 rounded-full w-8 h-8 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const dialog = e.currentTarget.closest('[role="dialog"]');
+                  if (dialog) {
+                    const event = new KeyboardEvent('keydown', { key: 'Escape' });
+                    dialog.dispatchEvent(event);
+                  }
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
               <video
                 src={mediaUrl}
                 className="w-full h-auto max-h-[90vh] object-contain"

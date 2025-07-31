@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Home, Users, MessageSquare, Plus, Settings, LogOut, Menu } from 'lucide-react';
+import { Home, Users, MessageSquare, Plus, Settings, LogOut, Menu, User } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -155,12 +155,13 @@ export function AppSidebar() {
                               {!isCollapsed && <span className="truncate font-medium">{huddle.name}</span>}
                             </div>
                             {!isCollapsed && (
-                              <div className="flex gap-1">
-                                <Badge variant="secondary" className="text-xs bg-sidebar-accent text-sidebar-accent-foreground">
-                                  {huddle.member_count}
-                                </Badge>
+                              <div className="flex gap-1 items-center">
+                                <div className="flex items-center gap-1">
+                                  <Users className="w-3 h-3 text-muted-foreground" />
+                                  <span className="text-xs text-muted-foreground">{huddle.member_count}</span>
+                                </div>
                                 {huddle.unread_count > 0 && (
-                                  <Badge variant="destructive" className="text-xs">
+                                  <Badge variant="destructive" className="text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full">
                                     {huddle.unread_count}
                                   </Badge>
                                 )}
@@ -183,6 +184,20 @@ export function AppSidebar() {
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton 
+                      asChild
+                      className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-200"
+                    >
+                      <button 
+                        onClick={() => handleNavClick('/profile')}
+                        className="flex items-center gap-3 w-full text-left"
+                      >
+                        <User className="w-4 h-4" />
+                        {!isCollapsed && <span className="font-medium">Profile</span>}
+                      </button>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton 
                       onClick={signOut}
