@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PostCard } from "@/components/PostCard";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Post {
   id: string;
@@ -24,6 +25,7 @@ export const YourFeed = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [followedTeams, setFollowedTeams] = useState<string[]>([]);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     fetchFollowedTeams();
@@ -118,12 +120,14 @@ export const YourFeed = () => {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="p-4 border-b border-border flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Your Feed</h2>
-        <Button variant="outline" size="sm" onClick={() => window.location.href = '/teams'}>
-          Follow Teams
-        </Button>
-      </div>
+      {!isMobile && (
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Your Feed</h2>
+          <Button variant="outline" size="sm" onClick={() => window.location.href = '/teams'}>
+            Follow Teams
+          </Button>
+        </div>
+      )}
       <div className="space-y-1">
         {posts.map((post) => (
           <PostCard key={`post-${post.id}`} post={post} />

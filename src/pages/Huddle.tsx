@@ -417,7 +417,7 @@ export const Huddle = () => {
                   {/* Sender name and timestamp - smaller and less prominent */}
                   <div className={`flex items-center gap-1 mb-1 px-1 ${isCurrentUser && !isTeamAgent ? 'flex-row-reverse' : ''}`}>
                     <span className="text-xs font-medium text-muted-foreground">
-                      {isTeamAgent ? 'TEAM AGENT' : 
+                      {isTeamAgent ? `${huddle?.team.name} Agent` : 
                        isCurrentUser ? 'You' : 
                        (message.profiles?.display_name || message.profiles?.username || 'Anonymous')}
                     </span>
@@ -485,35 +485,40 @@ export const Huddle = () => {
                   )}
                   
                    {/* Quick reaction buttons and Make Public */}
-                  <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {['👍', '😂', '🔥'].map((emoji) => {
-                      const reactionData = message.reactions?.[emoji];
-                      const hasReacted = reactionData?.users.includes(user?.id || '');
-                      
-                      if (!hasReacted && (!reactionData || reactionData.count === 0)) {
-                        return (
-                          <button
-                            key={emoji}
-                            className="text-xs px-2 py-1 rounded-full bg-background border border-border hover:bg-muted transition-colors"
-                            onClick={() => addReaction(message.id, emoji)}
-                          >
-                            {emoji}
-                          </button>
-                        );
-                      }
-                      return null;
-                    })}
+                  <div className="flex gap-1 mt-1 group">
+                    {/* Make Public Button - visible for message owners */}
+                    {message.user_id === user?.id && (
+                      <MakePublicButton
+                        messageId={message.id}
+                        messageContent={message.content}
+                        mediaUrl={message.media_url}
+                        mediaType={message.media_type}
+                        embedCode={message.embed_code}
+                        teamId={huddle?.team.id}
+                        isOwner={true}
+                      />
+                    )}
                     
-                    {/* Make Public Button - only for message owner */}
-                    <MakePublicButton
-                      messageId={message.id}
-                      messageContent={message.content}
-                      mediaUrl={message.media_url}
-                      mediaType={message.media_type}
-                      embedCode={message.embed_code}
-                      teamId={huddle?.team.id}
-                      isOwner={message.user_id === user?.id}
-                    />
+                    {/* Reaction buttons */}
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                      {['👍', '😂', '🔥'].map((emoji) => {
+                        const reactionData = message.reactions?.[emoji];
+                        const hasReacted = reactionData?.users.includes(user?.id || '');
+                        
+                        if (!hasReacted && (!reactionData || reactionData.count === 0)) {
+                          return (
+                            <button
+                              key={emoji}
+                              className="text-xs px-2 py-1 rounded-full bg-background border border-border hover:bg-muted transition-colors"
+                              onClick={() => addReaction(message.id, emoji)}
+                            >
+                              {emoji}
+                            </button>
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
                   </div>
                 </div>
                 
@@ -526,13 +531,13 @@ export const Huddle = () => {
       </div>
 
       {/* Message Input */}
-      <Card className="m-4 p-3 border-0 border-t border-border rounded-none">
+      <Card className="m-4 p-3 border-2 border-primary/20 bg-card/95 backdrop-blur-sm rounded-lg shadow-lg">
         <form onSubmit={sendMessage} className="flex gap-2 mb-2">
           <Textarea
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Type a message..."
-            className="flex-1 min-h-[40px] max-h-[120px] resize-none"
+            className="flex-1 min-h-[40px] max-h-[120px] resize-none border-primary/30 focus:border-primary bg-background"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();

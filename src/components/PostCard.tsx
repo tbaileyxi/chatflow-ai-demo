@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Heart, Flame, MessageCircle } from "lucide-react";
+import { Heart, Flame, Share } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -207,6 +207,43 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
     }
   };
 
+  const handleShare = async () => {
+    const shareData = {
+      title: `${post.team?.name} Post`,
+      text: post.content,
+      url: window.location.href
+    };
+
+    try {
+      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        // Fallback: copy to clipboard
+        await navigator.clipboard.writeText(`${post.content}\n\n${window.location.href}`);
+        toast({
+          title: "Link copied!",
+          description: "Post link copied to clipboard"
+        });
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(`${post.content}\n\n${window.location.href}`);
+        toast({
+          title: "Link copied!",
+          description: "Post link copied to clipboard"
+        });
+      } catch (clipboardError) {
+        toast({
+          title: "Share failed",
+          description: "Unable to share or copy link",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
   return (
     <Card className={`p-4 border-0 border-b border-border rounded-none ${isSpotlight ? 'bg-gradient-to-r from-spotlight/10 to-transparent' : ''}`}>
       {/* Team Header */}
@@ -367,6 +404,14 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
             <span className="text-sm">{fireCount}</span>
           </Button>
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleShare}
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+        >
+          <Share className="w-4 h-4" />
+        </Button>
       </div>
     </Card>
   );
