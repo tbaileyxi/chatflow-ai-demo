@@ -343,6 +343,63 @@ export type Database = {
         }
         Relationships: []
       }
+      spotlight_reports: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          reason: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          reason: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          reason?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      spotlight_votes: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+          vote_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+          vote_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+          vote_type?: string
+        }
+        Relationships: []
+      }
       teams: {
         Row: {
           city: string
@@ -440,6 +497,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_post_vote_score: {
+        Args: { post_uuid: string }
+        Returns: number
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"]
