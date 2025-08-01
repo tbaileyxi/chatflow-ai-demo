@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Trophy } from 'lucide-react';
+import { Plus, Edit, Trash2, Trophy, Upload, X } from 'lucide-react';
 
 interface Team {
   id: string;
@@ -29,6 +29,7 @@ export const TeamManagement = () => {
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     city: '',
@@ -171,6 +172,68 @@ export const TeamManagement = () => {
     setEditingTeam(null);
   };
 
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Error",
+        description: "Please select an image file",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: "Image must be less than 5MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `team-logos/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('broadcast-media')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from('broadcast-media')
+        .getPublicUrl(filePath);
+
+      setFormData(prev => ({ ...prev, logo_url: data.publicUrl }));
+      
+      toast({
+        title: "Success",
+        description: "Logo uploaded successfully",
+      });
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload logo",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeLogo = () => {
+    setFormData(prev => ({ ...prev, logo_url: '' }));
+  };
+
   if (loading) {
     return (
       <div className="text-center py-8">
@@ -260,13 +323,64 @@ export const TeamManagement = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="logo_url">Logo URL</Label>
-                <Input
-                  id="logo_url"
-                  value={formData.logo_url}
-                  onChange={(e) => setFormData(prev => ({ ...prev, logo_url: e.target.value }))}
-                  placeholder="https://..."
-                />
+                <Label>Team Logo</Label>
+                <div className="space-y-3">
+                  {formData.logo_url ? (
+                    <div className="flex items-center gap-3 p-3 border rounded-lg">
+                      <img 
+                        src={formData.logo_url} 
+                        alt="Team logo preview" 
+                        className="w-16 h-16 object-cover rounded-lg"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">Logo uploaded</p>
+                        <p className="text-xs text-muted-foreground">Click remove to change</p>
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={removeLogo}
+                      >
+                        <X className="w-4 h-4" />
+                        Remove
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                      <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Upload a team logo (JPG, PNG, max 5MB)
+                      </p>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          disabled={uploading}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        <Button type="button" disabled={uploading}>
+                          {uploading ? 'Uploading...' : 'Choose File'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="text-center text-xs text-muted-foreground">
+                    OR
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="logo_url">Logo URL</Label>
+                    <Input
+                      id="logo_url"
+                      value={formData.logo_url}
+                      onChange={(e) => setFormData(prev => ({ ...prev, logo_url: e.target.value }))}
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2">
