@@ -70,13 +70,18 @@ export const TeamManagement = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('Form data being submitted:', formData);
+    
     try {
       if (editingTeam) {
-        const { error } = await supabase
+        console.log('Updating team with ID:', editingTeam.id);
+        const { data, error } = await supabase
           .from('teams')
           .update(formData)
-          .eq('id', editingTeam.id);
+          .eq('id', editingTeam.id)
+          .select();
 
+        console.log('Update result:', { data, error });
         if (error) throw error;
         
         toast({
