@@ -39,6 +39,7 @@ export const EnhancedSpotlightFeed = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("today");
 
+  // All hooks must be called before any conditional returns
   useEffect(() => {
     fetchSpotlightPosts();
   }, [user]);
