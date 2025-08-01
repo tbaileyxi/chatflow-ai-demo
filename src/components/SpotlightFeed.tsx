@@ -74,6 +74,14 @@ export const SpotlightFeed = () => {
 
   const fetchAgentMessages = async () => {
     try {
+      // Get existing spotlight posts to avoid duplicates
+      const { data: existingPosts } = await supabase
+        .from('posts')
+        .select('id, created_at')
+        .eq('is_team_agent_message', true)
+        .eq('delivery_status', 'sent')
+        .in('target_audience', [['spotlight'], ['team_feed', 'spotlight']]);
+
       // Get team agent messages that are meant for spotlight (unique ones only)
       const { data: messages, error: messagesError } = await supabase
         .from('huddle_messages')
@@ -105,9 +113,19 @@ export const SpotlightFeed = () => {
           `)
           .in('id', huddleIds);
 
+        // Filter out messages that correspond to existing posts (to prevent duplicates)
+        const filteredMessages = messages.filter(message => {
+          // Check if there's a post with similar timestamp (within 5 minutes)
+          const messageTime = new Date(message.created_at).getTime();
+          return !existingPosts?.some(post => {
+            const postTime = new Date(post.created_at).getTime();
+            return Math.abs(messageTime - postTime) < 5 * 60 * 1000; // 5 minutes tolerance
+          });
+        });
+
         // Combine data and deduplicate by content AND huddle to avoid showing the same message multiple times
         const seenContent = new Set();
-        const enrichedMessages: AgentMessage[] = messages
+        const enrichedMessages: AgentMessage[] = filteredMessages
           .map(message => {
             const huddle = huddles?.find(h => h.id === message.huddle_id);
             return {

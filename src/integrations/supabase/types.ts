@@ -82,6 +82,7 @@ export type Database = {
         Row: {
           content: string
           created_at: string
+          embed_code: string | null
           huddle_id: string
           id: string
           is_team_agent_message: boolean | null
@@ -92,6 +93,7 @@ export type Database = {
         Insert: {
           content: string
           created_at?: string
+          embed_code?: string | null
           huddle_id: string
           id?: string
           is_team_agent_message?: boolean | null
@@ -102,6 +104,7 @@ export type Database = {
         Update: {
           content?: string
           created_at?: string
+          embed_code?: string | null
           huddle_id?: string
           id?: string
           is_team_agent_message?: boolean | null

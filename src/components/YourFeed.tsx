@@ -141,6 +141,15 @@ export const YourFeed = () => {
         return;
       }
 
+      // Get team agent messages, but exclude ones that already have corresponding posts
+      // First get post IDs that are team agent messages for these teams
+      const { data: existingPosts } = await supabase
+        .from('posts')
+        .select('id, created_at')
+        .in('team_id', followedTeamIds)
+        .eq('is_team_agent_message', true)
+        .eq('delivery_status', 'sent');
+
       // ONLY get team agent messages (broadcasts) - NO private user messages
       const { data: messages, error: messagesError } = await supabase
         .from('huddle_messages')
@@ -162,8 +171,18 @@ export const YourFeed = () => {
       if (messagesError) throw messagesError;
 
       if (messages && messages.length > 0) {
+        // Filter out messages that correspond to existing posts (to prevent duplicates)
+        const filteredMessages = messages.filter(message => {
+          // Check if there's a post with similar timestamp (within 5 minutes)
+          const messageTime = new Date(message.created_at).getTime();
+          return !existingPosts?.some(post => {
+            const postTime = new Date(post.created_at).getTime();
+            return Math.abs(messageTime - postTime) < 5 * 60 * 1000; // 5 minutes tolerance
+          });
+        });
+
         // Combine data with huddle info already fetched
-        const enrichedMessages: HuddleMessage[] = messages.map(message => {
+        const enrichedMessages: HuddleMessage[] = filteredMessages.map(message => {
           const huddle = teamHuddles?.find(h => h.id === message.huddle_id);
           return {
             ...message,

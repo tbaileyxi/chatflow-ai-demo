@@ -20,7 +20,7 @@ declare global {
 }
 
 // Twitter Embed Component
-const TwitterEmbed = ({ embedCode }: { embedCode: string }) => {
+export const TwitterEmbed = ({ embedCode }: { embedCode: string }) => {
   useEffect(() => {
     // Load Twitter widgets script
     if (window.twttr) {

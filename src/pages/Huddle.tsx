@@ -12,6 +12,7 @@ import { Send, Users, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { MediaUpload } from "@/components/MediaUpload";
 import { MediaViewer } from "@/components/MediaViewer";
+import { TwitterEmbed } from "@/components/PostCard";
 import { InviteButton } from "@/components/InviteButton";
 import { CollapsibleMemberList } from "@/components/CollapsibleMemberList";
 
@@ -33,6 +34,7 @@ interface Message {
   user_id: string;
   media_url?: string;
   media_type?: string;
+  embed_code?: string;
   is_team_agent_message?: boolean;
   profiles?: {
     display_name?: string;
@@ -155,6 +157,7 @@ export const Huddle = () => {
           user_id,
           media_url,
           media_type,
+          embed_code,
           is_team_agent_message
         `)
         .eq("huddle_id", id)
@@ -434,6 +437,13 @@ export const Huddle = () => {
                   `}>
                     {/* Message content - larger and more prominent */}
                     <p className="text-base leading-relaxed">{message.content}</p>
+                    
+                    {/* Embed content */}
+                    {message.embed_code && (
+                      <div className="mt-2">
+                        <TwitterEmbed embedCode={message.embed_code} />
+                      </div>
+                    )}
                     
                     {/* Media content */}
                     {message.media_url && message.media_type && (
