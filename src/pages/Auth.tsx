@@ -12,6 +12,8 @@ import { Phone, Info, Clock } from 'lucide-react';
 
 
 export const Auth = () => {
+  console.log('Auth component rendering');
+  
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -23,6 +25,8 @@ export const Auth = () => {
   const [isDevelopmentMode, setIsDevelopmentMode] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
   const [canResend, setCanResend] = useState(false);
+
+  console.log('Auth component - all hooks called, user:', !!user);
 
   if (user) {
     // Check for pending huddle join
