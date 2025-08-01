@@ -8,6 +8,50 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { MediaViewer } from "@/components/MediaViewer";
 
+// Twitter global type
+declare global {
+  interface Window {
+    twttr?: {
+      widgets: {
+        load: () => void;
+      };
+    };
+  }
+}
+
+// Twitter Embed Component
+const TwitterEmbed = ({ embedCode }: { embedCode: string }) => {
+  useEffect(() => {
+    // Load Twitter widgets script
+    if (window.twttr) {
+      window.twttr.widgets.load();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://platform.twitter.com/widgets.js';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  }, []);
+
+  // Check if it's a Twitter/X URL and convert to embed
+  if (embedCode.includes('twitter.com') || embedCode.includes('x.com')) {
+    const urlMatch = embedCode.match(/https?:\/\/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/);
+    if (urlMatch) {
+      const tweetUrl = urlMatch[0];
+      return (
+        <div className="twitter-embed">
+          <blockquote className="twitter-tweet">
+            <a href={tweetUrl}></a>
+          </blockquote>
+        </div>
+      );
+    }
+  }
+
+  // For other embeds, use dangerouslySetInnerHTML as fallback
+  return <div dangerouslySetInnerHTML={{ __html: embedCode }} />;
+};
+
 interface PostCardProps {
   post: {
     id: string;
@@ -199,7 +243,7 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
         {/* Embed Code Display */}
         {post.embed_code && (
           <div className="mt-3 rounded-lg overflow-hidden">
-            <div dangerouslySetInnerHTML={{ __html: post.embed_code }} />
+            <TwitterEmbed embedCode={post.embed_code} />
           </div>
         )}
 

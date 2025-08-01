@@ -13,7 +13,7 @@ interface Huddle {
   id: string;
   name: string;
   member_count: number;
-  unread_count: number;
+  has_unread: boolean;
 }
 
 export function AppSidebar() {
@@ -59,7 +59,7 @@ export function AppSidebar() {
 
           return {
             ...item.huddle,
-            unread_count: count || 0
+            has_unread: (count || 0) > 0
           };
         })
       );
@@ -183,14 +183,9 @@ export function AppSidebar() {
                                    <Users className="w-3 h-3 text-muted-foreground" />
                                    <span className="text-xs text-muted-foreground">{huddle.member_count}</span>
                                  </div>
-                                 {huddle.unread_count > 0 && (
-                                   <div className="flex items-center gap-1">
-                                     <MessageSquare className="w-3 h-3 text-destructive" />
-                                     <Badge variant="destructive" className="text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full">
-                                       {huddle.unread_count}
-                                     </Badge>
-                                   </div>
-                                 )}
+                                  {huddle.has_unread && (
+                                    <div className="w-2 h-2 bg-destructive rounded-full"></div>
+                                  )}
                               </div>
                             )}
                           </button>

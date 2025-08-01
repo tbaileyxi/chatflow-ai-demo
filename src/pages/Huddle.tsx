@@ -57,15 +57,22 @@ export const Huddle = () => {
   const [loading, setLoading] = useState(true);
   const [mediaDialogOpen, setMediaDialogOpen] = useState(false);
 
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      window.scrollTo({ 
+        top: document.body.scrollHeight, 
+        behavior: 'smooth' 
+      });
+    }, 100);
+  };
+
   useEffect(() => {
     if (id) {
       fetchHuddle();
       fetchMessages();
       
-      // Auto-scroll to bottom on mount for mobile UX
-      setTimeout(() => {
-        window.scrollTo(0, document.body.scrollHeight);
-      }, 100);
+      // Auto-scroll to bottom on mount
+      setTimeout(() => scrollToBottom(), 100);
       
       // Set up real-time subscription for messages with better performance
       const channel = supabase
@@ -82,9 +89,7 @@ export const Huddle = () => {
             // Add new message directly instead of refetching all
             addNewMessage(payload.new as any);
             // Auto-scroll to bottom on new message
-            setTimeout(() => {
-              window.scrollTo(0, document.body.scrollHeight);
-            }, 100);
+            setTimeout(() => scrollToBottom(), 100);
           }
         )
         .subscribe();
@@ -180,6 +185,9 @@ export const Huddle = () => {
       messagesWithProfiles.forEach(message => {
         fetchMessageReactions(message.id);
       });
+
+      // Auto-scroll to bottom after loading messages
+      setTimeout(() => scrollToBottom(), 100);
     } catch (error) {
       console.error("Error fetching messages:", error);
     }
@@ -212,7 +220,7 @@ export const Huddle = () => {
     }
   };
 
-  const sendMediaMessage = async (mediaUrl: string, mediaType: 'image' | 'video') => {
+  const sendMediaMessage = async (mediaUrl: string, mediaType: 'image' | 'video', commentary?: string) => {
     if (!user?.id) return;
 
     try {
@@ -221,7 +229,7 @@ export const Huddle = () => {
         .insert({
           huddle_id: id,
           user_id: user.id,
-          content: mediaType === 'image' ? 'Shared an image' : 'Shared a video',
+          content: commentary || '',
           media_url: mediaUrl,
           media_type: mediaType
         });

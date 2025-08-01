@@ -16,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface MediaUploadProps {
-  onMediaSelected: (url: string, type: 'image' | 'video') => void;
+  onMediaSelected: (url: string, type: 'image' | 'video', commentary?: string) => void;
   bucket: string;
   className?: string;
   showPreview?: boolean;
@@ -32,6 +32,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [commentary, setCommentary] = useState('');
   const { toast } = useToast();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -120,7 +121,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
         .from(bucket)
         .getPublicUrl(data.path);
 
-      onMediaSelected(publicUrl, getFileType(fileToUpload));
+      onMediaSelected(publicUrl, getFileType(fileToUpload), commentary.trim() || undefined);
       
       toast({
         title: "Upload successful",
@@ -130,6 +131,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
       // Reset state
       setSelectedFile(null);
       setPreviewUrl(null);
+      setCommentary('');
       setUploadProgress(0);
 
     } catch (error: any) {
@@ -145,6 +147,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
 
   const clearSelection = () => {
     setSelectedFile(null);
+    setCommentary('');
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
@@ -225,6 +228,18 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
           <div className="flex justify-between items-center text-sm text-muted-foreground mb-3">
             <span>{selectedFile.name}</span>
             <span>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</span>
+          </div>
+
+          {/* Commentary Input */}
+          <div className="mb-3">
+            <label className="text-sm font-medium text-foreground">Message (Optional)</label>
+            <input
+              type="text"
+              value={commentary}
+              onChange={(e) => setCommentary(e.target.value)}
+              placeholder="Add a message to go with your upload..."
+              className="w-full px-3 py-2 mt-1 text-sm border border-border rounded-md bg-background"
+            />
           </div>
 
           {isUploading && (

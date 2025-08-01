@@ -60,7 +60,7 @@ export const SpotlightFeed = () => {
           team:teams(id, name, logo_url),
           post_reactions(reaction_type)
         `)
-        .eq("is_spotlight", true)
+        .contains('target_audience', ['spotlight'])
         .eq("delivery_status", "sent")
         .order("created_at", { ascending: false })
         .limit(20);

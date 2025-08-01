@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
@@ -39,12 +39,13 @@ export const BroadcastCenter = () => {
   const [selectedTeam, setSelectedTeam] = useState('');
   const [messageType, setMessageType] = useState('text');
   const [content, setContent] = useState('');
-  const [targetAudience, setTargetAudience] = useState<string[]>(['team_feed']);
+  const [addToSpotlight, setAddToSpotlight] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [embedCode, setEmbedCode] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
+  const [mediaCommentary, setMediaCommentary] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus[]>([]);
   const [showDeliveryStatus, setShowDeliveryStatus] = useState(false);
   const [embedPreview, setEmbedPreview] = useState('');
@@ -108,11 +109,11 @@ export const BroadcastCenter = () => {
     }
   };
 
-  const handleAudienceChange = (audience: string, checked: boolean) => {
-    if (checked) {
-      setTargetAudience(prev => [...prev, audience]);
-    } else {
-      setTargetAudience(prev => prev.filter(a => a !== audience));
+  const handleMediaWithCommentary = (url: string, type: 'image' | 'video', commentary?: string) => {
+    setMediaUrl(url);
+    setMediaType(type);
+    if (commentary) {
+      setMediaCommentary(commentary);
     }
   };
 
@@ -141,7 +142,7 @@ export const BroadcastCenter = () => {
   };
 
   const validateForm = (): string | null => {
-    if (!content.trim() && !mediaUrl && messageType !== 'upload') {
+    if (!content.trim() && !mediaUrl && !mediaCommentary.trim() && messageType !== 'upload') {
       return 'Please enter message content or upload media';
     }
 
@@ -166,10 +167,6 @@ export const BroadcastCenter = () => {
 
     if (messageType === 'upload' && !mediaUrl) {
       return 'Please upload a file';
-    }
-
-    if (targetAudience.length === 0) {
-      return 'Please select at least one target audience';
     }
 
     return null;
@@ -246,12 +243,16 @@ export const BroadcastCenter = () => {
         };
       }
 
+      // Simplified broadcast system: Every message goes to Team Feed + All Team Huddles
+      // Optional: Add to Spotlight Feed
+      
+      const finalContent = mediaCommentary.trim() || content || (messageType === 'upload' ? '' : '');
+      
       const basePostData = {
-        content: content || (mediaType === 'image' ? 'Shared an image' : mediaType === 'video' ? 'Shared a video' : ''),
+        content: finalContent,
         team_id: selectedTeam,
         author_id: user.id,
         message_type: messageType,
-        is_spotlight: targetAudience.includes('spotlight'),
         is_agent_post: true,
         poll_data: pollData,
         media_url: messageType === 'upload' ? mediaUrl : null,
@@ -260,78 +261,53 @@ export const BroadcastCenter = () => {
 
       const deliveryResults: DeliveryStatus[] = [];
 
-      // Handle different target audiences
-      for (const audience of targetAudience) {
-        try {
-          if (audience === 'team_feed') {
-            // Only create regular team feed post - DO NOT broadcast to huddles
-            const postData = {
-              ...basePostData,
-              target_audience: ['team_feed']
-            };
+      try {
+        // ALWAYS create a single post with team_feed (and optionally spotlight)
+        const targetAudience = addToSpotlight ? ['team_feed', 'spotlight'] : ['team_feed'];
+        
+        const postData = {
+          ...basePostData,
+          target_audience: targetAudience,
+          is_spotlight: addToSpotlight
+        };
 
-            const { error } = await supabase
-              .from('posts')
-              .insert(postData);
+        const { error: postError } = await supabase
+          .from('posts')
+          .insert(postData);
 
-            if (error) throw error;
+        if (postError) throw postError;
 
-            deliveryResults.push({
-              channel: 'Team Feed',
-              status: 'delivered'
-            });
-          } else if (audience === 'team_agent') {
-            // Team Agent messages go to huddles as agent messages - use TEAM AGENT profile
-            const huddleResult = await broadcastToHuddles({
-              ...basePostData,
-              author_id: '00000000-0000-0000-0000-000000000000', // TEAM AGENT user_id
-              is_team_agent_message: true
-            });
-            deliveryResults.push({
-              channel: 'Team Agent Messages',
-              status: huddleResult.success ? 'delivered' : 'failed',
-              error: huddleResult.error
-            });
-          } else if (audience === 'side_huddles') {
-            // SEPARATE option for broadcasting to huddles only
-            const huddleResult = await broadcastToHuddles({
-              ...basePostData,
-              author_id: '00000000-0000-0000-0000-000000000000', // TEAM AGENT user_id
-              is_team_agent_message: true
-            });
-            deliveryResults.push({
-              channel: 'Side Huddles',
-              status: huddleResult.success ? 'delivered' : 'failed',
-              error: huddleResult.error
-            });
-          } else if (audience === 'spotlight') {
-            // Spotlight post - ensure single insertion
-            const postData = {
-              ...basePostData,
-              is_spotlight: true,
-              target_audience: ['spotlight']
-            };
+        deliveryResults.push({
+          channel: 'Team Feed',
+          status: 'delivered'
+        });
 
-            const { error } = await supabase
-              .from('posts')
-              .insert(postData);
-
-            if (error) throw error;
-
-            deliveryResults.push({
-              channel: 'Spotlight',
-              status: 'delivered'
-            });
-          }
-        } catch (error: any) {
+        if (addToSpotlight) {
           deliveryResults.push({
-            channel: audience === 'team_feed' ? 'Team Feed' : 
-                     audience === 'team_agent' ? 'Team Agent Messages' : 
-                     audience === 'spotlight' ? 'Spotlight' : audience,
-            status: 'failed',
-            error: error.message
+            channel: 'Spotlight Feed',
+            status: 'delivered'
           });
         }
+
+        // ALWAYS broadcast to all team huddles as Team Agent messages
+        const huddleResult = await broadcastToHuddles({
+          ...basePostData,
+          author_id: '00000000-0000-0000-0000-000000000000', // TEAM AGENT user_id
+          is_team_agent_message: true
+        });
+
+        deliveryResults.push({
+          channel: 'All Team Huddles',
+          status: huddleResult.success ? 'delivered' : 'failed',
+          error: huddleResult.error
+        });
+
+      } catch (error: any) {
+        deliveryResults.push({
+          channel: 'Broadcast',
+          status: 'failed',
+          error: error.message
+        });
       }
 
       setDeliveryStatus(deliveryResults);
@@ -351,7 +327,8 @@ export const BroadcastCenter = () => {
         setEmbedCode('');
         setMediaUrl('');
         setMediaType(null);
-        setTargetAudience(['team_feed']);
+        setMediaCommentary('');
+        setAddToSpotlight(false);
         
         // Delay hiding delivery status to let user see results
         setTimeout(() => setShowDeliveryStatus(false), 3000);
@@ -401,12 +378,15 @@ export const BroadcastCenter = () => {
         };
       }
 
+      const finalContent = mediaCommentary.trim() || content || (messageType === 'upload' ? '' : '');
+      const targetAudience = addToSpotlight ? ['team_feed', 'spotlight'] : ['team_feed'];
+
       const postData = {
-        content: content || (mediaType === 'image' ? 'Shared an image' : mediaType === 'video' ? 'Shared a video' : ''),
+        content: finalContent,
         team_id: selectedTeam,
         author_id: user.id,
         message_type: messageType,
-        is_spotlight: targetAudience.includes('spotlight'),
+        is_spotlight: addToSpotlight,
         is_agent_post: true,
         poll_data: pollData,
         media_url: messageType === 'upload' ? mediaUrl : null,
@@ -433,7 +413,8 @@ export const BroadcastCenter = () => {
       setEmbedCode('');
       setMediaUrl('');
       setMediaType(null);
-      setTargetAudience(['team_feed']);
+      setMediaCommentary('');
+      setAddToSpotlight(false);
       
     } catch (error: any) {
       console.error('Error scheduling message:', error);
@@ -613,7 +594,7 @@ export const BroadcastCenter = () => {
                 </div>
               ) : (
                 <MediaUpload
-                  onMediaSelected={handleMediaSelected}
+                  onMediaSelected={handleMediaWithCommentary}
                   bucket="broadcast-media"
                   showPreview={false}
                 />
@@ -621,67 +602,39 @@ export const BroadcastCenter = () => {
             </div>
           )}
 
+          {/* Upload Commentary for Media */}
+          {messageType === 'upload' && (
+            <div className="space-y-2">
+              <Label htmlFor="media-commentary">Message (Optional)</Label>
+              <Textarea
+                id="media-commentary"
+                value={mediaCommentary}
+                onChange={(e) => setMediaCommentary(e.target.value)}
+                placeholder="Add a message to go with your upload..."
+                rows={3}
+              />
+            </div>
+          )}
+
           <Separator />
 
-          {/* Target Audience */}
-          <div className="space-y-3">
-            <Label>Target Audience</Label>
-            <div className="grid grid-cols-1 gap-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="team_feed"
-                  checked={targetAudience.includes('team_feed')}
-                  onCheckedChange={(checked) => 
-                    handleAudienceChange('team_feed', checked as boolean)
-                  }
-                />
-                <Label htmlFor="team_feed" className="font-medium">Team Feed</Label>
-                <span className="text-xs text-muted-foreground">(public posts only)</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="spotlight"
-                  checked={targetAudience.includes('spotlight')}
-                  onCheckedChange={(checked) => 
-                    handleAudienceChange('spotlight', checked as boolean)
-                  }
-                />
-                <Label htmlFor="spotlight" className="font-medium">Spotlight</Label>
-                <span className="text-xs text-muted-foreground">(public showcase)</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="team_feed"
-                  checked={targetAudience.includes('team_feed')}
-                  onCheckedChange={(checked) => 
-                    handleAudienceChange('team_feed', checked as boolean)
-                  }
-                />
-                <Label htmlFor="team_feed" className="font-medium">Followed Teams Feed</Label>
-                <span className="text-xs text-muted-foreground">(sends to users who follow this team)</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="team_agent"
-                  checked={targetAudience.includes('team_agent')}
-                  onCheckedChange={(checked) => 
-                    handleAudienceChange('team_agent', checked as boolean)
-                  }
-                />
-                <Label htmlFor="team_agent" className="font-medium">Team Agent to Huddles</Label>
-                <span className="text-xs text-muted-foreground">(official messages to all huddles)</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="side_huddles"
-                  checked={targetAudience.includes('side_huddles')}
-                  onCheckedChange={(checked) => 
-                    handleAudienceChange('side_huddles', checked as boolean)
-                  }
-                />
-                <Label htmlFor="side_huddles" className="font-medium">Side Huddles</Label>
-                <span className="text-xs text-muted-foreground">(broadcast to huddles only)</span>
-              </div>
+          {/* Simplified Broadcast Options */}
+          <div className="space-y-4">
+            <div>
+              <Label className="text-base font-medium">Broadcast Settings</Label>
+              <p className="text-sm text-muted-foreground mt-1">
+                Every message automatically goes to Team Feed and All Team Huddles
+              </p>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="spotlight"
+                checked={addToSpotlight}
+                onCheckedChange={setAddToSpotlight}
+              />
+              <Label htmlFor="spotlight" className="font-medium">Add to Spotlight Feed</Label>
+              <span className="text-xs text-muted-foreground">(featured across all teams)</span>
             </div>
           </div>
 
