@@ -190,7 +190,7 @@ export const BroadcastCenter = () => {
             .insert({
               content: postData.content,
               huddle_id: huddle.id,
-              user_id: postData.author_id,
+              user_id: postData.is_team_agent_message ? '00000000-0000-0000-0000-000000000000' : postData.author_id,
               media_url: postData.media_url,
               media_type: postData.media_url ? 
                 (postData.media_url.includes('.mp4') || postData.media_url.includes('.mov') || postData.media_url.includes('.webm') || postData.media_url.includes('.avi') ? 'video' : 'image') 
