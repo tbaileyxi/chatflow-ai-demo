@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Phone } from 'lucide-react';
+import { Phone, Info, Clock } from 'lucide-react';
 
 
 export const Auth = () => {
@@ -19,6 +20,9 @@ export const Auth = () => {
   const [verificationCode, setVerificationCode] = useState('');
   const [sentCode, setSentCode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isDevelopmentMode, setIsDevelopmentMode] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
+  const [canResend, setCanResend] = useState(false);
 
   if (user) {
     // Check for pending huddle join
@@ -35,6 +39,29 @@ export const Auth = () => {
     }
     return <Navigate to="/" replace />;
   }
+
+  // Timer effect for countdown
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (sentCode && timeRemaining > 0) {
+      interval = setInterval(() => {
+        setTimeRemaining((prev) => {
+          if (prev <= 1) {
+            setCanResend(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [sentCode, timeRemaining]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const formatPhoneNumber = (phone: string) => {
     // Remove all non-digits
@@ -81,12 +108,33 @@ export const Auth = () => {
 
       if (error) throw error;
       
+      // Check if we're in development mode by calling the SMS function
+      try {
+        const { data: smsResponse } = await supabase.functions.invoke('send-sms', {
+          body: { phone_number: formattedPhone, verification_code: '123456' }
+        });
+        
+        if (smsResponse?.message?.includes('Development mode')) {
+          setIsDevelopmentMode(true);
+        }
+      } catch (smsError) {
+        console.log('SMS function check failed:', smsError);
+      }
+      
       // Update the phone number state to the formatted version
       setPhoneNumber(formattedPhone);
       setSentCode(true);
+      setTimeRemaining(300); // Reset timer to 5 minutes
+      setCanResend(false);
+      
+      const toastTitle = isDevelopmentMode ? "Development Mode" : "Code Sent";
+      const toastDescription = isDevelopmentMode 
+        ? "Use verification code: 123456 (no SMS sent)" 
+        : "Check your phone for the verification code";
+        
       toast({
-        title: "Code Sent",
-        description: "Check your phone for the verification code",
+        title: toastTitle,
+        description: toastDescription,
       });
     } catch (error: any) {
       console.error('SMS Error:', error);
@@ -106,6 +154,13 @@ export const Auth = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const requestNewCode = async () => {
+    setTimeRemaining(300);
+    setCanResend(false);
+    setVerificationCode('');
+    await sendVerificationCode();
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -128,9 +183,17 @@ export const Auth = () => {
       
       // Auth state will automatically redirect via useAuth
     } catch (error: any) {
+      let errorMessage = error.message;
+      
+      if (error.message?.includes('otp_expired') || error.message?.includes('expired')) {
+        errorMessage = "Verification code has expired. Please request a new code.";
+        setCanResend(true);
+        setTimeRemaining(0);
+      }
+      
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -178,37 +241,74 @@ export const Auth = () => {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleAuth} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="code">Verification Code</Label>
-                <p className="text-sm text-muted-foreground">
-                  Enter the 6-digit code sent to {phoneNumber}
-                </p>
-                <Input
-                  id="code"
-                  type="text"
-                  placeholder="123456"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
-                  maxLength={6}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Verifying...' : isSignUp ? 'Create Account' : 'Sign In'}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  setSentCode(false);
-                  setVerificationCode('');
-                }}
-              >
-                Change Phone Number
-              </Button>
-            </form>
+            <div className="space-y-4">
+              {isDevelopmentMode && (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Development Mode</strong><br />
+                    Use verification code: <strong>123456</strong><br />
+                    <span className="text-sm text-muted-foreground">No SMS will be sent</span>
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              <form onSubmit={handleAuth} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="code">Verification Code</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Enter the 6-digit code sent to {phoneNumber}
+                  </p>
+                  <Input
+                    id="code"
+                    type="text"
+                    placeholder={isDevelopmentMode ? "123456" : "Enter code"}
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value)}
+                    maxLength={6}
+                    required
+                  />
+                  
+                  {timeRemaining > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      Code expires in: {formatTime(timeRemaining)}
+                    </div>
+                  )}
+                </div>
+                
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Verifying...' : isSignUp ? 'Create Account' : 'Sign In'}
+                </Button>
+                
+                {canResend && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={requestNewCode}
+                    disabled={loading}
+                  >
+                    Request New Code
+                  </Button>
+                )}
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setSentCode(false);
+                    setVerificationCode('');
+                    setIsDevelopmentMode(false);
+                    setTimeRemaining(300);
+                    setCanResend(false);
+                  }}
+                >
+                  Change Phone Number
+                </Button>
+              </form>
+            </div>
           )}
         </CardContent>
       </Card>
