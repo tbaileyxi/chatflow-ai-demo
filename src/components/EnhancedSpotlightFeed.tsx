@@ -14,10 +14,16 @@ interface SpotlightPost {
   media_url?: string;
   poll_data?: any;
   created_at: string;
+  author_id?: string;
   team: {
     id: string;
     name: string;
     logo_url?: string;
+  };
+  author?: {
+    display_name?: string;
+    username?: string;
+    avatar_url?: string;
   };
   post_reactions: Array<{
     reaction_type: string;
@@ -54,6 +60,7 @@ export const EnhancedSpotlightFeed = () => {
           media_url,
           poll_data,
           created_at,
+          author_id,
           team:teams(id, name, logo_url),
           post_reactions(reaction_type)
         `)
@@ -64,10 +71,10 @@ export const EnhancedSpotlightFeed = () => {
 
       if (error) throw error;
 
-      // Fetch vote scores and user votes for each post
+      // Fetch vote scores, user votes, and author profiles for each post
       const postsWithVotes = await Promise.all(
         (posts || []).map(async (post) => {
-          const [voteScoreResult, userVoteResult, reportResult] = await Promise.all([
+          const [voteScoreResult, userVoteResult, reportResult, authorResult] = await Promise.all([
             supabase.rpc('calculate_post_vote_score', { post_uuid: post.id }),
             user ? supabase
               .from('spotlight_votes')
@@ -80,6 +87,11 @@ export const EnhancedSpotlightFeed = () => {
               .select('id')
               .eq('post_id', post.id)
               .eq('user_id', user.id)
+              .single() : Promise.resolve({ data: null }),
+            post.author_id ? supabase
+              .from('profiles')
+              .select('display_name, username, avatar_url')
+              .eq('user_id', post.author_id)
               .single() : Promise.resolve({ data: null })
           ]);
 
@@ -87,7 +99,8 @@ export const EnhancedSpotlightFeed = () => {
             ...post,
             vote_score: voteScoreResult.data || 0,
             user_vote: userVoteResult.data?.vote_type || null,
-            has_reported: !!reportResult.data
+            has_reported: !!reportResult.data,
+            author: authorResult.data
           };
         })
       );

@@ -61,10 +61,16 @@ interface PostCardProps {
     message_type?: string;
     poll_data?: any;
     created_at: string;
+    author_id?: string;
     team: {
       id: string;
       name: string;
       logo_url?: string;
+    };
+    author?: {
+      display_name?: string;
+      username?: string;
+      avatar_url?: string;
     };
     post_reactions: Array<{
       reaction_type: string;
@@ -249,18 +255,30 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
       {/* Team Header */}
       <div className="flex items-center gap-3 mb-3">
         <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-          {post.team.logo_url ? (
+          {post.author?.avatar_url ? (
+            <img src={post.author.avatar_url} alt="Author" className="w-8 h-8 rounded-full" />
+          ) : post.team.logo_url ? (
             <img src={post.team.logo_url} alt={post.team.name} className="w-8 h-8 rounded-full" />
           ) : (
             <span className="text-primary font-bold text-sm">
-              {post.team.name.substring(0, 2).toUpperCase()}
+              {post.author?.display_name ? 
+                post.author.display_name.substring(0, 2).toUpperCase() :
+                post.team.name.substring(0, 2).toUpperCase()
+              }
             </span>
           )}
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-foreground">{post.team.name}</h3>
-            <span className="text-xs text-primary font-medium">AGENT</span>
+            <h3 className="font-semibold text-foreground">
+              {post.author?.display_name || post.author?.username || post.team.name}
+            </h3>
+            {!post.author && (
+              <span className="text-xs text-primary font-medium">AGENT</span>
+            )}
+            {post.author && (
+              <span className="text-xs text-muted-foreground">via {post.team.name}</span>
+            )}
             {isSpotlight && (
               <span className="text-xs bg-spotlight text-primary-foreground px-2 py-1 rounded-full font-medium">
                 SPOTLIGHT

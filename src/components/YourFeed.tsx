@@ -10,10 +10,16 @@ interface Post {
   media_url?: string;
   poll_data?: any;
   created_at: string;
+  author_id?: string;
   team: {
     id: string;
     name: string;
     logo_url?: string;
+  };
+  author?: {
+    display_name?: string;
+    username?: string;
+    avatar_url?: string;
   };
   post_reactions: Array<{
     reaction_type: string;
