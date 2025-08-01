@@ -6,7 +6,8 @@ import { BroadcastCenter } from '@/components/admin/BroadcastCenter';
 import { TeamManagement } from '@/components/admin/TeamManagement';
 import { UserManagement } from '@/components/admin/UserManagement';
 import { FirstAdminSetup } from '@/components/admin/FirstAdminSetup';
-import { BarChart3, Radio, Users, Shield } from 'lucide-react';
+import { ModerationPanel } from '@/components/admin/ModerationPanel';
+import { BarChart3, Radio, Users, Shield, Flag } from 'lucide-react';
 
 export const Admin = () => {
   const { isAdmin, loading, user } = useAuth();
@@ -38,7 +39,7 @@ export const Admin = () => {
           <FirstAdminSetup />
         ) : (
           <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+            <TabsList className="grid grid-cols-5 w-full max-w-3xl">
               <TabsTrigger value="dashboard" className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
                 Dashboard
@@ -54,6 +55,10 @@ export const Admin = () => {
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Shield className="w-4 h-4" />
                 Users
+              </TabsTrigger>
+              <TabsTrigger value="moderation" className="flex items-center gap-2">
+                <Flag className="w-4 h-4" />
+                Moderation
               </TabsTrigger>
             </TabsList>
 
@@ -71,6 +76,10 @@ export const Admin = () => {
 
             <TabsContent value="users">
               <UserManagement />
+            </TabsContent>
+
+            <TabsContent value="moderation">
+              <ModerationPanel />
             </TabsContent>
           </Tabs>
         )}

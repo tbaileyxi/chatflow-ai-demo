@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -15,6 +15,7 @@ import { MediaViewer } from "@/components/MediaViewer";
 import { TwitterEmbed } from "@/components/PostCard";
 import { InviteButton } from "@/components/InviteButton";
 import { CollapsibleMemberList } from "@/components/CollapsibleMemberList";
+import { MakePublicButton } from "@/components/MakePublicButton";
 
 interface HuddleData {
   id: string;
@@ -483,7 +484,7 @@ export const Huddle = () => {
                     </div>
                   )}
                   
-                  {/* Quick reaction buttons */}
+                   {/* Quick reaction buttons and Make Public */}
                   <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {['👍', '😂', '🔥'].map((emoji) => {
                       const reactionData = message.reactions?.[emoji];
@@ -502,6 +503,17 @@ export const Huddle = () => {
                       }
                       return null;
                     })}
+                    
+                    {/* Make Public Button - only for message owner */}
+                    <MakePublicButton
+                      messageId={message.id}
+                      messageContent={message.content}
+                      mediaUrl={message.media_url}
+                      mediaType={message.media_type}
+                      embedCode={message.embed_code}
+                      teamId={huddle?.team.id}
+                      isOwner={message.user_id === user?.id}
+                    />
                   </div>
                 </div>
                 
@@ -516,11 +528,17 @@ export const Huddle = () => {
       {/* Message Input */}
       <Card className="m-4 p-3 border-0 border-t border-border rounded-none">
         <form onSubmit={sendMessage} className="flex gap-2 mb-2">
-          <Input
+          <Textarea
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Type a message..."
-            className="flex-1"
+            className="flex-1 min-h-[40px] max-h-[120px] resize-none"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage(e);
+              }
+            }}
           />
           <Dialog open={mediaDialogOpen} onOpenChange={setMediaDialogOpen}>
             <DialogTrigger asChild>

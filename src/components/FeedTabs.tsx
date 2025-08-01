@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { YourFeed } from "@/components/YourFeed";
-import { SpotlightFeed } from "@/components/SpotlightFeed";
+import { EnhancedSpotlightFeed } from "@/components/EnhancedSpotlightFeed";
 
 export const FeedTabs = () => {
   const [activeTab, setActiveTab] = useState("your-feed");
@@ -27,7 +27,7 @@ export const FeedTabs = () => {
           <YourFeed />
         </TabsContent>
         <TabsContent value="spotlight" className="flex-1 mt-0">
-          <SpotlightFeed />
+          <EnhancedSpotlightFeed />
         </TabsContent>
       </Tabs>
     </div>
