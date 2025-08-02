@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Users, Trophy, Heart, Check } from 'lucide-react';
+import { Search, Users, Trophy, Heart, Check, Clock } from 'lucide-react';
 
 interface Team {
   id: string;
@@ -21,6 +21,7 @@ interface Team {
   description?: string;
   follower_count?: number;
   is_following?: boolean;
+  status: 'active' | 'coming_soon' | 'inactive';
 }
 
 export const TeamDirectory = () => {
@@ -28,6 +29,7 @@ export const TeamDirectory = () => {
   const { toast } = useToast();
   const [teams, setTeams] = useState<Team[]>([]);
   const [followedTeams, setFollowedTeams] = useState<Team[]>([]);
+  const [waitlistTeams, setWaitlistTeams] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLeague, setSelectedLeague] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -36,6 +38,7 @@ export const TeamDirectory = () => {
     fetchTeams();
     if (user) {
       fetchFollowedTeams();
+      fetchWaitlistTeams();
     }
   }, [user]);
 
@@ -48,7 +51,7 @@ export const TeamDirectory = () => {
         .order('city', { ascending: true });
 
       if (error) throw error;
-      setTeams(data || []);
+      setTeams((data || []) as Team[]);
     } catch (error) {
       console.error('Error fetching teams:', error);
       toast({
@@ -71,9 +74,23 @@ export const TeamDirectory = () => {
         .eq('user_id', user?.id);
 
       if (error) throw error;
-      setFollowedTeams(data?.map(item => item.team) || []);
+      setFollowedTeams((data?.map(item => item.team) || []) as Team[]);
     } catch (error) {
       console.error('Error fetching followed teams:', error);
+    }
+  };
+
+  const fetchWaitlistTeams = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('team_waitlist')
+        .select('team_id')
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+      setWaitlistTeams(data?.map(item => item.team_id) || []);
+    } catch (error) {
+      console.error('Error fetching waitlist teams:', error);
     }
   };
 
@@ -134,7 +151,53 @@ export const TeamDirectory = () => {
     }
   };
 
-  const filteredTeams = teams.filter(team => {
+  const joinWaitlist = async (teamId: string) => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to join waitlist",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('team_waitlist')
+        .insert({
+          team_id: teamId,
+          user_id: user.id,
+          email: user.email || user.phone || ''
+        });
+
+      if (error) throw error;
+      
+      setWaitlistTeams(prev => [...prev, teamId]);
+      toast({
+        title: "Success",
+        description: "You'll be notified when this team launches!",
+      });
+    } catch (error) {
+      console.error('Error joining waitlist:', error);
+      toast({
+        title: "Error",
+        description: "Failed to join waitlist",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const activeTeams = teams.filter(team => team.status === 'active');
+  const comingSoonTeams = teams.filter(team => team.status === 'coming_soon');
+  
+  const filteredActiveTeams = activeTeams.filter(team => {
+    const matchesSearch = team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         team.city.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesLeague = selectedLeague === 'all' || team.league === selectedLeague;
+    return matchesSearch && matchesLeague;
+  });
+
+  const filteredComingSoonTeams = comingSoonTeams.filter(team => {
     const matchesSearch = team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          team.city.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesLeague = selectedLeague === 'all' || team.league === selectedLeague;
@@ -142,6 +205,7 @@ export const TeamDirectory = () => {
   });
 
   const isFollowing = (teamId: string) => followedTeams.some(team => team.id === teamId);
+  const isOnWaitlist = (teamId: string) => waitlistTeams.includes(teamId);
 
   if (loading) {
     return (
@@ -182,7 +246,7 @@ export const TeamDirectory = () => {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -216,84 +280,168 @@ export const TeamDirectory = () => {
               </div>
             </CardContent>
           </Card>
-        </div>
-
-        {/* Teams Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredTeams.map((team) => (
-            <Card key={team.id} className="transition-shadow hover:shadow-lg">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="w-12 h-12">
-                      <AvatarImage src={team.logo_url} />
-                      <AvatarFallback className="bg-primary/20 text-primary font-bold">
-                        {team.name.substring(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <CardTitle className="text-base">{team.city}</CardTitle>
-                      <p className="text-sm text-muted-foreground">{team.name}</p>
-                    </div>
-                  </div>
-                  {user && (
-                    <Button
-                      variant={isFollowing(team.id) ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => toggleFollow(team.id)}
-                      className="flex items-center gap-1"
-                    >
-                      {isFollowing(team.id) ? (
-                        <>
-                          <Check className="w-3 h-3" />
-                          Following
-                        </>
-                      ) : (
-                        <>
-                          <Heart className="w-3 h-3" />
-                          Follow
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <Badge variant="secondary">{team.league}</Badge>
-                    {team.conference && (
-                      <Badge variant="outline">{team.conference}</Badge>
-                    )}
-                  </div>
-                  
-                  {team.division && (
-                    <p className="text-sm text-muted-foreground">
-                      {team.conference} {team.division}
-                    </p>
-                  )}
-                  
-                  {team.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {team.description}
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {filteredTeams.length === 0 && (
           <Card>
-            <CardContent className="text-center py-8">
-              <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold mb-2">No teams found</h3>
-              <p className="text-muted-foreground">
-                Try adjusting your search terms or filters
-              </p>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Clock className="w-8 h-8 text-orange-500" />
+                <div>
+                  <p className="text-2xl font-bold">{comingSoonTeams.length}</p>
+                  <p className="text-sm text-muted-foreground">Coming Soon</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Active Teams Section */}
+        <div className="space-y-4">
+          <h2 className="text-2xl font-bold">Active Teams</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredActiveTeams.map((team) => (
+              <Card key={team.id} className="transition-shadow hover:shadow-lg">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={team.logo_url} />
+                        <AvatarFallback className="bg-primary/20 text-primary font-bold">
+                          {team.name.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <CardTitle className="text-base">{team.city}</CardTitle>
+                        <p className="text-sm text-muted-foreground">{team.name}</p>
+                      </div>
+                    </div>
+                    {user && (
+                      <Button
+                        variant={isFollowing(team.id) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => toggleFollow(team.id)}
+                        className="flex items-center gap-1"
+                      >
+                        {isFollowing(team.id) ? (
+                          <>
+                            <Check className="w-3 h-3" />
+                            Following
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="w-3 h-3" />
+                            Follow
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <Badge variant="secondary">{team.league}</Badge>
+                      {team.conference && (
+                        <Badge variant="outline">{team.conference}</Badge>
+                      )}
+                    </div>
+                    
+                    {team.division && (
+                      <p className="text-sm text-muted-foreground">
+                        {team.conference} {team.division}
+                      </p>
+                    )}
+                    
+                    {team.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {team.description}
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          
+          {filteredActiveTeams.length === 0 && (
+            <Card>
+              <CardContent className="text-center py-8">
+                <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">No active teams found</h3>
+                <p className="text-muted-foreground">
+                  Try adjusting your search terms or filters
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Coming Soon Teams Section */}
+        {filteredComingSoonTeams.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Launching Soon</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredComingSoonTeams.map((team) => (
+                <Card key={team.id} className="transition-shadow hover:shadow-lg border-dashed">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-12 h-12 opacity-60">
+                          <AvatarImage src={team.logo_url} />
+                          <AvatarFallback className="bg-muted text-muted-foreground font-bold">
+                            {team.name.substring(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <CardTitle className="text-base text-muted-foreground">{team.city}</CardTitle>
+                          <p className="text-sm text-muted-foreground">{team.name}</p>
+                        </div>
+                      </div>
+                      {user && (
+                        <Button
+                          variant={isOnWaitlist(team.id) ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => joinWaitlist(team.id)}
+                          disabled={isOnWaitlist(team.id)}
+                          className="flex items-center gap-1"
+                        >
+                          {isOnWaitlist(team.id) ? (
+                            <>
+                              <Check className="w-3 h-3" />
+                              On Waitlist
+                            </>
+                          ) : (
+                            'Join Waitlist'
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <Badge variant="outline" className="border-orange-500 text-orange-500">
+                          Coming Soon
+                        </Badge>
+                        <Badge variant="secondary">{team.league}</Badge>
+                        {team.conference && (
+                          <Badge variant="outline">{team.conference}</Badge>
+                        )}
+                      </div>
+                      
+                      {team.division && (
+                        <p className="text-sm text-muted-foreground">
+                          {team.conference} {team.division}
+                        </p>
+                      )}
+                      
+                      <p className="text-sm text-muted-foreground">
+                        Get notified when this team launches!
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Following Section */}

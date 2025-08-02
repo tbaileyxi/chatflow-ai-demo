@@ -202,14 +202,18 @@ export const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-center flex items-center justify-center gap-2">
-            <Phone className="h-5 w-5" />
-            {isSignUp ? 'Create Account' : 'Welcome to Side Huddle'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl font-bold text-foreground">
+            Finally: Private group chats that actually follow your team
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            All social media posts + your friends in one place
+          </p>
+        </div>
+        
+        <Card className="w-full">
+          <CardContent className="pt-6">
           {!sentCode ? (
             <div className="space-y-4">
               <div className="space-y-2">
@@ -308,9 +312,10 @@ export const Auth = () => {
                 </Button>
               </form>
             </div>
-          )}
-        </CardContent>
-      </Card>
+           )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

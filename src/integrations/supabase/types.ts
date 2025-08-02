@@ -400,6 +400,30 @@ export type Database = {
         }
         Relationships: []
       }
+      team_waitlist: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          team_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          team_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          team_id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       teams: {
         Row: {
           city: string
@@ -412,6 +436,7 @@ export type Database = {
           logo_url: string | null
           name: string
           stats: Json | null
+          status: string | null
           updated_at: string
         }
         Insert: {
@@ -425,6 +450,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           stats?: Json | null
+          status?: string | null
           updated_at?: string
         }
         Update: {
@@ -438,6 +464,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           stats?: Json | null
+          status?: string | null
           updated_at?: string
         }
         Relationships: []
