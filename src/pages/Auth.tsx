@@ -208,7 +208,7 @@ export const Auth = () => {
             Finally: Private group chats that actually follow your team
           </h1>
           <p className="text-sm text-muted-foreground">
-            All social media posts + your friends in one place
+            Curated social media posts + your friends in one place
           </p>
         </div>
         
