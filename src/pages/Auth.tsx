@@ -25,6 +25,9 @@ export const Auth = () => {
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
   const [canResend, setCanResend] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(true);
+  const [showDevAuth, setShowDevAuth] = useState(false);
+  const [devEmail, setDevEmail] = useState('');
+  const [devPassword, setDevPassword] = useState('');
 
   // Check for user authentication and handle redirects
   if (user) {
@@ -202,6 +205,60 @@ export const Auth = () => {
     }
   };
 
+  const handleDevAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!devEmail || !devPassword) {
+      toast({
+        title: "Error",
+        description: "Please enter both email and password",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Try to sign in first
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: devEmail,
+        password: devPassword,
+      });
+
+      if (signInError && signInError.message.includes('Invalid login credentials')) {
+        // If sign in fails, try to sign up
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: devEmail,
+          password: devPassword,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`
+          }
+        });
+
+        if (signUpError) throw signUpError;
+
+        toast({
+          title: "Success",
+          description: "Account created! You can now access the admin panel.",
+        });
+      } else if (signInError) {
+        throw signInError;
+      } else {
+        toast({
+          title: "Success",
+          description: "Successfully signed in!",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6">
@@ -216,7 +273,57 @@ export const Auth = () => {
         
         <Card className="w-full">
           <CardContent className="pt-6">
-          {!sentCode ? (
+          {showDevAuth ? (
+            <div className="space-y-4">
+              <div className="border border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Info className="w-4 h-4 text-orange-500" />
+                  <span className="font-medium text-orange-700 dark:text-orange-300">Development Authentication</span>
+                </div>
+                <p className="text-sm text-orange-600 dark:text-orange-400 mb-3">
+                  Quick access for development - bypasses SMS verification
+                </p>
+              </div>
+              
+              <form onSubmit={handleDevAuth} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="dev-email">Email</Label>
+                  <Input
+                    id="dev-email"
+                    type="email"
+                    value={devEmail}
+                    onChange={(e) => setDevEmail(e.target.value)}
+                    placeholder="admin@example.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dev-password">Password</Label>
+                  <Input
+                    id="dev-password"
+                    type="password"
+                    value={devPassword}
+                    onChange={(e) => setDevPassword(e.target.value)}
+                    placeholder="Enter password (min 6 characters)"
+                    required
+                  />
+                </div>
+                
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Authenticating...' : 'Sign In / Sign Up'}
+                </Button>
+                
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => setShowDevAuth(false)}
+                >
+                  Back to SMS Auth
+                </Button>
+              </form>
+            </div>
+          ) : !sentCode ? (
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
@@ -242,6 +349,13 @@ export const Auth = () => {
                   onClick={() => setIsSignUp(!isSignUp)}
                 >
                   {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDevAuth(true)}
+                  className="w-full"
+                >
+                  Development Authentication (Bypass SMS)
                 </Button>
               </div>
             </div>
