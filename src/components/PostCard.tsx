@@ -63,6 +63,7 @@ interface PostCardProps {
     created_at: string;
     author_id?: string;
     is_team_agent_message?: boolean;
+    is_agent_post?: boolean;
     team: {
       id: string;
       name: string;
@@ -256,7 +257,9 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
       {/* Team Header */}
       <div className="flex items-center gap-3 mb-3">
         <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-          {post.author?.avatar_url ? (
+          {(post.is_team_agent_message || post.is_agent_post) && post.team.logo_url ? (
+            <img src={post.team.logo_url} alt={post.team.name} className="w-8 h-8 rounded-full" />
+          ) : post.author?.avatar_url ? (
             <img src={post.author.avatar_url} alt="Author" className="w-8 h-8 rounded-full" />
           ) : post.team.logo_url ? (
             <img src={post.team.logo_url} alt={post.team.name} className="w-8 h-8 rounded-full" />
@@ -272,15 +275,15 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-foreground">
-              {post.is_team_agent_message || !post.author ? 
-                post.team.name : 
+              {(post.is_team_agent_message || post.is_agent_post || !post.author) ? 
+                `${post.team.name} Agent` : 
                 (post.author?.display_name || post.author?.username || post.team.name)
               }
             </h3>
-            {(post.is_team_agent_message || !post.author) && (
+            {(post.is_team_agent_message || post.is_agent_post || !post.author) && (
               <span className="text-xs text-primary font-medium">TEAM AGENT</span>
             )}
-            {post.author && !post.is_team_agent_message && (
+            {post.author && !post.is_team_agent_message && !post.is_agent_post && (
               <span className="text-xs text-muted-foreground">via {post.team.name}</span>
             )}
             {isSpotlight && (

@@ -404,9 +404,14 @@ export const Huddle = () => {
                 {/* Avatar - only show for non-current user messages */}
                 {(!isCurrentUser || isTeamAgent) && (
                   <Avatar className="w-7 h-7 flex-shrink-0">
-                    <AvatarImage src={message.profiles?.avatar_url} />
+                    {isTeamAgent && huddle?.team.logo_url ? (
+                      <AvatarImage src={huddle.team.logo_url} />
+                    ) : (
+                      <AvatarImage src={message.profiles?.avatar_url} />
+                    )}
                     <AvatarFallback className="text-xs">
-                      {isTeamAgent ? 'TA' : 
+                      {isTeamAgent ? 
+                        (huddle?.team.name.substring(0, 2).toUpperCase() || 'TA') : 
                        (message.profiles?.display_name || message.profiles?.username) ? 
                        (message.profiles.display_name || message.profiles.username)!.substring(0, 2).toUpperCase() : 'U'}
                     </AvatarFallback>

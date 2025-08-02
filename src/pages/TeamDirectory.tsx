@@ -189,6 +189,8 @@ export const TeamDirectory = () => {
 
   const activeTeams = teams.filter(team => team.status === 'active');
   const comingSoonTeams = teams.filter(team => team.status === 'coming_soon');
+  const totalActiveTeams = activeTeams.length;
+  const ncaaTeamCount = teams.filter(t => t.league === 'NCAA' && t.status === 'active').length;
   
   const filteredActiveTeams = activeTeams.filter(team => {
     const matchesSearch = team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -252,7 +254,7 @@ export const TeamDirectory = () => {
               <div className="flex items-center gap-3">
                 <Trophy className="w-8 h-8 text-primary" />
                 <div>
-                  <p className="text-2xl font-bold">{teams.length}</p>
+                  <p className="text-2xl font-bold">{totalActiveTeams}</p>
                   <p className="text-sm text-muted-foreground">Total Teams</p>
                 </div>
               </div>
@@ -263,8 +265,19 @@ export const TeamDirectory = () => {
               <div className="flex items-center gap-3">
                 <Users className="w-8 h-8 text-blue-500" />
                 <div>
-                  <p className="text-2xl font-bold">{teams.filter(t => t.league === 'NFL').length}</p>
+                  <p className="text-2xl font-bold">{teams.filter(t => t.league === 'NFL' && t.status === 'active').length}</p>
                   <p className="text-sm text-muted-foreground">NFL Teams</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Users className="w-8 h-8 text-green-500" />
+                <div>
+                  <p className="text-2xl font-bold">{ncaaTeamCount}</p>
+                  <p className="text-sm text-muted-foreground">NCAA Teams</p>
                 </div>
               </div>
             </CardContent>
@@ -321,10 +334,7 @@ export const TeamDirectory = () => {
                         className="flex items-center gap-1"
                       >
                         {isFollowing(team.id) ? (
-                          <>
-                            <Check className="w-3 h-3" />
-                            Following
-                          </>
+                          <Check className="w-4 h-4" />
                         ) : (
                           <>
                             <Heart className="w-3 h-3" />

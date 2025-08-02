@@ -73,20 +73,41 @@ export const TeamManagement = () => {
 
   const fetchWaitlistCounts = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch waitlist counts
+      const { data: waitlistData, error: waitlistError } = await supabase
         .from('team_waitlist')
         .select('team_id');
 
-      if (error) throw error;
+      if (waitlistError) throw waitlistError;
+      
+      // Fetch follower counts
+      const { data: followerData, error: followerError } = await supabase
+        .from('user_follows')
+        .select('team_id');
+
+      if (followerError) throw followerError;
       
       const counts: Record<string, number> = {};
-      data?.forEach(entry => {
-        counts[entry.team_id] = (counts[entry.team_id] || 0) + 1;
+      
+      // Count waitlist entries for coming_soon teams
+      waitlistData?.forEach(entry => {
+        const team = teams.find(t => t.id === entry.team_id);
+        if (team?.status === 'coming_soon') {
+          counts[entry.team_id] = (counts[entry.team_id] || 0) + 1;
+        }
+      });
+      
+      // Count followers for active teams
+      followerData?.forEach(entry => {
+        const team = teams.find(t => t.id === entry.team_id);
+        if (team?.status === 'active') {
+          counts[entry.team_id] = (counts[entry.team_id] || 0) + 1;
+        }
       });
       
       setWaitlistCounts(counts);
     } catch (error) {
-      console.error('Error fetching waitlist counts:', error);
+      console.error('Error fetching counts:', error);
     }
   };
 
@@ -498,7 +519,9 @@ export const TeamManagement = () => {
                 <p className="text-sm text-muted-foreground mb-2">{team.description}</p>
               )}
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Waitlist:</span>
+                <span className="text-muted-foreground">
+                  {team.status === 'coming_soon' ? 'Waitlist:' : 'Followers:'}
+                </span>
                 <Badge variant="outline">
                   {waitlistCounts[team.id] || 0} users
                 </Badge>
