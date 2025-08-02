@@ -29,22 +29,7 @@ export const Auth = () => {
   const [devEmail, setDevEmail] = useState('');
   const [devPassword, setDevPassword] = useState('');
 
-  // Check for user authentication and handle redirects
-  if (user) {
-    const pendingJoinData = localStorage.getItem('pendingHuddleJoin');
-    if (pendingJoinData) {
-      try {
-        const joinData = JSON.parse(pendingJoinData);
-        return <Navigate to={`/join-huddle/${joinData.huddleId}`} replace />;
-      } catch (error) {
-        console.error('Error parsing pending join data:', error);
-        localStorage.removeItem('pendingHuddleJoin');
-      }
-    }
-    return <Navigate to="/" replace />;
-  }
-
-  // Timer effect for countdown
+  // Timer effect for countdown - MOVED BEFORE EARLY RETURNS
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (sentCode && timeRemaining > 0) {
@@ -60,6 +45,21 @@ export const Auth = () => {
     }
     return () => clearInterval(interval);
   }, [sentCode, timeRemaining]);
+
+  // Check for user authentication and handle redirects
+  if (user) {
+    const pendingJoinData = localStorage.getItem('pendingHuddleJoin');
+    if (pendingJoinData) {
+      try {
+        const joinData = JSON.parse(pendingJoinData);
+        return <Navigate to={`/join-huddle/${joinData.huddleId}`} replace />;
+      } catch (error) {
+        console.error('Error parsing pending join data:', error);
+        localStorage.removeItem('pendingHuddleJoin');
+      }
+    }
+    return <Navigate to="/" replace />;
+  }
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
