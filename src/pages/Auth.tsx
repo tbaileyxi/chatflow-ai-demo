@@ -12,8 +12,6 @@ import { Phone, Info, Clock } from 'lucide-react';
 
 
 export const Auth = () => {
-  console.log('Auth component rendering');
-  
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -26,15 +24,12 @@ export const Auth = () => {
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
   const [canResend, setCanResend] = useState(false);
 
-  console.log('Auth component - all hooks called, user:', !!user);
-
+  // Check for user authentication and handle redirects
   if (user) {
-    // Check for pending huddle join
     const pendingJoinData = localStorage.getItem('pendingHuddleJoin');
     if (pendingJoinData) {
       try {
         const joinData = JSON.parse(pendingJoinData);
-        // Navigate to the original invite link to complete the flow
         return <Navigate to={`/join-huddle/${joinData.huddleId}`} replace />;
       } catch (error) {
         console.error('Error parsing pending join data:', error);

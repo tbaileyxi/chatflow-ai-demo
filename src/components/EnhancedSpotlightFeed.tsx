@@ -38,8 +38,6 @@ interface GroupedPosts {
 }
 
 export const EnhancedSpotlightFeed = () => {
-  console.log('EnhancedSpotlightFeed rendering');
-  
   const { user } = useAuth();
   const { toast } = useToast();
   const [posts, setPosts] = useState<SpotlightPost[]>([]);
@@ -60,9 +58,11 @@ export const EnhancedSpotlightFeed = () => {
           id,
           content,
           media_url,
+          embed_code,
           poll_data,
           created_at,
           author_id,
+          is_team_agent_message,
           team:teams(id, name, logo_url),
           post_reactions(reaction_type)
         `)

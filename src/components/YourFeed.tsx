@@ -77,9 +77,11 @@ export const YourFeed = () => {
           id,
           content,
           media_url,
+          embed_code,
           poll_data,
           created_at,
           target_audience,
+          is_team_agent_message,
           team:teams(id, name, logo_url),
           post_reactions(reaction_type)
         `)

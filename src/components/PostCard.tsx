@@ -62,6 +62,7 @@ interface PostCardProps {
     poll_data?: any;
     created_at: string;
     author_id?: string;
+    is_team_agent_message?: boolean;
     team: {
       id: string;
       name: string;
@@ -271,12 +272,15 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-foreground">
-              {post.author?.display_name || post.author?.username || post.team.name}
+              {post.is_team_agent_message || !post.author ? 
+                post.team.name : 
+                (post.author?.display_name || post.author?.username || post.team.name)
+              }
             </h3>
-            {!post.author && (
-              <span className="text-xs text-primary font-medium">AGENT</span>
+            {(post.is_team_agent_message || !post.author) && (
+              <span className="text-xs text-primary font-medium">TEAM AGENT</span>
             )}
-            {post.author && (
+            {post.author && !post.is_team_agent_message && (
               <span className="text-xs text-muted-foreground">via {post.team.name}</span>
             )}
             {isSpotlight && (
