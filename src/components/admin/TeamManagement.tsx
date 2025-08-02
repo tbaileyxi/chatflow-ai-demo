@@ -21,11 +21,13 @@ interface Team {
   description?: string;
   logo_url?: string;
   stats: any;
+  status: string;
   created_at: string;
 }
 
 export const TeamManagement = () => {
   const [teams, setTeams] = useState<Team[]>([]);
+  const [waitlistCounts, setWaitlistCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
@@ -37,12 +39,14 @@ export const TeamManagement = () => {
     conference: '',
     division: '',
     description: '',
-    logo_url: ''
+    logo_url: '',
+    status: 'active'
   });
   const { toast } = useToast();
 
   useEffect(() => {
     fetchTeams();
+    fetchWaitlistCounts();
   }, []);
 
   const fetchTeams = async () => {
@@ -64,6 +68,25 @@ export const TeamManagement = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchWaitlistCounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('team_waitlist')
+        .select('team_id');
+
+      if (error) throw error;
+      
+      const counts: Record<string, number> = {};
+      data?.forEach(entry => {
+        counts[entry.team_id] = (counts[entry.team_id] || 0) + 1;
+      });
+      
+      setWaitlistCounts(counts);
+    } catch (error) {
+      console.error('Error fetching waitlist counts:', error);
     }
   };
 
@@ -108,7 +131,8 @@ export const TeamManagement = () => {
         conference: '',
         division: '',
         description: '',
-        logo_url: ''
+        logo_url: '',
+        status: 'active'
       });
       setIsAddDialogOpen(false);
       setEditingTeam(null);
@@ -132,7 +156,8 @@ export const TeamManagement = () => {
       conference: team.conference,
       division: team.division,
       description: team.description || '',
-      logo_url: team.logo_url || ''
+      logo_url: team.logo_url || '',
+      status: team.status || 'active'
     });
     setIsAddDialogOpen(true);
   };
@@ -172,7 +197,8 @@ export const TeamManagement = () => {
       conference: '',
       division: '',
       description: '',
-      logo_url: ''
+      logo_url: '',
+      status: 'active'
     });
     setEditingTeam(null);
   };
@@ -292,7 +318,7 @@ export const TeamManagement = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="league">League</Label>
                   <Select value={formData.league} onValueChange={(value) => 
@@ -304,6 +330,21 @@ export const TeamManagement = () => {
                     <SelectContent>
                       <SelectItem value="NFL">NFL</SelectItem>
                       <SelectItem value="NCAA">NCAA</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={formData.status} onValueChange={(value) => 
+                    setFormData(prev => ({ ...prev, status: value }))
+                  }>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="coming_soon">Coming Soon</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -431,6 +472,9 @@ export const TeamManagement = () => {
                       {team.conference && (
                         <Badge variant="outline">{team.conference}</Badge>
                       )}
+                      <Badge variant={team.status === 'active' ? 'default' : team.status === 'coming_soon' ? 'secondary' : 'destructive'}>
+                        {team.status === 'active' ? 'Active' : team.status === 'coming_soon' ? 'Coming Soon' : 'Inactive'}
+                      </Badge>
                     </div>
                   </div>
                 </div>
@@ -451,8 +495,14 @@ export const TeamManagement = () => {
                 </p>
               )}
               {team.description && (
-                <p className="text-sm text-muted-foreground">{team.description}</p>
+                <p className="text-sm text-muted-foreground mb-2">{team.description}</p>
               )}
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Waitlist:</span>
+                <Badge variant="outline">
+                  {waitlistCounts[team.id] || 0} users
+                </Badge>
+              </div>
             </CardContent>
           </Card>
         ))}
