@@ -49,7 +49,7 @@ export function ScheduleDialog({ open, onOpenChange, onSchedule, loading }: Sche
               selected={selectedDate}
               onSelect={setSelectedDate}
               disabled={(date) => date < new Date()}
-              className="rounded-md border"
+              className="rounded-md border pointer-events-auto"
             />
           </div>
           
@@ -69,8 +69,8 @@ export function ScheduleDialog({ open, onOpenChange, onSchedule, loading }: Sche
           
           {selectedDate && (
             <div className="bg-muted p-3 rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                Scheduled for: {format(selectedDate, 'PPP')} at {selectedTime}
+              <p className="text-sm font-medium text-foreground">
+                Scheduled for: <span className="text-primary">{format(selectedDate, 'MMM d, yyyy')}</span> at <span className="text-primary">{selectedTime}</span>
               </p>
             </div>
           )}
