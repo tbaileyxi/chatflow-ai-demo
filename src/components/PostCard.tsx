@@ -216,18 +216,50 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
   };
 
   const handleShare = async () => {
+    // Create deep link to specific post if it's a spotlight post
+    const baseUrl = window.location.origin;
+    const postUrl = isSpotlight ? `${baseUrl}/spotlight/${post.id}` : window.location.href;
+    
     const shareData = {
-      title: `${post.team?.name} Post`,
+      title: isSpotlight ? 
+        `${post.author?.display_name || post.team?.name} on Side Huddle` : 
+        `${post.team?.name} Post`,
       text: post.content,
-      url: window.location.href
+      url: postUrl
     };
+
+    // Add media to share data if available and supported
+    if (post.media_url && navigator.share) {
+      try {
+        // For native sharing with media, we need to fetch the media as a file
+        const response = await fetch(post.media_url);
+        const blob = await response.blob();
+        const file = new File([blob], 'shared-media', { type: blob.type });
+        
+        const shareDataWithMedia = {
+          ...shareData,
+          files: [file]
+        };
+        
+        if (navigator.canShare && navigator.canShare(shareDataWithMedia)) {
+          await navigator.share(shareDataWithMedia);
+          return;
+        }
+      } catch (error) {
+        console.log('Media sharing not supported, falling back to text');
+      }
+    }
 
     try {
       if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
         await navigator.share(shareData);
       } else {
-        // Fallback: copy to clipboard
-        await navigator.clipboard.writeText(`${post.content}\n\n${window.location.href}`);
+        // Fallback: copy to clipboard with enhanced format
+        const shareText = post.media_url ? 
+          `${post.content}\n\n📸 View media: ${postUrl}` :
+          `${post.content}\n\n${postUrl}`;
+          
+        await navigator.clipboard.writeText(shareText);
         toast({
           title: "Link copied!",
           description: "Post link copied to clipboard"
@@ -237,7 +269,11 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
       console.error('Error sharing:', error);
       // Fallback: copy to clipboard
       try {
-        await navigator.clipboard.writeText(`${post.content}\n\n${window.location.href}`);
+        const shareText = post.media_url ? 
+          `${post.content}\n\n📸 View media: ${postUrl}` :
+          `${post.content}\n\n${postUrl}`;
+          
+        await navigator.clipboard.writeText(shareText);
         toast({
           title: "Link copied!",
           description: "Post link copied to clipboard"
@@ -257,19 +293,29 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
       {/* Team Header */}
       <div className="flex items-center gap-3 mb-3">
         <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-          {isSpotlight && post.author?.avatar_url ? (
-            <img src={post.author.avatar_url} alt="Author" className="w-8 h-8 rounded-full" />
-          ) : (post.is_team_agent_message || post.is_agent_post) && post.team.logo_url ? (
-            <img src={post.team.logo_url} alt={post.team.name} className="w-8 h-8 rounded-full" />
-          ) : post.team.logo_url ? (
-            <img src={post.team.logo_url} alt={post.team.name} className="w-8 h-8 rounded-full" />
+          {isSpotlight ? (
+            // For spotlight posts, always show user avatar/initials
+            post.author?.avatar_url ? (
+              <img src={post.author.avatar_url} alt="Author" className="w-8 h-8 rounded-full" />
+            ) : (
+              <span className="text-primary font-bold text-sm">
+                {post.author?.display_name ? 
+                  post.author.display_name.substring(0, 2).toUpperCase() :
+                  post.team.name.substring(0, 2).toUpperCase()
+                }
+              </span>
+            )
           ) : (
-            <span className="text-primary font-bold text-sm">
-              {isSpotlight && post.author?.display_name ? 
-                post.author.display_name.substring(0, 2).toUpperCase() :
-                post.team.name.substring(0, 2).toUpperCase()
-              }
-            </span>
+            // For regular posts, show team agent or team logo
+            (post.is_team_agent_message || post.is_agent_post) && post.team.logo_url ? (
+              <img src={post.team.logo_url} alt={post.team.name} className="w-8 h-8 rounded-full" />
+            ) : post.team.logo_url ? (
+              <img src={post.team.logo_url} alt={post.team.name} className="w-8 h-8 rounded-full" />
+            ) : (
+              <span className="text-primary font-bold text-sm">
+                {post.team.name.substring(0, 2).toUpperCase()}
+              </span>
+            )
           )}
         </div>
         <div className="flex-1">
