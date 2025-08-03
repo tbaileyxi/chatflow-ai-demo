@@ -257,15 +257,15 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
       {/* Team Header */}
       <div className="flex items-center gap-3 mb-3">
         <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-          {(post.is_team_agent_message || post.is_agent_post) && post.team.logo_url ? (
-            <img src={post.team.logo_url} alt={post.team.name} className="w-8 h-8 rounded-full" />
-          ) : post.author?.avatar_url ? (
+          {isSpotlight && post.author?.avatar_url ? (
             <img src={post.author.avatar_url} alt="Author" className="w-8 h-8 rounded-full" />
+          ) : (post.is_team_agent_message || post.is_agent_post) && post.team.logo_url ? (
+            <img src={post.team.logo_url} alt={post.team.name} className="w-8 h-8 rounded-full" />
           ) : post.team.logo_url ? (
             <img src={post.team.logo_url} alt={post.team.name} className="w-8 h-8 rounded-full" />
           ) : (
             <span className="text-primary font-bold text-sm">
-              {post.author?.display_name ? 
+              {isSpotlight && post.author?.display_name ? 
                 post.author.display_name.substring(0, 2).toUpperCase() :
                 post.team.name.substring(0, 2).toUpperCase()
               }
@@ -275,15 +275,17 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-foreground">
-              {(post.is_team_agent_message || post.is_agent_post || !post.author) ? 
+              {isSpotlight && post.author?.display_name ? 
+                post.author.display_name :
+                (post.is_team_agent_message || post.is_agent_post || !post.author) ? 
                 `${post.team.name} Agent` : 
                 (post.author?.display_name || post.author?.username || post.team.name)
               }
             </h3>
-            {(post.is_team_agent_message || post.is_agent_post || !post.author) && (
+            {(post.is_team_agent_message || post.is_agent_post || !post.author) && !isSpotlight && (
               <span className="text-xs text-primary font-medium">TEAM AGENT</span>
             )}
-            {post.author && !post.is_team_agent_message && !post.is_agent_post && (
+            {post.author && !post.is_team_agent_message && !post.is_agent_post && !isSpotlight && (
               <span className="text-xs text-muted-foreground">via {post.team.name}</span>
             )}
             {isSpotlight && (
@@ -407,37 +409,39 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
         )}
       </div>
 
-      {/* Reaction Buttons */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      {/* Reaction Buttons - Only show for non-spotlight posts */}
+      {!isSpotlight && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleReaction('like')}
+              className="flex items-center gap-2 text-like-button hover:text-like-button hover:bg-like-button/10"
+            >
+              <Heart className="w-4 h-4" />
+              <span className="text-sm">{likeCount}</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleReaction('fire')}
+              className="flex items-center gap-2 text-fire-button hover:text-fire-button hover:bg-fire-button/10"
+            >
+              <Flame className="w-4 h-4" />
+              <span className="text-sm">{fireCount}</span>
+            </Button>
+          </div>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleReaction('like')}
-            className="flex items-center gap-2 text-like-button hover:text-like-button hover:bg-like-button/10"
+            onClick={handleShare}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
           >
-            <Heart className="w-4 h-4" />
-            <span className="text-sm">{likeCount}</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleReaction('fire')}
-            className="flex items-center gap-2 text-fire-button hover:text-fire-button hover:bg-fire-button/10"
-          >
-            <Flame className="w-4 h-4" />
-            <span className="text-sm">{fireCount}</span>
+            <Share className="w-4 h-4" />
           </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleShare}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-        >
-          <Share className="w-4 h-4" />
-        </Button>
-      </div>
+      )}
     </Card>
   );
 };

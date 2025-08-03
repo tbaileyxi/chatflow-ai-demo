@@ -19,7 +19,7 @@ export const FeedTabs = () => {
             className="text-lg font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2"
           >
             Your Feed
-            {isMobile && activeTab === "your-feed" && (
+            {activeTab === "your-feed" && (
               <Button
                 variant="ghost"
                 size="sm"

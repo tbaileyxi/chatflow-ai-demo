@@ -240,23 +240,50 @@ export const EnhancedSpotlightFeed = () => {
   };
 
   const handleShare = async (post: SpotlightPost) => {
+    const deepLink = `${window.location.origin}/spotlight/${post.id}`;
+    const authorName = post.author?.display_name || post.team.name;
+    
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: `${post.team.name} on Side Huddle`,
+        const shareData: ShareData = {
+          title: `${authorName} on Side Huddle`,
           text: post.content,
-          url: window.location.origin
-        });
+          url: deepLink
+        };
+        
+        // Include media if available and supported
+        if (post.media_url && navigator.canShare) {
+          try {
+            const response = await fetch(post.media_url);
+            const blob = await response.blob();
+            const file = new File([blob], 'shared-media', { type: blob.type });
+            
+            if (navigator.canShare({ files: [file] })) {
+              shareData.files = [file];
+            }
+          } catch (error) {
+            console.log("Could not include media in share");
+          }
+        }
+        
+        await navigator.share(shareData);
       } catch (error) {
         console.log("Share cancelled");
       }
     } else {
-      // Fallback - copy to clipboard
-      const shareText = `${post.team.name}: ${post.content}\n\nJoin the conversation on Side Huddle: ${window.location.origin}`;
+      // Enhanced fallback with media info
+      let shareText = `Check out this post by ${authorName} on Side Huddle:\n\n"${post.content}"`;
+      
+      if (post.media_url) {
+        shareText += `\n\n📸 Includes ${post.media_url.includes('video') ? 'video' : 'image'}`;
+      }
+      
+      shareText += `\n\nView full post: ${deepLink}`;
+      
       navigator.clipboard.writeText(shareText);
       toast({
-        title: "Copied to clipboard",
-        description: "Share link copied to your clipboard"
+        title: "Enhanced share link copied!",
+        description: "Link includes media preview and deep link to the post"
       });
     }
   };
