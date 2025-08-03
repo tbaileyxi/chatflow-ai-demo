@@ -242,35 +242,38 @@ export const EnhancedSpotlightFeed = () => {
   const handleShare = async (post: SpotlightPost) => {
     const deepLink = `${window.location.origin}/spotlight/${post.id}`;
     const authorName = post.author?.display_name || post.team.name;
+    const mediaIndicator = post.media_url ? ` (${post.media_url.includes('video') ? 'video' : 'image'})` : '';
     
-    // Always prioritize deep link sharing over media file sharing
-    const shareData: ShareData = {
-      title: `${authorName} on Side Huddle`,
-      text: post.content,
-      url: deepLink
-    };
+    // Single text format that works best across platforms
+    const shareText = `"${post.content}" by ${authorName} on Side Huddle${mediaIndicator}\n\nView post: ${deepLink}`;
     
-    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          text: shareText
+        });
+      } else {
+        await navigator.clipboard.writeText(shareText);
+        toast({
+          title: "Link copied!",
+          description: "Post link copied to clipboard"
+        });
+      }
+    } catch (error) {
+      console.error('Share error:', error);
       try {
-        await navigator.share(shareData);
-      } catch (error) {
-        console.log("Share cancelled");
+        await navigator.clipboard.writeText(shareText);
+        toast({
+          title: "Link copied!",
+          description: "Post link copied to clipboard"
+        });
+      } catch (clipboardError) {
+        toast({
+          title: "Share failed",
+          description: "Unable to share or copy link",
+          variant: "destructive"
+        });
       }
-    } else {
-      // Enhanced fallback with media info
-      let shareText = `Check out this post by ${authorName} on Side Huddle:\n\n"${post.content}"`;
-      
-      if (post.media_url) {
-        shareText += `\n\n📸 Includes ${post.media_url.includes('video') ? 'video' : 'image'}`;
-      }
-      
-      shareText += `\n\nView full post: ${deepLink}`;
-      
-      navigator.clipboard.writeText(shareText);
-      toast({
-        title: "Link copied!",
-        description: "Post link copied to clipboard"
-      });
     }
   };
 
