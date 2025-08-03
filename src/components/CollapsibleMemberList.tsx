@@ -80,7 +80,7 @@ export const CollapsibleMemberList = ({ huddleId }: CollapsibleMemberListProps) 
             {onlineMembers.length > 0 && (
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                <span className="text-xs text-muted-foreground">{onlineMembers.length} online</span>
+                <span className="text-xs text-muted-foreground">{onlineMembers.length}</span>
               </div>
             )}
           </div>
