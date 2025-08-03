@@ -293,8 +293,17 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
       {/* Team Header */}
       <div className="flex items-center gap-3 mb-3">
         <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-          {isSpotlight ? (
-            // For spotlight posts, always show user avatar/initials
+          {(post.is_team_agent_message || post.is_agent_post || !post.author) ? (
+            // For team agent posts, show team logo
+            post.team.logo_url ? (
+              <img src={post.team.logo_url} alt={post.team.name} className="w-8 h-8 rounded-full" />
+            ) : (
+              <span className="text-primary font-bold text-sm">
+                {post.team.name.substring(0, 2).toUpperCase()}
+              </span>
+            )
+          ) : (
+            // For user posts, show user avatar
             post.author?.avatar_url ? (
               <img src={post.author.avatar_url} alt="Author" className="w-8 h-8 rounded-full" />
             ) : (
@@ -305,25 +314,12 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
                 }
               </span>
             )
-          ) : (
-            // For regular posts, show team agent or team logo
-            (post.is_team_agent_message || post.is_agent_post) && post.team.logo_url ? (
-              <img src={post.team.logo_url} alt={post.team.name} className="w-8 h-8 rounded-full" />
-            ) : post.team.logo_url ? (
-              <img src={post.team.logo_url} alt={post.team.name} className="w-8 h-8 rounded-full" />
-            ) : (
-              <span className="text-primary font-bold text-sm">
-                {post.team.name.substring(0, 2).toUpperCase()}
-              </span>
-            )
           )}
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-foreground">
-              {isSpotlight && post.author?.display_name ? 
-                post.author.display_name :
-                (post.is_team_agent_message || post.is_agent_post || !post.author) ? 
+              {(post.is_team_agent_message || post.is_agent_post || !post.author) ? 
                 `${post.team.name} Agent` : 
                 (post.author?.display_name || post.author?.username || post.team.name)
               }
