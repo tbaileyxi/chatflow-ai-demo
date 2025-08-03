@@ -113,14 +113,9 @@ export const YourFeed = () => {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6">
         <h3 className="text-xl font-semibold mb-4">Your feed is empty</h3>
-        <div className="space-y-2 text-center">
-          <Button onClick={() => window.location.href = '/teams'} className="mr-2">
-            Follow Teams
-          </Button>
-          <p className="text-sm text-muted-foreground">
-            Follow teams to see their posts in your feed
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Use the + button next to "Your Feed" to follow teams and see their posts
+        </p>
       </div>
     );
   }
@@ -128,14 +123,6 @@ export const YourFeed = () => {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      {!isMobile && (
-        <div className="p-4 border-b border-border flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Your Feed</h2>
-          <Button variant="outline" size="sm" onClick={() => window.location.href = '/teams'}>
-            Follow Teams
-          </Button>
-        </div>
-      )}
       <div className="space-y-1">
         {posts.map((post) => (
           <PostCard key={`post-${post.id}`} post={post} />
