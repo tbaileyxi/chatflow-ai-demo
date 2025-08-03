@@ -35,13 +35,25 @@ export const MakePublicButton = ({
 
     setLoading(true);
     try {
+      // Normalize message_type to match database constraints
+      let normalizedMessageType = 'text';
+      if (mediaUrl) {
+        if (embedCode) {
+          normalizedMessageType = 'embed';
+        } else {
+          normalizedMessageType = 'upload'; // For images/videos
+        }
+      } else if (embedCode) {
+        normalizedMessageType = 'embed';
+      }
+
       // Create a new post in the posts table with spotlight target audience
       const { error } = await supabase
         .from('posts')
         .insert({
           content: messageContent,
           media_url: mediaUrl,
-          message_type: mediaType || 'text',
+          message_type: normalizedMessageType,
           embed_code: embedCode,
           team_id: teamId,
           author_id: user.id,
