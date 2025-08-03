@@ -243,29 +243,15 @@ export const EnhancedSpotlightFeed = () => {
     const deepLink = `${window.location.origin}/spotlight/${post.id}`;
     const authorName = post.author?.display_name || post.team.name;
     
-    if (navigator.share) {
+    // Always prioritize deep link sharing over media file sharing
+    const shareData: ShareData = {
+      title: `${authorName} on Side Huddle`,
+      text: post.content,
+      url: deepLink
+    };
+    
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
       try {
-        const shareData: ShareData = {
-          title: `${authorName} on Side Huddle`,
-          text: post.content,
-          url: deepLink
-        };
-        
-        // Include media if available and supported
-        if (post.media_url && navigator.canShare) {
-          try {
-            const response = await fetch(post.media_url);
-            const blob = await response.blob();
-            const file = new File([blob], 'shared-media', { type: blob.type });
-            
-            if (navigator.canShare({ files: [file] })) {
-              shareData.files = [file];
-            }
-          } catch (error) {
-            console.log("Could not include media in share");
-          }
-        }
-        
         await navigator.share(shareData);
       } catch (error) {
         console.log("Share cancelled");
@@ -282,8 +268,8 @@ export const EnhancedSpotlightFeed = () => {
       
       navigator.clipboard.writeText(shareText);
       toast({
-        title: "Enhanced share link copied!",
-        description: "Link includes media preview and deep link to the post"
+        title: "Link copied!",
+        description: "Post link copied to clipboard"
       });
     }
   };
@@ -329,40 +315,42 @@ export const EnhancedSpotlightFeed = () => {
         
         {dates.map((date) => (
           <TabsContent key={date} value={date} className="flex-1 mt-0 overflow-y-auto">
-            <div className="space-y-1">
+            <div className="space-y-4">
               {groupedPosts[date]?.map((post) => (
-                <div key={post.id} className="relative">
+                <div key={post.id} className="bg-card rounded-lg border overflow-hidden">
                   <PostCard post={post} isSpotlight />
                   
-                  {/* Voting and Actions Overlay */}
-                  <div className="absolute top-4 right-4 flex flex-col gap-2">
-                    {/* Vote Score Display */}
-                    <div className="bg-background/90 backdrop-blur-sm border rounded-lg p-2 flex flex-col items-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleVote(post.id, 'up')}
-                        className={`p-1 h-auto ${post.user_vote === 'up' ? 'text-green-600' : 'text-muted-foreground hover:text-green-600'}`}
-                      >
-                        <ChevronUp className="w-4 h-4" />
-                      </Button>
-                      
-                      <span className="text-sm font-semibold py-1">
-                        {post.vote_score || 0}
-                      </span>
-                      
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleVote(post.id, 'down')}
-                        className={`p-1 h-auto ${post.user_vote === 'down' ? 'text-red-600' : 'text-muted-foreground hover:text-red-600'}`}
-                      >
-                        <ChevronDown className="w-4 h-4" />
-                      </Button>
+                  {/* Bottom Action Bar */}
+                  <div className="border-t bg-card/50 p-3 flex items-center justify-between">
+                    {/* Voting Section */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleVote(post.id, 'up')}
+                          className={`p-2 h-auto ${post.user_vote === 'up' ? 'text-green-600 bg-green-50' : 'text-muted-foreground hover:text-green-600'}`}
+                        >
+                          <ChevronUp className="w-4 h-4" />
+                        </Button>
+                        
+                        <span className="text-sm font-semibold min-w-[2rem] text-center">
+                          {post.vote_score || 0}
+                        </span>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleVote(post.id, 'down')}
+                          className={`p-2 h-auto ${post.user_vote === 'down' ? 'text-red-600 bg-red-50' : 'text-muted-foreground hover:text-red-600'}`}
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                     
                     {/* Action Buttons */}
-                    <div className="bg-background/90 backdrop-blur-sm border rounded-lg p-1 flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
                       <Button
                         variant="ghost"
                         size="sm"
