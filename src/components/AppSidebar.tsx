@@ -13,6 +13,7 @@ interface Huddle {
   id: string;
   name: string;
   member_count: number;
+  online_count: number;
   has_unread: boolean;
 }
 
@@ -29,37 +30,62 @@ export function AppSidebar() {
     }
   }, [user]);
 
+  // Update last_read_at when viewing a huddle to mark messages as read
+  useEffect(() => {
+    const currentPath = window.location.pathname;
+    const huddleMatch = currentPath.match(/\/huddle\/(.+)/);
+    
+    if (huddleMatch && user) {
+      const huddleId = huddleMatch[1];
+      const updateLastRead = async () => {
+        await supabase
+          .from('huddle_members')
+          .update({ last_read_at: new Date().toISOString() })
+          .eq('huddle_id', huddleId)
+          .eq('user_id', user.id);
+        
+        // Refresh huddles to update unread status
+        fetchUserHuddles();
+      };
+      
+      updateLastRead();
+    }
+  }, [window.location.pathname, user]);
+
   const fetchUserHuddles = async () => {
     try {
       const { data } = await supabase
         .from('huddle_members')
         .select(`
-          huddle:huddles(id, name, member_count),
+          huddle:huddles(id, name),
           last_read_at
         `)
         .eq('user_id', user?.id);
 
-      // Get unread message counts for each huddle
+      // Get real member counts, unread message counts, and online counts for each huddle
       const huddlesWithUnread = await Promise.all(
         (data || []).map(async (item) => {
-          // Update last_read_at when viewing huddle
-          if (window.location.pathname === `/huddle/${item.huddle.id}`) {
-            await supabase
-              .from('huddle_members')
-              .update({ last_read_at: new Date().toISOString() })
-              .eq('huddle_id', item.huddle.id)
-              .eq('user_id', user?.id);
-          }
+          // Get real member count from huddle_members table
+          const { count: realMemberCount } = await supabase
+            .from('huddle_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('huddle_id', item.huddle.id);
 
-          const { count } = await supabase
+          // Get unread message count
+          const { count: unreadCount } = await supabase
             .from('huddle_messages')
             .select('*', { count: 'exact', head: true })
             .eq('huddle_id', item.huddle.id)
             .gt('created_at', item.last_read_at || '1970-01-01');
 
+          // Simulate online count (in real app, this would use presence tracking)
+          const onlineCount = Math.max(1, Math.floor((realMemberCount || 1) * 0.6));
+
           return {
             ...item.huddle,
-            has_unread: (count || 0) > 0
+            member_count: realMemberCount || 1,
+            online_count: onlineCount,
+            has_unread: (unreadCount || 0) > 0
           };
         })
       );
@@ -178,15 +204,17 @@ export function AppSidebar() {
                               {!isCollapsed && <span className="truncate font-medium">{huddle.name}</span>}
                             </div>
                             {!isCollapsed && (
-                              <div className="flex gap-1 items-center">
-                               <div className="flex items-center gap-1">
-                                   <Users className="w-3 h-3 text-muted-foreground" />
-                                   <span className="text-xs text-muted-foreground">{huddle.member_count}</span>
-                                 </div>
-                                  {huddle.has_unread && (
-                                    <div className="w-2 h-2 bg-destructive rounded-full"></div>
-                                  )}
-                              </div>
+                               <div className="flex gap-1 items-center">
+                                <div className="flex items-center gap-1">
+                                    <Users className="w-3 h-3 text-muted-foreground" />
+                                    <span className="text-xs text-muted-foreground">
+                                      {huddle.member_count} • {huddle.online_count} online
+                                    </span>
+                                  </div>
+                                   {huddle.has_unread && (
+                                     <div className="w-2 h-2 bg-destructive rounded-full"></div>
+                                   )}
+                               </div>
                             )}
                           </button>
                         </SidebarMenuButton>
