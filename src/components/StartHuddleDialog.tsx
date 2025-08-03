@@ -44,6 +44,7 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
       const { data, error } = await supabase
         .from('teams')
         .select('id, name, city, league, logo_url')
+        .eq('status', 'active')
         .order('league', { ascending: true })
         .order('city', { ascending: true });
 
