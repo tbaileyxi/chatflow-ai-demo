@@ -196,6 +196,7 @@ export const BroadcastCenter = () => {
                 (postData.media_url.includes('.mp4') || postData.media_url.includes('.mov') || postData.media_url.includes('.webm') || postData.media_url.includes('.avi') ? 'video' : 'image') 
                 : 'text',
               embed_code: postData.embed_code,
+              poll_data: postData.poll_data,
               is_team_agent_message: postData.is_team_agent_message || false
             });
 
