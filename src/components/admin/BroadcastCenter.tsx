@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Send, Clock, Upload, Link, MessageSquare, BarChart3, CheckCircle, AlertCircle, Loader2, X, Calendar } from 'lucide-react';
 import { ScheduleDialog } from '@/components/ScheduleDialog';
 import { PostManagement } from '@/components/PostManagement';
+import { ScheduledBroadcastProcessor } from './ScheduledBroadcastProcessor';
 
 interface Team {
   id: string;
@@ -694,6 +695,9 @@ export const BroadcastCenter = () => {
           </div>
         </CardContent>
       </Card>
+      
+      {/* Scheduled Broadcast Processor */}
+      <ScheduledBroadcastProcessor />
       
       {/* Post Management Section */}
       <PostManagement />

@@ -36,6 +36,7 @@ interface Message {
   media_url?: string;
   media_type?: string;
   embed_code?: string;
+  poll_data?: any;
   is_team_agent_message?: boolean;
   profiles?: {
     display_name?: string;
@@ -59,6 +60,8 @@ export const Huddle = () => {
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [mediaDialogOpen, setMediaDialogOpen] = useState(false);
+  const [pollVotes, setPollVotes] = useState<{[messageId: string]: any[]}>({});
+  const [userVotes, setUserVotes] = useState<{[messageId: string]: number | null}>({});
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -159,6 +162,7 @@ export const Huddle = () => {
           media_url,
           media_type,
           embed_code,
+          poll_data,
           is_team_agent_message
         `)
         .eq("huddle_id", id)
@@ -185,9 +189,12 @@ export const Huddle = () => {
 
       setMessages(messagesWithProfiles);
       
-      // Fetch reactions for all messages
+      // Fetch reactions and poll votes for all messages
       messagesWithProfiles.forEach(message => {
         fetchMessageReactions(message.id);
+        if (message.poll_data) {
+          fetchPollVotes(message.id);
+        }
       });
 
       // Auto-scroll to bottom after loading messages
@@ -334,6 +341,76 @@ export const Huddle = () => {
     }
   };
 
+  const fetchPollVotes = async (messageId: string) => {
+    try {
+      const { data: votes, error } = await supabase
+        .from('poll_votes')
+        .select('*')
+        .eq('post_id', messageId);
+
+      if (error) throw error;
+      
+      setPollVotes(prev => ({ ...prev, [messageId]: votes || [] }));
+      
+      // Check if current user has voted
+      if (user) {
+        const userVoteRecord = votes?.find(v => v.user_id === user.id);
+        setUserVotes(prev => ({ ...prev, [messageId]: userVoteRecord?.option_id || null }));
+      }
+    } catch (error) {
+      console.error('Error fetching poll votes:', error);
+    }
+  };
+
+  const handlePollVote = async (messageId: string, optionId: number) => {
+    if (!user?.id) {
+      toast({
+        title: "Please sign in",
+        description: "You need to be logged in to vote",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const currentVote = userVotes[messageId];
+      
+      if (currentVote === optionId) {
+        // Remove vote
+        const { error } = await supabase
+          .from('poll_votes')
+          .delete()
+          .eq('post_id', messageId)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+        setUserVotes(prev => ({ ...prev, [messageId]: null }));
+      } else {
+        // Add or update vote
+        const { error } = await supabase
+          .from('poll_votes')
+          .upsert({
+            post_id: messageId,
+            user_id: user.id,
+            option_id: optionId
+          });
+
+        if (error) throw error;
+        setUserVotes(prev => ({ ...prev, [messageId]: optionId }));
+      }
+      
+      // Refresh poll votes
+      await fetchPollVotes(messageId);
+    } catch (error) {
+      console.error('Error voting:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit vote",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -459,6 +536,41 @@ export const Huddle = () => {
                           mediaType={message.media_type as 'image' | 'video'}
                           className="w-full h-auto rounded-lg"
                         />
+                      </div>
+                    )}
+                    
+                    {/* Poll content */}
+                    {message.poll_data && (
+                      <div className="mt-3 space-y-2">
+                        <div className="space-y-2">
+                          {message.poll_data.options?.map((option: any) => {
+                            const optionVotes = pollVotes[message.id]?.filter(v => v.option_id === option.id).length || 0;
+                            const totalVotes = pollVotes[message.id]?.length || 0;
+                            const percentage = totalVotes > 0 ? (optionVotes / totalVotes) * 100 : 0;
+                            const isSelected = userVotes[message.id] === option.id;
+                            
+                            return (
+                              <Button
+                                key={option.id}
+                                variant={isSelected ? "default" : "outline"}
+                                className="w-full justify-between h-auto p-3 relative overflow-hidden"
+                                onClick={() => handlePollVote(message.id, option.id)}
+                              >
+                                <div 
+                                  className="absolute inset-0 bg-primary/10 transition-all"
+                                  style={{ width: `${percentage}%` }}
+                                />
+                                <span className="relative z-10">{option.text}</span>
+                                <span className="relative z-10 text-sm text-muted-foreground">
+                                  {optionVotes} ({Math.round(percentage)}%)
+                                </span>
+                              </Button>
+                            );
+                          })}
+                          <p className="text-xs text-muted-foreground text-center">
+                            {pollVotes[message.id]?.length || 0} total votes
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
