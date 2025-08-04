@@ -15,6 +15,8 @@ interface SpotlightPost {
   poll_data?: any;
   created_at: string;
   author_id?: string;
+  is_agent_post?: boolean;
+  is_team_agent_message?: boolean;
   team: {
     id: string;
     name: string;
@@ -62,6 +64,7 @@ export const EnhancedSpotlightFeed = () => {
           poll_data,
           created_at,
           author_id,
+          is_agent_post,
           is_team_agent_message,
           team:teams(id, name, logo_url),
           post_reactions(reaction_type)
