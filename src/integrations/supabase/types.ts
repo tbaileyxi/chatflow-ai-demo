@@ -88,6 +88,7 @@ export type Database = {
           is_team_agent_message: boolean | null
           media_type: string | null
           media_url: string | null
+          poll_data: Json | null
           user_id: string
         }
         Insert: {
@@ -99,6 +100,7 @@ export type Database = {
           is_team_agent_message?: boolean | null
           media_type?: string | null
           media_url?: string | null
+          poll_data?: Json | null
           user_id: string
         }
         Update: {
@@ -110,6 +112,7 @@ export type Database = {
           is_team_agent_message?: boolean | null
           media_type?: string | null
           media_url?: string | null
+          poll_data?: Json | null
           user_id?: string
         }
         Relationships: []
