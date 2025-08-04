@@ -7,13 +7,19 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const FeedTabs = () => {
-  const [activeTab, setActiveTab] = useState("your-feed");
+  const [activeTab, setActiveTab] = useState("spotlight");
   const isMobile = useIsMobile();
 
   return (
     <div className="flex-1 flex flex-col">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <TabsList className="grid w-full grid-cols-2 bg-card border-b border-border rounded-none">
+          <TabsTrigger 
+            value="spotlight" 
+            className="text-lg font-semibold data-[state=active]:bg-spotlight data-[state=active]:text-primary-foreground"
+          >
+            Spotlight
+          </TabsTrigger>
           <TabsTrigger 
             value="your-feed" 
             className="text-lg font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2"
@@ -33,18 +39,12 @@ export const FeedTabs = () => {
               </Button>
             )}
           </TabsTrigger>
-          <TabsTrigger 
-            value="spotlight" 
-            className="text-lg font-semibold data-[state=active]:bg-spotlight data-[state=active]:text-primary-foreground"
-          >
-            Spotlight
-          </TabsTrigger>
         </TabsList>
-        <TabsContent value="your-feed" className="flex-1 mt-0">
-          <YourFeed />
-        </TabsContent>
         <TabsContent value="spotlight" className="flex-1 mt-0">
           <EnhancedSpotlightFeed />
+        </TabsContent>
+        <TabsContent value="your-feed" className="flex-1 mt-0">
+          <YourFeed />
         </TabsContent>
       </Tabs>
     </div>

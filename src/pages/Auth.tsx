@@ -336,10 +336,31 @@ export const Auth = () => {
                   required
                 />
               </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="terms" 
+                  checked={agreedToTerms}
+                  onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+                />
+                <Label htmlFor="terms" className="text-sm italic">
+                  Agree to{' '}
+                  <a 
+                    href="https://docs.google.com/document/d/e/2PACX-1vStEnMeiAhNukWvnEO0_4VbNxuBFU5kQ5y7froaOF8H_hjUFa1_nhIclOPnmXe8OL3Vx6-WhL-wMy4M/pub" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Opt in, Privacy & Terms of Service
+                  </a>{' '}
+                  Policies
+                </Label>
+              </div>
+
               <Button 
                 onClick={sendVerificationCode} 
                 className="w-full" 
-                disabled={loading}
+                disabled={loading || !agreedToTerms}
               >
                 {loading ? 'Sending...' : 'Send Verification Code'}
               </Button>
@@ -396,27 +417,8 @@ export const Auth = () => {
                   )}
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="terms" 
-                    checked={agreedToTerms}
-                    onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
-                  />
-                  <Label htmlFor="terms" className="text-sm italic">
-                    Agree to{' '}
-                    <a 
-                      href="https://docs.google.com/document/d/e/2PACX-1vStEnMeiAhNukWvnEO0_4VbNxuBFU5kQ5y7froaOF8H_hjUFa1_nhIclOPnmXe8OL3Vx6-WhL-wMy4M/pub" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      Opt in, Privacy & Terms of Service
-                    </a>{' '}
-                    Policies
-                  </Label>
-                </div>
                 
-                <Button type="submit" className="w-full" disabled={loading || !agreedToTerms}>
+                <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? 'Verifying...' : isSignUp ? 'Create Account' : 'Sign In'}
                 </Button>
                 
