@@ -628,26 +628,28 @@ export const Huddle = () => {
                       />
                     )}
                     
-                    {/* Reaction buttons */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                      {['👍', '😂', '🔥'].map((emoji) => {
-                        const reactionData = message.reactions?.[emoji];
-                        const hasReacted = reactionData?.users.includes(user?.id || '');
-                        
-                        if (!hasReacted && (!reactionData || reactionData.count === 0)) {
-                          return (
-                            <button
-                              key={emoji}
-                              className="text-xs px-2 py-1 rounded-full bg-background border border-border hover:bg-muted transition-colors"
-                              onClick={() => addReaction(message.id, emoji)}
-                            >
-                              {emoji}
-                            </button>
-                          );
-                        }
-                        return null;
-                      })}
-                    </div>
+                     {/* Reaction buttons - only show for OTHER users' messages */}
+                    {message.user_id !== user?.id && (
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                        {['👍', '😂', '🔥'].map((emoji) => {
+                          const reactionData = message.reactions?.[emoji];
+                          const hasReacted = reactionData?.users.includes(user?.id || '');
+                          
+                          if (!hasReacted && (!reactionData || reactionData.count === 0)) {
+                            return (
+                              <button
+                                key={emoji}
+                                className="text-xs px-2 py-1 rounded-full bg-background border border-border hover:bg-muted transition-colors"
+                                onClick={() => addReaction(message.id, emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            );
+                          }
+                          return null;
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
                 
