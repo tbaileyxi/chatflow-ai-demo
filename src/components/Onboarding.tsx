@@ -32,7 +32,7 @@ const OnboardingScreen1 = () => (
             <div className="text-left">
               <h3 className="font-semibold text-spotlight">Spotlight Feed</h3>
               <p className="text-sm text-muted-foreground">
-                Curated highlights and trending content from all your teams
+                Curated highlights and trending content from the world of sports
               </p>
               <Badge variant="secondary" className="mt-2">Default Feed</Badge>
             </div>
@@ -69,7 +69,7 @@ const OnboardingScreen2 = () => (
       </div>
       <h2 className="text-2xl font-bold text-foreground">Side Huddles</h2>
       <p className="text-muted-foreground max-w-md mx-auto">
-        Private group chats enhanced with Team Bot capabilities for real-time discussions
+        Your gameday group chat starts here. Invite Only chats for your friends, family & fans.
       </p>
     </div>
 
@@ -84,29 +84,13 @@ const OnboardingScreen2 = () => (
             <div className="text-left">
               <h3 className="font-semibold text-primary">Private Group Chats</h3>
               <p className="text-sm text-muted-foreground">
-                Create intimate discussions with fellow fans
+                Invite only chats for your friends, family & fans
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Team Bot Enhancement */}
-      <Card className="border-accent/20 bg-gradient-to-r from-accent/5 to-transparent">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center shrink-0">
-              <Zap className="w-5 h-5 text-accent" />
-            </div>
-            <div className="text-left">
-              <h3 className="font-semibold text-accent">Team Bot Enhancement</h3>
-              <p className="text-sm text-muted-foreground">
-                Receive official team updates and exclusive content
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   </div>
 );
