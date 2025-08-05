@@ -603,8 +603,8 @@ export const Huddle = () => {
                   
                    {/* Quick reaction buttons and Make Public */}
                   <div className="flex gap-1 mt-1 group">
-                    {/* Make Public Button - visible for message owners */}
-                    {message.user_id === user?.id && (
+                    {/* Make Public Button - visible for message owners (except team agent messages from Send Later) */}
+                    {message.user_id === user?.id && !message.is_team_agent_message && (
                       <MakePublicButton
                         messageId={message.id}
                         messageContent={message.content}

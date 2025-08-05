@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, Info, Clock } from 'lucide-react';
+import { Mail, Info, Eye, EyeOff } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 
 
@@ -17,34 +17,13 @@ export const Auth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isSignUp, setIsSignUp] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [sentCode, setSentCode] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  
-  const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
-  const [canResend, setCanResend] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(true);
-  const [showDevAuth, setShowDevAuth] = useState(false);
-  const [devEmail, setDevEmail] = useState('');
-  const [devPassword, setDevPassword] = useState('');
 
-  // Timer effect for countdown - MOVED BEFORE EARLY RETURNS
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (sentCode && timeRemaining > 0) {
-      interval = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev <= 1) {
-            setCanResend(true);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [sentCode, timeRemaining]);
 
   // Check for user authentication and handle redirects
   if (user) {
@@ -61,135 +40,10 @@ export const Auth = () => {
     return <Navigate to="/" replace />;
   }
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const formatPhoneNumber = (phone: string) => {
-    // Remove all non-digits
-    const cleaned = phone.replace(/\D/g, '');
-    
-    // Add + if not present and number doesn't start with +
-    if (!phone.startsWith('+') && cleaned.length >= 10) {
-      return `+1${cleaned.slice(-10)}`; // Default to US format
-    }
-    
-    return phone.startsWith('+') ? phone : `+${cleaned}`;
-  };
-
-  const sendVerificationCode = async () => {
-    if (!phoneNumber.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a phone number",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const formattedPhone = formatPhoneNumber(phoneNumber);
-    
-    // Basic validation
-    if (formattedPhone.length < 10) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid phone number",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
-        options: {
-          shouldCreateUser: isSignUp
-        }
-      });
-
-      if (error) throw error;
-      
-      // Update the phone number state to the formatted version
-      setPhoneNumber(formattedPhone);
-      setSentCode(true);
-      setTimeRemaining(300); // Reset timer to 5 minutes
-      setCanResend(false);
-      
-      toast({
-        title: "Code Sent",
-        description: "Check your phone for the verification code",
-      });
-    } catch (error: any) {
-      console.error('SMS Error:', error);
-      let errorMessage = "Failed to send verification code";
-      
-      if (error.message?.includes('Invalid phone number')) {
-        errorMessage = "Please enter a valid phone number with country code";
-      } else if (error.message?.includes('SMS')) {
-        errorMessage = "SMS service is not configured. Please contact support.";
-      }
-      
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const requestNewCode = async () => {
-    setTimeRemaining(300);
-    setCanResend(false);
-    setVerificationCode('');
-    await sendVerificationCode();
-  };
-
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        phone: phoneNumber,
-        token: verificationCode,
-        type: 'sms'
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Successfully authenticated!",
-      });
-      
-      // Auth state will automatically redirect via useAuth
-    } catch (error: any) {
-      let errorMessage = error.message;
-      
-      if (error.message?.includes('otp_expired') || error.message?.includes('expired')) {
-        errorMessage = "Verification code has expired. Please request a new code.";
-        setCanResend(true);
-        setTimeRemaining(0);
-      }
-      
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDevAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!devEmail || !devPassword) {
+    
+    if (!email || !password) {
       toast({
         title: "Error",
         description: "Please enter both email and password",
@@ -198,42 +52,66 @@ export const Auth = () => {
       return;
     }
 
+    if (isSignUp && password !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Passwords do not match",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (isSignUp && password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      // Try to sign in first
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: devEmail,
-        password: devPassword,
-      });
-
-      if (signInError && signInError.message.includes('Invalid login credentials')) {
-        // If sign in fails, try to sign up
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: devEmail,
-          password: devPassword,
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
           options: {
             emailRedirectTo: `${window.location.origin}/`
           }
         });
 
-        if (signUpError) throw signUpError;
+        if (error) throw error;
 
         toast({
-          title: "Success",
-          description: "Account created! You can now access the admin panel.",
+          title: "Account Created",
+          description: "Please check your email to verify your account.",
         });
-      } else if (signInError) {
-        throw signInError;
       } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+
         toast({
           title: "Success",
           description: "Successfully signed in!",
         });
       }
     } catch (error: any) {
+      let errorMessage = error.message;
+      
+      if (error.message?.includes('Invalid login credentials')) {
+        errorMessage = "Invalid email or password. Please try again.";
+      } else if (error.message?.includes('User already registered')) {
+        errorMessage = "An account with this email already exists. Please sign in instead.";
+      }
+      
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -255,69 +133,59 @@ export const Auth = () => {
         
         <Card className="w-full">
           <CardContent className="pt-6">
-          {showDevAuth ? (
-            <div className="space-y-4">
-              <div className="border border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Info className="w-4 h-4 text-orange-500" />
-                  <span className="font-medium text-orange-700 dark:text-orange-300">Development Authentication</span>
-                </div>
-                <p className="text-sm text-orange-600 dark:text-orange-400 mb-3">
-                  Quick access for development - bypasses SMS verification
-                </p>
-              </div>
-              
-              <form onSubmit={handleDevAuth} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="dev-email">Email</Label>
-                  <Input
-                    id="dev-email"
-                    type="email"
-                    value={devEmail}
-                    onChange={(e) => setDevEmail(e.target.value)}
-                    placeholder="admin@example.com"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dev-password">Password</Label>
-                  <Input
-                    id="dev-password"
-                    type="password"
-                    value={devPassword}
-                    onChange={(e) => setDevPassword(e.target.value)}
-                    placeholder="Enter password (min 6 characters)"
-                    required
-                  />
-                </div>
-                
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Authenticating...' : 'Sign In / Sign Up'}
-                </Button>
-                
-                <Button 
-                  type="button"
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => setShowDevAuth(false)}
-                >
-                  Back to SMS Auth
-                </Button>
-              </form>
-            </div>
-          ) : !sentCode ? (
-            <div className="space-y-4">
+            <form onSubmit={handleAuth} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+1 (555) 123-4567"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {isSignUp && (
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Confirm your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
 
               <div className="flex items-center space-x-2">
                 <Checkbox 
@@ -340,87 +208,23 @@ export const Auth = () => {
               </div>
 
               <Button 
-                onClick={sendVerificationCode} 
+                type="submit" 
                 className="w-full" 
                 disabled={loading || !agreedToTerms}
               >
-                {loading ? 'Sending...' : 'Send Verification Code'}
+                {loading ? (isSignUp ? 'Creating Account...' : 'Signing In...') : (isSignUp ? 'Create Account' : 'Sign In')}
               </Button>
-              <div className="mt-4 text-center space-y-2">
+              
+              <div className="text-center">
                 <Button
+                  type="button"
                   variant="link"
                   onClick={() => setIsSignUp(!isSignUp)}
                 >
                   {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowDevAuth(true)}
-                  className="w-full"
-                >
-                  Development Authentication (Bypass SMS)
-                </Button>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <form onSubmit={handleAuth} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="code">Verification Code</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Enter the 6-digit code sent to {phoneNumber}
-                  </p>
-                  <Input
-                    id="code"
-                    type="text"
-                    placeholder="Enter code"
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value)}
-                    maxLength={6}
-                    required
-                  />
-                  
-                  {timeRemaining > 0 && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      Code expires in: {formatTime(timeRemaining)}
-                    </div>
-                  )}
-                </div>
-
-                
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Verifying...' : isSignUp ? 'Create Account' : 'Sign In'}
-                </Button>
-                
-                {canResend && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={requestNewCode}
-                    disabled={loading}
-                  >
-                    Request New Code
-                  </Button>
-                )}
-                
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    setSentCode(false);
-                    setVerificationCode('');
-                    setTimeRemaining(300);
-                    setCanResend(false);
-                  }}
-                >
-                  Change Phone Number
-                </Button>
-              </form>
-            </div>
-           )}
+            </form>
           </CardContent>
         </Card>
       </div>
