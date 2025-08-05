@@ -21,7 +21,7 @@ export const Auth = () => {
   const [verificationCode, setVerificationCode] = useState('');
   const [sentCode, setSentCode] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [isDevelopmentMode, setIsDevelopmentMode] = useState(false);
+  
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
   const [canResend, setCanResend] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(true);
@@ -112,42 +112,24 @@ export const Auth = () => {
 
       if (error) throw error;
       
-      // Check if we're in development mode by calling the SMS function
-      try {
-        const { data: smsResponse } = await supabase.functions.invoke('send-sms', {
-          body: { phone_number: formattedPhone, verification_code: '123456' }
-        });
-        
-        if (smsResponse?.message?.includes('Development mode')) {
-          setIsDevelopmentMode(true);
-        }
-      } catch (smsError) {
-        console.log('SMS function check failed:', smsError);
-      }
-      
       // Update the phone number state to the formatted version
       setPhoneNumber(formattedPhone);
       setSentCode(true);
       setTimeRemaining(300); // Reset timer to 5 minutes
       setCanResend(false);
       
-      const toastTitle = isDevelopmentMode ? "Development Mode" : "Code Sent";
-      const toastDescription = isDevelopmentMode 
-        ? "Use verification code: 123456 (no SMS sent)" 
-        : "Check your phone for the verification code";
-        
       toast({
-        title: toastTitle,
-        description: toastDescription,
+        title: "Code Sent",
+        description: "Check your phone for the verification code",
       });
     } catch (error: any) {
       console.error('SMS Error:', error);
       let errorMessage = "Failed to send verification code";
       
-      if (error.message?.includes('Twilio')) {
-        errorMessage = "SMS service is not properly configured. Please contact support.";
-      } else if (error.message?.includes('Invalid phone number')) {
+      if (error.message?.includes('Invalid phone number')) {
         errorMessage = "Please enter a valid phone number with country code";
+      } else if (error.message?.includes('SMS')) {
+        errorMessage = "SMS service is not configured. Please contact support.";
       }
       
       toast({
@@ -382,17 +364,6 @@ export const Auth = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {isDevelopmentMode && (
-                <Alert>
-                  <Info className="h-4 w-4" />
-                  <AlertDescription>
-                    <strong>Development Mode</strong><br />
-                    Use verification code: <strong>123456</strong><br />
-                    <span className="text-sm text-muted-foreground">No SMS will be sent</span>
-                  </AlertDescription>
-                </Alert>
-              )}
-              
               <form onSubmit={handleAuth} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="code">Verification Code</Label>
@@ -402,7 +373,7 @@ export const Auth = () => {
                   <Input
                     id="code"
                     type="text"
-                    placeholder={isDevelopmentMode ? "123456" : "Enter code"}
+                    placeholder="Enter code"
                     value={verificationCode}
                     onChange={(e) => setVerificationCode(e.target.value)}
                     maxLength={6}
@@ -441,7 +412,6 @@ export const Auth = () => {
                   onClick={() => {
                     setSentCode(false);
                     setVerificationCode('');
-                    setIsDevelopmentMode(false);
                     setTimeRemaining(300);
                     setCanResend(false);
                   }}
