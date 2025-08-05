@@ -20,6 +20,7 @@ import { MakePublicButton } from "@/components/MakePublicButton";
 interface HuddleData {
   id: string;
   name: string;
+  owner_id: string;
   team: {
     id: string;
     name: string;
@@ -130,6 +131,7 @@ export const Huddle = () => {
           id,
           name,
           created_at,
+          owner_id,
           team:teams(id, name, logo_url)
         `)
         .eq("id", id)
@@ -208,6 +210,12 @@ export const Huddle = () => {
     e.preventDefault();
     if (!newMessage.trim() || !user?.id) return;
 
+    console.log("Attempting to send message:", { 
+      huddle_id: id, 
+      user_id: user.id, 
+      content: newMessage.trim() 
+    });
+
     try {
       const { error } = await supabase
         .from("huddle_messages")
@@ -217,9 +225,13 @@ export const Huddle = () => {
           content: newMessage.trim()
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Insert error:", error);
+        throw error;
+      }
       
       setNewMessage("");
+      console.log("Message sent successfully");
       // No need to fetch messages - real-time will handle it
     } catch (error) {
       console.error("Error sending message:", error);
@@ -458,7 +470,7 @@ export const Huddle = () => {
           </div>
         </div>
         <div className="mt-3">
-          <CollapsibleMemberList huddleId={huddle.id} />
+          <CollapsibleMemberList huddleId={huddle.id} ownerId={huddle.owner_id} />
         </div>
       </div>
 

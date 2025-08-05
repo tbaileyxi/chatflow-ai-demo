@@ -17,9 +17,10 @@ interface Member {
 
 interface CollapsibleMemberListProps {
   huddleId: string;
+  ownerId?: string;
 }
 
-export const CollapsibleMemberList = ({ huddleId }: CollapsibleMemberListProps) => {
+export const CollapsibleMemberList = ({ huddleId, ownerId }: CollapsibleMemberListProps) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -111,6 +112,9 @@ export const CollapsibleMemberList = ({ huddleId }: CollapsibleMemberListProps) 
                 </div>
                 <span className="text-sm">
                   {member.profiles?.display_name || member.profiles?.username || 'Anonymous'}
+                  {member.user_id === ownerId && (
+                    <span className="text-xs italic text-muted-foreground ml-1">(owner)</span>
+                  )}
                 </span>
               </div>
             ))}
@@ -131,6 +135,9 @@ export const CollapsibleMemberList = ({ huddleId }: CollapsibleMemberListProps) 
                 </Avatar>
                 <span className="text-sm text-muted-foreground">
                   {member.profiles?.display_name || member.profiles?.username || 'Anonymous'}
+                  {member.user_id === ownerId && (
+                    <span className="text-xs italic text-muted-foreground ml-1">(owner)</span>
+                  )}
                 </span>
               </div>
             ))}
