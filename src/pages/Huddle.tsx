@@ -663,8 +663,8 @@ export const Huddle = () => {
 
       {/* Message Input */}
       <Card className="m-4 border-2 border-primary/20 bg-card/95 backdrop-blur-sm rounded-lg shadow-lg">
-        <form onSubmit={sendMessage} className="flex items-end gap-2 p-3 pb-safe">
-          <div className="flex-1 min-w-0">
+        <form onSubmit={sendMessage} className="flex items-center gap-2 p-3 pb-safe">
+          <div className="flex-1">
             <Textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
@@ -678,10 +678,10 @@ export const Huddle = () => {
               }}
             />
           </div>
-          <div className="flex gap-1 shrink-0 ml-2">
+          <div className="flex gap-1 flex-shrink-0">
             <Dialog open={mediaDialogOpen} onOpenChange={setMediaDialogOpen}>
               <DialogTrigger asChild>
-                <Button type="button" variant="outline" size="icon" className="w-10 h-10 shrink-0">
+                <Button type="button" variant="outline" size="icon" className="w-10 h-10">
                   <Plus className="w-4 h-4" />
                 </Button>
               </DialogTrigger>
@@ -697,7 +697,7 @@ export const Huddle = () => {
                 />
               </DialogContent>
             </Dialog>
-            <Button type="submit" disabled={!newMessage.trim()} className="w-10 h-10 shrink-0">
+            <Button type="submit" disabled={!newMessage.trim()} className="w-10 h-10">
               <Send className="w-4 h-4" />
             </Button>
           </div>
