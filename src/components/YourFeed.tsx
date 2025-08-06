@@ -88,8 +88,7 @@ export const YourFeed = () => {
         .in("team_id", followedTeams)
         .contains("target_audience", ["team_feed"])
         .eq("delivery_status", "sent")
-        .order("created_at", { ascending: false })
-        .limit(15);
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       setPosts(posts || []);

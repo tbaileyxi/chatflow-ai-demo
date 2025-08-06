@@ -29,7 +29,12 @@ const App = () => (
             <main className="flex-1 flex flex-col min-w-0">
               <header className="h-12 flex items-center border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
                 <SidebarTrigger className="ml-2" />
-                <div className="ml-4 flex-1">
+                <div className="ml-4 flex-1 flex items-center gap-3">
+                  <img 
+                    src="/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png" 
+                    alt="Side Huddle Logo" 
+                    className="w-8 h-8"
+                  />
                   <button 
                     onClick={() => window.location.href = '/'}
                     className="text-lg font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"

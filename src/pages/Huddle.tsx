@@ -676,27 +676,29 @@ export const Huddle = () => {
               }
             }}
           />
-          <Dialog open={mediaDialogOpen} onOpenChange={setMediaDialogOpen}>
-            <DialogTrigger asChild>
-              <Button type="button" variant="outline" size="icon">
-                <Plus className="w-4 h-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="w-full max-w-md">
-              <VisuallyHidden>
-                <DialogTitle>Upload Media</DialogTitle>
-                <DialogDescription>Upload an image or video to share in the chat</DialogDescription>
-              </VisuallyHidden>
-              <MediaUpload
-                onMediaSelected={sendMediaMessage}
-                bucket="chat-media"
-                showPreview={true}
-              />
-            </DialogContent>
-          </Dialog>
-          <Button type="submit" disabled={!newMessage.trim()}>
-            <Send className="w-4 h-4" />
-          </Button>
+          <div className="flex gap-2 shrink-0">
+            <Dialog open={mediaDialogOpen} onOpenChange={setMediaDialogOpen}>
+              <DialogTrigger asChild>
+                <Button type="button" variant="outline" size="icon" className="shrink-0">
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="w-full max-w-md">
+                <VisuallyHidden>
+                  <DialogTitle>Upload Media</DialogTitle>
+                  <DialogDescription>Upload an image or video to share in the chat</DialogDescription>
+                </VisuallyHidden>
+                <MediaUpload
+                  onMediaSelected={sendMediaMessage}
+                  bucket="chat-media"
+                  showPreview={true}
+                />
+              </DialogContent>
+            </Dialog>
+            <Button type="submit" disabled={!newMessage.trim()} className="shrink-0">
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
         </form>
       </Card>
     </div>
