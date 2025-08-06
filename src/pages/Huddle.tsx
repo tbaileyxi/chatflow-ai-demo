@@ -663,14 +663,14 @@ export const Huddle = () => {
 
       {/* Message Input */}
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border">
-        <div className="p-3 pb-safe">
-          <form onSubmit={sendMessage} className="flex items-end gap-2 max-w-screen-sm mx-auto">
-            <div className="flex-1">
+        <div className="p-3 safe-area-inset-bottom">
+          <form onSubmit={sendMessage} className="flex items-end gap-2">
+            <div className="flex-1 min-w-0">
               <Textarea
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Type a message..."
-                className="w-full min-h-[40px] max-h-[100px] resize-none border-border/50 focus:border-primary bg-background/50 text-sm"
+                className="w-full min-h-[40px] max-h-[80px] resize-none border-border/50 focus:border-primary bg-background/50 text-sm"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -679,10 +679,10 @@ export const Huddle = () => {
                 }}
               />
             </div>
-            <div className="flex gap-1 shrink-0">
+            <div className="flex gap-1 flex-shrink-0 items-end">
               <Dialog open={mediaDialogOpen} onOpenChange={setMediaDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button type="button" variant="outline" size="icon" className="w-10 h-10 shrink-0">
+                  <Button type="button" variant="outline" size="icon" className="w-9 h-9 flex-shrink-0">
                     <Plus className="w-4 h-4" />
                   </Button>
                 </DialogTrigger>
@@ -698,7 +698,7 @@ export const Huddle = () => {
                   />
                 </DialogContent>
               </Dialog>
-              <Button type="submit" disabled={!newMessage.trim()} className="w-10 h-10 shrink-0">
+              <Button type="submit" disabled={!newMessage.trim()} className="w-9 h-9 flex-shrink-0">
                 <Send className="w-4 h-4" />
               </Button>
             </div>
