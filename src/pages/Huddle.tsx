@@ -662,24 +662,26 @@ export const Huddle = () => {
       </div>
 
       {/* Message Input */}
-      <Card className="m-4 p-3 border-2 border-primary/20 bg-card/95 backdrop-blur-sm rounded-lg shadow-lg">
-        <form onSubmit={sendMessage} className="flex gap-2 mb-2">
-          <Textarea
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 min-h-[40px] max-h-[120px] resize-none border-primary/30 focus:border-primary bg-background"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage(e);
-              }
-            }}
-          />
-          <div className="flex gap-2 shrink-0">
+      <Card className="m-4 border-2 border-primary/20 bg-card/95 backdrop-blur-sm rounded-lg shadow-lg">
+        <form onSubmit={sendMessage} className="flex items-end gap-2 p-3 pb-safe">
+          <div className="flex-1 min-w-0">
+            <Textarea
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type a message..."
+              className="w-full min-h-[40px] max-h-[120px] resize-none border-primary/30 focus:border-primary bg-background"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage(e);
+                }
+              }}
+            />
+          </div>
+          <div className="flex gap-1 shrink-0 ml-2">
             <Dialog open={mediaDialogOpen} onOpenChange={setMediaDialogOpen}>
               <DialogTrigger asChild>
-                <Button type="button" variant="outline" size="icon" className="shrink-0">
+                <Button type="button" variant="outline" size="icon" className="w-10 h-10 shrink-0">
                   <Plus className="w-4 h-4" />
                 </Button>
               </DialogTrigger>
@@ -695,7 +697,7 @@ export const Huddle = () => {
                 />
               </DialogContent>
             </Dialog>
-            <Button type="submit" disabled={!newMessage.trim()} className="shrink-0">
+            <Button type="submit" disabled={!newMessage.trim()} className="w-10 h-10 shrink-0">
               <Send className="w-4 h-4" />
             </Button>
           </div>

@@ -21,16 +21,54 @@ declare global {
 
 // Twitter Embed Component
 export const TwitterEmbed = ({ embedCode }: { embedCode: string }) => {
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
-    // Load Twitter widgets script
-    if (window.twttr) {
-      window.twttr.widgets.load();
-    } else {
-      const script = document.createElement('script');
-      script.src = 'https://platform.twitter.com/widgets.js';
-      script.async = true;
-      document.head.appendChild(script);
-    }
+    const loadTwitterWidgets = async () => {
+      try {
+        // Check if script is already loaded
+        if (window.twttr) {
+          window.twttr.widgets.load();
+          setIsLoading(false);
+          return;
+        }
+
+        // Load script only once per page
+        if (!document.querySelector('script[src*="platform.twitter.com"]')) {
+          const script = document.createElement('script');
+          script.src = 'https://platform.twitter.com/widgets.js';
+          script.async = true;
+          script.onload = () => {
+            if (window.twttr) {
+              window.twttr.widgets.load();
+              setIsLoading(false);
+            }
+          };
+          script.onerror = () => setIsLoading(false);
+          document.head.appendChild(script);
+        } else {
+          // Script exists, wait for it to load
+          const checkTwitter = setInterval(() => {
+            if (window.twttr) {
+              window.twttr.widgets.load();
+              setIsLoading(false);
+              clearInterval(checkTwitter);
+            }
+          }, 100);
+          
+          // Timeout after 5 seconds
+          setTimeout(() => {
+            clearInterval(checkTwitter);
+            setIsLoading(false);
+          }, 5000);
+        }
+      } catch (error) {
+        console.error('Error loading Twitter widgets:', error);
+        setIsLoading(false);
+      }
+    };
+
+    loadTwitterWidgets();
   }, []);
 
   // Check if it's a Twitter/X URL and convert to embed
@@ -39,8 +77,13 @@ export const TwitterEmbed = ({ embedCode }: { embedCode: string }) => {
     if (urlMatch) {
       const tweetUrl = urlMatch[0];
       return (
-        <div className="twitter-embed">
-          <blockquote className="twitter-tweet">
+        <div className="twitter-embed min-h-[200px] relative">
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded">
+              <div className="text-sm text-muted-foreground">Loading tweet...</div>
+            </div>
+          )}
+          <blockquote className="twitter-tweet" data-conversation="none" data-cards="hidden">
             <a href={tweetUrl}></a>
           </blockquote>
         </div>

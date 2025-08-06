@@ -91,7 +91,27 @@ export const YourFeed = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setPosts(posts || []);
+      
+      // Remove duplicates based on content and team_id (keep the most recent)
+      const uniquePosts = posts?.reduce((acc: Post[], post: Post) => {
+        const existingIndex = acc.findIndex(p => 
+          p.content === post.content && p.team.id === post.team.id
+        );
+        
+        if (existingIndex === -1) {
+          acc.push(post);
+        } else {
+          // Keep the more recent post
+          const existing = acc[existingIndex];
+          if (new Date(post.created_at) > new Date(existing.created_at)) {
+            acc[existingIndex] = post;
+          }
+        }
+        
+        return acc;
+      }, []) || [];
+      
+      setPosts(uniquePosts);
     } catch (error) {
       console.error("Error fetching posts:", error);
     } finally {
