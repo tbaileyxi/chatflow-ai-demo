@@ -662,47 +662,49 @@ export const Huddle = () => {
       </div>
 
       {/* Message Input */}
-      <Card className="m-4 border-2 border-primary/20 bg-card/95 backdrop-blur-sm rounded-lg shadow-lg">
-        <form onSubmit={sendMessage} className="flex items-center gap-2 p-3 pb-safe">
-          <div className="flex-1">
-            <Textarea
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type a message..."
-              className="w-full min-h-[40px] max-h-[120px] resize-none border-primary/30 focus:border-primary bg-background"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage(e);
-                }
-              }}
-            />
-          </div>
-          <div className="flex gap-1 flex-shrink-0">
-            <Dialog open={mediaDialogOpen} onOpenChange={setMediaDialogOpen}>
-              <DialogTrigger asChild>
-                <Button type="button" variant="outline" size="icon" className="w-10 h-10">
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="w-full max-w-md">
-                <VisuallyHidden>
-                  <DialogTitle>Upload Media</DialogTitle>
-                  <DialogDescription>Upload an image or video to share in the chat</DialogDescription>
-                </VisuallyHidden>
-                <MediaUpload
-                  onMediaSelected={sendMediaMessage}
-                  bucket="chat-media"
-                  showPreview={true}
-                />
-              </DialogContent>
-            </Dialog>
-            <Button type="submit" disabled={!newMessage.trim()} className="w-10 h-10">
-              <Send className="w-4 h-4" />
-            </Button>
-          </div>
-        </form>
-      </Card>
+      <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border">
+        <div className="p-3 pb-safe">
+          <form onSubmit={sendMessage} className="flex items-end gap-2 max-w-screen-sm mx-auto">
+            <div className="flex-1">
+              <Textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type a message..."
+                className="w-full min-h-[40px] max-h-[100px] resize-none border-border/50 focus:border-primary bg-background/50 text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage(e);
+                  }
+                }}
+              />
+            </div>
+            <div className="flex gap-1 shrink-0">
+              <Dialog open={mediaDialogOpen} onOpenChange={setMediaDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button type="button" variant="outline" size="icon" className="w-10 h-10 shrink-0">
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="w-full max-w-md">
+                  <VisuallyHidden>
+                    <DialogTitle>Upload Media</DialogTitle>
+                    <DialogDescription>Upload an image or video to share in the chat</DialogDescription>
+                  </VisuallyHidden>
+                  <MediaUpload
+                    onMediaSelected={sendMediaMessage}
+                    bucket="chat-media"
+                    showPreview={true}
+                  />
+                </DialogContent>
+              </Dialog>
+              <Button type="submit" disabled={!newMessage.trim()} className="w-10 h-10 shrink-0">
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 };

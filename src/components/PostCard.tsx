@@ -83,7 +83,7 @@ export const TwitterEmbed = ({ embedCode }: { embedCode: string }) => {
               <div className="text-sm text-muted-foreground">Loading tweet...</div>
             </div>
           )}
-          <blockquote className="twitter-tweet" data-conversation="none" data-cards="hidden">
+          <blockquote className="twitter-tweet" data-conversation="none">
             <a href={tweetUrl}></a>
           </blockquote>
         </div>
