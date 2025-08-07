@@ -526,7 +526,7 @@ export const Huddle = () => {
                     ${isCurrentUser && !isTeamAgent 
                       ? 'bg-primary text-primary-foreground rounded-br-md' 
                       : isTeamAgent 
-                        ? 'bg-accent/50 text-accent-foreground border border-accent rounded-bl-md'
+                        ? 'bg-accent text-accent-foreground border border-accent/30 rounded-bl-md'
                         : 'bg-muted text-foreground rounded-bl-md'
                     }
                   `}>
@@ -669,7 +669,7 @@ export const Huddle = () => {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Type a message..."
-              className="text-input w-full min-h-[40px] max-h-[80px] resize-none border-border/50 focus:border-primary bg-background/50"
+              className="text-input w-full min-h-[40px] max-h-[80px] resize-none border-border focus:border-primary bg-background text-foreground placeholder:text-muted-foreground"
               style={{ fontSize: '16px' }}
               onFocus={(e) => {
                 e.target.style.setProperty('width', 'calc(100% - 50px)', 'important');
