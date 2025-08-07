@@ -37,7 +37,7 @@ export const Auth = () => {
         localStorage.removeItem('pendingHuddleJoin');
       }
     }
-    return <Navigate to="/" replace />;
+    return <Navigate to="/app" replace />;
   }
 
   const handleAuth = async (e: React.FormEvent) => {

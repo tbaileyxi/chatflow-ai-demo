@@ -13,23 +13,23 @@ export const FeedTabs = () => {
   return (
     <div className="flex-1 flex flex-col">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-2 bg-card border-b border-border rounded-none">
+        <TabsList className="grid w-full grid-cols-2 bg-transparent border-b border-border rounded-none p-1">
           <TabsTrigger 
             value="spotlight" 
-            className="text-lg font-semibold data-[state=active]:bg-spotlight data-[state=active]:text-primary-foreground"
+            className="text-lg font-semibold rounded-full px-6 py-3 transition-all duration-200 data-[state=active]:bg-spotlight data-[state=active]:text-white data-[state=active]:shadow-lg hover:bg-muted"
           >
             Spotlight
           </TabsTrigger>
           <TabsTrigger 
             value="your-feed" 
-            className="text-lg font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2"
+            className="text-lg font-semibold rounded-full px-6 py-3 transition-all duration-200 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg hover:bg-muted flex items-center gap-2"
           >
             Your Feed
             {activeTab === "your-feed" && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 w-6 p-0 ml-1"
+                className="h-6 w-6 p-0 ml-1 hover:bg-white/20"
                 onClick={(e) => {
                   e.stopPropagation();
                   window.location.href = '/teams';

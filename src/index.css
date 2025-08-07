@@ -8,95 +8,108 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Black/Slate Background with Bright Yellow Accents */
-    --background: 210 11% 11%;
-    --foreground: 45 93% 47%;
+    /* Modern Sports Theme - Clean & Professional */
+    --background: 0 0% 100%;
+    --foreground: 210 29% 24%;
 
-    --card: 215 16% 15%;
-    --card-foreground: 45 93% 47%;
+    --card: 0 0% 100%;
+    --card-foreground: 210 29% 24%;
 
-    --popover: 215 16% 15%;
-    --popover-foreground: 45 93% 47%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 29% 24%;
 
-    /* Bright Yellow Primary */
-    --primary: 45 93% 47%;
-    --primary-foreground: 210 11% 11%;
+    /* Deep Navy Primary */
+    --primary: 233 70% 31%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 215 19% 20%;
-    --secondary-foreground: 45 93% 47%;
+    /* Electric Blue Secondary */
+    --secondary: 207 90% 54%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 215 19% 20%;
-    --muted-foreground: 215 15% 65%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 215 19% 20%;
-    --accent-foreground: 45 93% 47%;
+    /* Bright Orange Accent */
+    --accent: 14 100% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Forest Green Success */
+    --success: 122 47% 33%;
+    --success-foreground: 0 0% 100%;
 
     /* Red for destructive actions */
-    --destructive: 0 84% 50%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 215 19% 20%;
-    --input: 215 19% 20%;
-    --ring: 45 93% 47%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 233 70% 31%;
 
-    /* Sports UI elements with yellow theme */
-    --huddle-primary: 45 93% 47%;
-    --huddle-secondary: 45 85% 55%;
-    --spotlight: 45 93% 47%;
-    --like-button: 45 93% 47%;
-    --fire-button: 14 100% 57%;
+    /* Sports UI elements with modern theme */
+    --huddle-primary: 233 70% 31%;
+    --huddle-secondary: 207 90% 54%;
+    --spotlight: 14 100% 60%;
+    --like-button: 14 100% 60%;
+    --fire-button: 14 100% 60%;
 
     --radius: 0.75rem;
 
-    /* Sidebar with same dark/yellow theme */
-    --sidebar-background: 210 11% 11%;
-    --sidebar-foreground: 45 93% 47%;
-    --sidebar-primary: 45 93% 47%;
-    --sidebar-primary-foreground: 210 11% 11%;
-    --sidebar-accent: 215 19% 20%;
-    --sidebar-accent-foreground: 45 93% 47%;
-    --sidebar-border: 215 19% 20%;
-    --sidebar-ring: 45 93% 47%;
+    /* Sidebar with modern theme */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 210 29% 24%;
+    --sidebar-primary: 233 70% 31%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 96%;
+    --sidebar-accent-foreground: 210 29% 24%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 233 70% 31%;
   }
 
-  .light {
-    /* Light mode maintains yellow accent theme */
-    --background: 0 0% 100%;
-    --foreground: 210 11% 11%;
+  .dark {
+    /* Dark mode with navy/blue gradient backgrounds */
+    --background: 233 70% 31%;
+    --foreground: 0 0% 100%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 210 11% 11%;
+    --card: 233 60% 25%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 210 11% 11%;
+    --popover: 233 60% 25%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 45 93% 47%;
-    --primary-foreground: 210 11% 11%;
+    /* Deep Navy Primary */
+    --primary: 207 90% 54%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 210 11% 11%;
+    /* Electric Blue Secondary */
+    --secondary: 233 50% 40%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 233 50% 20%;
+    --muted-foreground: 215 20% 65%;
 
-    --accent: 210 40% 96%;
-    --accent-foreground: 210 11% 11%;
+    /* Bright Orange Accent */
+    --accent: 14 100% 60%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 50%;
+    /* Forest Green Success */
+    --success: 122 47% 33%;
+    --success-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 45 93% 47%;
+    --border: 233 50% 35%;
+    --input: 233 50% 35%;
+    --ring: 207 90% 54%;
     
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 210 11% 11%;
-    --sidebar-primary: 45 93% 47%;
-    --sidebar-primary-foreground: 210 11% 11%;
-    --sidebar-accent: 210 40% 96%;
-    --sidebar-accent-foreground: 210 11% 11%;
-    --sidebar-border: 214.3 31.8% 91.4%;
-    --sidebar-ring: 45 93% 47%;
+    --sidebar-background: 233 70% 31%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 207 90% 54%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 233 50% 40%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 233 50% 35%;
+    --sidebar-ring: 207 90% 54%;
   }
 }
 
