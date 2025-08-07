@@ -510,12 +510,12 @@ export const Huddle = () => {
                 <div className={`flex flex-col max-w-[80%] ${isCurrentUser && !isTeamAgent ? 'items-end ml-auto' : 'items-start'}`}>
                   {/* Sender name and timestamp - smaller and less prominent */}
                   <div className={`flex items-center gap-1 mb-1 px-1 ${isCurrentUser && !isTeamAgent ? 'flex-row-reverse' : ''}`}>
-                    <span className="text-xs font-medium text-muted-foreground">
+                    <span className="chat-metadata font-medium text-muted-foreground">
                       {isTeamAgent ? `${huddle?.team.name} Agent` : 
                        isCurrentUser ? 'You' : 
                        (message.profiles?.display_name || message.profiles?.username || 'Anonymous')}
                     </span>
-                    <span className="text-xs text-muted-foreground/70">
+                    <span className="chat-timestamp text-muted-foreground/70">
                       {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
@@ -531,7 +531,7 @@ export const Huddle = () => {
                     }
                   `}>
                     {/* Message content - larger and more prominent */}
-                    <p className="text-base leading-relaxed">{message.content}</p>
+                    <p className="chat-message-text leading-relaxed">{message.content}</p>
                     
                     {/* Embed content */}
                     {message.embed_code && (
@@ -664,21 +664,24 @@ export const Huddle = () => {
       {/* Message Input */}
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border">
         <div className="p-3 safe-area-inset-bottom">
-          <form onSubmit={sendMessage} className="flex items-end gap-2">
-            <div className="flex-1 min-w-0">
-              <Textarea
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type a message..."
-                className="w-full min-h-[40px] max-h-[80px] resize-none border-border/50 focus:border-primary bg-background/50 text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage(e);
-                  }
-                }}
-              />
-            </div>
+          <div className="chat-input-container">
+            <Textarea
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type a message..."
+              className="text-input w-full min-h-[40px] max-h-[80px] resize-none border-border/50 focus:border-primary bg-background/50"
+              style={{ fontSize: '16px' }}
+              onFocus={(e) => {
+                e.target.style.setProperty('width', 'calc(100% - 50px)', 'important');
+                e.target.style.setProperty('max-width', 'calc(100% - 50px)', 'important');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage(e);
+                }
+              }}
+            />
             <div className="flex gap-1 flex-shrink-0 items-end">
               <Dialog open={mediaDialogOpen} onOpenChange={setMediaDialogOpen}>
                 <DialogTrigger asChild>
@@ -698,10 +701,18 @@ export const Huddle = () => {
                   />
                 </DialogContent>
               </Dialog>
-              <Button type="submit" disabled={!newMessage.trim()} className="w-9 h-9 flex-shrink-0">
+              <Button 
+                type="button" 
+                disabled={!newMessage.trim()} 
+                className="arrow-button w-9 h-9 flex-shrink-0"
+                onClick={sendMessage}
+              >
                 <Send className="w-4 h-4" />
               </Button>
             </div>
+          </div>
+          <form onSubmit={sendMessage} style={{ display: 'none' }}>
+            {/* Hidden form for submit handling */}
           </form>
         </div>
       </div>
