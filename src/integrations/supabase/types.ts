@@ -438,6 +438,7 @@ export type Database = {
           league: string | null
           logo_url: string | null
           name: string
+          sponsor: string | null
           stats: Json | null
           status: string | null
           updated_at: string
@@ -452,6 +453,7 @@ export type Database = {
           league?: string | null
           logo_url?: string | null
           name: string
+          sponsor?: string | null
           stats?: Json | null
           status?: string | null
           updated_at?: string
@@ -466,6 +468,7 @@ export type Database = {
           league?: string | null
           logo_url?: string | null
           name?: string
+          sponsor?: string | null
           stats?: Json | null
           status?: string | null
           updated_at?: string

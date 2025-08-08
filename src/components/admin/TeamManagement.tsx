@@ -22,6 +22,7 @@ interface Team {
   logo_url?: string;
   stats: any;
   status: string;
+  sponsor?: string;
   created_at: string;
 }
 
@@ -40,7 +41,8 @@ export const TeamManagement = () => {
     division: '',
     description: '',
     logo_url: '',
-    status: 'active'
+    status: 'active',
+    sponsor: ''
   });
   const { toast } = useToast();
 
@@ -153,7 +155,8 @@ export const TeamManagement = () => {
         division: '',
         description: '',
         logo_url: '',
-        status: 'active'
+        status: 'active',
+        sponsor: ''
       });
       setIsAddDialogOpen(false);
       setEditingTeam(null);
@@ -178,7 +181,8 @@ export const TeamManagement = () => {
       division: team.division,
       description: team.description || '',
       logo_url: team.logo_url || '',
-      status: team.status || 'active'
+      status: team.status || 'active',
+      sponsor: team.sponsor || ''
     });
     setIsAddDialogOpen(true);
   };
@@ -219,7 +223,8 @@ export const TeamManagement = () => {
       division: '',
       description: '',
       logo_url: '',
-      status: 'active'
+      status: 'active',
+      sponsor: ''
     });
     setEditingTeam(null);
   };
@@ -458,6 +463,19 @@ export const TeamManagement = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Team description..."
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sponsor">Sponsor (Optional)</Label>
+                <Input
+                  id="sponsor"
+                  value={formData.sponsor}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sponsor: e.target.value }))}
+                  placeholder="e.g., Johnnie O, Nike, etc."
+                />
+                <p className="text-xs text-muted-foreground">
+                  Company name that will appear as "sponsored by: [company name]" on agent posts
+                </p>
               </div>
 
               <div className="flex justify-end gap-2">

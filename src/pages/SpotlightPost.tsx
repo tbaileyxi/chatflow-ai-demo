@@ -16,6 +16,7 @@ interface SpotlightPost {
     id: string;
     name: string;
     logo_url?: string;
+    sponsor?: string;
   };
   author?: {
     display_name?: string;
@@ -52,7 +53,7 @@ export const SpotlightPost = () => {
           created_at,
           author_id,
           is_team_agent_message,
-          team:teams(id, name, logo_url),
+          team:teams(id, name, logo_url, sponsor),
           post_reactions(reaction_type)
         `)
         .eq('id', id)

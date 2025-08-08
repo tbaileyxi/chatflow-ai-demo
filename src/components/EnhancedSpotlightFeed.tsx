@@ -21,6 +21,7 @@ interface SpotlightPost {
     id: string;
     name: string;
     logo_url?: string;
+    sponsor?: string;
   };
   author?: {
     display_name?: string;
@@ -66,7 +67,7 @@ export const EnhancedSpotlightFeed = () => {
           author_id,
           is_agent_post,
           is_team_agent_message,
-          team:teams(id, name, logo_url),
+          team:teams(id, name, logo_url, sponsor),
           post_reactions(reaction_type)
         `)
         .contains('target_audience', ['spotlight'])
