@@ -92,8 +92,7 @@ export const MakePublicButton = ({
           size="sm"
           className="text-xs text-muted-foreground hover:text-spotlight hover:bg-spotlight/10"
         >
-          <Megaphone className="w-3 h-3 mr-1" />
-          Make Public
+          <Megaphone className="w-3 h-3" />
         </Button>
       </DialogTrigger>
       <DialogContent>

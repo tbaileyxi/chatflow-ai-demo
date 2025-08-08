@@ -13,39 +13,47 @@ export const FeedTabs = () => {
   return (
     <div className="flex-1 flex flex-col">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-2 bg-transparent border-b border-border rounded-none p-1">
-          <TabsTrigger 
-            value="spotlight" 
-            className="text-lg font-semibold rounded-full px-6 py-3 transition-all duration-200 data-[state=active]:bg-spotlight data-[state=active]:text-white data-[state=active]:shadow-lg hover:bg-muted"
-          >
-            Spotlight
-          </TabsTrigger>
-          <TabsTrigger 
-            value="your-feed" 
-            className="text-lg font-semibold rounded-full px-6 py-3 transition-all duration-200 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg hover:bg-muted flex items-center gap-2"
-          >
-            Your Feed
-            {activeTab === "your-feed" && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 ml-1 hover:bg-white/20"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.location.href = '/teams';
-                }}
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
-            )}
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="spotlight" className="flex-1 mt-0">
-          <EnhancedSpotlightFeed />
-        </TabsContent>
-        <TabsContent value="your-feed" className="flex-1 mt-0">
-          <YourFeed />
-        </TabsContent>
+        <div className="flex w-full p-4 bg-gradient-to-r from-background to-muted/30 border-b border-border">
+          <div className="flex space-x-2 mx-auto glassmorphism rounded-full p-1 shadow-lg">
+            <button
+              onClick={() => setActiveTab("spotlight")}
+              className={`px-6 py-3 rounded-full text-lg font-semibold transition-all duration-300 ${
+                activeTab === "spotlight"
+                  ? "bg-spotlight text-spotlight-foreground shadow-lg transform scale-105"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              }`}
+            >
+              Spotlight
+            </button>
+            <button
+              onClick={() => setActiveTab("your-feed")}
+              className={`px-6 py-3 rounded-full text-lg font-semibold transition-all duration-300 flex items-center gap-2 ${
+                activeTab === "your-feed"
+                  ? "bg-primary text-primary-foreground shadow-lg transform scale-105"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              }`}
+            >
+              Your Feed
+              {activeTab === "your-feed" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 ml-1 hover:bg-white/20 rounded-full"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.location.href = '/teams';
+                  }}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              )}
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 mt-0">
+          {activeTab === "spotlight" && <EnhancedSpotlightFeed />}
+          {activeTab === "your-feed" && <YourFeed />}
+        </div>
       </Tabs>
     </div>
   );

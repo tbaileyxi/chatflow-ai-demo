@@ -97,7 +97,7 @@ export function AppSidebar() {
   };
 
   const menuItems = [
-    { title: 'Home', url: '/', icon: Home },
+    { title: 'Home', url: '/app', icon: Home },
     { title: 'Team Directory', url: '/teams', icon: Users }
   ];
 

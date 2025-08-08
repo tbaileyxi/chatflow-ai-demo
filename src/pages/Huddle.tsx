@@ -522,7 +522,7 @@ export const Huddle = () => {
                   
                   {/* Message bubble */}
                   <div className={`
-                    px-4 py-2 rounded-2xl max-w-full break-words
+                    px-4 py-2 rounded-2xl max-w-full break-words chat-bubble-shadow
                     ${isCurrentUser && !isTeamAgent 
                       ? 'bg-primary text-primary-foreground rounded-br-md' 
                       : isTeamAgent 
