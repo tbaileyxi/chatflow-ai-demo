@@ -516,6 +516,11 @@ export const Huddle = () => {
                        isCurrentUser ? 'You' : 
                        (message.profiles?.display_name || message.profiles?.username || 'Anonymous')}
                     </span>
+                    {isTeamAgent && huddle?.team.sponsor && (
+                      <span className="text-xs text-muted-foreground font-light">
+                        sponsored by: {huddle.team.sponsor}
+                      </span>
+                    )}
                     <span className="chat-timestamp text-muted-foreground/70">
                       {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>

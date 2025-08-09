@@ -368,7 +368,7 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
                 (post.author?.display_name || post.author?.username || post.team.name)
               }
             </h3>
-            {(post.is_team_agent_message || post.is_agent_post || !post.author) && !isSpotlight && post.team.sponsor && (
+            {(post.is_team_agent_message || post.is_agent_post || !post.author) && post.team.sponsor && (
               <span className="text-xs text-muted-foreground font-light">
                 sponsored by: {post.team.sponsor}
               </span>
