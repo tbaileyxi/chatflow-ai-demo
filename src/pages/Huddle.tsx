@@ -25,6 +25,7 @@ interface HuddleData {
     id: string;
     name: string;
     logo_url?: string;
+    sponsor?: string;
   };
   created_at: string;
 }
@@ -132,7 +133,7 @@ export const Huddle = () => {
           name,
           created_at,
           owner_id,
-          team:teams(id, name, logo_url)
+          team:teams(id, name, logo_url, sponsor)
         `)
         .eq("id", id)
         .single();

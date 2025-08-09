@@ -12,6 +12,7 @@ interface Post {
     id: string;
     name: string;
     logo_url?: string;
+    sponsor?: string;
   };
   post_reactions: Array<{
     reaction_type: string;
@@ -37,7 +38,7 @@ export const SpotlightFeed = () => {
           media_url,
           poll_data,
           created_at,
-          team:teams(id, name, logo_url),
+          team:teams(id, name, logo_url, sponsor),
           post_reactions(reaction_type)
         `)
         .contains('target_audience', ['spotlight'])
