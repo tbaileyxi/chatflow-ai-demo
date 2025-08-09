@@ -32,7 +32,7 @@ const Index = () => {
       setProfileComplete(true);
 
       // Check if user has seen onboarding after profile is complete
-      const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
+      const hasSeenOnboarding = localStorage.getItem(`hasSeenOnboarding_${user.id}`);
       if (!hasSeenOnboarding) {
         setShowOnboarding(true);
       }
@@ -48,7 +48,7 @@ const Index = () => {
   };
 
   const handleOnboardingComplete = () => {
-    localStorage.setItem('hasSeenOnboarding', 'true');
+    localStorage.setItem(`hasSeenOnboarding_${user?.id}`, 'true');
     setShowOnboarding(false);
   };
 

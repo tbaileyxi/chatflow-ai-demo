@@ -26,6 +26,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         
+        // Only check for onboarding on sign-in, not every auth state change
+        if (session?.user && event === 'SIGNED_IN') {
+          // Clear old onboarding data that might cause loops
+          const keys = Object.keys(localStorage);
+          keys.forEach(key => {
+            if (key.startsWith('hasSeenOnboarding_') && key !== `hasSeenOnboarding_${session.user.id}`) {
+              localStorage.removeItem(key);
+            }
+          });
+        }
+        
         // Fetch user role when user signs in
         if (session?.user) {
           setTimeout(async () => {

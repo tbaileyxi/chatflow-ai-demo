@@ -510,7 +510,7 @@ export const Huddle = () => {
                 
                 <div className={`flex flex-col max-w-[80%] ${isCurrentUser && !isTeamAgent ? 'items-end ml-auto' : 'items-start'}`}>
                   {/* Sender name and timestamp - smaller and less prominent */}
-                  <div className={`flex items-center gap-1 mb-1 px-1 ${isCurrentUser && !isTeamAgent ? 'flex-row-reverse' : ''}`}>
+                   <div className={`flex items-center gap-1 mb-1 px-1 ${isCurrentUser && !isTeamAgent ? 'flex-row-reverse' : ''}`}>
                     <span className="chat-metadata font-medium text-muted-foreground">
                       {isTeamAgent ? `${huddle?.team.name} Agent` : 
                        isCurrentUser ? 'You' : 
@@ -521,9 +521,6 @@ export const Huddle = () => {
                         sponsored by: {huddle.team.sponsor}
                       </span>
                     )}
-                    <span className="chat-timestamp text-muted-foreground/70">
-                      {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
                   </div>
                   
                   {/* Message bubble */}

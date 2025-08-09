@@ -32,7 +32,10 @@ const App = () => (
                 <SidebarTrigger className="ml-2" />
                 <div className="ml-4 flex-1 flex items-center gap-3">
                   <button 
-                    onClick={() => window.location.href = '/app'}
+                    onClick={() => {
+                      const navigate = window.location.pathname === '/app' ? () => {} : () => window.location.href = '/app';
+                      navigate();
+                    }}
                     className="text-lg font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
                   >
                     Side Huddle
