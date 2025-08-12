@@ -1,9 +1,19 @@
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Users, MessageCircle, Trophy } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useEffect } from 'react';
 
 export const Landing = () => {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
+  // Redirect logged-in users to their feed
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/app');
+    }
+  }, [user, loading, navigate]);
 
   return (
     <div className="min-h-screen bg-background overflow-hidden">
