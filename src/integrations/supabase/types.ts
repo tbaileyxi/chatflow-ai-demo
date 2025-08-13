@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      bears_trending: {
+        Row: {
+          author_username: string | null
+          content: string | null
+          created_at: string
+          embed_url: string
+          fetched_at: string
+          id: string
+          likes: number
+          post_id: string
+          rank_score: number | null
+          retweets: number
+        }
+        Insert: {
+          author_username?: string | null
+          content?: string | null
+          created_at?: string
+          embed_url: string
+          fetched_at?: string
+          id?: string
+          likes?: number
+          post_id: string
+          rank_score?: number | null
+          retweets?: number
+        }
+        Update: {
+          author_username?: string | null
+          content?: string | null
+          created_at?: string
+          embed_url?: string
+          fetched_at?: string
+          id?: string
+          likes?: number
+          post_id?: string
+          rank_score?: number | null
+          retweets?: number
+        }
+        Relationships: []
+      }
       huddle_members: {
         Row: {
           huddle_id: string
