@@ -72,17 +72,13 @@ export const ModerationPanel = () => {
               `)
               .eq('id', report.post_id)
               .single(),
-            supabase
-              .from('profiles')
-              .select('display_name, username')
-              .eq('user_id', report.user_id)
-              .single()
+            supabase.rpc('get_public_profile', { target_user_id: report.user_id })
           ]);
 
           return {
             ...report,
             posts: postResult.data || { id: '', content: '', created_at: '', team: { name: '', logo_url: '' } },
-            profiles: profileResult.data || { display_name: '', username: '' }
+            profiles: profileResult.data?.[0] || { display_name: '', username: '' }
           };
         })
       );
