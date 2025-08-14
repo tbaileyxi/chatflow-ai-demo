@@ -7,7 +7,8 @@ import { TeamManagement } from '@/components/admin/TeamManagement';
 import { UserManagement } from '@/components/admin/UserManagement';
 import { FirstAdminSetup } from '@/components/admin/FirstAdminSetup';
 import { ModerationPanel } from '@/components/admin/ModerationPanel';
-import { BarChart3, Radio, Users, Shield, Flag } from 'lucide-react';
+import { BearsTrendingManager } from '@/components/admin/BearsTrendingManager';
+import { BarChart3, Radio, Users, Shield, Flag, TrendingUp } from 'lucide-react';
 
 export const Admin = () => {
   const { isAdmin, loading, user } = useAuth();
@@ -39,7 +40,7 @@ export const Admin = () => {
           <FirstAdminSetup />
         ) : (
           <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="grid grid-cols-5 w-full max-w-3xl">
+            <TabsList className="grid grid-cols-6 w-full max-w-4xl">
               <TabsTrigger value="dashboard" className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
                 Dashboard
@@ -59,6 +60,10 @@ export const Admin = () => {
               <TabsTrigger value="moderation" className="flex items-center gap-2">
                 <Flag className="w-4 h-4" />
                 Moderation
+              </TabsTrigger>
+              <TabsTrigger value="trending" className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Trending
               </TabsTrigger>
             </TabsList>
 
@@ -80,6 +85,10 @@ export const Admin = () => {
 
             <TabsContent value="moderation">
               <ModerationPanel />
+            </TabsContent>
+
+            <TabsContent value="trending">
+              <BearsTrendingManager />
             </TabsContent>
           </Tabs>
         )}
