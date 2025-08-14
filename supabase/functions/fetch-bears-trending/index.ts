@@ -22,8 +22,8 @@ Deno.serve(async (req) => {
       throw new Error('Twitter Bearer Token not configured');
     }
 
-    // Search for Bears-related tweets
-    const searchQuery = 'Bears OR #DaBears OR #ChicagoBears -is:retweet';
+    // Search for Chicago Bears NFL team specifically
+    const searchQuery = '("Chicago Bears" OR #ChicagoBears OR #DaBears OR #Bears NFL OR "Da Bears" OR @ChicagoBears) -is:retweet';
     const twitterUrl = `https://api.twitter.com/2/tweets/search/recent?query=${encodeURIComponent(searchQuery)}&max_results=10&tweet.fields=created_at,public_metrics,author_id&expansions=author_id&user.fields=username`;
 
     const twitterResponse = await fetch(twitterUrl, {
