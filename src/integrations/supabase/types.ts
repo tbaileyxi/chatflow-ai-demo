@@ -577,6 +577,16 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_public_profile: {
+        Args: { target_user_id: string }
+        Returns: {
+          user_id: string
+          display_name: string
+          username: string
+          avatar_url: string
+          bio: string
+        }[]
+      }
       has_role: {
         Args: {
           _user_id: string
