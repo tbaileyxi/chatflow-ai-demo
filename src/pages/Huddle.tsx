@@ -110,15 +110,13 @@ export const Huddle = () => {
 
   const addNewMessage = async (newMessageData: any) => {
     // Fetch profile for the new message if not already available
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("user_id, display_name, username, avatar_url")
-      .eq("user_id", newMessageData.user_id)
-      .single();
+    const { data: profileData } = await supabase.rpc('get_public_profile', { 
+      target_user_id: newMessageData.user_id 
+    });
 
     const messageWithProfile = {
       ...newMessageData,
-      profiles: profileData
+      profiles: profileData?.[0] || null
     };
 
     setMessages(prev => [...prev, messageWithProfile]);
@@ -176,13 +174,12 @@ export const Huddle = () => {
       // Get unique user IDs
       const userIds = [...new Set(messagesData?.map(m => m.user_id) || [])];
       
-      // Get profiles for these users
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
-        .select("user_id, display_name, username, avatar_url")
-        .in("user_id", userIds);
-
-      if (profilesError) throw profilesError;
+      // Get profiles for these users using the secure function
+      const profilePromises = userIds.map(userId => 
+        supabase.rpc('get_public_profile', { target_user_id: userId })
+      );
+      const profileResults = await Promise.all(profilePromises);
+      const profilesData = profileResults.map(result => result.data?.[0]).filter(Boolean);
 
       // Map profiles to messages
       const messagesWithProfiles = messagesData?.map(message => ({
@@ -414,11 +411,15 @@ export const Huddle = () => {
       
       // Refresh poll votes
       await fetchPollVotes(messageId);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error voting:', error);
+      
+      // Check if it's a unique constraint violation (already voted)
+      const isAlreadyVoted = error?.message?.includes('duplicate') || error?.code === '23505';
+      
       toast({
         title: "Error",
-        description: "Failed to submit vote",
+        description: isAlreadyVoted ? "You have already voted on this poll" : "Failed to submit vote",
         variant: "destructive"
       });
     }
@@ -567,16 +568,18 @@ export const Huddle = () => {
                             return (
                               <Button
                                 key={option.id}
-                                variant={isSelected ? "default" : "outline"}
-                                className="w-full justify-between h-auto p-3 relative overflow-hidden"
+                                variant={isSelected ? "default" : "secondary"}
+                                className={`w-full justify-between h-auto p-3 relative overflow-hidden ${
+                                  isSelected ? 'bg-primary text-primary-foreground' : 'bg-card border border-border text-foreground hover:bg-accent hover:text-accent-foreground'
+                                }`}
                                 onClick={() => handlePollVote(message.id, option.id)}
                               >
                                 <div 
                                   className="absolute inset-0 bg-primary/10 transition-all"
                                   style={{ width: `${percentage}%` }}
                                 />
-                                <span className="relative z-10">{option.text}</span>
-                                <span className="relative z-10 text-sm text-muted-foreground">
+                                <span className="relative z-10 font-medium">{option.text}</span>
+                                <span className="relative z-10 text-sm opacity-75">
                                   {optionVotes} ({Math.round(percentage)}%)
                                 </span>
                               </Button>

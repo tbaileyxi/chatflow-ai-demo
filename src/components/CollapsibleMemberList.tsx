@@ -42,12 +42,13 @@ export const CollapsibleMemberList = ({ huddleId, ownerId }: CollapsibleMemberLi
 
       if (!data) return;
 
-      // Get profiles separately
+      // Get profiles separately using the new secure function
       const uniqueUserIds = [...new Set(data.map(m => m.user_id))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, display_name, username, avatar_url')
-        .in('user_id', uniqueUserIds);
+      const profilePromises = uniqueUserIds.map(userId => 
+        supabase.rpc('get_public_profile', { target_user_id: userId })
+      );
+      const profileResults = await Promise.all(profilePromises);
+      const profiles = profileResults.map(result => result.data?.[0]).filter(Boolean);
 
       // Mock online status for now (in a real app, you'd use presence or last_seen)
       const membersWithStatus = uniqueUserIds.map(userId => ({

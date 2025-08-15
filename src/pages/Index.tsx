@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { FeedTabs } from "@/components/FeedTabs";
 import { HuddleBar } from "@/components/HuddleBar";
 import { useAuth } from '@/hooks/useAuth';
-import { Onboarding } from "@/components/Onboarding";
+import { EnhancedOnboarding } from "@/components/EnhancedOnboarding";
 import { ProfileSetup } from "@/components/ProfileSetup";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -69,7 +69,7 @@ const Index = () => {
   }
 
   if (showOnboarding && profileComplete) {
-    return <Onboarding onComplete={handleOnboardingComplete} />;
+    return <EnhancedOnboarding onComplete={handleOnboardingComplete} />;
   }
 
   return (
