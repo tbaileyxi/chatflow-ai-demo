@@ -71,6 +71,8 @@ export function AppSidebar() {
             .select('*', { count: 'exact', head: true })
             .eq('huddle_id', item.huddle.id);
 
+          console.log(`Huddle ${item.huddle.id} - Real member count: ${realMemberCount}`);
+
           // Get unread message count
           const { count: unreadCount } = await supabase
             .from('huddle_messages')
