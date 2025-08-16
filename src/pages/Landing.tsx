@@ -35,9 +35,9 @@ export const Landing = () => {
               One App.{' '}
               <span className="text-primary">Your team feeds.</span>
               <br />
-              <span className="text-secondary">Your private chats.</span>
+              <span className="text-muted-foreground">Your private chats.</span>
               <br />
-              <span className="text-accent">Game on.</span>
+              <span className="text-primary">Game on.</span>
             </h1>
 
             {/* Subheadline */}
@@ -50,7 +50,7 @@ export const Landing = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-8">
               <Button 
                 size="lg" 
-                className="bg-accent hover:bg-accent/90 text-accent-foreground px-8 py-4 text-lg font-semibold group"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-semibold group"
                 onClick={() => navigate('/auth?signup=true')}
               >
                 Sign Up
@@ -59,7 +59,7 @@ export const Landing = () => {
               <Button 
                 variant="outline" 
                 size="lg" 
-                className="border-secondary text-secondary hover:bg-secondary hover:text-secondary-foreground px-8 py-4 text-lg font-semibold"
+                className="border-muted-foreground text-muted-foreground hover:bg-muted hover:text-foreground px-8 py-4 text-lg font-semibold"
                 onClick={() => navigate('/auth')}
               >
                 Sign In
@@ -120,7 +120,7 @@ export const Landing = () => {
           </p>
           <Button 
             size="lg" 
-            className="bg-accent hover:bg-accent/90 text-accent-foreground px-8 py-4 text-lg font-semibold"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-semibold"
             onClick={() => navigate('/auth?signup=true')}
           >
             Get Started Now

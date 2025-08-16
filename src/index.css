@@ -77,10 +77,10 @@ All colors MUST be HSL.
     --ring: 45 100% 51%;
 
     /* Modern UI elements */
-    --huddle: 270 100% 70%;
-    --huddle-foreground: 0 0% 100%;
-    --spotlight: 195 100% 60%;
-    --spotlight-foreground: 0 0% 100%;
+    --huddle-primary: 270 100% 70%;
+    --huddle-secondary: 260 100% 80%;
+    --spotlight: 45 100% 51%;
+    --spotlight-foreground: 0 0% 0%;
     --like-button: 24 95% 53%;
     --like-button-foreground: 0 0% 100%;
     --fire-button: 0 84% 60%;

@@ -19,7 +19,7 @@ export const FeedTabs = () => {
               onClick={() => setActiveTab("spotlight")}
               className={`px-6 py-3 rounded-full text-lg font-semibold transition-all duration-300 ${
                 activeTab === "spotlight"
-                  ? "bg-spotlight text-spotlight-foreground shadow-lg transform scale-105"
+                  ? "bg-primary text-primary-foreground shadow-lg transform scale-105"
                   : "text-muted-foreground hover:text-foreground hover:bg-background/50"
               }`}
             >
@@ -29,7 +29,7 @@ export const FeedTabs = () => {
               onClick={() => setActiveTab("your-feed")}
               className={`px-6 py-3 rounded-full text-lg font-semibold transition-all duration-300 flex items-center gap-2 ${
                 activeTab === "your-feed"
-                  ? "bg-primary text-primary-foreground shadow-lg transform scale-105"
+                  ? "bg-secondary text-secondary-foreground shadow-lg transform scale-105"
                   : "text-muted-foreground hover:text-foreground hover:bg-background/50"
               }`}
             >

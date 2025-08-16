@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ArrowLeft, ArrowRight, CheckCircle, Eye, Users, MessageSquare, Zap, Target, Calendar, User } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle, Eye, Users, MessageSquare, Target, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -18,8 +18,8 @@ interface EnhancedOnboardingProps {
 const OnboardingScreen1 = () => (
   <div className="text-center space-y-6">
     <div className="space-y-4">
-      <div className="mx-auto w-16 h-16 bg-gradient-to-br from-spotlight to-primary rounded-full flex items-center justify-center">
-        <Eye className="w-8 h-8 text-white" />
+      <div className="mx-auto w-16 h-16 bg-primary rounded-full flex items-center justify-center">
+        <Eye className="w-8 h-8 text-primary-foreground" />
       </div>
       <h2 className="text-2xl font-bold text-foreground">Two Powerful Feeds</h2>
       <p className="text-muted-foreground max-w-md mx-auto">
@@ -29,14 +29,14 @@ const OnboardingScreen1 = () => (
 
     <div className="grid gap-4 max-w-lg mx-auto">
       {/* Spotlight Feed */}
-      <Card className="border-spotlight/20 bg-gradient-to-r from-spotlight/5 to-transparent">
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-spotlight/10 rounded-lg flex items-center justify-center shrink-0">
-              <Target className="w-5 h-5 text-spotlight" />
+            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
+              <Target className="w-5 h-5 text-primary" />
             </div>
             <div className="text-left">
-              <h3 className="font-semibold text-spotlight">Spotlight Feed</h3>
+              <h3 className="font-semibold text-primary">Spotlight Feed</h3>
               <p className="text-sm text-muted-foreground">
                 Curated highlights and trending content from the world of sports
               </p>
@@ -47,51 +47,18 @@ const OnboardingScreen1 = () => (
       </Card>
 
       {/* Your Feed */}
-      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
+      <Card className="border-secondary/20 bg-gradient-to-r from-secondary/5 to-transparent">
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
-              <Calendar className="w-5 h-5 text-primary" />
+            <div className="w-10 h-10 bg-secondary/10 rounded-lg flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5 text-secondary" />
             </div>
             <div className="text-left">
-              <h3 className="font-semibold text-primary">Your Feed</h3>
+              <h3 className="font-semibold text-secondary">Your Feed</h3>
               <p className="text-sm text-muted-foreground">
                 Personal timeline with content from teams you follow
               </p>
               <Badge variant="outline" className="mt-2">Personalized</Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  </div>
-);
-
-const OnboardingScreen2 = () => (
-  <div className="text-center space-y-6">
-    <div className="space-y-4">
-      <div className="mx-auto w-16 h-16 bg-gradient-to-br from-primary to-blue-600 rounded-full flex items-center justify-center">
-        <Users className="w-8 h-8 text-white" />
-      </div>
-      <h2 className="text-2xl font-bold text-foreground">Side Huddles</h2>
-      <p className="text-muted-foreground max-w-md mx-auto">
-        Your gameday group chat starts here. Invite Only chats for your friends, family & fans.
-      </p>
-    </div>
-
-    <div className="grid gap-4 max-w-lg mx-auto">
-      {/* Private Chats */}
-      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
-              <MessageSquare className="w-5 h-5 text-primary" />
-            </div>
-            <div className="text-left">
-              <h3 className="font-semibold text-primary">Private Group Chats</h3>
-              <p className="text-sm text-muted-foreground">
-                Invite only chats for your friends, family & fans
-              </p>
             </div>
           </div>
         </CardContent>
@@ -107,10 +74,16 @@ interface ProfileSetupProps {
 
 const ProfileSetupScreen = ({ onNext, onBack }: ProfileSetupProps) => {
   const [displayName, setDisplayName] = useState('');
-  const [username, setUsername] = useState('');
   const [saving, setSaving] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Generate username from display name
+  const generateUsername = (name: string) => {
+    const base = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const random = Math.floor(Math.random() * 1000);
+    return `${base}${random}`;
+  };
 
   // Generate random color for avatar
   const avatarColors = [
@@ -120,10 +93,10 @@ const ProfileSetupScreen = ({ onNext, onBack }: ProfileSetupProps) => {
   const randomColor = avatarColors[Math.floor(Math.random() * avatarColors.length)];
 
   const handleSave = async () => {
-    if (!displayName.trim() || !username.trim()) {
+    if (!displayName.trim()) {
       toast({
-        title: "Required fields",
-        description: "Please fill in both display name and username",
+        title: "Required field",
+        description: "Please enter a display name",
         variant: "destructive"
       });
       return;
@@ -131,23 +104,17 @@ const ProfileSetupScreen = ({ onNext, onBack }: ProfileSetupProps) => {
 
     setSaving(true);
     try {
+      const username = generateUsername(displayName);
+      
       const { error } = await supabase
         .from('profiles')
         .upsert({
           user_id: user?.id,
           display_name: displayName.trim(),
-          username: username.trim().toLowerCase()
+          username: username
         });
 
       if (error) {
-        if (error.message.includes('unique')) {
-          toast({
-            title: "Username taken",
-            description: "This username is already taken. Please choose another.",
-            variant: "destructive"
-          });
-          return;
-        }
         throw error;
       }
 
@@ -172,12 +139,12 @@ const ProfileSetupScreen = ({ onNext, onBack }: ProfileSetupProps) => {
   return (
     <div className="text-center space-y-6">
       <div className="space-y-4">
-        <div className="mx-auto w-16 h-16 bg-gradient-to-br from-secondary to-accent rounded-full flex items-center justify-center">
-          <User className="w-8 h-8 text-white" />
+        <div className="mx-auto w-16 h-16 bg-secondary rounded-full flex items-center justify-center">
+          <User className="w-8 h-8 text-secondary-foreground" />
         </div>
         <h2 className="text-2xl font-bold text-foreground">Set Up Your Profile</h2>
         <p className="text-muted-foreground max-w-md mx-auto">
-          Let other fans know who you are with a display name and username
+          Just need your display name to get started. You can customize everything later!
         </p>
       </div>
 
@@ -205,19 +172,6 @@ const ProfileSetupScreen = ({ onNext, onBack }: ProfileSetupProps) => {
             />
             <p className="text-xs text-muted-foreground">This is how others will see you</p>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="username" className="text-left block">Username</Label>
-            <Input
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-              placeholder="Enter a unique username"
-              className="text-center"
-              maxLength={30}
-            />
-            <p className="text-xs text-muted-foreground">Unique identifier for your profile</p>
-          </div>
         </div>
 
         <div className="flex gap-2">
@@ -227,7 +181,7 @@ const ProfileSetupScreen = ({ onNext, onBack }: ProfileSetupProps) => {
           </Button>
           <Button 
             onClick={handleSave} 
-            disabled={saving || !displayName.trim() || !username.trim()}
+            disabled={saving || !displayName.trim()}
             className="flex-1"
           >
             {saving ? "Saving..." : "Continue"}
@@ -239,11 +193,11 @@ const ProfileSetupScreen = ({ onNext, onBack }: ProfileSetupProps) => {
   );
 };
 
-const OnboardingScreen4 = () => (
+const OnboardingScreen3 = () => (
   <div className="text-center space-y-6">
     <div className="space-y-4">
-      <div className="mx-auto w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center">
-        <CheckCircle className="w-8 h-8 text-white" />
+      <div className="mx-auto w-16 h-16 bg-primary rounded-full flex items-center justify-center">
+        <CheckCircle className="w-8 h-8 text-primary-foreground" />
       </div>
       <h2 className="text-2xl font-bold text-foreground">You're All Set!</h2>
       <p className="text-muted-foreground max-w-md mx-auto">
@@ -268,10 +222,10 @@ const OnboardingScreen4 = () => (
         </CardContent>
       </Card>
 
-      <Card className="border-l-4 border-l-accent">
+      <Card className="border-l-4 border-l-secondary">
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-accent text-accent-foreground rounded-full flex items-center justify-center text-sm font-bold">
+            <div className="w-8 h-8 bg-secondary text-secondary-foreground rounded-full flex items-center justify-center text-sm font-bold">
               2
             </div>
             <div className="text-left">
@@ -289,7 +243,7 @@ const OnboardingScreen4 = () => (
 
 export const EnhancedOnboarding = ({ onComplete }: EnhancedOnboardingProps) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const totalSteps = 4;
+  const totalSteps = 3;
 
   const handleNext = () => {
     if (currentStep < totalSteps - 1) {
@@ -314,18 +268,16 @@ export const EnhancedOnboarding = ({ onComplete }: EnhancedOnboardingProps) => {
       case 0:
         return <OnboardingScreen1 />;
       case 1:
-        return <OnboardingScreen2 />;
-      case 2:
         return <ProfileSetupScreen onNext={handleNext} onBack={handleBack} />;
-      case 3:
-        return <OnboardingScreen4 />;
+      case 2:
+        return <OnboardingScreen3 />;
       default:
         return <OnboardingScreen1 />;
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-2xl space-y-8">
         {/* Progress Header */}
         <div className="text-center space-y-4">
@@ -338,7 +290,6 @@ export const EnhancedOnboarding = ({ onComplete }: EnhancedOnboardingProps) => {
             <Progress value={(currentStep + 1) / totalSteps * 100} className="w-full" />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Feed Types</span>
-              <span>Side Huddles</span>
               <span>Profile Setup</span>
               <span>Get Started</span>
             </div>
@@ -346,14 +297,14 @@ export const EnhancedOnboarding = ({ onComplete }: EnhancedOnboardingProps) => {
         </div>
 
         {/* Main Content */}
-        <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+        <Card className="border border-border shadow-lg bg-card">
           <CardContent className="p-8">
             {renderCurrentScreen()}
           </CardContent>
         </Card>
 
         {/* Navigation - only show for non-profile setup screens */}
-        {currentStep !== 2 && (
+        {currentStep !== 1 && (
           <div className="flex justify-between items-center">
             <div className="flex gap-2">
               {currentStep > 0 ? (
