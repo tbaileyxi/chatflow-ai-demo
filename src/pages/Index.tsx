@@ -20,7 +20,7 @@ const Index = () => {
       // Check if user has completed profile setup
       const { data: profile } = await supabase
         .from('profiles')
-        .select('display_name, avatar_url')
+        .select('display_name, avatar_url, onboarding_completed')
         .eq('user_id', user.id)
         .single();
 
@@ -31,9 +31,8 @@ const Index = () => {
 
       setProfileComplete(true);
 
-      // Check if user has seen onboarding before
-      const hasSeenOnboarding = localStorage.getItem(`hasSeenOnboarding_${user.id}`);
-      if (!hasSeenOnboarding) {
+      // Only show onboarding for users who haven't completed it yet
+      if (!profile.onboarding_completed) {
         setShowOnboarding(true);
       }
     };
@@ -48,8 +47,13 @@ const Index = () => {
     setShowOnboarding(true);
   };
 
-  const handleOnboardingComplete = () => {
-    localStorage.setItem(`hasSeenOnboarding_${user?.id}`, 'true');
+  const handleOnboardingComplete = async () => {
+    // Mark onboarding as completed in database
+    await supabase
+      .from('profiles')
+      .update({ onboarding_completed: true })
+      .eq('user_id', user?.id);
+    
     setShowOnboarding(false);
   };
 

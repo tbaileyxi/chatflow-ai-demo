@@ -342,6 +342,7 @@ export type Database = {
           display_name: string | null
           id: string
           last_login_at: string | null
+          onboarding_completed: boolean
           phone_number: string | null
           signup_method: string | null
           status: string | null
@@ -359,6 +360,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           last_login_at?: string | null
+          onboarding_completed?: boolean
           phone_number?: string | null
           signup_method?: string | null
           status?: string | null
@@ -376,6 +378,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           last_login_at?: string | null
+          onboarding_completed?: boolean
           phone_number?: string | null
           signup_method?: string | null
           status?: string | null
