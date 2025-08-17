@@ -316,7 +316,7 @@ export const TeamManagement = () => {
               Add Team
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingTeam ? 'Edit Team' : 'Add New Team'}
@@ -346,19 +346,26 @@ export const TeamManagement = () => {
 
               <div className="grid grid-cols-4 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="league">League</Label>
-                  <Select value={formData.league} onValueChange={(value) => 
-                    setFormData(prev => ({ ...prev, league: value }))
-                  }>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="NFL">NFL</SelectItem>
-                      <SelectItem value="NCAA">NCAA</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                   <Label htmlFor="league">League</Label>
+                   <Select value={formData.league} onValueChange={(value) => 
+                     setFormData(prev => ({ ...prev, league: value }))
+                   }>
+                     <SelectTrigger>
+                       <SelectValue />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="NFL">NFL</SelectItem>
+                       <SelectItem value="NCAA">NCAA</SelectItem>
+                       <SelectItem value="NBA">NBA</SelectItem>
+                       <SelectItem value="MLB">MLB</SelectItem>
+                       <SelectItem value="NHL">NHL</SelectItem>
+                       <SelectItem value="MLS">MLS</SelectItem>
+                       <SelectItem value="WNBA">WNBA</SelectItem>
+                       <SelectItem value="Premier League">Premier League</SelectItem>
+                       <SelectItem value="Other">Other</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="status">Status</Label>
                   <Select value={formData.status} onValueChange={(value) => 

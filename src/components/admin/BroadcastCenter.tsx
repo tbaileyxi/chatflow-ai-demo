@@ -510,10 +510,14 @@ export const BroadcastCenter = () => {
                 placeholder={
                   messageType === 'poll' ? 'What would you like to ask?' : 
                   messageType === 'embed' ? 'Optional caption for your embed...' :
-                  'Enter your message...'
+                  'Enter your message... (Use line breaks for formatting)'
                 }
-                rows={4}
+                rows={6}
+                className="resize-vertical"
               />
+              <p className="text-xs text-muted-foreground">
+                Tip: Use line breaks (Enter key) to format your message with multiple paragraphs
+              </p>
             </div>
           )}
 

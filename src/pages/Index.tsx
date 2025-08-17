@@ -31,8 +31,11 @@ const Index = () => {
 
       setProfileComplete(true);
 
-      // Only show onboarding for truly new users (just after profile setup)
-      // Don't check localStorage for returning users - they should skip onboarding
+      // Check if user has seen onboarding before
+      const hasSeenOnboarding = localStorage.getItem(`hasSeenOnboarding_${user.id}`);
+      if (!hasSeenOnboarding) {
+        setShowOnboarding(true);
+      }
     };
 
     checkUserProfile();
@@ -41,7 +44,7 @@ const Index = () => {
   const handleProfileSetupComplete = () => {
     setShowProfileSetup(false);
     setProfileComplete(true);
-    // Only show onboarding for new users after profile setup
+    // Show onboarding for new users after profile setup
     setShowOnboarding(true);
   };
 
@@ -66,8 +69,8 @@ const Index = () => {
     return <ProfileSetup onComplete={handleProfileSetupComplete} />;
   }
 
-  // Only show onboarding if we just completed profile setup (not for returning users)
-  if (showOnboarding && profileComplete && showProfileSetup === false) {
+  // Show onboarding if user hasn't seen it before
+  if (showOnboarding && profileComplete) {
     return <EnhancedOnboarding onComplete={handleOnboardingComplete} />;
   }
 

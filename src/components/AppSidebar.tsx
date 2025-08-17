@@ -66,12 +66,16 @@ export function AppSidebar() {
       const huddlesWithUnread = await Promise.all(
         (data || []).map(async (item) => {
           // Get real member count from huddle_members table
-          const { count: realMemberCount } = await supabase
+          const { count: realMemberCount, error: countError } = await supabase
             .from('huddle_members')
             .select('*', { count: 'exact', head: true })
             .eq('huddle_id', item.huddle.id);
 
-          console.log(`Huddle ${item.huddle.id} - Real member count: ${realMemberCount}`);
+          if (countError) {
+            console.error(`Error counting members for huddle ${item.huddle.id}:`, countError);
+          }
+
+          console.log(`Huddle ${item.huddle.name} (${item.huddle.id}) - Real member count: ${realMemberCount}`);
 
           // Get unread message count
           const { count: unreadCount } = await supabase
@@ -80,12 +84,13 @@ export function AppSidebar() {
             .eq('huddle_id', item.huddle.id)
             .gt('created_at', item.last_read_at || '1970-01-01');
 
-          // Simulate online count (in real app, this would use presence tracking)
-          const onlineCount = Math.max(1, Math.floor((realMemberCount || 1) * 0.6));
+          // More realistic online count based on actual member count
+          const actualMemberCount = realMemberCount || 0;
+          const onlineCount = Math.max(1, Math.floor(actualMemberCount * 0.7));
 
           return {
             ...item.huddle,
-            member_count: realMemberCount || 1,
+            member_count: actualMemberCount,
             online_count: onlineCount,
             has_unread: (unreadCount || 0) > 0
           };
