@@ -22,7 +22,7 @@ const OnboardingScreen1 = () => (
         <Eye className="w-8 h-8 text-primary-foreground" />
       </div>
       <h2 className="text-2xl font-bold text-foreground">Two Powerful Feeds</h2>
-      <p className="text-muted-foreground max-w-md mx-auto">
+      <p className="text-foreground max-w-md mx-auto">
         Stay connected with your teams through two distinct feeds designed for different experiences
       </p>
     </div>
@@ -36,8 +36,8 @@ const OnboardingScreen1 = () => (
               <Target className="w-5 h-5 text-primary" />
             </div>
             <div className="text-left">
-              <h3 className="font-semibold text-primary">Spotlight Feed</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className="font-semibold text-foreground">Spotlight Feed</h3>
+              <p className="text-sm text-foreground">
                 Curated highlights and trending content from the world of sports
               </p>
               <Badge variant="secondary" className="mt-2">Default Feed</Badge>
@@ -54,8 +54,8 @@ const OnboardingScreen1 = () => (
               <Users className="w-5 h-5 text-secondary" />
             </div>
             <div className="text-left">
-              <h3 className="font-semibold text-secondary">Your Feed</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className="font-semibold text-foreground">Your Feed</h3>
+              <p className="text-sm text-foreground">
                 Personal timeline with content from teams you follow
               </p>
               <Badge variant="outline" className="mt-2">Personalized</Badge>
@@ -243,7 +243,7 @@ const OnboardingScreen3 = () => (
 
 export const EnhancedOnboarding = ({ onComplete }: EnhancedOnboardingProps) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const totalSteps = 3;
+  const totalSteps = 2;
 
   const handleNext = () => {
     if (currentStep < totalSteps - 1) {
@@ -268,8 +268,6 @@ export const EnhancedOnboarding = ({ onComplete }: EnhancedOnboardingProps) => {
       case 0:
         return <OnboardingScreen1 />;
       case 1:
-        return <ProfileSetupScreen onNext={handleNext} onBack={handleBack} />;
-      case 2:
         return <OnboardingScreen3 />;
       default:
         return <OnboardingScreen1 />;
@@ -290,7 +288,6 @@ export const EnhancedOnboarding = ({ onComplete }: EnhancedOnboardingProps) => {
             <Progress value={(currentStep + 1) / totalSteps * 100} className="w-full" />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Feed Types</span>
-              <span>Profile Setup</span>
               <span>Get Started</span>
             </div>
           </div>
@@ -303,8 +300,8 @@ export const EnhancedOnboarding = ({ onComplete }: EnhancedOnboardingProps) => {
           </CardContent>
         </Card>
 
-        {/* Navigation - only show for non-profile setup screens */}
-        {currentStep !== 1 && (
+        {/* Navigation */}
+        {true && (
           <div className="flex justify-between items-center">
             <div className="flex gap-2">
               {currentStep > 0 ? (

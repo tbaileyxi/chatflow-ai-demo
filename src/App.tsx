@@ -2,11 +2,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { MessageSquareMore } from "lucide-react";
+import { MessageSquare, MessageSquareMore } from "lucide-react";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
 import { Landing } from "./pages/Landing";
 import { Admin } from "./pages/Admin";
@@ -22,6 +25,69 @@ const queryClient = new QueryClient();
 
 const AppContent = () => {
   const { toggleSidebar } = useSidebar();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [onlineStatus, setOnlineStatus] = useState({ totalMembers: 0, onlineMembers: 0, hasUnread: false });
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchOnlineStatus = async () => {
+      try {
+        const { data: memberData } = await supabase
+          .from('huddle_members')
+          .select(`
+            huddle:huddles(id, name, owner_id),
+            last_read_at
+          `)
+          .eq('user_id', user.id);
+
+        if (!memberData?.length) {
+          setOnlineStatus({ totalMembers: 0, onlineMembers: 0, hasUnread: false });
+          return;
+        }
+
+        let totalMembers = 0;
+        let othersOnlineCount = 0;
+        let hasUnread = false;
+
+        for (const member of memberData) {
+          const { data: huddleMembers } = await supabase
+            .from('huddle_members')
+            .select('user_id')
+            .eq('huddle_id', member.huddle.id);
+
+          const cutoffTime = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+          const { data: onlineProfiles } = await supabase
+            .from('profiles')
+            .select('user_id')
+            .in('user_id', huddleMembers?.map(m => m.user_id) || [])
+            .gte('last_login_at', cutoffTime);
+
+          const { count: unreadCount } = await supabase
+            .from('huddle_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('huddle_id', member.huddle.id)
+            .gt('created_at', member.last_read_at || '1970-01-01');
+
+          const huddleOnlineCount = onlineProfiles?.length || 0;
+          const othersOnline = Math.max(0, huddleOnlineCount - (onlineProfiles?.some(p => p.user_id === user.id) ? 1 : 0));
+
+          totalMembers += huddleMembers?.length || 0;
+          othersOnlineCount += othersOnline;
+          if ((unreadCount || 0) > 0) hasUnread = true;
+        }
+
+        setOnlineStatus({ totalMembers, onlineMembers: othersOnlineCount, hasUnread });
+      } catch (error) {
+        console.error('Error fetching online status:', error);
+      }
+    };
+
+    fetchOnlineStatus();
+    const interval = setInterval(fetchOnlineStatus, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -31,22 +97,25 @@ const AppContent = () => {
           <SidebarTrigger className="ml-2" />
           <div className="ml-4 flex-1 flex items-center gap-3">
             <button 
-              onClick={() => {
-                const navigate = window.location.pathname === '/app' ? () => {} : () => window.location.href = '/app';
-                navigate();
-              }}
+              onClick={() => navigate('/app')}
               className="text-lg font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
             >
               Side Huddle
             </button>
-          </div>
-          <div className="mr-4">
-            <button 
-              onClick={toggleSidebar}
-              className="w-8 h-8 p-1.5 bg-huddle/10 hover:bg-huddle/20 text-huddle border border-huddle/20 rounded-md transition-colors flex items-center justify-center"
-              title="Toggle Huddles Sidebar"
+            <button
+              onClick={() => navigate('/app')}
+              className={`relative flex items-center gap-2 px-2 py-1 rounded-md border transition-colors
+                ${onlineStatus.onlineMembers > 0 
+                  ? 'bg-primary/20 text-primary border-primary/30' 
+                  : 'text-muted-foreground hover:text-foreground border-border'}
+              `}
+              title="Open Chat"
             >
-              <MessageSquareMore className="w-4 h-4" />
+              <MessageSquare className={`w-4 h-4 ${onlineStatus.onlineMembers > 0 ? 'text-primary' : ''}`} />
+              <span className="hidden sm:inline">Chat</span>
+              {onlineStatus.onlineMembers > 0 && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-primary animate-pulse" />
+              )}
             </button>
           </div>
         </header>
