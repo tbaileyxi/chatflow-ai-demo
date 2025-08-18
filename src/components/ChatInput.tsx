@@ -30,7 +30,9 @@ export const ChatInput = ({
 
     setSending(true);
     try {
-      await onSendMessage(message.trim());
+      // Process message to make URLs clickable
+      const processedMessage = linkifyText(message.trim());
+      await onSendMessage(processedMessage);
       setMessage('');
       // Reset textarea height
       if (textareaRef.current) {
@@ -78,9 +80,16 @@ export const ChatInput = ({
   }, []);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value);
+    const value = e.target.value;
+    setMessage(value);
     adjustTextareaHeight();
   }, [adjustTextareaHeight]);
+
+  // Function to make URLs clickable
+  const linkifyText = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline">$1</a>');
+  };
 
   return (
     <div className="p-4 bg-card border-t border-border">

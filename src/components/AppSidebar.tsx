@@ -65,17 +65,37 @@ export function AppSidebar() {
       // Get real member counts, unread message counts, and online counts for each huddle
       const huddlesWithUnread = await Promise.all(
         (data || []).map(async (item) => {
-          // Get real member count from huddle_members table
-          const { count: realMemberCount, error: countError } = await supabase
+          // Get ALL members including owner from huddle_members table
+          const { data: allMembers, error: membersError } = await supabase
             .from('huddle_members')
-            .select('*', { count: 'exact', head: true })
+            .select('user_id')
             .eq('huddle_id', item.huddle.id);
 
-          if (countError) {
-            console.error(`Error counting members for huddle ${item.huddle.id}:`, countError);
+          // Also get the huddle owner info
+          const { data: huddleInfo, error: huddleError } = await supabase
+            .from('huddles')
+            .select('owner_id')
+            .eq('id', item.huddle.id)
+            .single();
+
+          if (membersError || huddleError) {
+            console.error(`Error fetching huddle data for ${item.huddle.id}:`, membersError || huddleError);
           }
 
-          console.log(`Huddle ${item.huddle.name} (${item.huddle.id}) - Real member count: ${realMemberCount}`);
+          // Create a Set to ensure unique user IDs (members + owner)
+          const allUserIds = new Set<string>();
+          
+          // Add all members
+          allMembers?.forEach(member => allUserIds.add(member.user_id));
+          
+          // Add owner if not already included
+          if (huddleInfo?.owner_id) {
+            allUserIds.add(huddleInfo.owner_id);
+          }
+
+          const totalMemberCount = allUserIds.size;
+
+          console.log(`Huddle ${item.huddle.name} (${item.huddle.id}) - Total members (including owner): ${totalMemberCount}`);
 
           // Get unread message count
           const { count: unreadCount } = await supabase
@@ -84,13 +104,19 @@ export function AppSidebar() {
             .eq('huddle_id', item.huddle.id)
             .gt('created_at', item.last_read_at || '1970-01-01');
 
-          // More realistic online count based on actual member count
-          const actualMemberCount = realMemberCount || 0;
-          const onlineCount = Math.max(1, Math.floor(actualMemberCount * 0.7));
+          // Online count based on recent activity
+          const cutoffTime = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+          const { data: onlineProfiles } = await supabase
+            .from('profiles')
+            .select('user_id')
+            .in('user_id', Array.from(allUserIds))
+            .gte('last_login_at', cutoffTime);
+
+          const onlineCount = onlineProfiles?.length || 0;
 
           return {
             ...item.huddle,
-            member_count: actualMemberCount,
+            member_count: totalMemberCount,
             online_count: onlineCount,
             has_unread: (unreadCount || 0) > 0
           };

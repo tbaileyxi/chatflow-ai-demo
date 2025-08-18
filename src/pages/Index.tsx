@@ -17,23 +17,37 @@ const Index = () => {
     const checkUserProfile = async () => {
       if (!user) return;
 
-      // Check if user has completed profile setup
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('display_name, avatar_url, onboarding_completed')
-        .eq('user_id', user.id)
-        .single();
+      try {
+        // Check if user has completed profile setup
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('display_name, avatar_url, onboarding_completed')
+          .eq('user_id', user.id)
+          .single();
 
-      if (!profile || !profile.display_name) {
-        setShowProfileSetup(true);
-        return;
-      }
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error fetching profile:', error);
+          return;
+        }
 
-      setProfileComplete(true);
+        // If no profile exists or no display name, show profile setup
+        if (!profile || !profile.display_name) {
+          setShowProfileSetup(true);
+          setShowOnboarding(false);
+          setProfileComplete(false);
+          return;
+        }
 
-      // Only show onboarding for users who haven't completed it yet
-      if (!profile.onboarding_completed) {
-        setShowOnboarding(true);
+        setProfileComplete(true);
+
+        // Only show onboarding for users who haven't completed it yet AND have a complete profile
+        if (profile.onboarding_completed === false || profile.onboarding_completed === null) {
+          setShowOnboarding(true);
+        } else {
+          setShowOnboarding(false);
+        }
+      } catch (error) {
+        console.error('Error checking user profile:', error);
       }
     };
 

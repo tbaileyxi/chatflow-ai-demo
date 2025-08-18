@@ -112,18 +112,18 @@ export const AppHeader = () => {
       <div className="flex items-center gap-4">
         <h1 className="text-xl font-bold text-foreground">Side Huddle</h1>
         
-        {/* Chat icon moved to left side */}
+        {/* Chat icon positioned on left */}
         <Button
           variant={isOnMainPage ? "default" : "ghost"}
           size="sm"
           onClick={handleChatClick}
-          className={`flex items-center gap-2 relative ${
+          className={`flex items-center gap-2 relative transition-colors ${
             onlineStatus.hasUnread ? 'animate-pulse' : ''
-          } ${onlineStatus.onlineMembers > 0 ? 'text-yellow-500 hover:text-yellow-400' : ''}`}
+          } ${onlineStatus.onlineMembers > 0 ? 'bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30 border-yellow-500/50' : ''}`}
         >
           <MessageSquare 
             className={`w-4 h-4 ${
-              onlineStatus.onlineMembers > 0 ? 'text-yellow-500' : 'text-muted-foreground'
+              onlineStatus.onlineMembers > 0 ? 'text-yellow-600' : 'text-muted-foreground'
             }`} 
           />
           <span className="hidden sm:inline">Chat</span>
