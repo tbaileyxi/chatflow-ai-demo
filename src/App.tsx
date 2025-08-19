@@ -84,9 +84,19 @@ const AppContent = () => {
       }
     };
 
+    // Listen for custom event when huddle is read
+    const handleHuddleRead = () => {
+      fetchOnlineStatus();
+    };
+
     fetchOnlineStatus();
     const interval = setInterval(fetchOnlineStatus, 30000);
-    return () => clearInterval(interval);
+    window.addEventListener('huddleRead', handleHuddleRead);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('huddleRead', handleHuddleRead);
+    };
   }, [user]);
 
   return (
@@ -105,16 +115,18 @@ const AppContent = () => {
             <button
               onClick={toggleSidebar}
               className={`relative flex items-center gap-2 px-2 py-1 rounded-md border transition-colors
-                ${onlineStatus.onlineMembers > 0 
+                ${onlineStatus.hasUnread 
                   ? 'bg-yellow-500/20 text-yellow-600 border-yellow-500/30 hover:bg-yellow-500/30' 
+                  : onlineStatus.onlineMembers > 0
+                  ? 'bg-green-500/20 text-green-600 border-green-500/30 hover:bg-green-500/30'
                   : 'text-muted-foreground hover:text-foreground border-border'}
               `}
               title="Open Chat"
             >
-              <MessageSquare className={`w-4 h-4 ${onlineStatus.onlineMembers > 0 ? 'text-yellow-600' : ''}`} />
+              <MessageSquare className={`w-4 h-4 ${onlineStatus.hasUnread ? 'text-yellow-600' : onlineStatus.onlineMembers > 0 ? 'text-green-600' : ''}`} />
               <span className="hidden sm:inline">Chat</span>
-              {onlineStatus.onlineMembers > 0 && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
+              {onlineStatus.hasUnread && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               )}
             </button>
           </div>

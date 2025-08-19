@@ -74,10 +74,30 @@ export const Huddle = () => {
     }, 100);
   };
 
+  const markMessagesAsRead = async () => {
+    if (!user?.id || !id) return;
+    
+    try {
+      await supabase
+        .from('huddle_members')
+        .update({ last_read_at: new Date().toISOString() })
+        .eq('huddle_id', id)
+        .eq('user_id', user.id);
+      
+      // Trigger a custom event to update the red dot in the header
+      window.dispatchEvent(new CustomEvent('huddleRead', { detail: { huddleId: id } }));
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
+  };
+
   useEffect(() => {
-    if (id) {
+    if (id && user) {
       fetchHuddle();
       fetchMessages();
+      
+      // Mark messages as read when entering the huddle
+      markMessagesAsRead();
       
       // Auto-scroll to bottom on mount
       setTimeout(() => scrollToBottom(), 100);
@@ -106,7 +126,7 @@ export const Huddle = () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [id]);
+  }, [id, user]);
 
   const addNewMessage = async (newMessageData: any) => {
     // Fetch profile for the new message if not already available
