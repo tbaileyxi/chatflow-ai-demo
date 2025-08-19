@@ -431,7 +431,7 @@ export const TeamManagement = () => {
                       <p className="text-sm text-muted-foreground mb-2">
                         Upload a team logo (JPG, PNG, max 5MB)
                       </p>
-                      <div className="relative">
+                      <label className="relative inline-block cursor-pointer">
                         <input
                           type="file"
                           accept="image/*"
@@ -439,10 +439,10 @@ export const TeamManagement = () => {
                           disabled={uploading}
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         />
-                        <Button type="button" disabled={uploading}>
+                        <Button type="button" disabled={uploading} className="pointer-events-none">
                           {uploading ? 'Uploading...' : 'Choose File'}
                         </Button>
-                      </div>
+                      </label>
                     </div>
                   )}
                   
