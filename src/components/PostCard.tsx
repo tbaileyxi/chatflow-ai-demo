@@ -390,7 +390,7 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
 
       {/* Post Content */}
       <div className="mb-3">
-        <p className="text-foreground leading-relaxed">{post.content}</p>
+        <p className="text-foreground leading-relaxed whitespace-pre-wrap">{post.content}</p>
         
         {/* Embed Code Display */}
         {post.embed_code && (

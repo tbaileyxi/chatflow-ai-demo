@@ -103,18 +103,18 @@ const AppContent = () => {
               Side Huddle
             </button>
             <button
-              onClick={() => navigate('/app')}
+              onClick={toggleSidebar}
               className={`relative flex items-center gap-2 px-2 py-1 rounded-md border transition-colors
                 ${onlineStatus.onlineMembers > 0 
-                  ? 'bg-primary/20 text-primary border-primary/30' 
+                  ? 'bg-yellow-500/20 text-yellow-600 border-yellow-500/30 hover:bg-yellow-500/30' 
                   : 'text-muted-foreground hover:text-foreground border-border'}
               `}
               title="Open Chat"
             >
-              <MessageSquare className={`w-4 h-4 ${onlineStatus.onlineMembers > 0 ? 'text-primary' : ''}`} />
+              <MessageSquare className={`w-4 h-4 ${onlineStatus.onlineMembers > 0 ? 'text-yellow-600' : ''}`} />
               <span className="hidden sm:inline">Chat</span>
               {onlineStatus.onlineMembers > 0 && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
               )}
             </button>
           </div>

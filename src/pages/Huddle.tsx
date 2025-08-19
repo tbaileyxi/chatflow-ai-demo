@@ -535,7 +535,7 @@ export const Huddle = () => {
                     }
                   `}>
                     {/* Message content - larger and more prominent */}
-                    <p className="chat-message-text leading-relaxed">{message.content}</p>
+                    <p className="chat-message-text leading-relaxed whitespace-pre-wrap">{message.content}</p>
                     
                     {/* Embed content */}
                     {message.embed_code && (

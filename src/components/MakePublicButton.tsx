@@ -105,7 +105,7 @@ export const MakePublicButton = ({
         
         <div className="space-y-4">
           <div className="p-3 bg-muted rounded-lg">
-            <p className="text-sm text-foreground">{messageContent}</p>
+            <p className="text-sm text-foreground whitespace-pre-wrap">{messageContent}</p>
             {mediaUrl && (
               <div className="mt-2 text-xs text-muted-foreground">
                 Includes {mediaType === 'image' ? 'image' : 'media'} attachment
