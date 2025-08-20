@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PostCard } from "@/components/PostCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ChevronUp, ChevronDown, Flag, Share } from "lucide-react";
+import { ChevronUp, ChevronDown, Flag, Share, Plus, CalendarDays } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow, format, isToday, isYesterday, startOfDay } from "date-fns";
@@ -47,11 +47,32 @@ export const EnhancedSpotlightFeed = () => {
   const [groupedPosts, setGroupedPosts] = useState<GroupedPosts>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("today");
+  const [showAllDates, setShowAllDates] = useState(false);
+  const tabsListRef = useRef<HTMLDivElement>(null);
 
   // All hooks must be called before any conditional returns
   useEffect(() => {
     fetchSpotlightPosts();
   }, [user]);
+
+  // Auto-scroll to center today's date when component mounts or activeTab changes
+  useEffect(() => {
+    if (tabsListRef.current && activeTab) {
+      const activeTrigger = tabsListRef.current.querySelector(`[data-state="active"]`) as HTMLElement;
+      if (activeTrigger) {
+        const container = tabsListRef.current;
+        const containerWidth = container.offsetWidth;
+        const triggerLeft = activeTrigger.offsetLeft;
+        const triggerWidth = activeTrigger.offsetWidth;
+        const scrollPosition = triggerLeft - (containerWidth / 2) + (triggerWidth / 2);
+        
+        container.scrollTo({
+          left: scrollPosition,
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [activeTab, groupedPosts]);
 
   const fetchSpotlightPosts = async () => {
     try {
@@ -116,9 +137,12 @@ export const EnhancedSpotlightFeed = () => {
       setPosts(postsWithVotes);
       setGroupedPosts(grouped);
       
-      // Set active tab to first available date
+      // Set active tab to "today" if it exists, otherwise first available date
       const dates = Object.keys(grouped);
-      if (dates.length > 0) {
+      const todayKey = getDateKey(new Date());
+      if (dates.includes(todayKey)) {
+        setActiveTab(todayKey);
+      } else if (dates.length > 0) {
         setActiveTab(dates[0]);
       }
     } catch (error) {
@@ -290,10 +314,13 @@ export const EnhancedSpotlightFeed = () => {
   }
 
   const dates = Object.keys(groupedPosts);
+  const visibleDates = showAllDates ? dates : dates.slice(0, 7);
+  const todayKey = getDateKey(new Date());
   
   if (dates.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6">
+        <CalendarDays className="w-12 h-12 text-muted-foreground mb-4" />
         <h3 className="text-xl font-semibold mb-2">No spotlight content yet</h3>
         <p className="text-muted-foreground">Spotlight posts will appear here!</p>
       </div>
@@ -303,22 +330,74 @@ export const EnhancedSpotlightFeed = () => {
   return (
     <div className="flex-1 flex flex-col">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="flex w-full bg-card border-b border-border rounded-none overflow-x-auto scrollbar-none">
-          {dates.slice(0, 5).map((date) => (
-            <TabsTrigger 
-              key={date}
-              value={date} 
-              className="text-xs sm:text-sm font-medium whitespace-nowrap px-2 sm:px-3 py-2 min-w-fit flex-shrink-0 data-[state=active]:bg-spotlight data-[state=active]:text-primary-foreground"
+        {/* Enhanced Date Navigation */}
+        <div className="bg-card border-b border-border">
+          <div className="relative">
+            <TabsList 
+              ref={tabsListRef}
+              className="flex w-full bg-transparent border-0 rounded-none overflow-x-auto overflow-y-hidden scrollbar-none scroll-smooth px-4 py-2"
+              style={{ 
+                scrollSnapType: 'x mandatory',
+                WebkitOverflowScrolling: 'touch'
+              }}
             >
-              {getDateLabel(date)}
-            </TabsTrigger>
-          ))}
-          {dates.length > 5 && (
-            <div className="flex items-center px-1 sm:px-2 text-xs text-muted-foreground flex-shrink-0">
-              +{dates.length - 5}
-            </div>
-          )}
-        </TabsList>
+              {/* Left padding for proper centering */}
+              <div className="flex-shrink-0 w-16"></div>
+              
+              {visibleDates.map((date) => {
+                const isToday = date === todayKey;
+                const isActive = activeTab === date;
+                
+                return (
+                  <TabsTrigger 
+                    key={date}
+                    value={date}
+                    className={`
+                      text-sm font-medium whitespace-nowrap px-4 py-2.5 min-w-fit flex-shrink-0 mx-1
+                      transition-all duration-200 rounded-full
+                      ${isToday ? 'ring-2 ring-spotlight/30' : ''}
+                      ${isActive ? 'bg-spotlight text-white shadow-lg' : 'hover:bg-muted'}
+                      data-[state=active]:bg-spotlight data-[state=active]:text-white
+                      data-[state=active]:shadow-lg
+                      scroll-snap-align: center
+                    `}
+                    style={{ scrollSnapAlign: 'center' }}
+                  >
+                    <span className={isToday ? 'font-bold' : ''}>
+                      {getDateLabel(date)}
+                    </span>
+                    {isToday && (
+                      <span className="ml-1 w-2 h-2 bg-white rounded-full inline-block opacity-80"></span>
+                    )}
+                  </TabsTrigger>
+                );
+              })}
+              
+              {/* Right padding for proper centering */}
+              <div className="flex-shrink-0 w-16"></div>
+            </TabsList>
+            
+            {/* Plus Button for showing more dates */}
+            {dates.length > 7 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAllDates(!showAllDates)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 bg-card border border-border shadow-sm hover:bg-muted rounded-full"
+                title={showAllDates ? "Show fewer dates" : "Show all dates"}
+              >
+                <Plus className={`w-4 h-4 transition-transform duration-200 ${showAllDates ? 'rotate-45' : ''}`} />
+              </Button>
+            )}
+            
+            {/* Date count indicator */}
+            {!showAllDates && dates.length > 7 && (
+              <div className="absolute right-12 top-1/2 -translate-y-1/2 text-xs text-muted-foreground bg-card border border-border rounded-full px-2 py-1 shadow-sm">
+                +{dates.length - 7}
+              </div>
+            )}
+          </div>
+        </div>
         
         {dates.map((date) => (
           <TabsContent key={date} value={date} className="flex-1 mt-0 overflow-y-auto">
