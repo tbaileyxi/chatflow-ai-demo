@@ -108,7 +108,7 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
         member_count: 1
       });
       
-      // Create the huddle
+      // Create the huddle (trigger automatically adds owner as member)
       const { data: huddle, error: huddleError } = await supabase
         .from('huddles')
         .insert({
@@ -123,20 +123,6 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
 
       if (huddleError) {
         throw new Error(`Failed to create huddle: ${huddleError.message}`);
-      }
-
-      // Add creator as first member
-      const { error: memberError } = await supabase
-        .from('huddle_members')
-        .insert({
-          huddle_id: huddle.id,
-          user_id: user.id
-        });
-
-      if (memberError) {
-        // Clean up the huddle if member insertion fails
-        await supabase.from('huddles').delete().eq('id', huddle.id);
-        throw new Error(`Failed to add member: ${memberError.message}`);
       }
 
       toast({
