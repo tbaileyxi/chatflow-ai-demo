@@ -125,14 +125,19 @@ export const Profile = () => {
     try {
       const { error } = await supabase
         .from('profiles')
-        .upsert({
-          user_id: user.id,
-          display_name: profile.display_name,
-          username: profile.username,
-          phone_number: profile.phone_number,
-          bio: profile.bio,
-          avatar_url: profile.avatar_url
-        });
+        .upsert(
+          {
+            user_id: user.id,
+            display_name: profile.display_name,
+            username: profile.username,
+            phone_number: profile.phone_number,
+            bio: profile.bio,
+            avatar_url: profile.avatar_url
+          },
+          {
+            onConflict: 'user_id'
+          }
+        );
 
       if (error) {
         if (error.message?.includes('username') && error.message?.includes('unique')) {

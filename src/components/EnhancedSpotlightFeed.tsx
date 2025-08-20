@@ -304,18 +304,18 @@ export const EnhancedSpotlightFeed = () => {
     <div className="flex-1 flex flex-col">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <TabsList className="flex w-full bg-card border-b border-border rounded-none overflow-x-auto scrollbar-none">
-          {dates.slice(0, 7).map((date) => (
+          {dates.slice(0, 5).map((date) => (
             <TabsTrigger 
               key={date}
               value={date} 
-              className="text-sm font-medium whitespace-nowrap px-3 py-2 min-w-fit flex-shrink-0 data-[state=active]:bg-spotlight data-[state=active]:text-primary-foreground"
+              className="text-xs sm:text-sm font-medium whitespace-nowrap px-2 sm:px-3 py-2 min-w-fit flex-shrink-0 data-[state=active]:bg-spotlight data-[state=active]:text-primary-foreground"
             >
               {getDateLabel(date)}
             </TabsTrigger>
           ))}
-          {dates.length > 7 && (
-            <div className="flex items-center px-2 text-xs text-muted-foreground flex-shrink-0">
-              +{dates.length - 7} more
+          {dates.length > 5 && (
+            <div className="flex items-center px-1 sm:px-2 text-xs text-muted-foreground flex-shrink-0">
+              +{dates.length - 5}
             </div>
           )}
         </TabsList>
