@@ -31,37 +31,46 @@ export const CollapsibleMemberList = ({ huddleId, ownerId }: CollapsibleMemberLi
 
   const fetchMembers = async () => {
     try {
-      const { data, error } = await supabase
+      // Get all huddle members including the owner
+      const { data: memberData, error: memberError } = await supabase
         .from('huddle_members')
-        .select(`
-          user_id
-        `)
+        .select('user_id')
         .eq('huddle_id', huddleId);
 
-      if (error) throw error;
+      if (memberError) throw memberError;
 
-      if (!data) return;
+      // Get owner info from huddles table
+      const { data: huddleData, error: huddleError } = await supabase
+        .from('huddles')
+        .select('owner_id')
+        .eq('id', huddleId)
+        .single();
 
-      // Get profiles separately using the new secure function
-      const uniqueUserIds = [...new Set(data.map(m => m.user_id))];
-      const profilePromises = uniqueUserIds.map(userId => 
+      if (huddleError) throw huddleError;
+
+      // Combine all user IDs (members + owner, remove duplicates)
+      const memberIds = memberData?.map(m => m.user_id) || [];
+      const allUserIds = [...new Set([...memberIds, huddleData.owner_id])];
+
+      // Get profiles for all users
+      const profilePromises = allUserIds.map(userId => 
         supabase.rpc('get_public_profile', { target_user_id: userId })
       );
       const profileResults = await Promise.all(profilePromises);
       const profiles = profileResults.map(result => result.data?.[0]).filter(Boolean);
 
       // Set realistic online status - show owner as always online, others randomly
-      const membersWithStatus = uniqueUserIds.map(userId => ({
+      const membersWithStatus = allUserIds.map(userId => ({
         user_id: userId,
         profiles: profiles?.find(p => p.user_id === userId) || null,
-        online: userId === ownerId ? true : Math.random() > 0.3 // Owner always online, others 70% chance
+        online: userId === huddleData.owner_id ? true : Math.random() > 0.3 // Owner always online, others 70% chance
       }));
 
       console.log(`Huddle ${huddleId} - Fetched ${membersWithStatus.length} members:`, 
         membersWithStatus.map(m => ({ 
           id: m.user_id, 
           name: m.profiles?.display_name || 'Unknown', 
-          isOwner: m.user_id === ownerId,
+          isOwner: m.user_id === huddleData.owner_id,
           online: m.online 
         }))
       );

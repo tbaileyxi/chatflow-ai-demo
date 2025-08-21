@@ -16,6 +16,7 @@ import { TwitterEmbed } from "@/components/PostCard";
 import { InviteButton } from "@/components/InviteButton";
 import { CollapsibleMemberList } from "@/components/CollapsibleMemberList";
 import { MakePublicButton } from "@/components/MakePublicButton";
+import { HuddleManagement } from "@/components/HuddleManagement";
 
 interface HuddleData {
   id: string;
@@ -489,6 +490,7 @@ export const Huddle = () => {
           </div>
           <div className="flex items-center gap-2">
             <InviteButton huddleId={huddle.id} />
+            <HuddleManagement huddleId={huddle.id} ownerId={huddle.owner_id} huddle={huddle} />
           </div>
         </div>
         <div className="mt-3">
