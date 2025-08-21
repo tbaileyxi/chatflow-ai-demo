@@ -89,6 +89,7 @@ export const HuddleManagement = ({ huddleId, ownerId, huddle }: HuddleManagement
         });
       }
 
+      window.dispatchEvent(new CustomEvent('huddlesChanged'));
       navigate('/app');
     } catch (error) {
       console.error('Error leaving huddle:', error);
@@ -120,6 +121,7 @@ export const HuddleManagement = ({ huddleId, ownerId, huddle }: HuddleManagement
         description: "The huddle and all its messages have been permanently deleted.",
       });
 
+      window.dispatchEvent(new CustomEvent('huddlesChanged'));
       navigate('/app');
     } catch (error) {
       console.error('Error deleting huddle:', error);

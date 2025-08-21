@@ -30,11 +30,11 @@ export function AppSidebar() {
     }
   }, [user]);
 
-  // Update last_read_at when viewing a huddle to mark messages as read
+  // Update unread status and listen for events
   useEffect(() => {
     const currentPath = window.location.pathname;
     const huddleMatch = currentPath.match(/\/huddle\/(.+)/);
-    
+
     if (huddleMatch && user) {
       const huddleId = huddleMatch[1];
       const updateLastRead = async () => {
@@ -50,7 +50,17 @@ export function AppSidebar() {
       
       updateLastRead();
     }
-  }, [window.location.pathname, user]);
+
+    const onHuddleRead = () => fetchUserHuddles();
+    const onHuddlesChanged = () => fetchUserHuddles();
+    window.addEventListener('huddleRead', onHuddleRead);
+    window.addEventListener('huddlesChanged', onHuddlesChanged);
+
+    return () => {
+      window.removeEventListener('huddleRead', onHuddleRead);
+      window.removeEventListener('huddlesChanged', onHuddlesChanged);
+    };
+  }, [user]);
 
   const fetchUserHuddles = async () => {
     try {
