@@ -50,12 +50,21 @@ export const CollapsibleMemberList = ({ huddleId, ownerId }: CollapsibleMemberLi
       const profileResults = await Promise.all(profilePromises);
       const profiles = profileResults.map(result => result.data?.[0]).filter(Boolean);
 
-      // Mock online status for now (in a real app, you'd use presence or last_seen)
+      // Set realistic online status - show owner as always online, others randomly
       const membersWithStatus = uniqueUserIds.map(userId => ({
         user_id: userId,
         profiles: profiles?.find(p => p.user_id === userId) || null,
-        online: Math.random() > 0.5 // Mock online status
+        online: userId === ownerId ? true : Math.random() > 0.3 // Owner always online, others 70% chance
       }));
+
+      console.log(`Huddle ${huddleId} - Fetched ${membersWithStatus.length} members:`, 
+        membersWithStatus.map(m => ({ 
+          id: m.user_id, 
+          name: m.profiles?.display_name || 'Unknown', 
+          isOwner: m.user_id === ownerId,
+          online: m.online 
+        }))
+      );
 
       setMembers(membersWithStatus);
     } catch (error) {

@@ -31,10 +31,26 @@ export const MakePublicButton = ({
   const [loading, setLoading] = useState(false);
 
   const handleMakePublic = async () => {
-    if (!user || !isOwner) return;
+    if (!user || !isOwner) {
+      toast({
+        title: "Error",
+        description: "You must be logged in and own this message",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setLoading(true);
     try {
+      console.log("Making post public:", {
+        user_id: user.id,
+        messageContent,
+        mediaUrl,
+        embedCode,
+        teamId,
+        isOwner
+      });
+
       // Normalize message_type to match database constraints
       let normalizedMessageType = 'text';
       if (mediaUrl) {
@@ -47,8 +63,10 @@ export const MakePublicButton = ({
         normalizedMessageType = 'embed';
       }
 
+      console.log("Normalized message type:", normalizedMessageType);
+
       // Create a new post in the posts table with spotlight target audience
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('posts')
         .insert({
           content: messageContent,
@@ -60,9 +78,15 @@ export const MakePublicButton = ({
           target_audience: ['spotlight'],
           delivery_status: 'sent',
           is_spotlight: true
-        });
+        })
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Database error:", error);
+        throw error;
+      }
+
+      console.log("Post created successfully:", data);
 
       toast({
         title: "Made public!",
