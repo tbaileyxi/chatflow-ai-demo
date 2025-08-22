@@ -195,28 +195,47 @@ export const EnhancedSpotlightFeed = () => {
       return;
     }
 
+    console.log("Voting on post:", postId, "vote type:", voteType, "user:", user.id);
+
     try {
       const currentPost = posts.find(p => p.id === postId);
       const currentVote = currentPost?.user_vote;
 
+      console.log("Current vote:", currentVote);
+
       if (currentVote === voteType) {
         // Remove vote
-        await supabase
+        console.log("Removing vote");
+        const { error } = await supabase
           .from('spotlight_votes')
           .delete()
           .eq('post_id', postId)
           .eq('user_id', user.id);
+        
+        if (error) {
+          console.error("Delete vote error:", error);
+          throw error;
+        }
       } else {
         // Add or update vote
-        await supabase
+        console.log("Adding/updating vote");
+        const { error } = await supabase
           .from('spotlight_votes')
           .upsert({
             post_id: postId,
             user_id: user.id,
             vote_type: voteType
+          }, {
+            onConflict: 'post_id,user_id'
           });
+        
+        if (error) {
+          console.error("Upsert vote error:", error);
+          throw error;
+        }
       }
 
+      console.log("Vote operation successful, refreshing posts");
       // Refresh posts to get updated vote scores
       await fetchSpotlightPosts();
     } catch (error) {

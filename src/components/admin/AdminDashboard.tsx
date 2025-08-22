@@ -26,7 +26,7 @@ export const AdminDashboard = () => {
   const fetchDashboardStats = async () => {
     try {
       const [usersRes, teamsRes, postsRes, huddlesRes] = await Promise.all([
-        supabase.from('user_roles').select('id', { count: 'exact', head: true }),
+        supabase.from('profiles').select('id', { count: 'exact', head: true }),
         supabase.from('teams').select('id', { count: 'exact', head: true }),
         supabase.from('posts').select('id', { count: 'exact', head: true }),
         supabase.from('huddles').select('id', { count: 'exact', head: true })
