@@ -153,6 +153,30 @@ export const EnhancedSpotlightFeed = () => {
     }
   };
 
+  const calculateHotnessScore = (post: SpotlightPost): number => {
+    const now = new Date();
+    const postTime = new Date(post.created_at);
+    const minutesSincePosted = (now.getTime() - postTime.getTime()) / (1000 * 60);
+    const hoursSincePosted = minutesSincePosted / 60;
+    
+    // Algorithm parameters
+    const VIRTUAL_UPVOTES = 2;
+    const DECAY_OFFSET = 2;
+    const DECAY_POWER = 1.5;
+    const GUARANTEE_VISIBILITY_MINUTES = 30;
+    
+    // Guarantee new post visibility (first 30 minutes)
+    if (minutesSincePosted < GUARANTEE_VISIBILITY_MINUTES) {
+      return Number.MAX_SAFE_INTEGER; // Ensures it shows at the very top
+    }
+    
+    // After trial window, use decaying score
+    const upvotes = post.vote_score || 0;
+    const hotnessScore = (upvotes + VIRTUAL_UPVOTES) / Math.pow(hoursSincePosted + DECAY_OFFSET, DECAY_POWER);
+    
+    return hotnessScore;
+  };
+
   const groupPostsByDate = (posts: SpotlightPost[]): GroupedPosts => {
     const grouped: GroupedPosts = {};
     
@@ -166,9 +190,9 @@ export const EnhancedSpotlightFeed = () => {
       grouped[dateKey].push(post);
     });
 
-    // Sort posts within each date by vote score
+    // Sort posts within each date by hotness score
     Object.keys(grouped).forEach(date => {
-      grouped[date].sort((a, b) => (b.vote_score || 0) - (a.vote_score || 0));
+      grouped[date].sort((a, b) => calculateHotnessScore(b) - calculateHotnessScore(a));
     });
 
     return grouped;
@@ -224,7 +248,7 @@ export const EnhancedSpotlightFeed = () => {
       setGroupedPosts(prev => {
         const group = { ...prev };
         const list = (group[dateKey] || []).map(p => p.id === postId ? { ...p, user_vote: nextVote, vote_score: (p.vote_score || 0) + delta } : p);
-        list.sort((a, b) => (b.vote_score || 0) - (a.vote_score || 0));
+        list.sort((a, b) => calculateHotnessScore(b) - calculateHotnessScore(a));
         return { ...group, [dateKey]: list };
       });
     }
@@ -261,7 +285,7 @@ export const EnhancedSpotlightFeed = () => {
           setGroupedPosts(prev => {
             const group = { ...prev };
             const list = (group[dateKey] || []).map(p => p.id === postId ? { ...p, vote_score: serverScore } : p);
-            list.sort((a, b) => (b.vote_score || 0) - (a.vote_score || 0));
+            list.sort((a, b) => calculateHotnessScore(b) - calculateHotnessScore(a));
             return { ...group, [dateKey]: list };
           });
         }
@@ -275,7 +299,7 @@ export const EnhancedSpotlightFeed = () => {
         setGroupedPosts(prev => {
           const group = { ...prev };
           const list = (group[dateKey] || []).map(p => p.id === postId ? { ...p, user_vote: currentVote, vote_score: prevScore } : p);
-          list.sort((a, b) => (b.vote_score || 0) - (a.vote_score || 0));
+          list.sort((a, b) => calculateHotnessScore(b) - calculateHotnessScore(a));
           return { ...group, [dateKey]: list };
         });
       }
