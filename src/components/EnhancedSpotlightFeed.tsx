@@ -49,6 +49,7 @@ export const EnhancedSpotlightFeed = () => {
   const [activeTab, setActiveTab] = useState("today");
   const [showAllDates, setShowAllDates] = useState(false);
   const tabsListRef = useRef<HTMLDivElement>(null);
+  const [pendingVotes, setPendingVotes] = useState<Record<string, boolean>>({});
 
   // All hooks must be called before any conditional returns
   useEffect(() => {
@@ -195,30 +196,50 @@ export const EnhancedSpotlightFeed = () => {
       return;
     }
 
-    console.log("Voting on post:", postId, "vote type:", voteType, "user:", user.id);
+    if (pendingVotes[postId]) return;
+
+    const currentPost = posts.find(p => p.id === postId);
+    const currentVote = currentPost?.user_vote ?? null;
+    const prevScore = currentPost?.vote_score || 0;
+
+    let nextVote: 'up' | 'down' | null;
+    let delta = 0;
+    if (currentVote === voteType) {
+      nextVote = null;
+      delta = voteType === 'up' ? -1 : +1;
+    } else if (currentVote === null) {
+      nextVote = voteType;
+      delta = voteType === 'up' ? +1 : -1;
+    } else {
+      nextVote = voteType;
+      delta = voteType === 'up' ? +2 : -2;
+    }
+
+    // Optimistic update for instant UI feedback
+    setPendingVotes(prev => ({ ...prev, [postId]: true }));
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, user_vote: nextVote, vote_score: (p.vote_score || 0) + delta } : p));
+
+    if (currentPost) {
+      const dateKey = getDateKey(new Date(currentPost.created_at));
+      setGroupedPosts(prev => {
+        const group = { ...prev };
+        const list = (group[dateKey] || []).map(p => p.id === postId ? { ...p, user_vote: nextVote, vote_score: (p.vote_score || 0) + delta } : p);
+        list.sort((a, b) => (b.vote_score || 0) - (a.vote_score || 0));
+        return { ...group, [dateKey]: list };
+      });
+    }
 
     try {
-      const currentPost = posts.find(p => p.id === postId);
-      const currentVote = currentPost?.user_vote;
-
-      console.log("Current vote:", currentVote);
-
       if (currentVote === voteType) {
         // Remove vote
-        console.log("Removing vote");
         const { error } = await supabase
           .from('spotlight_votes')
           .delete()
           .eq('post_id', postId)
           .eq('user_id', user.id);
-        
-        if (error) {
-          console.error("Delete vote error:", error);
-          throw error;
-        }
+        if (error) throw error;
       } else {
         // Add or update vote
-        console.log("Adding/updating vote");
         const { error } = await supabase
           .from('spotlight_votes')
           .upsert({
@@ -228,22 +249,45 @@ export const EnhancedSpotlightFeed = () => {
           }, {
             onConflict: 'post_id,user_id'
           });
-        
-        if (error) {
-          console.error("Upsert vote error:", error);
-          throw error;
-        }
+        if (error) throw error;
       }
 
-      console.log("Vote operation successful, refreshing posts");
-      // Refresh posts to get updated vote scores
-      await fetchSpotlightPosts();
+      // Background verify server score for accuracy (doesn't block UI)
+      const { data: serverScore } = await supabase.rpc('calculate_post_vote_score', { post_uuid: postId });
+      if (typeof serverScore === 'number') {
+        setPosts(prev => prev.map(p => p.id === postId ? { ...p, vote_score: serverScore } : p));
+        if (currentPost) {
+          const dateKey = getDateKey(new Date(currentPost.created_at));
+          setGroupedPosts(prev => {
+            const group = { ...prev };
+            const list = (group[dateKey] || []).map(p => p.id === postId ? { ...p, vote_score: serverScore } : p);
+            list.sort((a, b) => (b.vote_score || 0) - (a.vote_score || 0));
+            return { ...group, [dateKey]: list };
+          });
+        }
+      }
     } catch (error) {
       console.error("Error voting:", error);
+      // Revert optimistic update on error
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, user_vote: currentVote, vote_score: prevScore } : p));
+      if (currentPost) {
+        const dateKey = getDateKey(new Date(currentPost.created_at));
+        setGroupedPosts(prev => {
+          const group = { ...prev };
+          const list = (group[dateKey] || []).map(p => p.id === postId ? { ...p, user_vote: currentVote, vote_score: prevScore } : p);
+          list.sort((a, b) => (b.vote_score || 0) - (a.vote_score || 0));
+          return { ...group, [dateKey]: list };
+        });
+      }
       toast({
         title: "Error",
         description: "Failed to submit vote",
         variant: "destructive"
+      });
+    } finally {
+      setPendingVotes(prev => {
+        const { [postId]: _, ...rest } = prev;
+        return rest;
       });
     }
   };
@@ -434,6 +478,8 @@ export const EnhancedSpotlightFeed = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleVote(post.id, 'up')}
+                          disabled={!!pendingVotes[post.id]}
+                          aria-busy={pendingVotes[post.id] ? true : undefined}
                           className={`p-2 h-auto ${post.user_vote === 'up' ? 'text-green-600 bg-green-50' : 'text-muted-foreground hover:text-green-600'}`}
                         >
                           <ChevronUp className="w-4 h-4" />
@@ -447,6 +493,8 @@ export const EnhancedSpotlightFeed = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleVote(post.id, 'down')}
+                          disabled={!!pendingVotes[post.id]}
+                          aria-busy={pendingVotes[post.id] ? true : undefined}
                           className={`p-2 h-auto ${post.user_vote === 'down' ? 'text-red-600 bg-red-50' : 'text-muted-foreground hover:text-red-600'}`}
                         >
                           <ChevronDown className="w-4 h-4" />
