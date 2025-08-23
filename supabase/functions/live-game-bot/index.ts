@@ -57,8 +57,41 @@ interface GameState {
   }>
 }
 
-// Store game states in memory (in production, use Redis or database)
-const gameStates = new Map<string, GameState>()
+// Store game states in database for persistence across function calls
+async function getGameState(gameId: string, supabase: any): Promise<GameState | null> {
+  try {
+    const { data } = await supabase
+      .from('game_states')
+      .select('*')
+      .eq('game_id', gameId)
+      .single()
+    
+    return data ? {
+      gameId: data.game_id,
+      lastScore: data.last_score,
+      lastPeriod: data.last_period,
+      lastClock: data.last_clock,
+      lastStatus: data.last_status,
+      teams: data.teams
+    } : null
+  } catch {
+    return null
+  }
+}
+
+async function setGameState(gameState: GameState, supabase: any) {
+  await supabase
+    .from('game_states')
+    .upsert({
+      game_id: gameState.gameId,
+      last_score: gameState.lastScore,
+      last_period: gameState.lastPeriod,
+      last_clock: gameState.lastClock,
+      last_status: gameState.lastStatus,
+      teams: gameState.teams,
+      updated_at: new Date().toISOString()
+    })
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -160,7 +193,7 @@ async function processGame(game: ESPNGame, league: string, teamIds: Set<string>,
       teams
     }
 
-    const previousState = gameStates.get(gameId)
+    const previousState = await getGameState(gameId, supabase)
     
     // Detect changes and post updates
     if (!previousState) {
@@ -173,11 +206,14 @@ async function processGame(game: ESPNGame, league: string, teamIds: Set<string>,
     }
 
     // Update stored state
-    gameStates.set(gameId, currentState)
+    await setGameState(currentState, supabase)
 
-    // Clean up completed games after 1 hour
+    // Clean up completed games
     if (status.type.completed) {
-      setTimeout(() => gameStates.delete(gameId), 3600000)
+      await supabase
+        .from('game_states')
+        .delete()
+        .eq('game_id', gameId)
     }
 
   } catch (error) {
@@ -256,7 +292,30 @@ async function postToTeamFeeds(teams: any[], content: string, supabase: any) {
         .single()
 
       if (dbTeam) {
-        // Post to team feed
+        // Find all huddles for this team
+        const { data: huddles } = await supabase
+          .from('huddles')
+          .select('id, name')
+          .eq('team_id', dbTeam.id)
+
+        console.log(`Found ${huddles?.length || 0} huddles for team ${team.name}`)
+
+        // Post to each team huddle
+        for (const huddle of huddles || []) {
+          await supabase
+            .from('huddle_messages')
+            .insert({
+              content,
+              huddle_id: huddle.id,
+              user_id: null, // Bot message
+              is_bot_message: true,
+              message_type: 'game_update'
+            })
+
+          console.log(`Posted game update to huddle: ${huddle.name}`)
+        }
+
+        // Also post to main team feed for visibility
         await supabase
           .from('posts')
           .insert({
@@ -268,7 +327,7 @@ async function postToTeamFeeds(teams: any[], content: string, supabase: any) {
             delivery_status: 'sent'
           })
 
-        console.log(`Posted to team ${team.name} feed`)
+        console.log(`Posted to team ${team.name} feed and ${huddles?.length || 0} huddles`)
       }
     }
   } catch (error) {
