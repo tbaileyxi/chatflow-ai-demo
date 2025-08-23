@@ -53,6 +53,42 @@ export type Database = {
         }
         Relationships: []
       }
+      game_states: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          last_clock: string | null
+          last_period: number
+          last_score: string
+          last_status: string
+          teams: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          last_clock?: string | null
+          last_period?: number
+          last_score: string
+          last_status: string
+          teams: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          last_clock?: string | null
+          last_period?: number
+          last_score?: string
+          last_status?: string
+          teams?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       huddle_members: {
         Row: {
           huddle_id: string
@@ -124,9 +160,11 @@ export type Database = {
           embed_code: string | null
           huddle_id: string
           id: string
+          is_bot_message: boolean | null
           is_team_agent_message: boolean | null
           media_type: string | null
           media_url: string | null
+          message_type: string | null
           poll_data: Json | null
           user_id: string
         }
@@ -136,9 +174,11 @@ export type Database = {
           embed_code?: string | null
           huddle_id: string
           id?: string
+          is_bot_message?: boolean | null
           is_team_agent_message?: boolean | null
           media_type?: string | null
           media_url?: string | null
+          message_type?: string | null
           poll_data?: Json | null
           user_id: string
         }
@@ -148,9 +188,11 @@ export type Database = {
           embed_code?: string | null
           huddle_id?: string
           id?: string
+          is_bot_message?: boolean | null
           is_team_agent_message?: boolean | null
           media_type?: string | null
           media_url?: string | null
+          message_type?: string | null
           poll_data?: Json | null
           user_id?: string
         }
