@@ -1,1 +1,4 @@
 project_id = "dejuwyeypiggvlyfliap"
+
+[functions.live-game-bot]
+verify_jwt = false
