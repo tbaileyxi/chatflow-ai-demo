@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 
 interface VirtualizedChatProps<T> {
@@ -10,11 +10,47 @@ interface VirtualizedChatProps<T> {
 export function VirtualizedChat<T>({ items, loadMoreTop, itemContent }: VirtualizedChatProps<T>) {
   const data = useMemo(() => items, [items]);
 
+  // Ensure the list always has a real height even if parents aren't sized correctly
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const setMeasuredHeight = () => {
+      const h = el.clientHeight;
+      // Fallback if the container isn't sized by layout yet
+      if (h < 100) {
+        setHeight(Math.max(Math.floor(window.innerHeight * 0.7), 320));
+      } else {
+        setHeight(h);
+      }
+    };
+
+    setMeasuredHeight();
+
+    const ResizeObserverImpl = (window as any).ResizeObserver as typeof ResizeObserver | undefined;
+    let ro: ResizeObserver | undefined;
+    if (ResizeObserverImpl) {
+      ro = new ResizeObserverImpl(() => setMeasuredHeight());
+      ro.observe(el);
+    }
+
+    const onResize = () => setMeasuredHeight();
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      ro?.disconnect();
+    };
+  }, []);
+
   return (
-    <div className="flex-1 min-h-0">
+    <div ref={containerRef} className="flex-1 min-h-0">
       <Virtuoso
-        style={{ height: "100%" }}
+        style={{ height: height ?? Math.max(Math.floor(window.innerHeight * 0.7), 320) }}
         data={data}
+        initialTopMostItemIndex={Math.max(0, data.length - 1)}
         itemContent={(index, item) => itemContent(index, item)}
         startReached={async () => {
           if (loadMoreTop) await loadMoreTop();
