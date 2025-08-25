@@ -282,6 +282,14 @@ async function postGameEnd(gameState: GameState, supabase: any) {
 
 async function postToTeamFeeds(teams: any[], content: string, supabase: any) {
   try {
+    // Get or create system user for bot messages
+    const { data: systemUserId } = await supabase.rpc('get_or_create_system_user')
+    
+    if (!systemUserId) {
+      console.error('Failed to get system user ID')
+      return
+    }
+
     // Get team IDs from our database by matching names
     for (const team of teams) {
       const { data: dbTeam } = await supabase
@@ -302,21 +310,25 @@ async function postToTeamFeeds(teams: any[], content: string, supabase: any) {
 
         // Post to each team huddle
         for (const huddle of huddles || []) {
-          await supabase
+          const { error } = await supabase
             .from('huddle_messages')
             .insert({
               content,
               huddle_id: huddle.id,
-              user_id: null, // Bot message
+              user_id: systemUserId,
               is_bot_message: true,
               message_type: 'game_update'
             })
 
-          console.log(`Posted game update to huddle: ${huddle.name}`)
+          if (error) {
+            console.error(`Error posting to huddle ${huddle.name}:`, error)
+          } else {
+            console.log(`Posted game update to huddle: ${huddle.name}`)
+          }
         }
 
         // Also post to main team feed for visibility
-        await supabase
+        const { error: postError } = await supabase
           .from('posts')
           .insert({
             content,
@@ -327,7 +339,11 @@ async function postToTeamFeeds(teams: any[], content: string, supabase: any) {
             delivery_status: 'sent'
           })
 
-        console.log(`Posted to team ${team.name} feed and ${huddles?.length || 0} huddles`)
+        if (postError) {
+          console.error(`Error posting to team ${team.name} feed:`, postError)
+        } else {
+          console.log(`Posted to team ${team.name} feed and ${huddles?.length || 0} huddles`)
+        }
       }
     }
   } catch (error) {

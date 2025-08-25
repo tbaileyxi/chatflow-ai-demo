@@ -622,6 +622,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_or_create_system_user: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_poll_vote_counts: {
         Args: { post_uuid: string }
         Returns: {
