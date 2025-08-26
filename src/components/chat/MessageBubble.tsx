@@ -93,11 +93,6 @@ export const MessageBubble = ({
             <span className="text-xs text-muted-foreground">
               {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
             </span>
-            {message.is_team_agent_message && (
-              <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
-                Team Bot
-              </Badge>
-            )}
             {message.is_bot_message && (
               <Badge variant="outline" className="text-xs px-1.5 py-0.5">
                 Game Bot

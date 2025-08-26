@@ -53,14 +53,17 @@ export const MakePublicButton = ({
 
       // Normalize message_type to match database constraints
       let normalizedMessageType = 'text';
-      if (mediaUrl) {
-        if (embedCode) {
-          normalizedMessageType = 'embed';
-        } else {
-          normalizedMessageType = 'upload'; // For images/videos
-        }
-      } else if (embedCode) {
+      if (embedCode) {
         normalizedMessageType = 'embed';
+      } else if (mediaUrl) {
+        // Handle different media types
+        if (mediaType === 'image') {
+          normalizedMessageType = 'image';
+        } else if (mediaType === 'video') {
+          normalizedMessageType = 'video';
+        } else {
+          normalizedMessageType = 'upload'; // fallback
+        }
       }
 
       console.log("Normalized message type:", normalizedMessageType);

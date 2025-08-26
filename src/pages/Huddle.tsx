@@ -780,7 +780,7 @@ useEffect(() => {
               typingChannelRef.current?.send({
                 type: 'broadcast',
                 event: 'typing',
-                payload: { userId: user.id, name: displayName }
+                payload: { userId: user.id, name: name }
               });
             }
           }}
