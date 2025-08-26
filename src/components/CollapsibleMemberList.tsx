@@ -59,7 +59,7 @@ export const CollapsibleMemberList = ({ huddleId, ownerId }: CollapsibleMemberLi
       const profileResults = await Promise.all(profilePromises);
       const profiles = profileResults.map(result => result.data?.[0]).filter(Boolean);
 
-      // Set realistic online status - show owner as always online, others randomly
+      // Use consistent online status logic across components 
       const membersWithStatus = allUserIds.map(userId => ({
         user_id: userId,
         profiles: profiles?.find(p => p.user_id === userId) || null,

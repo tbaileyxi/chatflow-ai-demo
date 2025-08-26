@@ -118,8 +118,13 @@ export const Huddle = () => {
       markMessagesAsRead();
     };
 
+    const handleScroll = () => {
+      markMessagesAsRead();
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('scroll', handleScroll);
 
     // Mark as read immediately when component mounts
     if (id && user?.id) {
@@ -129,12 +134,13 @@ export const Huddle = () => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('scroll', handleScroll);
     };
   }, [id, user?.id]);
 
-  // Also mark as read when new messages arrive
+  // Also mark as read when new messages arrive and when user is viewing
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 && !document.hidden) {
       markMessagesAsRead();
     }
   }, [messages.length]);
