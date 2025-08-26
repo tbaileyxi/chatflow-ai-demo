@@ -236,7 +236,9 @@ export const BroadcastCenter = () => {
       let pollData = null;
       if (messageType === 'poll') {
         const validOptions = pollOptions.filter(option => option.trim());
+        const pollId = crypto.randomUUID();
         pollData = {
+          id: pollId,
           question: content,
           options: validOptions.map((option, index) => ({ 
             id: index, 

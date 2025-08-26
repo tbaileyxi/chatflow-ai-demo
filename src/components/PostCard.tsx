@@ -143,6 +143,18 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
     }
   }, [post.id, post.poll_data]);
 
+  // Live update poll votes
+  useEffect(() => {
+    if (!post.poll_data) return;
+    const channel = supabase
+      .channel(`poll-votes-post-${post.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes', filter: `post_id=eq.${post.id}` }, () => {
+        fetchPollVotes();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [post.id, post.poll_data]);
+
   const fetchPollVotes = async () => {
     try {
       const { data: votes, error } = await supabase
@@ -473,16 +485,12 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
                   <Button
                     key={option.id}
                     variant={isUserVoted ? "default" : isPreSelected ? "secondary" : "outline"}
-                    className="w-full justify-between h-auto p-3 relative overflow-hidden"
+                    className="w-full justify-between h-auto p-3"
                     onClick={() => userVote === null ? setSelectedOption(option.id) : undefined}
                     disabled={userVote !== null}
                   >
-                    <div 
-                      className="absolute inset-0 bg-primary/10 transition-all"
-                      style={{ width: `${percentage}%` }}
-                    />
-                    <span className="relative z-10">{option.text}</span>
-                    <span className="relative z-10 text-sm text-muted-foreground">
+                    <span>{option.text}</span>
+                    <span className="text-sm text-muted-foreground">
                       {optionVotes} ({Math.round(percentage)}%)
                     </span>
                   </Button>

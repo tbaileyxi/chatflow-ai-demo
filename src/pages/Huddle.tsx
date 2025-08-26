@@ -75,6 +75,24 @@ const lastTypingSentRef = useRef<number>(0);
 const typingMapRef = useRef<Map<string, { name: string; ts: number }>>(new Map());
 const [displayName, setDisplayName] = useState<string>("");
 
+// Fetch display name for typing indicator
+useEffect(() => {
+  const loadDisplayName = async () => {
+    if (!user?.id) return;
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('display_name, username')
+        .eq('user_id', user.id)
+        .single();
+      setDisplayName(data?.display_name || data?.username || user.email?.split('@')[0] || 'User');
+    } catch {
+      setDisplayName(user?.email?.split('@')[0] || 'User');
+    }
+  };
+  loadDisplayName();
+}, [user?.id]);
+
   const scrollToBottom = () => {
     setTimeout(() => {
       window.scrollTo({ 
@@ -186,7 +204,7 @@ useEffect(() => {
       .on('broadcast', { event: 'typing' }, (event) => {
         try {
           const { userId, name } = (event as any).payload || {};
-          if (!userId) return;
+          if (!userId || userId === user?.id) return; // ignore self events (fix mobile self-typing)
           const now = Date.now();
           const map = typingMapRef.current;
           map.set(userId, { name: name || 'Someone', ts: now });
@@ -762,7 +780,7 @@ useEffect(() => {
               typingChannelRef.current?.send({
                 type: 'broadcast',
                 event: 'typing',
-                payload: { userId: user.id, name }
+                payload: { userId: user.id, name: displayName }
               });
             }
           }}

@@ -162,16 +162,18 @@ export const MessageBubble = ({
 
               {/* Poll Content */}
               {message.poll_data && (
-                <div className="mt-3">
+                <div className="mt-3 mb-2">
                   <h4 className="font-medium mb-2">{message.poll_data.question}</h4>
                   <div className="space-y-2">
-                    {message.poll_data.options?.map((option: any, index: number) => {
-                      const count = (pollVotes || []).filter(v => v.option_id === index).length;
-                      const isUserVoted = userVote === index;
-                      const isPreSelected = selectedOption === index;
+                    {message.poll_data.options?.map((option: any) => {
+                      const count = (pollVotes || []).filter(v => v.option_id === option.id).length;
+                      const total = (pollVotes || []).length;
+                      const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                      const isUserVoted = userVote === option.id;
+                      const isPreSelected = selectedOption === option.id;
                       return (
                         <Button
-                          key={index}
+                          key={option.id}
                           variant={isUserVoted ? "default" : isPreSelected ? "secondary" : "outline"}
                           size="sm"
                           className="w-full justify-between text-left"
@@ -181,13 +183,13 @@ export const MessageBubble = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             if (userVote === null) {
-                              setSelectedOption(index);
+                              setSelectedOption(option.id);
                             }
                           }}
                           disabled={userVote !== null}
                         >
                           <span className="truncate">{option.text}</span>
-                          <span className="ml-2 text-xs opacity-80">{count} vote{count !== 1 ? 's' : ''}</span>
+                          <span className="ml-2 text-xs opacity-80">{count} ({pct}%)</span>
                         </Button>
                       );
                     })}
@@ -207,6 +209,9 @@ export const MessageBubble = ({
                         SUBMIT
                       </Button>
                     )}
+                    <p className="text-xs text-muted-foreground text-center">
+                      {(pollVotes || []).length} total votes
+                    </p>
                   </div>
                 </div>
               )}
