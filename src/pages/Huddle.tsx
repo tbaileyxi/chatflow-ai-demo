@@ -68,6 +68,9 @@ export const Huddle = () => {
 const [loadingOlder, setLoadingOlder] = useState(false);
 const [typingUsers, setTypingUsers] = useState<string[]>([]);
 const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+const msgChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+const pollVotesChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+const resubscribeRef = useRef<(() => void) | null>(null);
 const lastTypingSentRef = useRef<number>(0);
 const typingMapRef = useRef<Map<string, { name: string; ts: number }>>(new Map());
 const [displayName, setDisplayName] = useState<string>("");
@@ -151,51 +154,33 @@ const [displayName, setDisplayName] = useState<string>("");
     }
   }, [messages.length]);
 
-  // Set up real-time subscription for new messages
-  useEffect(() => {
-    if (!id) return;
+// Set up real-time subscriptions (robust for mobile resume)
+useEffect(() => {
+  if (!id) return;
 
-    // Realtime: new messages
+  const subscribeAll = () => {
+    console.log('[Realtime] (re)subscribing channels for huddle', id);
+    // Messages INSERT
     const msgChannel = supabase
       .channel(`huddle-messages-${id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'huddle_messages',
-          filter: `huddle_id=eq.${id}`,
-        },
-        async (payload) => {
-          console.log('New message received:', payload);
-          const newMessage = payload.new as any;
-
-          // Fetch profile data for the sender
-          if (newMessage.user_id) {
-            const { data: profile } = await supabase
-              .rpc('get_public_profile', { target_user_id: newMessage.user_id });
-            newMessage.profiles = Array.isArray(profile) ? profile[0] : (profile ?? null);
-          }
-
-          // Fetch reactions
-          const reactions = await fetchMessageReactions(newMessage.id);
-          newMessage.reactions = reactions;
-
-          // Add to messages (avoid duplicates)
-          setMessages(prev => (prev.some(m => m.id === newMessage.id) ? prev : [...prev, newMessage]));
-
-          // Fetch poll votes if this is a poll
-          if (newMessage.poll_data) {
-            fetchPollVotes(newMessage.id);
-          }
-
-          // Auto-scroll to bottom
-          setTimeout(scrollToBottom, 100);
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'huddle_messages', filter: `huddle_id=eq.${id}` }, async (payload) => {
+        console.log('[Realtime] New message payload', payload);
+        const newMessage = payload.new as any;
+        if (newMessage.user_id) {
+          const { data: profile } = await supabase.rpc('get_public_profile', { target_user_id: newMessage.user_id });
+          newMessage.profiles = Array.isArray(profile) ? profile[0] : (profile ?? null);
         }
-      )
-      .subscribe();
+        const reactions = await fetchMessageReactions(newMessage.id);
+        newMessage.reactions = reactions;
+        setMessages(prev => (prev.some(m => m.id === newMessage.id) ? prev : [...prev, newMessage]));
+        if (newMessage.poll_data) {
+          fetchPollVotes(newMessage.id);
+        }
+        setTimeout(scrollToBottom, 100);
+      })
+      .subscribe((status) => console.log('[Realtime] msgChannel status', status));
 
-    // Realtime: typing indicator via broadcast (also used for lightweight new message pings)
+    // Typing / pings
     const typingChannel = supabase
       .channel(`huddle-typing-${id}`)
       .on('broadcast', { event: 'typing' }, (event) => {
@@ -205,83 +190,82 @@ const [displayName, setDisplayName] = useState<string>("");
           const now = Date.now();
           const map = typingMapRef.current;
           map.set(userId, { name: name || 'Someone', ts: now });
-
-          // Recompute active typers (within last 3s)
           const active: string[] = [];
-          map.forEach((value) => {
-            if (now - value.ts < 3000) active.push(value.name);
-          });
+          map.forEach((value) => { if (now - value.ts < 3000) active.push(value.name); });
           setTypingUsers(active);
         } catch (e) {
           console.warn('Typing broadcast parse error', e);
         }
       })
       .on('broadcast', { event: 'new_message' }, () => {
-        // Lightweight ping to refresh in case Postgres realtime missed on mobile
+        console.log('[Realtime] new_message broadcast received -> fetchMessages');
         fetchMessages();
       })
-      .subscribe();
+      .subscribe((status) => console.log('[Realtime] typingChannel status', status));
 
-    typingChannelRef.current = typingChannel;
-
-    // Realtime: poll vote changes across users (keep results cumulative)
+    // Poll votes
     const pollVotesChannel = supabase
       .channel(`poll-votes-${id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'poll_votes' },
-        (payload) => {
-          const postId = (payload.new as any)?.post_id || (payload.old as any)?.post_id;
-          if (!postId) return;
-          // Only refresh if this poll exists in current message list
-          if (messages.some(m => m.id === postId)) {
-            fetchPollVotes(postId);
-          }
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, (payload) => {
+        const postId = (payload.new as any)?.post_id || (payload.old as any)?.post_id;
+        if (!postId) return;
+        if (messages.some(m => m.id === postId)) {
+          fetchPollVotes(postId);
         }
-      )
-      .subscribe();
+      })
+      .subscribe((status) => console.log('[Realtime] pollVotesChannel status', status));
 
-    // Prune old typing entries
-    const prune = setInterval(() => {
-      const now = Date.now();
-      const map = typingMapRef.current;
-      let changed = false;
-      map.forEach((value, key) => {
-        if (now - value.ts >= 3000) {
-          map.delete(key);
-          changed = true;
-        }
-      });
-      if (changed) {
-        setTypingUsers(Array.from(map.values()).map(v => v.name));
-      }
-    }, 1500);
+    typingChannelRef.current = typingChannel;
+    msgChannelRef.current = msgChannel;
+    pollVotesChannelRef.current = pollVotesChannel;
+  };
 
-    return () => {
-      supabase.removeChannel(msgChannel);
-      supabase.removeChannel(typingChannel);
-      supabase.removeChannel(pollVotesChannel);
-      clearInterval(prune);
-    };
-  }, [id]);
+  subscribeAll();
 
-  // Fallback: resync messages periodically and on visibility/online (helps mobile)
-  useEffect(() => {
-    const resync = setInterval(() => {
-      if (!document.hidden) {
-        fetchMessages();
-      }
-    }, 10000);
-    const onVisibility = () => { if (!document.hidden) fetchMessages(); };
-    const onOnline = () => fetchMessages();
-    document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('online', onOnline);
-    return () => {
-      clearInterval(resync);
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('online', onOnline);
-    };
-  }, [id]);
+  // Prune old typing entries
+  const prune = setInterval(() => {
+    const now = Date.now();
+    const map = typingMapRef.current;
+    let changed = false;
+    map.forEach((value, key) => {
+      if (now - value.ts >= 3000) { map.delete(key); changed = true; }
+    });
+    if (changed) setTypingUsers(Array.from(map.values()).map(v => v.name));
+  }, 1500);
+
+  // Expose resubscribe for other effects
+  resubscribeRef.current = () => {
+    console.log('[Realtime] resubscribe requested');
+    if (msgChannelRef.current) supabase.removeChannel(msgChannelRef.current);
+    if (typingChannelRef.current) supabase.removeChannel(typingChannelRef.current);
+    if (pollVotesChannelRef.current) supabase.removeChannel(pollVotesChannelRef.current);
+    subscribeAll();
+    fetchMessages();
+  };
+
+  return () => {
+    if (msgChannelRef.current) supabase.removeChannel(msgChannelRef.current);
+    if (typingChannelRef.current) supabase.removeChannel(typingChannelRef.current);
+    if (pollVotesChannelRef.current) supabase.removeChannel(pollVotesChannelRef.current);
+    clearInterval(prune);
+  };
+}, [id]);
+
+// Fallback: resync and resubscribe on visibility/online (mobile recovery)
+useEffect(() => {
+  const resync = setInterval(() => {
+    fetchMessages();
+  }, 12000);
+  const onVisibility = () => { if (!document.hidden) { resubscribeRef.current?.(); } };
+  const onOnline = () => { resubscribeRef.current?.(); };
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('online', onOnline);
+  return () => {
+    clearInterval(resync);
+    document.removeEventListener('visibilitychange', onVisibility);
+    window.removeEventListener('online', onOnline);
+  };
+}, [id]);
 
   const addNewMessage = async (newMessageData: any) => {
     // Fetch profile for the new message if not already available
