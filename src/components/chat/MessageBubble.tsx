@@ -7,6 +7,7 @@ import { formatDistanceToNow } from "date-fns";
 import { MediaViewer } from "@/components/MediaViewer";
 import { TwitterEmbed } from "@/components/PostCard";
 import { LazyEmbed } from "./LazyEmbed";
+import { MakePublicButton } from "@/components/MakePublicButton";
 
 interface MessageBubbleProps {
   message: any;
@@ -14,6 +15,9 @@ interface MessageBubbleProps {
   isConsecutive?: boolean;
   onAddReaction?: (messageId: string, emoji: string) => void;
   currentUserId?: string;
+  teamName?: string;
+  teamLogoUrl?: string;
+  teamId?: string;
 }
 
 const QUICK_REACTIONS = ['👍', '👎', '❤️', '😂', '😮', '😢'];
@@ -23,11 +27,15 @@ export const MessageBubble = ({
   previousMessage, 
   isConsecutive = false,
   onAddReaction,
-  currentUserId 
+  currentUserId,
+  teamName,
+  teamLogoUrl,
+  teamId
 }: MessageBubbleProps) => {
   const [reactionPopoverOpen, setReactionPopoverOpen] = useState(false);
   
   const isOwnMessage = message.user_id === currentUserId;
+  const isTeamAgent = !!message.is_team_agent_message;
   const showProfile = !isConsecutive || previousMessage?.user_id !== message.user_id;
   
   const handleReaction = (emoji: string) => {
@@ -49,9 +57,11 @@ export const MessageBubble = ({
       {/* Avatar - only show for first message in sequence */}
       {showProfile && (
         <Avatar className="h-8 w-8 shrink-0">
-          <AvatarImage src={message.profiles?.avatar_url} />
+          <AvatarImage src={isTeamAgent ? teamLogoUrl : message.profiles?.avatar_url} />
           <AvatarFallback className="text-xs">
-            {message.profiles?.display_name?.[0] || message.profiles?.username?.[0] || 'U'}
+            {isTeamAgent
+              ? (teamName?.[0] || 'T')
+              : (message.profiles?.display_name?.[0] || message.profiles?.username?.[0] || 'U')}
           </AvatarFallback>
         </Avatar>
       )}
@@ -67,7 +77,9 @@ export const MessageBubble = ({
             isOwnMessage ? 'justify-end' : 'justify-start'
           }`}>
             <span className="text-sm font-medium">
-              {message.profiles?.display_name || message.profiles?.username || 'Unknown User'}
+              {message.is_team_agent_message
+                ? `${teamName || 'Team'} Agent`
+                : (message.profiles?.display_name || message.profiles?.username || 'Unknown User')}
             </span>
             <span className="text-xs text-muted-foreground">
               {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
@@ -89,7 +101,7 @@ export const MessageBubble = ({
         <Popover open={reactionPopoverOpen} onOpenChange={setReactionPopoverOpen}>
           <PopoverTrigger asChild>
             <div
-              className={`inline-block max-w-[85%] rounded-2xl px-4 py-2 text-sm cursor-pointer select-text ${
+              className={`inline-block max-w-[85%] rounded-2xl px-4 py-2 text-base cursor-pointer select-text ${
                 isOwnMessage
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted'
@@ -165,6 +177,19 @@ export const MessageBubble = ({
                 </Button>
               ))}
             </div>
+            {isOwnMessage && (
+              <div className="mt-1 flex justify-end">
+                <MakePublicButton
+                  messageId={message.id}
+                  messageContent={message.content || ''}
+                  mediaUrl={message.media_url}
+                  mediaType={message.media_type}
+                  embedCode={message.embed_code}
+                  teamId={teamId}
+                  isOwner={true}
+                />
+              </div>
+            )}
           </PopoverContent>
         </Popover>
 

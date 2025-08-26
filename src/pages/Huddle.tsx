@@ -129,17 +129,17 @@ export const Huddle = () => {
           if (newMessage.user_id) {
             const { data: profile } = await supabase
               .rpc('get_public_profile', { target_user_id: newMessage.user_id });
-            
-            newMessage.profiles = profile;
+
+            newMessage.profiles = Array.isArray(profile) ? profile[0] : (profile ?? null);
           }
           
           // Fetch reactions
           const reactions = await fetchMessageReactions(newMessage.id);
           newMessage.reactions = reactions;
           
-          // Add to messages
-          setMessages(prev => [...prev, newMessage]);
-          
+          // Add to messages (avoid duplicates)
+          setMessages(prev => (prev.some(m => m.id === newMessage.id) ? prev : [...prev, newMessage]));
+
           // Auto-scroll to bottom
           setTimeout(scrollToBottom, 100);
         }
@@ -162,7 +162,7 @@ export const Huddle = () => {
       profiles: profileData?.[0] || null
     };
 
-    setMessages(prev => [...prev, messageWithProfile]);
+    setMessages(prev => (prev.some(m => m.id === newMessageData.id) ? prev : [...prev, messageWithProfile]));
   };
 
   const fetchHuddle = async () => {
@@ -308,13 +308,15 @@ export const Huddle = () => {
     });
 
     try {
-      const { error } = await supabase
+      const { data: inserted, error } = await supabase
         .from("huddle_messages")
         .insert({
           huddle_id: id,
           user_id: user.id,
           content: messageText.trim()
-        });
+        })
+        .select()
+        .single();
 
       if (error) {
         console.error("Insert error:", error);
@@ -322,7 +324,9 @@ export const Huddle = () => {
       }
       
       console.log("Message sent successfully");
-      // No need to fetch messages - real-time will handle it
+      if (inserted) {
+        await addNewMessage(inserted);
+      }
     } catch (error) {
       console.error("Error sending message:", error);
       toast({
@@ -337,7 +341,7 @@ export const Huddle = () => {
     if (!user?.id) return;
 
     try {
-      const { error } = await supabase
+      const { data: inserted, error } = await supabase
         .from("huddle_messages")
         .insert({
           huddle_id: id,
@@ -345,7 +349,9 @@ export const Huddle = () => {
           content: '',
           media_url: mediaUrl,
           media_type: mediaType || 'image'
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
       
@@ -353,6 +359,10 @@ export const Huddle = () => {
         title: "Success",
         description: `${mediaType === 'video' ? 'Video' : 'Image'} sent successfully`,
       });
+      
+      if (inserted) {
+        await addNewMessage(inserted);
+      }
       
     } catch (error) {
       console.error("Error sending media:", error);
@@ -569,7 +579,7 @@ export const Huddle = () => {
         </div>
       </div>
 
-      <div className="flex-1 max-w-4xl mx-auto flex flex-col min-h-0">
+      <div className="flex-1 w-full flex flex-col min-h-0">
         {/* Messages Area */}
         <VirtualizedChat
           items={messages}
@@ -588,6 +598,9 @@ export const Huddle = () => {
                 isConsecutive={isConsecutive}
                 onAddReaction={addReaction}
                 currentUserId={user?.id}
+                teamName={huddle.team?.name}
+                teamLogoUrl={huddle.team?.logo_url}
+                teamId={huddle.team?.id}
               />
             );
           }}
