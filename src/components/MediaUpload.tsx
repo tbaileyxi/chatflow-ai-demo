@@ -213,7 +213,8 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
                 <img
                   src={previewUrl}
                   alt="Preview"
-                  className="max-w-full h-auto max-h-64 rounded object-cover"
+                  className="max-w-full h-auto max-h-64 rounded object-contain bg-muted/50"
+                  style={{ aspectRatio: 'auto' }}
                 />
               ) : (
                 <video

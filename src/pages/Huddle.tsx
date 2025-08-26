@@ -106,6 +106,39 @@ export const Huddle = () => {
     fetchHuddleAndMessages();
   }, [id]);
 
+  // Mark messages as read when viewing the page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        markMessagesAsRead();
+      }
+    };
+
+    const handleFocus = () => {
+      markMessagesAsRead();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    // Mark as read immediately when component mounts
+    if (id && user?.id) {
+      markMessagesAsRead();
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [id, user?.id]);
+
+  // Also mark as read when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0) {
+      markMessagesAsRead();
+    }
+  }, [messages.length]);
+
   // Set up real-time subscription for new messages
   useEffect(() => {
     if (!id) return;
@@ -308,6 +341,36 @@ export const Huddle = () => {
     });
 
     try {
+      // Fetch current user profile to ensure latest data
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      // Optimistically add the message with current profile data
+      const tempMessage = {
+        id: `temp-${Date.now()}`,
+        content: messageText.trim(),
+        user_id: user.id,
+        huddle_id: id,
+        created_at: new Date().toISOString(),
+        profiles: currentProfile || {
+          display_name: user.email?.split('@')[0] || 'User',
+          username: null,
+          avatar_url: null
+        },
+        reactions: {},
+        media_url: null,
+        media_type: 'text',
+        embed_code: null,
+        is_team_agent_message: false,
+        poll_data: null
+      };
+
+      setMessages(prev => [...prev, tempMessage]);
+      setTimeout(scrollToBottom, 50);
+
       const { data: inserted, error } = await supabase
         .from("huddle_messages")
         .insert({
@@ -320,13 +383,15 @@ export const Huddle = () => {
 
       if (error) {
         console.error("Insert error:", error);
+        // Remove the optimistic message on error
+        setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
         throw error;
       }
       
+      // Remove temp message, real-time will handle the actual message
+      setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
       console.log("Message sent successfully");
-      if (inserted) {
-        await addNewMessage(inserted);
-      }
+      
     } catch (error) {
       console.error("Error sending message:", error);
       toast({

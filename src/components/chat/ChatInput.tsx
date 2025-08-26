@@ -117,8 +117,8 @@ export const ChatInput = ({ onSendMessage, onSendMedia, placeholder = "Type your
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled || sending}
-          className="min-h-[40px] max-h-[120px] resize-none rounded-xl border-muted-foreground/20 focus:border-primary/50 transition-colors"
-          rows={1}
+          className="min-h-[56px] max-h-[120px] resize-none rounded-2xl bg-muted/30 border-2 border-muted-foreground/20 focus:border-primary/50 focus:bg-background transition-all px-4 py-3 text-base"
+          rows={2}
         />
       </div>
 
