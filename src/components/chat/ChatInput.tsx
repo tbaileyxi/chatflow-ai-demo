@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -12,9 +12,10 @@ interface ChatInputProps {
   onSendMedia?: (mediaUrl: string, mediaType?: string) => Promise<void>;
   placeholder?: string;
   disabled?: boolean;
+  onTyping?: () => void;
 }
 
-export const ChatInput = ({ onSendMessage, onSendMedia, placeholder = "Type your message...", disabled = false }: ChatInputProps) => {
+export const ChatInput = ({ onSendMessage, onSendMedia, placeholder = "Type your message...", disabled = false, onTyping }: ChatInputProps) => {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [mediaDialogOpen, setMediaDialogOpen] = useState(false);
@@ -71,10 +72,11 @@ export const ChatInput = ({ onSendMessage, onSendMedia, placeholder = "Type your
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value);
-    adjustTextareaHeight();
-  };
+const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  setMessage(e.target.value);
+  adjustTextareaHeight();
+  onTyping?.();
+};
 
   const linkifyText = (text: string): string => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;

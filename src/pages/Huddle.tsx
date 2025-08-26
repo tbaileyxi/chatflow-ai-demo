@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { VirtualizedChat } from "@/components/chat/VirtualizedChat";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { formatDistanceToNow } from "date-fns";
+import { TypingIndicator } from "@/components/chat/TypingIndicator";
 
 interface HuddleData {
   id: string;
@@ -64,7 +65,12 @@ export const Huddle = () => {
   const PAGE_SIZE = 40;
   const [oldestCreatedAt, setOldestCreatedAt] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const [loadingOlder, setLoadingOlder] = useState(false);
+const [loadingOlder, setLoadingOlder] = useState(false);
+const [typingUsers, setTypingUsers] = useState<string[]>([]);
+const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+const lastTypingSentRef = useRef<number>(0);
+const typingMapRef = useRef<Map<string, { name: string; ts: number }>>(new Map());
+const [displayName, setDisplayName] = useState<string>("");
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -149,7 +155,8 @@ export const Huddle = () => {
   useEffect(() => {
     if (!id) return;
 
-    const channel = supabase
+    // Realtime: new messages
+    const msgChannel = supabase
       .channel(`huddle-messages-${id}`)
       .on(
         'postgres_changes',
@@ -161,23 +168,26 @@ export const Huddle = () => {
         },
         async (payload) => {
           console.log('New message received:', payload);
-          
           const newMessage = payload.new as any;
-          
+
           // Fetch profile data for the sender
           if (newMessage.user_id) {
             const { data: profile } = await supabase
               .rpc('get_public_profile', { target_user_id: newMessage.user_id });
-
             newMessage.profiles = Array.isArray(profile) ? profile[0] : (profile ?? null);
           }
-          
+
           // Fetch reactions
           const reactions = await fetchMessageReactions(newMessage.id);
           newMessage.reactions = reactions;
-          
+
           // Add to messages (avoid duplicates)
           setMessages(prev => (prev.some(m => m.id === newMessage.id) ? prev : [...prev, newMessage]));
+
+          // Fetch poll votes if this is a poll
+          if (newMessage.poll_data) {
+            fetchPollVotes(newMessage.id);
+          }
 
           // Auto-scroll to bottom
           setTimeout(scrollToBottom, 100);
@@ -185,8 +195,51 @@ export const Huddle = () => {
       )
       .subscribe();
 
+    // Realtime: typing indicator via broadcast
+    const typingChannel = supabase
+      .channel(`huddle-typing-${id}`)
+      .on('broadcast', { event: 'typing' }, (event) => {
+        try {
+          const { userId, name } = (event as any).payload || {};
+          if (!userId) return;
+          const now = Date.now();
+          const map = typingMapRef.current;
+          map.set(userId, { name: name || 'Someone', ts: now });
+
+          // Recompute active typers (within last 3s)
+          const active: string[] = [];
+          map.forEach((value, key) => {
+            if (now - value.ts < 3000) active.push(value.name);
+          });
+          setTypingUsers(active);
+        } catch (e) {
+          console.warn('Typing broadcast parse error', e);
+        }
+      })
+      .subscribe();
+
+    typingChannelRef.current = typingChannel;
+
+    // Prune old typing entries
+    const prune = setInterval(() => {
+      const now = Date.now();
+      const map = typingMapRef.current;
+      let changed = false;
+      map.forEach((value, key) => {
+        if (now - value.ts >= 3000) {
+          map.delete(key);
+          changed = true;
+        }
+      });
+      if (changed) {
+        setTypingUsers(Array.from(map.values()).map(v => v.name));
+      }
+    }, 1500);
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(msgChannel);
+      supabase.removeChannel(typingChannel);
+      clearInterval(prune);
     };
   }, [id]);
 
@@ -577,14 +630,11 @@ export const Huddle = () => {
       await fetchPollVotes(messageId);
     } catch (error: any) {
       console.error('Error voting:', error);
-      
-      // Check if it's a unique constraint violation (already voted)
-      const isAlreadyVoted = error?.message?.includes('duplicate') || error?.code === '23505';
-      
+
+      // Show clearer message per spec
       toast({
-        title: "Error",
-        description: isAlreadyVoted ? "You have already voted on this poll" : "Failed to submit vote",
-        variant: "destructive"
+        title: "You already voted",
+        description: "You can change your vote by selecting a different option.",
       });
     }
   };
@@ -663,10 +713,16 @@ export const Huddle = () => {
                 teamName={huddle.team?.name}
                 teamLogoUrl={huddle.team?.logo_url}
                 teamId={huddle.team?.id}
+                onPollVote={handlePollVote}
+                pollVotes={pollVotes[message.id]}
+                userVote={userVotes[message.id]}
               />
             );
           }}
         />
+
+        {/* Typing Indicator */}
+        <TypingIndicator typingUsers={typingUsers} />
 
         {/* Message Input */}
         <ChatInput
@@ -674,6 +730,19 @@ export const Huddle = () => {
           onSendMedia={sendMediaMessage}
           placeholder="Type your message..."
           disabled={loading}
+          onTyping={() => {
+            // Throttle typing broadcasts to avoid flooding
+            const now = Date.now();
+            if (now - (lastTypingSentRef.current || 0) > 1200 && user?.id) {
+              lastTypingSentRef.current = now;
+              const name = displayName || user.email?.split('@')[0] || 'User';
+              typingChannelRef.current?.send({
+                type: 'broadcast',
+                event: 'typing',
+                payload: { userId: user.id, name }
+              });
+            }
+          }}
         />
       </div>
     </div>

@@ -18,6 +18,9 @@ interface MessageBubbleProps {
   teamName?: string;
   teamLogoUrl?: string;
   teamId?: string;
+  onPollVote?: (messageId: string, optionId: number) => void;
+  pollVotes?: Array<{ option_id: number; user_id: string }>;
+  userVote?: number | null;
 }
 
 const QUICK_REACTIONS = ['👍', '👎', '❤️', '😂', '😮', '😢'];
@@ -30,7 +33,10 @@ export const MessageBubble = ({
   currentUserId,
   teamName,
   teamLogoUrl,
-  teamId
+  teamId,
+  onPollVote,
+  pollVotes,
+  userVote
 }: MessageBubbleProps) => {
   const [reactionPopoverOpen, setReactionPopoverOpen] = useState(false);
   
@@ -145,20 +151,26 @@ export const MessageBubble = ({
                 <div className="mt-3">
                   <h4 className="font-medium mb-2">{message.poll_data.question}</h4>
                   <div className="space-y-2">
-                    {message.poll_data.options?.map((option: any, index: number) => (
-                      <Button
-                        key={index}
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-start text-left"
-                        onClick={() => {
-                          // Poll voting will be handled at parent level
-                          console.log('Poll vote clicked:', option, index);
-                        }}
-                      >
-                        {option.text}
-                      </Button>
-                    ))}
+                    {message.poll_data.options?.map((option: any, index: number) => {
+                      const count = (pollVotes || []).filter(v => v.option_id === index).length;
+                      const isSelected = userVote === index;
+                      return (
+                        <Button
+                          key={index}
+                          variant={isSelected ? "default" : "outline"}
+                          size="sm"
+                          className="w-full justify-between text-left"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onPollVote?.(message.id, index);
+                          }}
+                        >
+                          <span className="truncate">{option.text}</span>
+                          <span className="ml-2 text-xs opacity-80">{count} vote{count !== 1 ? 's' : ''}</span>
+                        </Button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
