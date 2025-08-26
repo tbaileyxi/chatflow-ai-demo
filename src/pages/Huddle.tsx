@@ -265,6 +265,24 @@ const [displayName, setDisplayName] = useState<string>("");
     };
   }, [id]);
 
+  // Fallback: resync messages periodically and on visibility/online (helps mobile)
+  useEffect(() => {
+    const resync = setInterval(() => {
+      if (!document.hidden) {
+        fetchMessages();
+      }
+    }, 10000);
+    const onVisibility = () => { if (!document.hidden) fetchMessages(); };
+    const onOnline = () => fetchMessages();
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('online', onOnline);
+    return () => {
+      clearInterval(resync);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('online', onOnline);
+    };
+  }, [id]);
+
   const addNewMessage = async (newMessageData: any) => {
     // Fetch profile for the new message if not already available
     const { data: profileData } = await supabase.rpc('get_public_profile', { 
@@ -645,11 +663,14 @@ const [displayName, setDisplayName] = useState<string>("");
         // Add or update vote
         const { error } = await supabase
           .from('poll_votes')
-          .upsert({
-            post_id: messageId,
-            user_id: user.id,
-            option_id: optionId
-          });
+          .upsert(
+            {
+              post_id: messageId,
+              user_id: user.id,
+              option_id: optionId
+            },
+            { onConflict: 'post_id,user_id' }
+          );
 
         if (error) throw error;
         setUserVotes(prev => ({ ...prev, [messageId]: optionId }));

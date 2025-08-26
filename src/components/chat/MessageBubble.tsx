@@ -44,6 +44,7 @@ export const MessageBubble = ({
   const isTeamAgent = !!message.is_team_agent_message;
   const showProfile = !isConsecutive || previousMessage?.user_id !== message.user_id;
   const reactionsEnabled = !message.poll_data;
+  const showContent = message.content && !(message.poll_data && typeof message.poll_data.question === 'string' && message.content.trim() === message.poll_data.question.trim());
   
   const handleReaction = (emoji: string) => {
     if (onAddReaction) {
@@ -134,7 +135,7 @@ export const MessageBubble = ({
               }}
             >
               {/* Text Content */}
-              {message.content && (
+              {showContent && (
                 <div 
                   className="whitespace-pre-wrap break-words"
                   dangerouslySetInnerHTML={{ __html: message.content }}

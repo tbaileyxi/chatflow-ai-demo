@@ -237,11 +237,14 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
         // Add or update vote
         const { error } = await supabase
           .from('poll_votes')
-          .upsert({
-            post_id: post.id,
-            user_id: user.id,
-            option_id: optionId
-          });
+          .upsert(
+            {
+              post_id: post.id,
+              user_id: user.id,
+              option_id: optionId
+            },
+            { onConflict: 'post_id,user_id' }
+          );
 
         if (error) throw error;
         setUserVote(optionId);
@@ -249,12 +252,13 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
       
       // Refresh poll votes
       await fetchPollVotes();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error voting:', error);
+      const dup = error?.code === '23505';
       toast({
-        title: "Error",
-        description: "Failed to submit vote",
-        variant: "destructive"
+        title: dup ? "You already voted" : "Error",
+        description: dup ? "You can change your vote by selecting a different option." : "Failed to submit vote",
+        variant: dup ? undefined : "destructive"
       });
     }
   };
