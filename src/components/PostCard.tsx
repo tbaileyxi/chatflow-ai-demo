@@ -131,6 +131,7 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
   const [reactions, setReactions] = useState(post.post_reactions);
   const [pollVotes, setPollVotes] = useState<any[]>([]);
   const [userVote, setUserVote] = useState<number | null>(null);
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
 
   const likeCount = reactions.filter(r => r.reaction_type === 'like').length;
   const fireCount = reactions.filter(r => r.reaction_type === 'fire').length;
@@ -212,8 +213,8 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
     }
   };
 
-  const handlePollVote = async (optionId: number) => {
-    if (!user?.id) {
+  const submitPollVote = async () => {
+    if (!user?.id || selectedOption === null) {
       toast({
         title: "Please sign in",
         description: "You need to be logged in to vote",
@@ -223,35 +224,27 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
     }
 
     try {
-      if (userVote === optionId) {
-        // Remove vote
-        const { error } = await supabase
-          .from('poll_votes')
-          .delete()
-          .eq('post_id', post.id)
-          .eq('user_id', user.id);
+      const { error } = await supabase
+        .from('poll_votes')
+        .upsert(
+          {
+            post_id: post.id,
+            user_id: user.id,
+            option_id: selectedOption
+          },
+          { onConflict: 'post_id,user_id' }
+        );
 
-        if (error) throw error;
-        setUserVote(null);
-      } else {
-        // Add or update vote
-        const { error } = await supabase
-          .from('poll_votes')
-          .upsert(
-            {
-              post_id: post.id,
-              user_id: user.id,
-              option_id: optionId
-            },
-            { onConflict: 'post_id,user_id' }
-          );
-
-        if (error) throw error;
-        setUserVote(optionId);
-      }
+      if (error) throw error;
+      setUserVote(selectedOption);
+      setSelectedOption(null);
       
       // Refresh poll votes
       await fetchPollVotes();
+      toast({
+        title: "Vote submitted!",
+        description: "Your vote has been recorded.",
+      });
     } catch (error: any) {
       console.error('Error voting:', error);
       const dup = error?.code === '23505';
@@ -473,14 +466,16 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
                 const optionVotes = pollVotes.filter(v => v.option_id === option.id).length;
                 const totalVotes = pollVotes.length;
                 const percentage = totalVotes > 0 ? (optionVotes / totalVotes) * 100 : 0;
-                const isSelected = userVote === option.id;
+                const isUserVoted = userVote === option.id;
+                const isPreSelected = selectedOption === option.id;
                 
                 return (
                   <Button
                     key={option.id}
-                    variant={isSelected ? "default" : "outline"}
+                    variant={isUserVoted ? "default" : isPreSelected ? "secondary" : "outline"}
                     className="w-full justify-between h-auto p-3 relative overflow-hidden"
-                    onClick={() => handlePollVote(option.id)}
+                    onClick={() => userVote === null ? setSelectedOption(option.id) : undefined}
+                    disabled={userVote !== null}
                   >
                     <div 
                       className="absolute inset-0 bg-primary/10 transition-all"
@@ -493,6 +488,14 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
                   </Button>
                 );
               })}
+              {userVote === null && selectedOption !== null && (
+                <Button 
+                  onClick={submitPollVote}
+                  className="w-full"
+                >
+                  SUBMIT
+                </Button>
+              )}
               <p className="text-xs text-muted-foreground text-center">
                 {pollVotes.length} total votes
               </p>

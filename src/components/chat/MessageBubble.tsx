@@ -39,6 +39,7 @@ export const MessageBubble = ({
   userVote
 }: MessageBubbleProps) => {
   const [reactionPopoverOpen, setReactionPopoverOpen] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
   
   const isOwnMessage = message.user_id === currentUserId;
   const isTeamAgent = !!message.is_team_agent_message;
@@ -166,11 +167,12 @@ export const MessageBubble = ({
                   <div className="space-y-2">
                     {message.poll_data.options?.map((option: any, index: number) => {
                       const count = (pollVotes || []).filter(v => v.option_id === index).length;
-                      const isSelected = userVote === index;
+                      const isUserVoted = userVote === index;
+                      const isPreSelected = selectedOption === index;
                       return (
                         <Button
                           key={index}
-                          variant={isSelected ? "default" : "outline"}
+                          variant={isUserVoted ? "default" : isPreSelected ? "secondary" : "outline"}
                           size="sm"
                           className="w-full justify-between text-left"
                           onPointerDown={(e) => e.stopPropagation()}
@@ -178,14 +180,33 @@ export const MessageBubble = ({
                           onMouseDown={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation();
-                            onPollVote?.(message.id, index);
+                            if (userVote === null) {
+                              setSelectedOption(index);
+                            }
                           }}
+                          disabled={userVote !== null}
                         >
                           <span className="truncate">{option.text}</span>
                           <span className="ml-2 text-xs opacity-80">{count} vote{count !== 1 ? 's' : ''}</span>
                         </Button>
                       );
                     })}
+                    {userVote === null && selectedOption !== null && (
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPollVote?.(message.id, selectedOption);
+                          setSelectedOption(null);
+                        }}
+                      >
+                        SUBMIT
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}

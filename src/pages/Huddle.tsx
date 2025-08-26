@@ -631,40 +631,29 @@ useEffect(() => {
     }
 
     try {
-      const currentVote = userVotes[messageId];
-      
-      if (currentVote === optionId) {
-        // Remove vote
-        const { error } = await supabase
-          .from('poll_votes')
-          .delete()
-          .eq('post_id', messageId)
-          .eq('user_id', user.id);
+      const { error } = await supabase
+        .from('poll_votes')
+        .upsert(
+          {
+            post_id: messageId,
+            user_id: user.id,
+            option_id: optionId
+          },
+          { onConflict: 'post_id,user_id' }
+        );
 
-        if (error) throw error;
-        setUserVotes(prev => ({ ...prev, [messageId]: null }));
-      } else {
-        // Add or update vote
-        const { error } = await supabase
-          .from('poll_votes')
-          .upsert(
-            {
-              post_id: messageId,
-              user_id: user.id,
-              option_id: optionId
-            },
-            { onConflict: 'post_id,user_id' }
-          );
-
-        if (error) throw error;
-        setUserVotes(prev => ({ ...prev, [messageId]: optionId }));
-      }
+      if (error) throw error;
+      setUserVotes(prev => ({ ...prev, [messageId]: optionId }));
       
       // Refresh poll votes
       await fetchPollVotes(messageId);
+      toast({
+        title: "Vote submitted!",
+        description: "Your vote has been recorded.",
+      });
     } catch (error: any) {
       console.error('Error voting:', error);
-
+      
       // Show clearer message per spec
       toast({
         title: "You already voted",
