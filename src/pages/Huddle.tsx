@@ -354,29 +354,6 @@ export const Huddle = () => {
         .eq('user_id', user.id)
         .single();
 
-      // Optimistically add the message with current profile data
-      const tempMessage = {
-        id: `temp-${Date.now()}`,
-        content: messageText.trim(),
-        user_id: user.id,
-        huddle_id: id,
-        created_at: new Date().toISOString(),
-        profiles: currentProfile || {
-          display_name: user.email?.split('@')[0] || 'User',
-          username: null,
-          avatar_url: null
-        },
-        reactions: {},
-        media_url: null,
-        media_type: 'text',
-        embed_code: null,
-        is_team_agent_message: false,
-        poll_data: null
-      };
-
-      setMessages(prev => [...prev, tempMessage]);
-      setTimeout(scrollToBottom, 50);
-
       const { data: inserted, error } = await supabase
         .from("huddle_messages")
         .insert({
@@ -389,13 +366,27 @@ export const Huddle = () => {
 
       if (error) {
         console.error("Insert error:", error);
-        // Remove the optimistic message on error
-        setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
         throw error;
       }
+
+      // Immediately show the message locally to fix display issue
+      const messageWithProfile = {
+        ...inserted,
+        profiles: currentProfile || {
+          display_name: user.email?.split('@')[0] || 'User',
+          username: null,
+          avatar_url: null
+        },
+        reactions: {}
+      };
+
+      // Add to messages if not already there (avoid duplicates)
+      setMessages(prev => {
+        const exists = prev.some(m => m.id === messageWithProfile.id);
+        return exists ? prev : [...prev, messageWithProfile];
+      });
       
-      // Remove temp message, real-time will handle the actual message
-      setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
+      setTimeout(scrollToBottom, 50);
       console.log("Message sent successfully");
       
     } catch (error) {

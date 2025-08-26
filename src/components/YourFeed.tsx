@@ -72,6 +72,8 @@ export const YourFeed = () => {
         return;
       }
 
+      setLoading(true); // Show loading for better UX
+      
       const { data: posts, error } = await supabase
         .from("posts")
         .select(`
@@ -89,7 +91,8 @@ export const YourFeed = () => {
         .in("team_id", followedTeams)
         .contains("target_audience", ["team_feed"])
         .eq("delivery_status", "sent")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(50); // Limit for better performance
 
       if (error) throw error;
       

@@ -151,7 +151,10 @@ export const MessageBubble = ({
                         variant="outline"
                         size="sm"
                         className="w-full justify-start text-left"
-                        onClick={() => {/* Handle poll vote */}}
+                        onClick={() => {
+                          // Poll voting will be handled at parent level
+                          console.log('Poll vote clicked:', option, index);
+                        }}
                       >
                         {option.text}
                       </Button>
