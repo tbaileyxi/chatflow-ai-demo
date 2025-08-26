@@ -43,6 +43,7 @@ export const MessageBubble = ({
   const isOwnMessage = message.user_id === currentUserId;
   const isTeamAgent = !!message.is_team_agent_message;
   const showProfile = !isConsecutive || previousMessage?.user_id !== message.user_id;
+  const reactionsEnabled = !message.poll_data;
   
   const handleReaction = (emoji: string) => {
     if (onAddReaction) {
@@ -112,8 +113,19 @@ export const MessageBubble = ({
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted'
               }`}
-              onContextMenu={handleLongPress}
+              onPointerDown={(e) => {
+                // Prevent opening emoji popover on normal taps/clicks when polls are present
+                if (!reactionsEnabled) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
+              onContextMenu={(e) => {
+                if (!reactionsEnabled) return;
+                handleLongPress(e);
+              }}
               onTouchStart={(e) => {
+                if (!reactionsEnabled) return;
                 // Handle long press on touch devices
                 const timer = setTimeout(() => handleLongPress(e), 500);
                 const cleanup = () => clearTimeout(timer);
@@ -160,6 +172,8 @@ export const MessageBubble = ({
                           variant={isSelected ? "default" : "outline"}
                           size="sm"
                           className="w-full justify-between text-left"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
                           onMouseDown={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation();

@@ -195,7 +195,7 @@ const [displayName, setDisplayName] = useState<string>("");
       )
       .subscribe();
 
-    // Realtime: typing indicator via broadcast
+    // Realtime: typing indicator via broadcast (also used for lightweight new message pings)
     const typingChannel = supabase
       .channel(`huddle-typing-${id}`)
       .on('broadcast', { event: 'typing' }, (event) => {
@@ -208,7 +208,7 @@ const [displayName, setDisplayName] = useState<string>("");
 
           // Recompute active typers (within last 3s)
           const active: string[] = [];
-          map.forEach((value, key) => {
+          map.forEach((value) => {
             if (now - value.ts < 3000) active.push(value.name);
           });
           setTypingUsers(active);
@@ -216,9 +216,30 @@ const [displayName, setDisplayName] = useState<string>("");
           console.warn('Typing broadcast parse error', e);
         }
       })
+      .on('broadcast', { event: 'new_message' }, () => {
+        // Lightweight ping to refresh in case Postgres realtime missed on mobile
+        fetchMessages();
+      })
       .subscribe();
 
     typingChannelRef.current = typingChannel;
+
+    // Realtime: poll vote changes across users (keep results cumulative)
+    const pollVotesChannel = supabase
+      .channel(`poll-votes-${id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'poll_votes' },
+        (payload) => {
+          const postId = (payload.new as any)?.post_id || (payload.old as any)?.post_id;
+          if (!postId) return;
+          // Only refresh if this poll exists in current message list
+          if (messages.some(m => m.id === postId)) {
+            fetchPollVotes(postId);
+          }
+        }
+      )
+      .subscribe();
 
     // Prune old typing entries
     const prune = setInterval(() => {
@@ -239,6 +260,7 @@ const [displayName, setDisplayName] = useState<string>("");
     return () => {
       supabase.removeChannel(msgChannel);
       supabase.removeChannel(typingChannel);
+      supabase.removeChannel(pollVotesChannel);
       clearInterval(prune);
     };
   }, [id]);
@@ -437,6 +459,13 @@ const [displayName, setDisplayName] = useState<string>("");
       setMessages(prev => {
         const exists = prev.some(m => m.id === messageWithProfile.id);
         return exists ? prev : [...prev, messageWithProfile];
+      });
+      
+      // Notify others (helps mobile resume) via lightweight broadcast
+      typingChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'new_message',
+        payload: { id: inserted.id }
       });
       
       setTimeout(scrollToBottom, 50);
