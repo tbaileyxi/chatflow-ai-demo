@@ -45,6 +45,11 @@ interface Message {
   embed_code?: string;
   poll_data?: any;
   is_team_agent_message?: boolean;
+  origin_team_id?: string;
+  origin_teams?: {
+    name: string;
+    logo_url?: string;
+  } | null;
   profiles?: {
     display_name?: string;
     username?: string;
@@ -347,7 +352,9 @@ useEffect(() => {
           media_type,
           embed_code,
           poll_data,
-          is_team_agent_message
+          is_team_agent_message,
+          origin_team_id,
+          origin_teams:teams!origin_team_id(name, logo_url)
         `)
         .eq("huddle_id", id)
         .order("created_at", { ascending: false })
@@ -404,7 +411,9 @@ useEffect(() => {
           media_type,
           embed_code,
           poll_data,
-          is_team_agent_message
+          is_team_agent_message,
+          origin_team_id,
+          origin_teams:teams!origin_team_id(name, logo_url)
         `)
         .eq("huddle_id", id)
         .lt('created_at', oldestCreatedAt)
@@ -776,6 +785,7 @@ useEffect(() => {
                 teamName={huddle.team?.name}
                 teamLogoUrl={huddle.team?.logo_url}
                 teamId={huddle.team?.id}
+                originTeamName={message.origin_teams?.name}
                 onPollVote={handlePollVote}
                 pollVotes={pollVotes[message.id]}
                 userVote={userVotes[message.id]}

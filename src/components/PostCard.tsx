@@ -114,6 +114,10 @@ interface PostCardProps {
       logo_url?: string;
       sponsor?: string;
     };
+    origin_teams?: {
+      name: string;
+      logo_url?: string;
+    };
     author?: {
       display_name?: string;
       username?: string;
@@ -136,6 +140,15 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
 
   const likeCount = reactions.filter(r => r.reaction_type === 'like').length;
   const fireCount = reactions.filter(r => r.reaction_type === 'fire').length;
+  
+  // Extract tags from content
+  const extractTags = (content: string) => {
+    const tagRegex = /#[\w]+/g;
+    return content.match(tagRegex) || [];
+  };
+  
+  const tags = extractTags(post.content);
+  const contentWithoutTags = post.content.replace(/#[\w]+/g, '').trim();
 
   // Fetch poll votes if this is a poll
   useEffect(() => {
@@ -371,10 +384,10 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
           )}
         </div>
         <div className="flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-semibold text-foreground">
               {(post.is_team_agent_message || post.is_agent_post || !post.author) ? 
-                `${post.team.name} Agent` : 
+                `${post.origin_teams?.name || post.team.name} Agent` : 
                 (post.author?.display_name || post.author?.username || post.team.name)
               }
             </h3>
@@ -391,6 +404,16 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
                 SPOTLIGHT
               </span>
             )}
+            {/* Tags on the far right */}
+            {tags.length > 0 && (
+              <div className="ml-auto flex gap-1 flex-wrap">
+                {tags.map((tag, index) => (
+                  <span key={index} className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-full">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">
             {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
@@ -402,7 +425,7 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
       <div className="mb-3">
         <div 
           className="text-foreground leading-relaxed whitespace-pre-wrap" 
-          dangerouslySetInnerHTML={{ __html: linkifyTeamNames(post.content) }}
+          dangerouslySetInnerHTML={{ __html: linkifyTeamNames(contentWithoutTags) }}
         />
         
         {/* Embed Code Display */}

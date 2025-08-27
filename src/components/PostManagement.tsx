@@ -44,7 +44,7 @@ export function PostManagement() {
           target_audience,
           is_spotlight,
           delivery_status,
-          teams:team_id (name)
+          teams:teams!team_id(name)
         `)
         .order('created_at', { ascending: false })
         .limit(50);

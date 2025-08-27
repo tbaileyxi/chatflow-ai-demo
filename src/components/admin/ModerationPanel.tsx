@@ -68,7 +68,7 @@ export const ModerationPanel = () => {
                 content,
                 media_url,
                 created_at,
-                team:teams!inner(name, logo_url)
+                team:teams!team_id(name, logo_url)
               `)
               .eq('id', report.post_id)
               .single(),

@@ -209,6 +209,7 @@ export type Database = {
           media_type: string | null
           media_url: string | null
           message_type: string | null
+          origin_team_id: string | null
           poll_data: Json | null
           user_id: string
         }
@@ -223,6 +224,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           message_type?: string | null
+          origin_team_id?: string | null
           poll_data?: Json | null
           user_id: string
         }
@@ -237,10 +239,19 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           message_type?: string | null
+          origin_team_id?: string | null
           poll_data?: Json | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "huddle_messages_origin_team_id_fkey"
+            columns: ["origin_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       huddle_subscriptions: {
         Row: {
@@ -406,6 +417,7 @@ export type Database = {
           is_team_agent_message: boolean | null
           media_url: string | null
           message_type: string | null
+          origin_team_id: string | null
           poll_data: Json | null
           scheduled_at: string | null
           target_audience: string[] | null
@@ -425,6 +437,7 @@ export type Database = {
           is_team_agent_message?: boolean | null
           media_url?: string | null
           message_type?: string | null
+          origin_team_id?: string | null
           poll_data?: Json | null
           scheduled_at?: string | null
           target_audience?: string[] | null
@@ -444,6 +457,7 @@ export type Database = {
           is_team_agent_message?: boolean | null
           media_url?: string | null
           message_type?: string | null
+          origin_team_id?: string | null
           poll_data?: Json | null
           scheduled_at?: string | null
           target_audience?: string[] | null
@@ -456,6 +470,13 @@ export type Database = {
             columns: ["huddle_id"]
             isOneToOne: false
             referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "posts_origin_team_id_fkey"
+            columns: ["origin_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
           {

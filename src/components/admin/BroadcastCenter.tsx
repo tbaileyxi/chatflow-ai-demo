@@ -198,6 +198,7 @@ export const BroadcastCenter = () => {
               content: postData.content,
               huddle_id: huddle.id,
               user_id: postData.is_team_agent_message ? '00000000-0000-0000-0000-000000000000' : postData.author_id,
+              origin_team_id: postData.origin_team_id,
               media_url: postData.media_url,
               media_type: postData.media_url ? 
                 (postData.media_url.includes('.mp4') || postData.media_url.includes('.mov') || postData.media_url.includes('.webm') || postData.media_url.includes('.avi') ? 'video' : 'image') 
@@ -271,6 +272,7 @@ export const BroadcastCenter = () => {
         const postData = {
           content: finalContent,
           team_id: sourceTeam, // The post belongs to the source team
+          origin_team_id: sourceTeam, // Track the original source team
           author_id: user.id,
           message_type: messageType,
           is_agent_post: true,
@@ -310,7 +312,8 @@ export const BroadcastCenter = () => {
         for (const destTeamId of selectedTeams) {
           const feedPostData = {
             content: tags.trim() ? `${finalContent} ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}` : finalContent,
-            team_id: sourceTeam, // Keep source team attribution
+            team_id: destTeamId, // Post appears in destination team's feed
+            origin_team_id: sourceTeam, // But track the source team for attribution
             author_id: user.id,
             message_type: messageType,
             is_agent_post: true,
@@ -341,6 +344,7 @@ export const BroadcastCenter = () => {
         const huddleResult = await broadcastToHuddles({
           content: huddleContent,
           team_id: sourceTeam, // Keep source team context
+          origin_team_id: sourceTeam, // Track the original source team
           author_id: user.id,
           message_type: messageType,
           is_agent_post: true,
@@ -449,6 +453,7 @@ export const BroadcastCenter = () => {
       const postData = {
         content: contentWithTags,
         team_id: sourceTeam, // Post belongs to source team
+        origin_team_id: sourceTeam, // Track the original source team
         author_id: user.id,
         message_type: messageType,
         is_spotlight: addToSpotlight,

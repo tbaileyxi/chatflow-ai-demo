@@ -85,7 +85,7 @@ export const YourFeed = () => {
           created_at,
           target_audience,
           is_team_agent_message,
-          team:teams(id, name, logo_url, sponsor),
+          team:teams!team_id(id, name, logo_url, sponsor),
           post_reactions(reaction_type)
         `)
         .in("team_id", followedTeams)

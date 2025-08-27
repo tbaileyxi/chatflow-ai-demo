@@ -18,6 +18,7 @@ interface MessageBubbleProps {
   teamName?: string;
   teamLogoUrl?: string;
   teamId?: string;
+  originTeamName?: string;
   onPollVote?: (messageId: string, optionId: number) => void;
   pollVotes?: Array<{ option_id: number; user_id: string }>;
   userVote?: number | null;
@@ -34,6 +35,7 @@ export const MessageBubble = ({
   teamName,
   teamLogoUrl,
   teamId,
+  originTeamName,
   onPollVote,
   pollVotes,
   userVote
@@ -46,6 +48,15 @@ export const MessageBubble = ({
   const showProfile = !isConsecutive || previousMessage?.user_id !== message.user_id;
   const reactionsEnabled = !message.poll_data;
   const showContent = message.content && !(message.poll_data && typeof message.poll_data.question === 'string' && message.content.trim() === message.poll_data.question.trim());
+  
+  // Extract tags from content
+  const extractTags = (content: string) => {
+    const tagRegex = /#[\w]+/g;
+    return content.match(tagRegex) || [];
+  };
+  
+  const tags = extractTags(message.content || '');
+  const contentWithoutTags = (message.content || '').replace(/#[\w]+/g, '').trim();
   
   const handleReaction = (emoji: string) => {
     if (onAddReaction) {
@@ -82,12 +93,12 @@ export const MessageBubble = ({
       <div className={`flex-1 min-w-0 ${isOwnMessage ? 'text-right' : 'text-left'}`}>
         {/* User info - only show for first message in sequence */}
         {showProfile && (
-          <div className={`flex items-center gap-2 mb-1 ${
+          <div className={`flex items-center gap-2 mb-1 flex-wrap ${
             isOwnMessage ? 'justify-end' : 'justify-start'
           }`}>
             <span className="text-sm font-medium">
               {message.is_team_agent_message
-                ? (teamName || 'Team')
+                ? `${originTeamName || teamName || 'Team'} Agent`
                 : (message.profiles?.display_name || message.profiles?.username || 'Unknown User')}
             </span>
             <span className="text-xs text-muted-foreground">
@@ -97,6 +108,16 @@ export const MessageBubble = ({
               <Badge variant="outline" className="text-xs px-1.5 py-0.5">
                 Game Bot
               </Badge>
+            )}
+            {/* Tags on the far right */}
+            {tags.length > 0 && (
+              <div className={`flex gap-1 flex-wrap ${isOwnMessage ? 'order-first' : 'ml-auto'}`}>
+                {tags.map((tag, index) => (
+                  <span key={index} className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-full">
+                    {tag}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
         )}
@@ -134,7 +155,7 @@ export const MessageBubble = ({
               {showContent && (
                 <div 
                   className="whitespace-pre-wrap break-words"
-                  dangerouslySetInnerHTML={{ __html: message.content }}
+                  dangerouslySetInnerHTML={{ __html: contentWithoutTags }}
                 />
               )}
 

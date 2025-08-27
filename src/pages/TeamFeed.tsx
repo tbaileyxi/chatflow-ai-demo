@@ -38,6 +38,11 @@ interface Post {
     city: string;
     logo_url?: string;
   };
+  origin_teams?: {
+    name: string;
+    city: string;
+    logo_url?: string;
+  };
 }
 
 export const TeamFeed = () => {
@@ -98,9 +103,11 @@ export const TeamFeed = () => {
           created_at,
           author_id,
           team_id,
+          origin_team_id,
           is_spotlight,
           poll_data,
-          teams!inner(name, city, logo_url)
+          teams!team_id(name, city, logo_url),
+          origin_teams:teams!origin_team_id(name, city, logo_url)
         `)
         .eq('team_id', teamId)
         .contains('target_audience', ['team_feed'])
@@ -298,7 +305,7 @@ export const TeamFeed = () => {
           ) : posts.length > 0 ? (
             <div className="space-y-4">
               {posts.map((post) => (
-                <PostCard 
+                  <PostCard 
                   key={post.id}
                   post={{
                     ...post,
@@ -308,6 +315,7 @@ export const TeamFeed = () => {
                       logo_url: post.teams?.logo_url,
                       sponsor: ''
                     },
+                    origin_teams: post.origin_teams,
                     post_reactions: []
                   }}
                   isSpotlight={false}

@@ -53,7 +53,7 @@ export const SpotlightPost = () => {
           created_at,
           author_id,
           is_team_agent_message,
-          team:teams(id, name, logo_url, sponsor),
+          team:teams!team_id(id, name, logo_url, sponsor),
           post_reactions(reaction_type)
         `)
         .eq('id', id)

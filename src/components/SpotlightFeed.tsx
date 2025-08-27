@@ -38,7 +38,7 @@ export const SpotlightFeed = () => {
           media_url,
           poll_data,
           created_at,
-          team:teams(id, name, logo_url, sponsor),
+          team:teams!team_id(id, name, logo_url, sponsor),
           post_reactions(reaction_type)
         `)
         .contains('target_audience', ['spotlight'])
