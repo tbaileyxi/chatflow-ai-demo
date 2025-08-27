@@ -602,6 +602,36 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          huddle_id: string
+          id: string
+          ip_address: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          huddle_id: string
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          huddle_id?: string
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       team_waitlist: {
         Row: {
           created_at: string
@@ -740,6 +770,14 @@ export type Database = {
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"]
+      }
+      get_huddle_subscription_status: {
+        Args: { target_huddle_id: string }
+        Returns: {
+          expires_at: string
+          is_verified: boolean
+          status: string
+        }[]
       }
       get_or_create_system_user: {
         Args: Record<PropertyKey, never>

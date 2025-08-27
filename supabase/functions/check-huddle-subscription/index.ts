@@ -12,6 +12,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Use service role for secure database operations
   const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -41,7 +42,22 @@ serve(async (req) => {
       
       if (!huddleId) throw new Error("Huddle ID not found in session metadata");
 
-      // Create or update huddle subscription
+      // Verify user owns the huddle before updating subscription
+      const { data: huddleData, error: huddleError } = await supabaseClient
+        .from("huddles")
+        .select("owner_id")
+        .eq("id", huddleId)
+        .single();
+
+      if (huddleError || !huddleData) {
+        throw new Error("Huddle not found");
+      }
+
+      if (huddleData.owner_id !== user.id) {
+        throw new Error("Access denied: You do not own this huddle");
+      }
+
+      // Create or update huddle subscription with enhanced security
       const expiresAt = new Date(subscription.current_period_end * 1000);
       
       await supabaseClient.from("huddle_subscriptions").upsert({
@@ -51,6 +67,15 @@ serve(async (req) => {
         stripe_customer_id: subscription.customer as string,
         status: subscription.status === 'active' ? 'active' : 'cancelled',
         expires_at: expiresAt.toISOString(),
+      });
+
+      // Log the subscription access for audit purposes
+      await supabaseClient.from("subscription_audit_log").insert({
+        user_id: user.id,
+        huddle_id: huddleId,
+        action: "subscription_verified",
+        ip_address: req.headers.get("x-forwarded-for") || "unknown",
+        user_agent: req.headers.get("user-agent") || "unknown"
       });
 
       return new Response(JSON.stringify({ 
