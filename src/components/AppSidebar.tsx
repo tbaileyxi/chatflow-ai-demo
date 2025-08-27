@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import { StartHuddleDialog } from '@/components/StartHuddleDialog';
 import { useAuth } from '@/hooks/useAuth';
+import { HuddleSearchSidebar } from "./HuddleSearchSidebar";
 import { supabase } from '@/integrations/supabase/client';
 
 interface Huddle {
@@ -185,6 +186,14 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Huddle Search Section */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Find Huddles</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <HuddleSearchSidebar isExpanded={!isCollapsed} />
           </SidebarGroupContent>
         </SidebarGroup>
 

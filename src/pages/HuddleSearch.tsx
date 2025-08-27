@@ -17,9 +17,14 @@ interface Huddle {
   name: string;
   member_count: number;
   is_verified: boolean;
+  owner_id: string;
   team: {
     name: string;
     logo_url?: string;
+  };
+  owner_profile?: {
+    display_name?: string;
+    username?: string;
   };
 }
 
@@ -46,6 +51,7 @@ export const HuddleSearch = () => {
           name,
           member_count,
           is_verified,
+          owner_id,
           teams:team_id (
             name,
             logo_url
@@ -56,9 +62,17 @@ export const HuddleSearch = () => {
 
       if (error) throw error;
 
+      // Fetch owner profiles separately
+      const ownerIds = data?.map(h => h.owner_id) || [];
+      const { data: ownerProfiles } = await supabase
+        .from("profiles")
+        .select("user_id, display_name, username")
+        .in("user_id", ownerIds);
+
       const formattedHuddles = data?.map(huddle => ({
         ...huddle,
-        team: huddle.teams || { name: "Unknown Team" }
+        team: huddle.teams || { name: "Unknown Team" },
+        owner_profile: ownerProfiles?.find(p => p.user_id === huddle.owner_id)
       })) || [];
 
       setAllHuddles(formattedHuddles);
@@ -101,6 +115,9 @@ export const HuddleSearch = () => {
                 {huddle.is_verified && <VerifiedBadge size="sm" />}
               </div>
               <p className="text-sm text-muted-foreground">{huddle.team.name}</p>
+              <p className="text-xs text-muted-foreground">
+                Owner: {huddle.owner_profile?.display_name || huddle.owner_profile?.username || "Unknown"}
+              </p>
             </div>
           </div>
           <HuddleJoinButton huddle={huddle} onJoinSuccess={fetchHuddles} />
