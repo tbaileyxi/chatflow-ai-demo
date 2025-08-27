@@ -347,7 +347,7 @@ async function postToTeamFeeds(teams: any[], content: string, supabase: any) {
       }
 
       if (dbTeam) {
-        console.log(`Matched ESPN team "${team.name}" to DB team "${dbTeam.name}" (${dbTeam.city})")
+        console.log(`Matched ESPN team "${team.name}" to DB team "${dbTeam.name}" (${dbTeam.city})`)
         
         // Find all huddles for this team
         const { data: huddles } = await supabase
