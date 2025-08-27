@@ -42,6 +42,7 @@ export const useSpotlightPosts = () => {
           id,
           content,
           media_url,
+          embed_code,
           poll_data,
           created_at,
           team:teams!team_id(id, name, logo_url, sponsor),
