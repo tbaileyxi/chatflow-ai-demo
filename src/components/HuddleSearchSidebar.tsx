@@ -65,7 +65,7 @@ export const HuddleSearchSidebar = ({ isExpanded }: HuddleSearchSidebarProps) =>
           )
         `)
         .eq("is_private", false)
-        .or(`name.ilike.%${searchQuery}%,teams.name.ilike.%${searchQuery}%`)
+        .or(`name.ilike.%${searchQuery}%`)
         .limit(5)
         .order("member_count", { ascending: false });
 
