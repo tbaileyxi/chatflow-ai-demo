@@ -53,6 +53,7 @@ export const BroadcastCenter = () => {
   const [embedPreview, setEmbedPreview] = useState('');
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
+  const [tags, setTags] = useState('');
 
   useEffect(() => {
     fetchTeams();
@@ -280,6 +281,11 @@ export const BroadcastCenter = () => {
           is_spotlight: addToSpotlight
         };
 
+        // Add tags if provided
+        if (tags.trim()) {
+          postData.content += ` ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}`;
+        }
+
         const { data: createdPost, error: postError } = await supabase
           .from('posts')
           .insert(postData)
@@ -300,10 +306,40 @@ export const BroadcastCenter = () => {
           });
         }
 
+        // Create additional posts for destination team feeds (not spotlight)
+        for (const destTeamId of selectedTeams) {
+          const feedPostData = {
+            content: tags.trim() ? `${finalContent} ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}` : finalContent,
+            team_id: destTeamId, // Post appears in destination team's feed
+            author_id: user.id,
+            message_type: messageType,
+            is_agent_post: true,
+            poll_data: pollData,
+            media_url: messageType === 'upload' ? mediaUrl : null,
+            embed_code: messageType === 'embed' ? embedCode : null,
+            target_audience: ['team_feed'], // Only team feed, no spotlight
+            is_spotlight: false
+          };
+
+          const { error: feedError } = await supabase
+            .from('posts')
+            .insert(feedPostData);
+
+          const destTeamInfo = teams.find(t => t.id === destTeamId);
+          const destTeamName = destTeamInfo ? `${destTeamInfo.city} ${destTeamInfo.name}` : 'Team';
+
+          deliveryResults.push({
+            channel: `${destTeamName} - Team Feed`,
+            status: feedError ? 'failed' : 'delivered',
+            error: feedError?.message
+          });
+        }
+
         // Broadcast the source team's message to all destination teams' huddles
         const allTargetTeams = [sourceTeam, ...selectedTeams];
+        const huddleContent = tags.trim() ? `${finalContent} ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}` : finalContent;
         const huddleResult = await broadcastToHuddles({
-          content: finalContent,
+          content: huddleContent,
           team_id: sourceTeam, // Keep source team context
           author_id: user.id,
           message_type: messageType,
@@ -355,6 +391,7 @@ export const BroadcastCenter = () => {
         setMediaCommentary('');
         setAddToSpotlight(false);
         setSelectedTeams([]);
+        setTags('');
         
         // Delay hiding delivery status to let user see results
         setTimeout(() => setShowDeliveryStatus(false), 3000);
@@ -405,11 +442,12 @@ export const BroadcastCenter = () => {
       }
 
       const finalContent = mediaCommentary.trim() || content || (messageType === 'upload' ? '' : '');
+      const contentWithTags = tags.trim() ? `${finalContent} ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}` : finalContent;
       const targetAudience = addToSpotlight ? ['team_feed', 'spotlight'] : ['team_feed'];
 
       // Schedule a single post from the source team with destination teams metadata
       const postData = {
-        content: finalContent,
+        content: contentWithTags,
         team_id: sourceTeam, // Post belongs to source team
         author_id: user.id,
         message_type: messageType,
@@ -446,6 +484,7 @@ export const BroadcastCenter = () => {
       setMediaCommentary('');
       setAddToSpotlight(false);
       setSelectedTeams([]);
+      setTags('');
       
     } catch (error: any) {
       console.error('Error scheduling message:', error);
@@ -682,6 +721,20 @@ export const BroadcastCenter = () => {
               />
             </div>
           )}
+
+          {/* Tags */}
+          <div className="space-y-2">
+            <Label htmlFor="tags">Tags (Optional)</Label>
+            <Input
+              id="tags"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="sports, breaking, news (comma separated)"
+            />
+            <p className="text-xs text-muted-foreground">
+              Tags will be automatically formatted with # symbols
+            </p>
+          </div>
 
           <Separator />
 
