@@ -69,6 +69,11 @@ export default {
 					primary: 'hsl(var(--huddle-primary))',
 					secondary: 'hsl(var(--huddle-secondary))'
 				},
+				verified: {
+					primary: 'hsl(var(--verified-primary))',
+					background: 'hsl(var(--verified-background))',
+					border: 'hsl(var(--verified-border))'
+				},
 				spotlight: 'hsl(var(--spotlight))',
 				'like-button': 'hsl(var(--like-button))',
 				'fire-button': 'hsl(var(--fire-button))'

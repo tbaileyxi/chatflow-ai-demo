@@ -2,3 +2,9 @@ project_id = "dejuwyeypiggvlyfliap"
 
 [functions.live-game-bot]
 verify_jwt = false
+
+[functions.create-huddle-subscription]
+verify_jwt = true
+
+[functions.check-huddle-subscription]
+verify_jwt = true

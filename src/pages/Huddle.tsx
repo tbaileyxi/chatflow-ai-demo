@@ -16,11 +16,15 @@ import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { formatDistanceToNow } from "date-fns";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { HuddleVerificationDialog } from "@/components/HuddleVerificationDialog";
+import { HuddleRequestsManager } from "@/components/HuddleRequestsManager";
 
 interface HuddleData {
   id: string;
   name: string;
   owner_id: string;
+  is_verified?: boolean;
   team: {
     id: string;
     name: string;
@@ -308,6 +312,7 @@ useEffect(() => {
           name,
           created_at,
           owner_id,
+          is_verified,
           team:teams(id, name, logo_url, sponsor)
         `)
         .eq("id", id)
@@ -715,7 +720,10 @@ useEffect(() => {
               )}
             </div>
             <div>
-              <h2 className="font-bold text-lg">{huddle.name}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-lg">{huddle.name}</h2>
+                {huddle.is_verified && <VerifiedBadge size="sm" />}
+              </div>
               <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <Users className="w-4 h-4" />
                 {huddle.team.name} Side Huddle
@@ -723,12 +731,19 @@ useEffect(() => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {user?.id === huddle.owner_id && !huddle.is_verified && (
+              <HuddleVerificationDialog huddleId={huddle.id} isVerified={huddle.is_verified} />
+            )}
             <InviteButton huddleId={huddle.id} />
             <HuddleManagement huddleId={huddle.id} ownerId={huddle.owner_id} huddle={huddle} />
           </div>
         </div>
-        <div className="mt-3">
+        <div className="mt-3 space-y-3">
           <CollapsibleMemberList huddleId={huddle.id} ownerId={huddle.owner_id} />
+          <HuddleRequestsManager 
+            huddleId={huddle.id} 
+            isOwner={user?.id === huddle.owner_id} 
+          />
         </div>
       </div>
 
