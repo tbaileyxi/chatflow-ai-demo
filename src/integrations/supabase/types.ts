@@ -668,6 +668,7 @@ export type Database = {
           logo_url: string | null
           name: string
           sponsor: string | null
+          sponsor_url: string | null
           stats: Json | null
           status: string | null
           updated_at: string
@@ -683,6 +684,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           sponsor?: string | null
+          sponsor_url?: string | null
           stats?: Json | null
           status?: string | null
           updated_at?: string
@@ -698,6 +700,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           sponsor?: string | null
+          sponsor_url?: string | null
           stats?: Json | null
           status?: string | null
           updated_at?: string

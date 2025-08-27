@@ -31,6 +31,7 @@ interface HuddleData {
     name: string;
     logo_url?: string;
     sponsor?: string;
+    sponsor_url?: string;
   };
   created_at: string;
 }
@@ -319,7 +320,7 @@ useEffect(() => {
           created_at,
           owner_id,
           is_verified,
-          team:teams(id, name, logo_url, sponsor)
+          team:teams(id, name, logo_url, sponsor, sponsor_url)
         `)
         .eq("id", id)
         .single();

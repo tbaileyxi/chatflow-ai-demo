@@ -113,6 +113,7 @@ interface PostCardProps {
       name: string;
       logo_url?: string;
       sponsor?: string;
+      sponsor_url?: string;
     };
     origin_teams?: {
       name: string;
@@ -393,7 +394,20 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
             </h3>
             {(post.is_team_agent_message || post.is_agent_post || !post.author) && post.team.sponsor && (
               <span className="text-xs text-muted-foreground font-light">
-                sponsored by: {post.team.sponsor}
+                sponsored by: {
+                  post.team.sponsor_url ? (
+                    <a 
+                      href={post.team.sponsor_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-primary hover:underline"
+                    >
+                      {post.team.sponsor}
+                    </a>
+                  ) : (
+                    post.team.sponsor
+                  )
+                }
               </span>
             )}
             {post.author && !post.is_team_agent_message && !post.is_agent_post && !isSpotlight && (
