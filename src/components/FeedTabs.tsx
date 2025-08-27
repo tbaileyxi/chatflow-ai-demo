@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { YourFeed } from "@/components/YourFeed";
-import { EnhancedSpotlightFeed } from "@/components/EnhancedSpotlightFeed";
+import { OptimizedYourFeed } from "@/components/optimized/OptimizedYourFeed";
+import { OptimizedSpotlightFeed } from "@/components/optimized/OptimizedSpotlightFeed";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -51,8 +51,8 @@ export const FeedTabs = () => {
           </div>
         </div>
         <div className="flex-1 mt-0">
-          {activeTab === "spotlight" && <EnhancedSpotlightFeed />}
-          {activeTab === "your-feed" && <YourFeed />}
+          {activeTab === "spotlight" && <OptimizedSpotlightFeed />}
+          {activeTab === "your-feed" && <OptimizedYourFeed />}
         </div>
       </Tabs>
     </div>
