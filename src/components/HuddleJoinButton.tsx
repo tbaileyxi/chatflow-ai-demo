@@ -42,6 +42,30 @@ export const HuddleJoinButton = ({
     setLoading(true);
     try {
       if (huddle.is_verified) {
+        // Check if request already exists
+        const { data: existingRequest } = await supabase
+          .from("huddle_join_requests")
+          .select("id, status")
+          .eq("huddle_id", huddle.id)
+          .eq("user_id", user.id)
+          .single();
+
+        if (existingRequest) {
+          if (existingRequest.status === "pending") {
+            toast({
+              title: "Request already sent",
+              description: "Your join request is pending review.",
+            });
+          } else {
+            toast({
+              title: "Request already processed",
+              description: `Your join request was ${existingRequest.status}.`,
+            });
+          }
+          setOpen(false);
+          return;
+        }
+
         // Create join request for verified huddles
         const { error } = await supabase.from("huddle_join_requests").insert({
           huddle_id: huddle.id,

@@ -19,6 +19,7 @@ import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { HuddleVerificationDialog } from "@/components/HuddleVerificationDialog";
 import { HuddleRequestsManager } from "@/components/HuddleRequestsManager";
+import { HuddleOwnerPanel } from "@/components/HuddleOwnerPanel";
 
 interface HuddleData {
   id: string;
@@ -734,16 +735,22 @@ useEffect(() => {
             {user?.id === huddle.owner_id && !huddle.is_verified && (
               <HuddleVerificationDialog huddleId={huddle.id} isVerified={huddle.is_verified} />
             )}
+            <HuddleOwnerPanel 
+              huddle={{
+                id: huddle.id,
+                name: huddle.name,
+                is_verified: huddle.is_verified || false,
+                member_count: 0, // This will be updated in the component
+                owner_id: huddle.owner_id
+              }}
+              isOwner={user?.id === huddle.owner_id}
+            />
             <InviteButton huddleId={huddle.id} />
             <HuddleManagement huddleId={huddle.id} ownerId={huddle.owner_id} huddle={huddle} />
           </div>
         </div>
-        <div className="mt-3 space-y-3">
+        <div className="mt-3">
           <CollapsibleMemberList huddleId={huddle.id} ownerId={huddle.owner_id} />
-          <HuddleRequestsManager 
-            huddleId={huddle.id} 
-            isOwner={user?.id === huddle.owner_id} 
-          />
         </div>
       </div>
 
