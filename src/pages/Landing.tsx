@@ -16,20 +16,24 @@ export const Landing = () => {
   }, [user, loading, navigate]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-primary/8 overflow-hidden relative">
+    <div className="min-h-screen bg-background overflow-hidden relative">
       {/* Sharp Background Pattern */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Sharp geometric pattern */}
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/10 via-transparent to-huddle-primary/10"></div>
-          <div className="absolute top-20 left-20 w-40 h-40 bg-primary/20 rotate-45 blur-xl"></div>
-          <div className="absolute top-40 right-32 w-32 h-32 bg-huddle-primary/25 rotate-12 blur-lg"></div>
-          <div className="absolute bottom-40 left-1/3 w-48 h-48 bg-primary/15 -rotate-12 blur-2xl"></div>
+        <div className="absolute inset-0 opacity-40">
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-secondary/20 via-transparent to-muted/20"></div>
+          <div className="absolute top-20 left-20 w-40 h-40 bg-primary/30 rotate-45 blur-xl shadow-2xl"></div>
+          <div className="absolute top-40 right-32 w-32 h-32 bg-secondary/40 rotate-12 blur-lg shadow-xl"></div>
+          <div className="absolute bottom-40 left-1/3 w-48 h-48 bg-primary/20 -rotate-12 blur-2xl shadow-lg"></div>
           
-          {/* Sharp lines */}
-          <div className="absolute top-1/4 right-1/4 w-1 h-20 bg-gradient-to-b from-primary to-transparent rotate-45"></div>
-          <div className="absolute bottom-1/3 left-1/3 w-1 h-16 bg-gradient-to-b from-huddle-primary to-transparent -rotate-12"></div>
-          <div className="absolute top-1/2 left-1/4 w-1 h-12 bg-gradient-to-b from-huddle-primary to-transparent rotate-90"></div>
+          {/* Sharp lines with yellow/slate accents */}
+          <div className="absolute top-1/4 right-1/4 w-2 h-24 bg-gradient-to-b from-primary to-transparent rotate-45 shadow-lg"></div>
+          <div className="absolute bottom-1/3 left-1/3 w-2 h-20 bg-gradient-to-b from-secondary to-transparent -rotate-12 shadow-md"></div>
+          <div className="absolute top-1/2 left-1/4 w-1 h-16 bg-gradient-to-b from-primary to-transparent rotate-90 shadow-sm"></div>
+          
+          {/* Additional dynamic elements */}
+          <div className="absolute top-3/4 right-1/4 w-6 h-6 bg-primary rounded-full blur-sm shadow-lg animate-pulse"></div>
+          <div className="absolute top-1/3 left-1/6 w-4 h-4 bg-secondary rounded-full blur-sm shadow-md animate-pulse delay-1000"></div>
         </div>
       </div>
 
@@ -50,28 +54,28 @@ export const Landing = () => {
               </div>
             </div>
             
-            {/* Headline */}
-            <h1 className="text-4xl md:text-6xl font-black text-foreground leading-tight tracking-tight drop-shadow-lg" style={{ fontFamily: 'Impact, "Arial Black", sans-serif' }}>
-              One App.{' '}
-              <span className="text-primary">Your team feeds.</span>
+            {/* New Headline */}
+            <h1 className="text-5xl md:text-7xl font-black leading-tight tracking-tight mb-6" style={{ fontFamily: 'Impact, "Arial Black", sans-serif', textShadow: '3px 3px 6px rgba(0,0,0,0.3)' }}>
+              <span className="text-primary drop-shadow-lg" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>One App.</span>{' '}
+              <span className="text-secondary drop-shadow-lg" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>Your team feeds.</span>
               <br />
-              <span className="text-muted-foreground">Your private chats.</span>
+              <span className="text-muted-foreground drop-shadow-lg" style={{ textShadow: '1px 1px 3px rgba(0,0,0,0.4)' }}>Your private chats.</span>
               <br />
-              <span className="text-huddle-primary">Game on.</span>
+              <span className="text-primary drop-shadow-lg" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.6)' }}>Game on.</span>
             </h1>
 
-            {/* Subheadline */}
-            <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto font-medium leading-relaxed">
-              Finally: Private group chats that actually follow your team. 
-              Curated social media posts + your friends in one place.
-            </p>
+            {/* Updated tagline */}
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-8 tracking-wide" style={{ textShadow: '1px 1px 3px rgba(0,0,0,0.3)' }}>
+              THE SPORTS APP FOR FRIENDS & FANS
+            </h2>
 
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-8">
+            {/* CTA Buttons - Now above the fold */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
               <Button 
                 size="lg" 
-                className="bg-gradient-to-r from-primary to-huddle-primary hover:from-primary/90 hover:to-huddle-primary/90 text-white px-8 py-4 text-lg font-semibold group shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-bold shadow-2xl hover:shadow-primary/40 transition-all duration-300 transform hover:scale-105 border-2 border-primary"
                 onClick={() => navigate('/auth?signup=true')}
+                style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
               >
                 Sign Up
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
@@ -79,12 +83,19 @@ export const Landing = () => {
               <Button 
                 variant="outline" 
                 size="lg" 
-                className="border-2 border-muted-foreground/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground hover:border-primary px-8 py-4 text-lg font-semibold backdrop-blur-sm transition-all duration-300"
+                className="border-2 border-secondary bg-secondary/20 text-foreground hover:bg-secondary/40 hover:text-foreground hover:border-primary px-8 py-4 text-lg font-bold backdrop-blur-sm transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105"
                 onClick={() => navigate('/auth')}
+                style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}
               >
                 Sign In
               </Button>
             </div>
+
+            {/* Updated Subheadline */}
+            <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto font-medium leading-relaxed" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.2)' }}>
+              Finally: Private group chats enhanced with your team news. 
+              Curated social media posts + your friends in one place.
+            </p>
           </div>
         </div>
       </div>
@@ -94,8 +105,8 @@ export const Landing = () => {
         <div className="max-w-6xl mx-auto px-4">
           <div className="grid md:grid-cols-3 gap-8">
             {/* Feature 1 */}
-            <div className="text-center space-y-4 p-8 bg-card/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-primary/10 hover:border-primary/20 group">
-              <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-huddle-primary/20 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300">
+            <div className="text-center space-y-4 p-8 bg-card/90 backdrop-blur-sm rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 border-2 border-primary/20 hover:border-primary/40 group">
+              <div className="w-16 h-16 bg-primary/30 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300 shadow-lg">
                 <Users className="h-8 w-8 text-primary" />
               </div>
               <h3 className="text-xl font-bold text-card-foreground">Team Feeds</h3>
@@ -105,9 +116,9 @@ export const Landing = () => {
             </div>
 
             {/* Feature 2 */}
-            <div className="text-center space-y-4 p-8 bg-card/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-huddle-primary/10 hover:border-huddle-primary/20 group">
-              <div className="w-16 h-16 bg-gradient-to-br from-huddle-primary/20 to-secondary/20 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300">
-                <MessageCircle className="h-8 w-8 text-huddle-primary" />
+            <div className="text-center space-y-4 p-8 bg-card/90 backdrop-blur-sm rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 border-2 border-secondary/20 hover:border-secondary/40 group">
+              <div className="w-16 h-16 bg-secondary/30 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                <MessageCircle className="h-8 w-8 text-secondary" />
               </div>
               <h3 className="text-xl font-bold text-card-foreground">Private Chats</h3>
               <p className="text-muted-foreground leading-relaxed">
@@ -116,8 +127,8 @@ export const Landing = () => {
             </div>
 
             {/* Feature 3 */}
-            <div className="text-center space-y-4 p-8 bg-card/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-primary/10 hover:border-primary/20 group">
-              <div className="w-16 h-16 bg-gradient-to-br from-huddle-primary/20 to-primary/20 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300">
+            <div className="text-center space-y-4 p-8 bg-card/90 backdrop-blur-sm rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 border-2 border-primary/20 hover:border-primary/40 group">
+              <div className="w-16 h-16 bg-primary/30 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300 shadow-lg">
                 <Trophy className="h-8 w-8 text-primary" />
               </div>
               <h3 className="text-xl font-bold text-card-foreground">Game Ready</h3>
@@ -130,24 +141,26 @@ export const Landing = () => {
       </div>
 
       {/* Footer CTA */}
-      <div className="py-16 bg-gradient-to-r from-primary via-huddle-primary to-primary text-white relative overflow-hidden">
+      <div className="py-16 bg-primary text-primary-foreground relative overflow-hidden shadow-2xl">
         {/* Background decoration */}
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-10 left-10 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
-          <div className="absolute bottom-10 right-10 w-24 h-24 bg-white/10 rounded-full blur-lg"></div>
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-10 left-10 w-32 h-32 bg-secondary/20 rounded-full blur-xl shadow-lg"></div>
+          <div className="absolute bottom-10 right-10 w-24 h-24 bg-secondary/30 rounded-full blur-lg shadow-md"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-secondary/10 rounded-full blur-2xl"></div>
         </div>
         
         <div className="max-w-4xl mx-auto text-center px-4 space-y-6 relative z-10">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
             Ready to elevate your sports experience?
           </h2>
-          <p className="text-xl opacity-90 font-medium">
+          <p className="text-xl font-medium opacity-95" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
             Join thousands of fans already connecting on Side Huddle.
           </p>
           <Button 
             size="lg" 
-            className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm border border-white/30 hover:border-white/50 px-8 py-4 text-lg font-semibold shadow-2xl transition-all duration-300 transform hover:scale-105"
+            className="bg-secondary text-secondary-foreground hover:bg-secondary/90 border-2 border-secondary px-8 py-4 text-lg font-bold shadow-2xl hover:shadow-secondary/40 transition-all duration-300 transform hover:scale-105"
             onClick={() => navigate('/auth?signup=true')}
+            style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
           >
             Get Started Now
           </Button>

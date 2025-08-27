@@ -189,13 +189,15 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Huddle Search Section */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Find Official Huddles</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <HuddleSearchSidebar isExpanded={!isCollapsed} />
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/* Huddle Search Section - Only show to logged in users */}
+        {user && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Find Official Huddles</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <HuddleSearchSidebar isExpanded={!isCollapsed} />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {user && (
           <>

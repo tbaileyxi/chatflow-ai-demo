@@ -192,13 +192,14 @@ export const BroadcastCenter = () => {
       // Create actual huddle messages for each huddle
       if (huddles?.length) {
         for (const huddle of huddles) {
-          const { error: huddleMessageError } = await supabase
+          const { data: createdMessage, error: huddleMessageError } = await supabase
             .from('huddle_messages')
             .insert({
               content: postData.content,
               huddle_id: huddle.id,
               user_id: postData.is_team_agent_message ? '00000000-0000-0000-0000-000000000000' : postData.author_id,
               origin_team_id: postData.origin_team_id,
+              origin_post_id: postData.post_id, // Link to the original post for cascade deletion
               media_url: postData.media_url,
               media_type: postData.media_url ? 
                 (postData.media_url.includes('.mp4') || postData.media_url.includes('.mov') || postData.media_url.includes('.webm') || postData.media_url.includes('.avi') ? 'video' : 'image') 
@@ -206,7 +207,8 @@ export const BroadcastCenter = () => {
               embed_code: postData.embed_code,
               poll_data: postData.poll_data,
               is_team_agent_message: postData.is_team_agent_message || false
-            });
+            })
+            .select();
 
           if (huddleMessageError) {
             console.error(`Failed to broadcast to huddle ${huddle.name}:`, huddleMessageError);
@@ -351,7 +353,8 @@ export const BroadcastCenter = () => {
           poll_data: pollData,
           media_url: messageType === 'upload' ? mediaUrl : null,
           embed_code: messageType === 'embed' ? embedCode : null,
-          is_team_agent_message: true
+          is_team_agent_message: true,
+          post_id: createdPost.id // Include the post ID for linking
         }, allTargetTeams);
 
         // Add delivery status for each team's huddles

@@ -209,6 +209,7 @@ export type Database = {
           media_type: string | null
           media_url: string | null
           message_type: string | null
+          origin_post_id: string | null
           origin_team_id: string | null
           poll_data: Json | null
           user_id: string
@@ -224,6 +225,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           message_type?: string | null
+          origin_post_id?: string | null
           origin_team_id?: string | null
           poll_data?: Json | null
           user_id: string
@@ -239,11 +241,19 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           message_type?: string | null
+          origin_post_id?: string | null
           origin_team_id?: string | null
           poll_data?: Json | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "huddle_messages_origin_post_fk"
+            columns: ["origin_post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "huddle_messages_origin_team_id_fkey"
             columns: ["origin_team_id"]
