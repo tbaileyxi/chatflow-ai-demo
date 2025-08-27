@@ -51,19 +51,13 @@ export const MakePublicButton = ({
         isOwner
       });
 
-      // Normalize message_type to match database constraints
+      // Normalize message_type to match database constraints (text, upload, embed, poll)
       let normalizedMessageType = 'text';
       if (embedCode) {
         normalizedMessageType = 'embed';
       } else if (mediaUrl) {
-        // Handle different media types
-        if (mediaType === 'image') {
-          normalizedMessageType = 'image';
-        } else if (mediaType === 'video') {
-          normalizedMessageType = 'video';
-        } else {
-          normalizedMessageType = 'upload'; // fallback
-        }
+        // All media files (images, videos, etc.) use 'upload' type
+        normalizedMessageType = 'upload';
       }
 
       console.log("Normalized message type:", normalizedMessageType);

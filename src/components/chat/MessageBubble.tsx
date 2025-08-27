@@ -87,7 +87,7 @@ export const MessageBubble = ({
           }`}>
             <span className="text-sm font-medium">
               {message.is_team_agent_message
-                ? `${teamName || 'Team'} Agent`
+                ? (teamName || 'Team')
                 : (message.profiles?.display_name || message.profiles?.username || 'Unknown User')}
             </span>
             <span className="text-xs text-muted-foreground">
