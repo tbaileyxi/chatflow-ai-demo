@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Users, MessageCircle, Trophy } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect } from 'react';
-import shLogo from '@/assets/sh-logo-updated.png';
 
 export const Landing = () => {
   const navigate = useNavigate();
@@ -25,12 +24,12 @@ export const Landing = () => {
           <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/10 via-transparent to-huddle-primary/10"></div>
           <div className="absolute top-20 left-20 w-40 h-40 bg-primary/20 rotate-45 blur-xl"></div>
           <div className="absolute top-40 right-32 w-32 h-32 bg-huddle-primary/25 rotate-12 blur-lg"></div>
-          <div className="absolute bottom-40 left-1/3 w-48 h-48 bg-accent/15 -rotate-12 blur-2xl"></div>
+          <div className="absolute bottom-40 left-1/3 w-48 h-48 bg-primary/15 -rotate-12 blur-2xl"></div>
           
           {/* Sharp lines */}
           <div className="absolute top-1/4 right-1/4 w-1 h-20 bg-gradient-to-b from-primary to-transparent rotate-45"></div>
           <div className="absolute bottom-1/3 left-1/3 w-1 h-16 bg-gradient-to-b from-huddle-primary to-transparent -rotate-12"></div>
-          <div className="absolute top-1/2 left-1/4 w-1 h-12 bg-gradient-to-b from-accent to-transparent rotate-90"></div>
+          <div className="absolute top-1/2 left-1/4 w-1 h-12 bg-gradient-to-b from-huddle-primary to-transparent rotate-90"></div>
         </div>
       </div>
 
@@ -52,13 +51,13 @@ export const Landing = () => {
             </div>
             
             {/* Headline */}
-            <h1 className="text-4xl md:text-6xl font-black text-foreground leading-tight tracking-tight" style={{ fontFamily: 'Impact, "Arial Black", sans-serif' }}>
+            <h1 className="text-4xl md:text-6xl font-black text-foreground leading-tight tracking-tight drop-shadow-lg" style={{ fontFamily: 'Impact, "Arial Black", sans-serif' }}>
               One App.{' '}
-              <span className="text-transparent bg-gradient-to-r from-primary to-huddle-primary bg-clip-text">Your team feeds.</span>
+              <span className="text-primary">Your team feeds.</span>
               <br />
               <span className="text-muted-foreground">Your private chats.</span>
               <br />
-              <span className="text-transparent bg-gradient-to-r from-huddle-primary to-primary bg-clip-text">Game on.</span>
+              <span className="text-huddle-primary">Game on.</span>
             </h1>
 
             {/* Subheadline */}
@@ -117,9 +116,9 @@ export const Landing = () => {
             </div>
 
             {/* Feature 3 */}
-            <div className="text-center space-y-4 p-8 bg-card/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-accent/10 hover:border-accent/20 group">
-              <div className="w-16 h-16 bg-gradient-to-br from-accent/20 to-primary/20 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300">
-                <Trophy className="h-8 w-8 text-accent" />
+            <div className="text-center space-y-4 p-8 bg-card/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-primary/10 hover:border-primary/20 group">
+              <div className="w-16 h-16 bg-gradient-to-br from-huddle-primary/20 to-primary/20 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300">
+                <Trophy className="h-8 w-8 text-primary" />
               </div>
               <h3 className="text-xl font-bold text-card-foreground">Game Ready</h3>
               <p className="text-muted-foreground leading-relaxed">
