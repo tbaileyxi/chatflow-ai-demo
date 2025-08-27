@@ -310,7 +310,7 @@ export const BroadcastCenter = () => {
         for (const destTeamId of selectedTeams) {
           const feedPostData = {
             content: tags.trim() ? `${finalContent} ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}` : finalContent,
-            team_id: destTeamId, // Post appears in destination team's feed
+            team_id: sourceTeam, // Keep source team attribution
             author_id: user.id,
             message_type: messageType,
             is_agent_post: true,
