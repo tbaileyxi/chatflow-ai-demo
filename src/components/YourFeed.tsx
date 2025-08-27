@@ -11,11 +11,17 @@ interface Post {
   poll_data?: any;
   created_at: string;
   author_id?: string;
+  is_team_agent_message?: boolean;
+  is_agent_post?: boolean;
   team: {
     id: string;
     name: string;
     logo_url?: string;
     sponsor?: string;
+  };
+  origin_teams?: {
+    name: string;
+    logo_url?: string;
   };
   author?: {
     display_name?: string;
@@ -85,7 +91,9 @@ export const YourFeed = () => {
           created_at,
           target_audience,
           is_team_agent_message,
+          is_agent_post,
           team:teams!team_id(id, name, logo_url, sponsor),
+          origin_teams:teams!origin_team_id(name, logo_url),
           post_reactions(reaction_type)
         `)
         .in("team_id", followedTeams)

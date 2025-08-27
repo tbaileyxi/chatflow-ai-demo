@@ -361,12 +361,12 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
       <div className="flex items-center gap-3 mb-3">
         <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
           {(post.is_team_agent_message || post.is_agent_post || !post.author) ? (
-            // For team agent posts, show team logo
-            post.team.logo_url ? (
-              <img src={post.team.logo_url} alt={post.team.name} className="w-8 h-8 rounded-full" />
+            // For team agent posts, show origin team logo if available, otherwise current team logo
+            (post.origin_teams?.logo_url || post.team.logo_url) ? (
+              <img src={post.origin_teams?.logo_url || post.team.logo_url} alt={post.origin_teams?.name || post.team.name} className="w-8 h-8 rounded-full" />
             ) : (
               <span className="text-primary font-bold text-sm">
-                {post.team.name.substring(0, 2).toUpperCase()}
+                {(post.origin_teams?.name || post.team.name).substring(0, 2).toUpperCase()}
               </span>
             )
           ) : (
