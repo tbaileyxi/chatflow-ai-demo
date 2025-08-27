@@ -89,6 +89,50 @@ export type Database = {
         }
         Relationships: []
       }
+      huddle_join_requests: {
+        Row: {
+          created_at: string
+          huddle_id: string
+          id: string
+          message: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          huddle_id: string
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          huddle_id?: string
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "huddle_join_requests_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       huddle_members: {
         Row: {
           huddle_id: string
@@ -198,39 +242,89 @@ export type Database = {
         }
         Relationships: []
       }
+      huddle_subscriptions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          huddle_id: string
+          id: string
+          owner_id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          huddle_id: string
+          id?: string
+          owner_id: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          huddle_id?: string
+          id?: string
+          owner_id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "huddle_subscriptions_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: true
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       huddles: {
         Row: {
           created_at: string
           id: string
           is_private: boolean | null
+          is_verified: boolean | null
           last_message_at: string | null
           member_count: number | null
           name: string
           owner_id: string
           team_id: string
           updated_at: string
+          verification_expires_at: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           is_private?: boolean | null
+          is_verified?: boolean | null
           last_message_at?: string | null
           member_count?: number | null
           name: string
           owner_id: string
           team_id: string
           updated_at?: string
+          verification_expires_at?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           is_private?: boolean | null
+          is_verified?: boolean | null
           last_message_at?: string | null
           member_count?: number | null
           name?: string
           owner_id?: string
           team_id?: string
           updated_at?: string
+          verification_expires_at?: string | null
         }
         Relationships: [
           {
@@ -614,6 +708,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_huddle_join_request: {
+        Args: { request_id: string }
+        Returns: undefined
+      }
       calculate_post_vote_score: {
         Args: { post_uuid: string }
         Returns: number
