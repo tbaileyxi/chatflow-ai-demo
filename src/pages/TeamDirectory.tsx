@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { Search, Users, Trophy, Heart, Check, Clock, Eye } from 'lucide-react';
+import { StartHuddleDialog } from '@/components/StartHuddleDialog';
 
 interface Team {
   id: string;
@@ -329,21 +330,35 @@ export const TeamDirectory = () => {
                       </div>
                     </div>
                     {user && (
-                      <Button
-                        variant={isFollowing(team.id) ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => toggleFollow(team.id)}
-                        className="flex items-center gap-1"
-                      >
-                        {isFollowing(team.id) ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <>
-                            <Heart className="w-3 h-3" />
-                            Follow
-                          </>
-                        )}
-                      </Button>
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          variant={isFollowing(team.id) ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => toggleFollow(team.id)}
+                          className="flex items-center gap-1"
+                        >
+                          {isFollowing(team.id) ? (
+                            <Check className="w-4 h-4" />
+                          ) : (
+                            <>
+                              <Heart className="w-3 h-3" />
+                              Follow
+                            </>
+                          )}
+                        </Button>
+                        <StartHuddleDialog 
+                          trigger={
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="flex items-center gap-1 w-full"
+                            >
+                              <Users className="w-3 h-3" />
+                              Start Huddle
+                            </Button>
+                          }
+                        />
+                      </div>
                     )}
                   </div>
                 </CardHeader>

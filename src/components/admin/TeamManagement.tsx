@@ -23,6 +23,7 @@ interface Team {
   stats: any;
   status: string;
   sponsor?: string;
+  sponsor_url?: string;
   created_at: string;
 }
 
@@ -42,7 +43,8 @@ export const TeamManagement = () => {
     description: '',
     logo_url: '',
     status: 'active',
-    sponsor: ''
+    sponsor: '',
+    sponsor_url: ''
   });
   const { toast } = useToast();
 
@@ -156,7 +158,8 @@ export const TeamManagement = () => {
         description: '',
         logo_url: '',
         status: 'active',
-        sponsor: ''
+        sponsor: '',
+        sponsor_url: ''
       });
       setIsAddDialogOpen(false);
       setEditingTeam(null);
@@ -182,7 +185,8 @@ export const TeamManagement = () => {
       description: team.description || '',
       logo_url: team.logo_url || '',
       status: team.status || 'active',
-      sponsor: team.sponsor || ''
+      sponsor: team.sponsor || '',
+      sponsor_url: team.sponsor_url || ''
     });
     setIsAddDialogOpen(true);
   };
@@ -224,7 +228,8 @@ export const TeamManagement = () => {
       description: '',
       logo_url: '',
       status: 'active',
-      sponsor: ''
+      sponsor: '',
+      sponsor_url: ''
     });
     setEditingTeam(null);
   };
@@ -482,6 +487,19 @@ export const TeamManagement = () => {
                 />
                 <p className="text-xs text-muted-foreground">
                   Company name that will appear as "sponsored by: [company name]" on agent posts
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sponsor_url">Sponsor Hyperlink (Optional)</Label>
+                <Input
+                  id="sponsor_url"
+                  value={formData.sponsor_url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sponsor_url: e.target.value }))}
+                  placeholder="https://..."
+                />
+                <p className="text-xs text-muted-foreground">
+                  URL to make the sponsor name clickable (requires sponsor name to be filled)
                 </p>
               </div>
 
