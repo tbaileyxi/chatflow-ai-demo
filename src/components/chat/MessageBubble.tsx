@@ -77,10 +77,10 @@ export const MessageBubble = ({
       {/* Avatar - only show for first message in sequence */}
       {showProfile && (
         <Avatar className="h-8 w-8 shrink-0">
-          <AvatarImage src={isTeamAgent ? (message.origin_team?.logo_url || teamLogoUrl) : message.profiles?.avatar_url} />
+          <AvatarImage src={isTeamAgent ? (message.origin_teams?.logo_url || teamLogoUrl) : message.profiles?.avatar_url} />
           <AvatarFallback className="text-xs">
             {isTeamAgent
-              ? ((message.origin_team?.name || teamName)?.[0] || 'T')
+              ? ((message.origin_teams?.name || teamName)?.[0] || 'T')
               : (message.profiles?.display_name?.[0] || message.profiles?.username?.[0] || 'U')}
           </AvatarFallback>
         </Avatar>
@@ -98,7 +98,7 @@ export const MessageBubble = ({
           }`}>
             <span className="text-sm font-medium">
               {message.is_team_agent_message
-                ? `${originTeamName || teamName || 'Team'} Agent`
+                ? `${message.origin_teams?.name || originTeamName || teamName || 'Team'} Agent`
                 : (message.profiles?.display_name || message.profiles?.username || 'Unknown User')}
             </span>
             <span className="text-xs text-muted-foreground">

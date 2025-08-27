@@ -104,21 +104,14 @@ export const YourFeed = () => {
 
       if (error) throw error;
       
-      // Remove duplicates based on content and team_id (keep the most recent)
+      // Remove duplicates based on post ID (most reliable way)
       const uniquePosts = posts?.reduce((acc: Post[], post: Post) => {
-        const existingIndex = acc.findIndex(p => 
-          p.content === post.content && p.team.id === post.team.id
-        );
+        const existingIndex = acc.findIndex(p => p.id === post.id);
         
         if (existingIndex === -1) {
           acc.push(post);
-        } else {
-          // Keep the more recent post
-          const existing = acc[existingIndex];
-          if (new Date(post.created_at) > new Date(existing.created_at)) {
-            acc[existingIndex] = post;
-          }
         }
+        // If duplicate ID found, keep the existing one (shouldn't happen with proper DB queries)
         
         return acc;
       }, []) || [];
