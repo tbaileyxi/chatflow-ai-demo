@@ -109,16 +109,43 @@ serve(async (req) => {
     // Fetch followed teams to know which games to monitor
     const { data: followedTeams } = await supabase
       .from('user_follows')
-      .select('team_id, teams(name, city)')
+      .select('team_id, teams(name, city, conference)')
 
-    const teamIds = new Set(followedTeams?.map(f => f.team_id) || [])
-    console.log(`Monitoring ${teamIds.size} followed teams`)
+    // Fetch all Power 4 NCAA teams (automatically included in monitoring)
+    const { data: power4Teams } = await supabase
+      .from('teams')
+      .select('id, name, city, conference')
+      .eq('league', 'NCAA')
+      .in('conference', ['SEC', 'Big Ten', 'Big 12', 'ACC'])
+
+    // Combine followed teams and Power 4 teams
+    const allTeams = new Map()
+    
+    // Add followed teams
+    followedTeams?.forEach(f => {
+      if (f.teams) {
+        allTeams.set(f.team_id, {
+          id: f.team_id,
+          name: f.teams.name,
+          city: f.teams.city,
+          conference: f.teams.conference
+        })
+      }
+    })
+    
+    // Add Power 4 teams (automatically monitored)
+    power4Teams?.forEach(team => {
+      allTeams.set(team.id, team)
+    })
+
+    const teamIds = new Set(Array.from(allTeams.keys()))
+    console.log(`Monitoring ${teamIds.size} teams (${followedTeams?.length || 0} followed + ${power4Teams?.length || 0} Power 4 NCAA teams)`)
 
     // Poll NFL games
-    await pollLeague('nfl', teamIds, supabase)
+    await pollLeague('nfl', teamIds, allTeams, supabase)
     
-    // Poll NCAA games
-    await pollLeague('college-football', teamIds, supabase)
+    // Poll NCAA games  
+    await pollLeague('college-football', teamIds, allTeams, supabase)
 
     return new Response(
       JSON.stringify({ success: true, message: 'Live game bot completed' }),
@@ -134,7 +161,7 @@ serve(async (req) => {
   }
 })
 
-async function pollLeague(league: string, teamIds: Set<string>, supabase: any) {
+async function pollLeague(league: string, teamIds: Set<string>, allTeams: Map<string, any>, supabase: any) {
   try {
     console.log(`Polling ${league} games...`)
     
@@ -151,7 +178,7 @@ async function pollLeague(league: string, teamIds: Set<string>, supabase: any) {
     console.log(`Found ${games.length} ${league} games`)
 
     for (const game of games) {
-      await processGame(game, league, teamIds, supabase)
+      await processGame(game, league, teamIds, allTeams, supabase)
     }
 
   } catch (error) {
@@ -159,7 +186,7 @@ async function pollLeague(league: string, teamIds: Set<string>, supabase: any) {
   }
 }
 
-async function processGame(game: ESPNGame, league: string, teamIds: Set<string>, supabase: any) {
+async function processGame(game: ESPNGame, league: string, teamIds: Set<string>, allTeams: Map<string, any>, supabase: any) {
   try {
     const gameId = game.id
     const competition = game.competitions[0]
@@ -173,9 +200,9 @@ async function processGame(game: ESPNGame, league: string, teamIds: Set<string>,
       isHome: comp.homeAway === 'home'
     }))
 
-    // Check if any of our followed teams are playing
+    // Check if any of our monitored teams are playing
     const relevantTeams = teams.filter(team => 
-      teamIds.has(team.id) || hasTeamMatch(team.name, teamIds, supabase)
+      hasTeamMatch(team, allTeams, supabase)
     )
 
     if (relevantTeams.length === 0) {
@@ -290,23 +317,45 @@ async function postToTeamFeeds(teams: any[], content: string, supabase: any) {
       return
     }
 
-    // Get team IDs from our database by matching names
+    // Get team IDs from our database by improved matching for NCAA teams
     for (const team of teams) {
-      const { data: dbTeam } = await supabase
+      // Try multiple matching strategies for better NCAA team identification
+      let dbTeam = null
+      
+      // Strategy 1: Exact name match (works well for NFL)
+      const { data: exactMatch } = await supabase
         .from('teams')
-        .select('id')
-        .or(`name.ilike.%${team.name}%,city.ilike.%${team.abbreviation}%`)
+        .select('id, name, city')
+        .ilike('name', team.name)
         .limit(1)
-        .single()
+        .maybeSingle()
+      
+      if (exactMatch) {
+        dbTeam = exactMatch
+      } else {
+        // Strategy 2: Match by city and partial name (better for NCAA)
+        const { data: cityMatch } = await supabase
+          .from('teams')
+          .select('id, name, city')
+          .or(`city.ilike.%${team.name.split(' ')[0]}%,name.ilike.%${team.abbreviation}%,name.ilike.%${team.name.split(' ').pop()}%`)
+          .limit(1)
+          .maybeSingle()
+        
+        if (cityMatch) {
+          dbTeam = cityMatch
+        }
+      }
 
       if (dbTeam) {
+        console.log(`Matched ESPN team "${team.name}" to DB team "${dbTeam.name}" (${dbTeam.city})")
+        
         // Find all huddles for this team
         const { data: huddles } = await supabase
           .from('huddles')
           .select('id, name')
           .eq('team_id', dbTeam.id)
 
-        console.log(`Found ${huddles?.length || 0} huddles for team ${team.name}`)
+        console.log(`Found ${huddles?.length || 0} huddles for team ${dbTeam.name}`)
 
         // Post to each team huddle
         for (const huddle of huddles || []) {
@@ -340,10 +389,12 @@ async function postToTeamFeeds(teams: any[], content: string, supabase: any) {
           })
 
         if (postError) {
-          console.error(`Error posting to team ${team.name} feed:`, postError)
+          console.error(`Error posting to team ${dbTeam.name} feed:`, postError)
         } else {
-          console.log(`Posted to team ${team.name} feed and ${huddles?.length || 0} huddles`)
+          console.log(`Posted to team ${dbTeam.name} feed and ${huddles?.length || 0} huddles`)
         }
+      } else {
+        console.log(`Could not match ESPN team "${team.name}" (${team.abbreviation}) to any team in database`)
       }
     }
   } catch (error) {
@@ -371,8 +422,32 @@ function getPeriodEndText(period: number): string {
   }
 }
 
-async function hasTeamMatch(teamName: string, teamIds: Set<string>, supabase: any): Promise<boolean> {
-  // This would check if the team name matches any of our followed teams
-  // For now, return false to keep it simple
+function hasTeamMatch(espnTeam: any, allTeams: Map<string, any>, supabase: any): boolean {
+  // Check if this ESPN team matches any of our monitored teams
+  for (const [teamId, team] of allTeams) {
+    // Direct name match (case insensitive)
+    if (team.name.toLowerCase() === espnTeam.name.toLowerCase()) {
+      return true
+    }
+    
+    // NCAA-specific matching: check if city matches ESPN team name
+    if (team.city && espnTeam.name.toLowerCase().includes(team.city.toLowerCase())) {
+      return true
+    }
+    
+    // Check if ESPN team name contains our team's name  
+    if (espnTeam.name.toLowerCase().includes(team.name.toLowerCase())) {
+      return true
+    }
+    
+    // Check abbreviation matches
+    if (espnTeam.abbreviation && (
+      espnTeam.abbreviation.toLowerCase() === team.name.toLowerCase() ||
+      team.city?.toLowerCase().startsWith(espnTeam.abbreviation.toLowerCase())
+    )) {
+      return true
+    }
+  }
+  
   return false
 }
