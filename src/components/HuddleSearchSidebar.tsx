@@ -159,21 +159,22 @@ export const HuddleSearchSidebar = ({ isExpanded }: HuddleSearchSidebarProps) =>
                       </span>
                     </div>
                     
-                    <div className="flex items-center justify-between mt-1">
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Users className="w-2 h-2" />
-                          <span>{huddle.member_count}</span>
-                        </div>
-                        {huddle.is_verified && (
-                          <Badge variant="secondary" className="text-xs px-1 py-0">
-                            Official
-                          </Badge>
-                        )}
+                    <div className="flex items-center gap-1 mt-2">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Users className="w-2 h-2" />
+                        <span>{huddle.member_count}</span>
                       </div>
+                      {huddle.is_verified && (
+                        <Badge variant="secondary" className="text-xs px-1 py-0 h-4">
+                          Official
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-2">
                       <HuddleJoinButton 
                         huddle={huddle} 
                         onJoinSuccess={handleJoinSuccess}
+                        compact
                       />
                     </div>
                   </div>

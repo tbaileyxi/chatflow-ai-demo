@@ -16,12 +16,14 @@ interface HuddleJoinButtonProps {
   };
   isAlreadyMember?: boolean;
   onJoinSuccess?: () => void;
+  compact?: boolean;
 }
 
 export const HuddleJoinButton = ({ 
   huddle, 
   isAlreadyMember, 
-  onJoinSuccess 
+  onJoinSuccess,
+  compact = false
 }: HuddleJoinButtonProps) => {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -132,11 +134,23 @@ export const HuddleJoinButton = ({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button 
-          size="sm" 
-          className="bg-huddle-primary hover:bg-huddle-primary/90 text-white"
+          size={compact ? "sm" : "sm"}
+          className={compact 
+            ? "bg-huddle-primary hover:bg-huddle-primary/90 text-white text-xs h-6 px-2 w-full justify-center"
+            : "bg-huddle-primary hover:bg-huddle-primary/90 text-white"
+          }
         >
-          <UserPlus className="w-4 h-4 mr-2" />
-          {huddle.is_verified ? "Request to Join" : "Join Huddle"}
+          {compact ? (
+            <>
+              <UserPlus className="w-3 h-3 mr-1" />
+              {huddle.is_verified ? "Request" : "Join"}
+            </>
+          ) : (
+            <>
+              <UserPlus className="w-4 h-4 mr-2" />
+              {huddle.is_verified ? "Request to Join" : "Join Huddle"}
+            </>
+          )}
         </Button>
       </DialogTrigger>
       
