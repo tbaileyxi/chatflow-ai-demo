@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { MediaViewer } from "@/components/MediaViewer";
+import { linkifyTeamNames } from "@/utils/teamLinking";
 
 // Twitter global type
 declare global {
@@ -399,7 +400,10 @@ export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
 
       {/* Post Content */}
       <div className="mb-3">
-        <p className="text-foreground leading-relaxed whitespace-pre-wrap">{post.content}</p>
+        <div 
+          className="text-foreground leading-relaxed whitespace-pre-wrap" 
+          dangerouslySetInnerHTML={{ __html: linkifyTeamNames(post.content) }}
+        />
         
         {/* Embed Code Display */}
         {post.embed_code && (

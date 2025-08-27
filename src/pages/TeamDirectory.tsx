@@ -8,7 +8,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Users, Trophy, Heart, Check, Clock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Users, Trophy, Heart, Check, Clock, Eye } from 'lucide-react';
 
 interface Team {
   id: string;
@@ -25,6 +26,7 @@ interface Team {
 }
 
 export const TeamDirectory = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [teams, setTeams] = useState<Team[]>([]);
@@ -365,6 +367,16 @@ export const TeamDirectory = () => {
                         {team.description}
                       </p>
                     )}
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/teams/${team.id}`)}
+                      className="w-full flex items-center gap-2"
+                    >
+                      <Eye className="w-4 h-4" />
+                      View Team Feed
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

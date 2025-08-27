@@ -16,6 +16,7 @@ import { Admin } from "./pages/Admin";
 import { Auth } from "./pages/Auth";
 import { Profile } from "./pages/Profile";
 import { TeamDirectory } from "./pages/TeamDirectory";
+import { TeamFeed } from "./pages/TeamFeed";
 import { Huddle } from "./pages/Huddle";
 import { JoinHuddle } from "./pages/JoinHuddle";
 import { SpotlightPost } from "./pages/SpotlightPost";
@@ -139,6 +140,7 @@ const AppContent = () => {
           <Route path="/auth" element={<Auth />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/teams" element={<TeamDirectory />} />
+          <Route path="/teams/:teamId" element={<TeamFeed />} />
           <Route path="/huddle/:id" element={<Huddle />} />
           <Route path="/join-huddle/:huddleId" element={<JoinHuddle />} />
           <Route path="/spotlight/:id" element={<SpotlightPost />} />

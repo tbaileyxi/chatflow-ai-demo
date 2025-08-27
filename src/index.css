@@ -126,6 +126,19 @@ All colors MUST be HSL.
   .button-shadow {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
+}
+
+/* Team link styling */
+.team-link {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.team-link:hover {
+  color: hsl(var(--primary) / 0.8);
+}
 
   .chat-bubble-shadow {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
