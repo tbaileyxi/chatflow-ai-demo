@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Users, MessageCircle, Trophy } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect } from 'react';
+import shLogo from '@/assets/sh-logo-updated.png';
 
 export const Landing = () => {
   const navigate = useNavigate();
@@ -16,33 +17,42 @@ export const Landing = () => {
   }, [user, loading, navigate]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 overflow-hidden">
-      {/* Hero Section */}
-      <div className="relative">
-        {/* Modern Background with gradients and shapes */}
-        <div className="absolute inset-0 overflow-hidden">
-          {/* Gradient orbs */}
-          <div className="absolute top-10 left-10 w-64 h-64 bg-gradient-to-r from-primary/20 to-huddle-primary/20 rounded-full blur-3xl"></div>
-          <div className="absolute top-32 right-20 w-48 h-48 bg-gradient-to-r from-accent/20 to-secondary/20 rounded-full blur-2xl"></div>
-          <div className="absolute bottom-20 left-1/4 w-56 h-56 bg-gradient-to-r from-huddle-primary/15 to-primary/15 rounded-full blur-3xl"></div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-primary/8 overflow-hidden relative">
+      {/* Sharp Background Pattern */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Sharp geometric pattern */}
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/10 via-transparent to-huddle-primary/10"></div>
+          <div className="absolute top-20 left-20 w-40 h-40 bg-primary/20 rotate-45 blur-xl"></div>
+          <div className="absolute top-40 right-32 w-32 h-32 bg-huddle-primary/25 rotate-12 blur-lg"></div>
+          <div className="absolute bottom-40 left-1/3 w-48 h-48 bg-accent/15 -rotate-12 blur-2xl"></div>
           
-          {/* Geometric accents */}
-          <div className="absolute top-1/4 right-1/4 w-2 h-16 bg-gradient-to-b from-primary to-transparent rotate-45"></div>
-          <div className="absolute bottom-1/3 left-1/3 w-2 h-12 bg-gradient-to-b from-huddle-primary to-transparent -rotate-12"></div>
+          {/* Sharp lines */}
+          <div className="absolute top-1/4 right-1/4 w-1 h-20 bg-gradient-to-b from-primary to-transparent rotate-45"></div>
+          <div className="absolute bottom-1/3 left-1/3 w-1 h-16 bg-gradient-to-b from-huddle-primary to-transparent -rotate-12"></div>
+          <div className="absolute top-1/2 left-1/4 w-1 h-12 bg-gradient-to-b from-accent to-transparent rotate-90"></div>
         </div>
+      </div>
+
+      {/* Hero Section */}
+      <div className="relative z-10">
 
         {/* Content */}
-        <div className="relative z-10 max-w-6xl mx-auto px-4 pt-12 pb-32">
+        <div className="max-w-6xl mx-auto px-4 pt-12 pb-32">
           <div className="text-center space-y-8">
             {/* Logo */}
             <div className="flex justify-center mb-8">
-              <div className="w-24 h-24 md:w-32 md:h-32 bg-gradient-to-br from-primary to-huddle-primary rounded-full flex items-center justify-center shadow-2xl">
-                <span className="text-3xl md:text-5xl font-black text-white">SH</span>
+              <div className="w-28 h-28 md:w-36 md:h-36 rounded-full overflow-hidden shadow-2xl border-4 border-primary/20 bg-black">
+                <img 
+                  src="/lovable-uploads/89d98004-873f-423c-983e-8f49264b77cf.png" 
+                  alt="Side Huddle Logo" 
+                  className="w-full h-full object-contain"
+                />
               </div>
             </div>
             
             {/* Headline */}
-            <h1 className="text-4xl md:text-6xl font-bold text-foreground leading-tight tracking-tight">
+            <h1 className="text-4xl md:text-6xl font-black text-foreground leading-tight tracking-tight" style={{ fontFamily: 'Impact, "Arial Black", sans-serif' }}>
               One App.{' '}
               <span className="text-transparent bg-gradient-to-r from-primary to-huddle-primary bg-clip-text">Your team feeds.</span>
               <br />
