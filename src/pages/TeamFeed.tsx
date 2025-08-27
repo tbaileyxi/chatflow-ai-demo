@@ -298,41 +298,20 @@ export const TeamFeed = () => {
           ) : posts.length > 0 ? (
             <div className="space-y-4">
               {posts.map((post) => (
-                <Card key={post.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage src={post.teams?.logo_url} />
-                        <AvatarFallback>
-                          {post.teams?.name.substring(0, 2).toUpperCase() || 'T'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="font-medium">
-                            {post.teams?.city} {post.teams?.name}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(post.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div 
-                          className="text-sm"
-                          dangerouslySetInnerHTML={{ __html: post.content }}
-                        />
-                        {post.media_url && (
-                          <div className="mt-2">
-                            <img 
-                              src={post.media_url} 
-                              alt="Post media" 
-                              className="rounded-lg max-w-full h-auto"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <PostCard 
+                  key={post.id}
+                  post={{
+                    ...post,
+                    team: {
+                      id: post.team_id || '',
+                      name: post.teams?.name || '',
+                      logo_url: post.teams?.logo_url,
+                      sponsor: ''
+                    },
+                    post_reactions: []
+                  }}
+                  isSpotlight={false}
+                />
               ))}
             </div>
           ) : (
