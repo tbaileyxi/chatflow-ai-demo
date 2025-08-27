@@ -111,7 +111,7 @@ export const HuddleSearchSidebar = ({ isExpanded }: HuddleSearchSidebarProps) =>
         <div className="relative">
           <Search className="absolute left-2 top-2.5 w-3 h-3 text-muted-foreground" />
           <Input
-            placeholder="Search huddles..."
+            placeholder="Search official huddles..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-7 text-xs h-8"

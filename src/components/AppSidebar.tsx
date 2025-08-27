@@ -191,7 +191,7 @@ export function AppSidebar() {
 
         {/* Huddle Search Section */}
         <SidebarGroup>
-          <SidebarGroupLabel>Find Huddles</SidebarGroupLabel>
+          <SidebarGroupLabel>Find Official Huddles</SidebarGroupLabel>
           <SidebarGroupContent>
             <HuddleSearchSidebar isExpanded={!isCollapsed} />
           </SidebarGroupContent>
@@ -202,7 +202,7 @@ export function AppSidebar() {
             <Separator className="bg-sidebar-border" />
             <SidebarGroup>
               <SidebarGroupLabel className="flex items-center justify-between text-sidebar-foreground font-semibold">
-                {!isCollapsed && 'Side Huddles'}
+                {!isCollapsed && 'Your Side Huddles'}
                 {!isCollapsed && (
                   <StartHuddleDialog 
                     onHuddleCreated={fetchUserHuddles}

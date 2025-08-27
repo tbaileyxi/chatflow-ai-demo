@@ -12,7 +12,7 @@ export const HuddleBar = () => {
   return (
     <div className="bg-card border-t border-border p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-foreground">Side Huddles</h3>
+        <h3 className="font-semibold text-foreground">Your Side Huddles</h3>
         <Button
           size="sm"
           className="bg-huddle-primary hover:bg-huddle-primary/90 text-white"
