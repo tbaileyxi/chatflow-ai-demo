@@ -54,20 +54,10 @@ export const Landing = () => {
               </div>
             </div>
             
-            {/* New Headline */}
-            <h1 className="text-5xl md:text-7xl font-black leading-tight tracking-tight mb-6" style={{ fontFamily: 'Impact, "Arial Black", sans-serif', textShadow: '3px 3px 6px rgba(0,0,0,0.3)' }}>
-              <span className="text-primary drop-shadow-lg" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>One App.</span>{' '}
-              <span className="text-secondary drop-shadow-lg" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>Your team feeds.</span>
-              <br />
-              <span className="text-muted-foreground drop-shadow-lg" style={{ textShadow: '1px 1px 3px rgba(0,0,0,0.4)' }}>Your private chats.</span>
-              <br />
-              <span className="text-primary drop-shadow-lg" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.6)' }}>Game on.</span>
-            </h1>
-
-            {/* Updated tagline */}
-            <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-8 tracking-wide" style={{ textShadow: '1px 1px 3px rgba(0,0,0,0.3)' }}>
+            {/* Main tagline */}
+            <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-8 tracking-wide" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
               THE SPORTS APP FOR FRIENDS & FANS
-            </h2>
+            </h1>
 
             {/* CTA Buttons - Now above the fold */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
@@ -115,13 +105,13 @@ export const Landing = () => {
               </p>
             </div>
 
-            {/* Feature 2 */}
-            <div className="text-center space-y-4 p-8 bg-card/90 backdrop-blur-sm rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 border-2 border-secondary/20 hover:border-secondary/40 group">
-              <div className="w-16 h-16 bg-secondary/30 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                <MessageCircle className="h-8 w-8 text-secondary" />
+            {/* Feature 2 - Fixed contrast and design for Private Chats */}
+            <div className="text-center space-y-4 p-8 bg-card backdrop-blur-sm rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 border-2 border-primary/30 hover:border-primary/50 group">
+              <div className="w-16 h-16 bg-primary/40 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300 shadow-lg border border-primary/20">
+                <MessageCircle className="h-8 w-8 text-primary" />
               </div>
-              <h3 className="text-xl font-bold text-card-foreground">Private Chats</h3>
-              <p className="text-muted-foreground leading-relaxed">
+              <h3 className="text-xl font-bold text-foreground">Private Chats</h3>
+              <p className="text-foreground/80 leading-relaxed font-medium">
                 Create invite-only group chats with your friends, family, and fellow fans.
               </p>
             </div>
