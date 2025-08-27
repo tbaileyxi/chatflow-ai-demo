@@ -258,75 +258,80 @@ export const BroadcastCenter = () => {
       
       const finalContent = mediaCommentary.trim() || content || (messageType === 'upload' ? '' : '');
       
-      // Create posts for each selected team
+      // New broadcast system: Single post from source team that gets distributed
       const deliveryResults: DeliveryStatus[] = [];
+      const sourceTeamInfo = teams.find(t => t.id === sourceTeam);
+      const sourceTeamName = sourceTeamInfo ? `${sourceTeamInfo.city} ${sourceTeamInfo.name}` : 'Source Team';
 
-      for (const teamId of selectedTeams) {
-        const basePostData = {
+      try {
+        // Create the single post from the source team
+        const targetAudience = addToSpotlight ? ['team_feed', 'spotlight'] : ['team_feed'];
+        
+        const postData = {
           content: finalContent,
-          team_id: teamId,
+          team_id: sourceTeam, // The post belongs to the source team
           author_id: user.id,
           message_type: messageType,
           is_agent_post: true,
           poll_data: pollData,
           media_url: messageType === 'upload' ? mediaUrl : null,
-          embed_code: messageType === 'embed' ? embedCode : null
+          embed_code: messageType === 'embed' ? embedCode : null,
+          target_audience: targetAudience,
+          is_spotlight: addToSpotlight
         };
 
-        try {
-          // Create post for team feed (and optionally spotlight)
-          const targetAudience = addToSpotlight ? ['team_feed', 'spotlight'] : ['team_feed'];
-          
-          const postData = {
-            ...basePostData,
-            target_audience: targetAudience,
-            is_spotlight: addToSpotlight
-          };
+        const { data: createdPost, error: postError } = await supabase
+          .from('posts')
+          .insert(postData)
+          .select()
+          .single();
 
-          const { error: postError } = await supabase
-            .from('posts')
-            .insert(postData);
+        if (postError) throw postError;
 
-          if (postError) throw postError;
+        deliveryResults.push({
+          channel: `${sourceTeamName} - Team Feed`,
+          status: 'delivered'
+        });
 
-          const teamInfo = teams.find(t => t.id === teamId);
-          const teamName = teamInfo ? `${teamInfo.city} ${teamInfo.name}` : 'Team';
-
+        if (addToSpotlight) {
           deliveryResults.push({
-            channel: `${teamName} - Team Feed`,
+            channel: 'Spotlight Feed',
             status: 'delivered'
           });
+        }
 
-          if (addToSpotlight) {
-            deliveryResults.push({
-              channel: 'Spotlight Feed',
-              status: 'delivered'
-            });
-          }
+        // Broadcast the source team's message to all destination teams' huddles
+        const allTargetTeams = [sourceTeam, ...selectedTeams];
+        const huddleResult = await broadcastToHuddles({
+          content: finalContent,
+          team_id: sourceTeam, // Keep source team context
+          author_id: user.id,
+          message_type: messageType,
+          is_agent_post: true,
+          poll_data: pollData,
+          media_url: messageType === 'upload' ? mediaUrl : null,
+          embed_code: messageType === 'embed' ? embedCode : null,
+          is_team_agent_message: true
+        }, allTargetTeams);
 
-          // Broadcast to all team huddles
-          const huddleResult = await broadcastToHuddles({
-            ...basePostData,
-            author_id: '00000000-0000-0000-0000-000000000000',
-            is_team_agent_message: true
-          }, [teamId]);
-
+        // Add delivery status for each team's huddles
+        for (const teamId of allTargetTeams) {
+          const teamInfo = teams.find(t => t.id === teamId);
+          const teamName = teamInfo ? `${teamInfo.city} ${teamInfo.name}` : 'Team';
+          
           deliveryResults.push({
             channel: `${teamName} - All Huddles`,
             status: huddleResult.success ? 'delivered' : 'failed',
             error: huddleResult.error
           });
-
-        } catch (error: any) {
-          const teamInfo = teams.find(t => t.id === teamId);
-          const teamName = teamInfo ? `${teamInfo.city} ${teamInfo.name}` : 'Team';
-          
-          deliveryResults.push({
-            channel: `${teamName} - Broadcast`,
-            status: 'failed',
-            error: error.message
-          });
         }
+
+      } catch (error: any) {
+        deliveryResults.push({
+          channel: `${sourceTeamName} - Broadcast`,
+          status: 'failed',
+          error: error.message
+        });
       }
 
 
@@ -402,29 +407,29 @@ export const BroadcastCenter = () => {
       const finalContent = mediaCommentary.trim() || content || (messageType === 'upload' ? '' : '');
       const targetAudience = addToSpotlight ? ['team_feed', 'spotlight'] : ['team_feed'];
 
-      // Schedule posts for each selected team
-      for (const teamId of selectedTeams) {
-        const postData = {
-          content: finalContent,
-          team_id: teamId,
-          author_id: user.id,
-          message_type: messageType,
-          is_spotlight: addToSpotlight,
-          is_agent_post: true,
-          poll_data: pollData,
-          media_url: messageType === 'upload' ? mediaUrl : null,
-          embed_code: messageType === 'embed' ? embedCode : null,
-          scheduled_at: scheduledAt.toISOString(),
-          delivery_status: 'scheduled',
-          target_audience: targetAudience
-        };
+      // Schedule a single post from the source team with destination teams metadata
+      const postData = {
+        content: finalContent,
+        team_id: sourceTeam, // Post belongs to source team
+        author_id: user.id,
+        message_type: messageType,
+        is_spotlight: addToSpotlight,
+        is_agent_post: true,
+        poll_data: pollData,
+        media_url: messageType === 'upload' ? mediaUrl : null,
+        embed_code: messageType === 'embed' ? embedCode : null,
+        scheduled_at: scheduledAt.toISOString(),
+        delivery_status: 'scheduled',
+        target_audience: targetAudience,
+        // Store destination teams as metadata for scheduled broadcast processor
+        destination_teams: selectedTeams
+      };
 
-        const { error } = await supabase
-          .from('posts')
-          .insert(postData);
+      const { error } = await supabase
+        .from('posts')
+        .insert(postData);
 
-        if (error) throw error;
-      }
+      if (error) throw error;
 
 
       toast({
