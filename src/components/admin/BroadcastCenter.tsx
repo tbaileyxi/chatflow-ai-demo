@@ -37,7 +37,8 @@ export const BroadcastCenter = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [teams, setTeams] = useState<Team[]>([]);
-  const [selectedTeam, setSelectedTeam] = useState('');
+  const [sourceTeam, setSourceTeam] = useState('');
+  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [messageType, setMessageType] = useState('text');
   const [content, setContent] = useState('');
   const [addToSpotlight, setAddToSpotlight] = useState(false);
@@ -147,8 +148,12 @@ export const BroadcastCenter = () => {
       return 'Please enter message content or upload media';
     }
 
-    if (!selectedTeam) {
-      return 'Please select a team';
+    if (!sourceTeam) {
+      return 'Please select a source team';
+    }
+
+    if (selectedTeams.length === 0) {
+      return 'Please select at least one destination team';
     }
 
     if (!user?.id) {
@@ -173,13 +178,13 @@ export const BroadcastCenter = () => {
     return null;
   };
 
-  const broadcastToHuddles = async (postData: any) => {
+  const broadcastToHuddles = async (postData: any, teamIds: string[]) => {
     try {
-      // Get all huddles for the selected team
+      // Get all huddles for the selected teams
       const { data: huddles, error: huddlesError } = await supabase
         .from('huddles')
-        .select('id, name')
-        .eq('team_id', selectedTeam);
+        .select('id, name, team_id')
+        .in('team_id', teamIds);
 
       if (huddlesError) throw huddlesError;
 
@@ -253,67 +258,77 @@ export const BroadcastCenter = () => {
       
       const finalContent = mediaCommentary.trim() || content || (messageType === 'upload' ? '' : '');
       
-      const basePostData = {
-        content: finalContent,
-        team_id: selectedTeam,
-        author_id: user.id,
-        message_type: messageType,
-        is_agent_post: true,
-        poll_data: pollData,
-        media_url: messageType === 'upload' ? mediaUrl : null,
-        embed_code: messageType === 'embed' ? embedCode : null
-      };
-
+      // Create posts for each selected team
       const deliveryResults: DeliveryStatus[] = [];
 
-      try {
-        // ALWAYS create a single post with team_feed (and optionally spotlight)
-        const targetAudience = addToSpotlight ? ['team_feed', 'spotlight'] : ['team_feed'];
-        
-        const postData = {
-          ...basePostData,
-          target_audience: targetAudience,
-          is_spotlight: addToSpotlight
+      for (const teamId of selectedTeams) {
+        const basePostData = {
+          content: finalContent,
+          team_id: teamId,
+          author_id: user.id,
+          message_type: messageType,
+          is_agent_post: true,
+          poll_data: pollData,
+          media_url: messageType === 'upload' ? mediaUrl : null,
+          embed_code: messageType === 'embed' ? embedCode : null
         };
 
-        const { error: postError } = await supabase
-          .from('posts')
-          .insert(postData);
+        try {
+          // Create post for team feed (and optionally spotlight)
+          const targetAudience = addToSpotlight ? ['team_feed', 'spotlight'] : ['team_feed'];
+          
+          const postData = {
+            ...basePostData,
+            target_audience: targetAudience,
+            is_spotlight: addToSpotlight
+          };
 
-        if (postError) throw postError;
+          const { error: postError } = await supabase
+            .from('posts')
+            .insert(postData);
 
-        deliveryResults.push({
-          channel: 'Team Feed',
-          status: 'delivered'
-        });
+          if (postError) throw postError;
 
-        if (addToSpotlight) {
+          const teamInfo = teams.find(t => t.id === teamId);
+          const teamName = teamInfo ? `${teamInfo.city} ${teamInfo.name}` : 'Team';
+
           deliveryResults.push({
-            channel: 'Spotlight Feed',
+            channel: `${teamName} - Team Feed`,
             status: 'delivered'
           });
+
+          if (addToSpotlight) {
+            deliveryResults.push({
+              channel: 'Spotlight Feed',
+              status: 'delivered'
+            });
+          }
+
+          // Broadcast to all team huddles
+          const huddleResult = await broadcastToHuddles({
+            ...basePostData,
+            author_id: '00000000-0000-0000-0000-000000000000',
+            is_team_agent_message: true
+          }, [teamId]);
+
+          deliveryResults.push({
+            channel: `${teamName} - All Huddles`,
+            status: huddleResult.success ? 'delivered' : 'failed',
+            error: huddleResult.error
+          });
+
+        } catch (error: any) {
+          const teamInfo = teams.find(t => t.id === teamId);
+          const teamName = teamInfo ? `${teamInfo.city} ${teamInfo.name}` : 'Team';
+          
+          deliveryResults.push({
+            channel: `${teamName} - Broadcast`,
+            status: 'failed',
+            error: error.message
+          });
         }
-
-        // ALWAYS broadcast to all team huddles as Team Agent messages
-        const huddleResult = await broadcastToHuddles({
-          ...basePostData,
-          author_id: '00000000-0000-0000-0000-000000000000', // TEAM AGENT user_id
-          is_team_agent_message: true
-        });
-
-        deliveryResults.push({
-          channel: 'All Team Huddles',
-          status: huddleResult.success ? 'delivered' : 'failed',
-          error: huddleResult.error
-        });
-
-      } catch (error: any) {
-        deliveryResults.push({
-          channel: 'Broadcast',
-          status: 'failed',
-          error: error.message
-        });
       }
+
 
       setDeliveryStatus(deliveryResults);
 
@@ -334,6 +349,7 @@ export const BroadcastCenter = () => {
         setMediaType(null);
         setMediaCommentary('');
         setAddToSpotlight(false);
+        setSelectedTeams([]);
         
         // Delay hiding delivery status to let user see results
         setTimeout(() => setShowDeliveryStatus(false), 3000);
@@ -386,30 +402,34 @@ export const BroadcastCenter = () => {
       const finalContent = mediaCommentary.trim() || content || (messageType === 'upload' ? '' : '');
       const targetAudience = addToSpotlight ? ['team_feed', 'spotlight'] : ['team_feed'];
 
-      const postData = {
-        content: finalContent,
-        team_id: selectedTeam,
-        author_id: user.id,
-        message_type: messageType,
-        is_spotlight: addToSpotlight,
-        is_agent_post: true,
-        poll_data: pollData,
-        media_url: messageType === 'upload' ? mediaUrl : null,
-        embed_code: messageType === 'embed' ? embedCode : null,
-        scheduled_at: scheduledAt.toISOString(),
-        delivery_status: 'scheduled',
-        target_audience: targetAudience
-      };
+      // Schedule posts for each selected team
+      for (const teamId of selectedTeams) {
+        const postData = {
+          content: finalContent,
+          team_id: teamId,
+          author_id: user.id,
+          message_type: messageType,
+          is_spotlight: addToSpotlight,
+          is_agent_post: true,
+          poll_data: pollData,
+          media_url: messageType === 'upload' ? mediaUrl : null,
+          embed_code: messageType === 'embed' ? embedCode : null,
+          scheduled_at: scheduledAt.toISOString(),
+          delivery_status: 'scheduled',
+          target_audience: targetAudience
+        };
 
-      const { error } = await supabase
-        .from('posts')
-        .insert(postData);
+        const { error } = await supabase
+          .from('posts')
+          .insert(postData);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
+
 
       toast({
         title: "Broadcast Scheduled",
-        description: `Message scheduled for ${scheduledAt.toLocaleString()}`,
+        description: `Message scheduled for ${selectedTeams.length} team${selectedTeams.length > 1 ? 's' : ''} at ${scheduledAt.toLocaleString()}`,
       });
 
       // Reset form
@@ -420,6 +440,7 @@ export const BroadcastCenter = () => {
       setMediaType(null);
       setMediaCommentary('');
       setAddToSpotlight(false);
+      setSelectedTeams([]);
       
     } catch (error: any) {
       console.error('Error scheduling message:', error);
@@ -443,21 +464,53 @@ export const BroadcastCenter = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Team Selection */}
+          {/* Source Team Selection */}
           <div className="space-y-2">
-            <Label htmlFor="team-select">Select Team</Label>
-            <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+            <Label htmlFor="source-team-select">Source Team Agent</Label>
+            <Select value={sourceTeam} onValueChange={setSourceTeam}>
               <SelectTrigger>
-                <SelectValue placeholder="Choose a team to broadcast from" />
+                <SelectValue placeholder="Choose agent to broadcast from" />
               </SelectTrigger>
               <SelectContent>
                 {teams.map((team) => (
                   <SelectItem key={team.id} value={team.id}>
-                    {team.city} {team.name} ({team.league})
+                    {team.city} {team.name} Agent ({team.league})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Destination Teams Selection */}
+          <div className="space-y-2">
+            <Label>Destination Teams</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-40 overflow-y-auto border rounded-md p-3">
+              {teams.map((team) => (
+                <div key={team.id} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id={`team-${team.id}`}
+                    checked={selectedTeams.includes(team.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedTeams(prev => [...prev, team.id]);
+                      } else {
+                        setSelectedTeams(prev => prev.filter(id => id !== team.id));
+                      }
+                    }}
+                    className="rounded border-input"
+                  />
+                  <Label htmlFor={`team-${team.id}`} className="text-sm">
+                    {team.city} {team.name}
+                  </Label>
+                </div>
+              ))}
+            </div>
+            {selectedTeams.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Broadcasting to {selectedTeams.length} team{selectedTeams.length > 1 ? 's' : ''}
+              </p>
+            )}
           </div>
 
           {/* Message Type */}
