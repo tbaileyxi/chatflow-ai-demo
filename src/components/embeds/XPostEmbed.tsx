@@ -51,8 +51,8 @@ export function XPostEmbed({ embedCode }: XPostEmbedProps) {
           <blockquote 
             className="twitter-tweet" 
             data-conversation="none" 
-            data-width="300"
             data-theme="auto"
+            style={{ maxWidth: '100%' }}
           >
             <a href={tweetUrl}></a>
           </blockquote>
@@ -66,8 +66,8 @@ export function XPostEmbed({ embedCode }: XPostEmbedProps) {
   return (
     <div 
       ref={containerRef}
-      className="embed-content w-full max-w-full overflow-hidden" 
-      style={{ maxWidth: '300px' }}
+      className="embed-content w-full max-w-full overflow-hidden"
+      style={{ maxWidth: '100%', minWidth: 0 }}
       dangerouslySetInnerHTML={{ __html: sanitized }} 
     />
   );

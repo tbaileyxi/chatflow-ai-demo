@@ -8,9 +8,12 @@ interface VirtualizedChatProps<T> {
   getItemKey?: (item: T) => React.Key; // stable key to prevent re-renders
   defaultItemHeight?: number; // helps Virtuoso estimate before measurement
   overscan?: number; // control how much extra content to render
+  alignToBottom?: boolean; // when true, stick to bottom like chat
+  initialIndex?: number; // starting index (default 0 for feeds, last for chat)
+  followOutput?: boolean | 'smooth' | 'auto'; // control auto-follow behavior
 }
 
-export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey, defaultItemHeight, overscan }: VirtualizedChatProps<T>) {
+export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey, defaultItemHeight, overscan, alignToBottom = true, initialIndex, followOutput = 'smooth' }: VirtualizedChatProps<T>) {
   const data = useMemo(() => items, [items]);
 
   // Ensure the list always has a real height even if parents aren't sized correctly
@@ -60,13 +63,13 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
         computeItemKey={(index, item) => (getItemKey ? getItemKey(item) : index)}
         defaultItemHeight={defaultItemHeight}
         increaseViewportBy={{ top: 200, bottom: 400 }}
-        initialTopMostItemIndex={Math.max(0, data.length - 1)}
+        initialTopMostItemIndex={initialIndex !== undefined ? initialIndex : (alignToBottom ? Math.max(0, data.length - 1) : 0)}
         itemContent={(index, item) => itemContent(index, item)}
         startReached={async () => {
           if (loadMoreTop) await loadMoreTop();
         }}
-        followOutput="smooth"
-        alignToBottom={true}
+        followOutput={followOutput}
+        alignToBottom={alignToBottom}
         overscan={overscan ?? 400}
         scrollSeekConfiguration={{
           enter: (v) => Math.abs(v) > 1200,

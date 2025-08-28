@@ -89,6 +89,9 @@ export const VirtualizedOptimizedSpotlightFeed = memo(() => {
         getItemKey={getItemKey}
         defaultItemHeight={200}
         overscan={100}
+        alignToBottom={false}
+        initialIndex={0}
+        followOutput={false}
       />
       {isFetchingNextPage && (
         <div className="flex justify-center py-4">
