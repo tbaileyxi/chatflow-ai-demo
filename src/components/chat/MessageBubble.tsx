@@ -171,9 +171,11 @@ export const MessageBubble = ({
 
               {/* Embed Content */}
               {message.embed_code && (
-                <LazyEmbed>
-                  <TwitterEmbed embedCode={message.embed_code} />
-                </LazyEmbed>
+                <div className="mt-2 embed-chat media-inline rounded-xl">
+                  <LazyEmbed>
+                    <TwitterEmbed embedCode={message.embed_code} />
+                  </LazyEmbed>
+                </div>
               )}
 
               {/* Poll Content */}

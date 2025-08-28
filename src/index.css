@@ -361,6 +361,26 @@ All colors MUST be HSL.
     object-fit: contain !important;
   }
 
+  /* Chat/Sidelines embed containment to keep inline within bubbles */
+  .embed-chat {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    border-radius: 12px;
+    background: hsl(var(--background));
+    contain: layout paint;
+  }
+  .embed-chat .twitter-tweet,
+  .embed-chat .embed-content,
+  .embed-chat iframe,
+  .embed-chat video,
+  .embed-chat object,
+  .embed-chat embed {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: block;
+  }
+
   /* iOS zoom prevention and mobile typing improvements */
   @supports (-webkit-touch-callout: none) {
     input, textarea, select { font-size: 16px !important; }
