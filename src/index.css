@@ -458,3 +458,16 @@ All colors MUST be HSL.
 
   /* Improve tap responsiveness */
   button, a, input, textarea { touch-action: manipulation; }
+
+  /* X embed container isolation to prevent flashing/jumps */
+  .x-embed-container {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    contain: layout paint;
+    content-visibility: auto;
+    contain-intrinsic-size: 600px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    will-change: contents;
+  }

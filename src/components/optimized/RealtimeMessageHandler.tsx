@@ -52,7 +52,7 @@ export const RealtimeMessageHandler = ({
     if (batchUpdaterRef.current) {
       batchUpdaterRef.current.destroy();
     }
-    batchUpdaterRef.current = new BatchUpdater(debouncedUpdate, 5, 150);
+    batchUpdaterRef.current = new BatchUpdater(debouncedUpdate, 5, isTyping ? 500 : 150);
 
     console.log('[Realtime] Setting up optimized subscriptions for huddle', huddleId);
 

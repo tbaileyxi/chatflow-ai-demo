@@ -24,18 +24,23 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
   const [height, setHeight] = useState<number | null>(null);
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout>();
+  const lastScrollStateRef = useRef<boolean>(false);
 
   // Handle iOS-specific scroll behavior during typing
   const handleScrollStateChange = useCallback((isScrolling: boolean) => {
+    // Avoid redundant state updates
+    if (lastScrollStateRef.current === isScrolling) return;
+    lastScrollStateRef.current = isScrolling;
+
     setIsUserScrolling(isScrolling);
     if (scrollTimeoutRef.current) {
       clearTimeout(scrollTimeoutRef.current);
     }
-    
     // Reset scroll state after user stops scrolling
     scrollTimeoutRef.current = setTimeout(() => {
+      lastScrollStateRef.current = false;
       setIsUserScrolling(false);
-    }, 150);
+    }, 250);
   }, []);
 
   useEffect(() => {
