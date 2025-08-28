@@ -459,22 +459,40 @@ All colors MUST be HSL.
   /* Improve tap responsiveness */
   button, a, input, textarea { touch-action: manipulation; }
 
-  /* X embed container - static and isolated to prevent flashing */
+  /* X embed container - fit inline on mobile, no sideways scroll */
   .x-embed-container {
     width: 100%;
     max-width: 100%;
     min-width: 0;
     contain: strict;
     content-visibility: auto;
-    contain-intrinsic-size: 560px 600px;
+    /* remove large intrinsic sizing that created big boxes on iOS */
+    /* contain-intrinsic-size: auto; */
     overflow: hidden;
     position: relative;
-    min-height: 200px;
+    min-height: 0 !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
     /* Disable transitions and animations to avoid flashes */
     transition: none !important;
     animation: none !important;
+  }
+  /* Ensure X embed fits width inside container */
+  .x-embed-container .twitter-tweet,
+  .x-embed-container .twitter-tweet-rendered {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 auto !important;
+  }
+  .x-embed-container iframe {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    display: block;
   }
 
   /* Completely disable transitions during any embed activity */
