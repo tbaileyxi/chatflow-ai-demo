@@ -105,11 +105,16 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
           contain: 'strict'
         }}
       >
-        {data.map((item, index) => (
-          <div key={getItemKey ? getItemKey(item) : index}>
-            {itemContent(index, item)}
-          </div>
-        ))}
+        <div style={{ display: 'flex', flexDirection: 'column-reverse' }}>
+          {data.slice().reverse().map((item, index) => {
+            const actualIndex = data.length - 1 - index;
+            return (
+              <div key={getItemKey ? getItemKey(item) : actualIndex}>
+                {itemContent(actualIndex, item)}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

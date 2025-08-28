@@ -459,18 +459,15 @@ All colors MUST be HSL.
   /* Improve tap responsiveness */
   button, a, input, textarea { touch-action: manipulation; }
 
-  /* X embed container - fit inline on mobile, no sideways scroll */
+  /* X embed container - mobile responsive, no big boxes */
   .x-embed-container {
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    contain: strict;
-    content-visibility: auto;
-    /* remove large intrinsic sizing that created big boxes on iOS */
-    /* contain-intrinsic-size: auto; */
+    contain: layout;
     overflow: hidden;
     position: relative;
-    min-height: 0 !important;
+    min-height: 280px;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: none;
     touch-action: pan-y;

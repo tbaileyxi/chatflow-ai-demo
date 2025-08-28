@@ -89,11 +89,9 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
           ref={containerRef} 
           className="twitter-embed x-embed-container w-full overflow-hidden"
           style={{
-            contain: 'strict',
-            // Keep hidden until stable to avoid flashes
-            contentVisibility: isLoading ? 'hidden' : 'auto',
+            contain: 'layout',
             position: 'relative',
-            minHeight: 320,
+            minHeight: 280,
             WebkitTransform: 'translateZ(0)',
             transform: 'translateZ(0)'
           }}
@@ -130,9 +128,9 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
       style={{ 
         maxWidth: '100%', 
         minWidth: 0,
-        contain: 'strict',
-        contentVisibility: isLoading ? 'hidden' : 'auto',
+        contain: 'layout',
         position: 'relative',
+        minHeight: 280,
         WebkitTransform: 'translateZ(0)',
         transform: 'translateZ(0)',
         WebkitOverflowScrolling: 'auto',

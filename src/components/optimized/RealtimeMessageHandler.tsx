@@ -60,11 +60,37 @@ export const RealtimeMessageHandler = ({
     channelsRef.current = [];
   }, []);
 
-  // Temporarily disable all real-time updates to stop flashing
+  // Setup real-time message subscription
   useEffect(() => {
-    console.log('[Realtime] Real-time updates disabled to prevent flashing');
-    return () => {};
-  }, [huddleId]);
+    if (!huddleId) return;
+
+    console.log('[Realtime] Setting up subscription for huddle:', huddleId);
+    
+    const channel = supabase
+      .channel(`huddle-${huddleId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'huddle_messages',
+          filter: `huddle_id=eq.${huddleId}`
+        },
+        (payload) => {
+          console.log('[Realtime] New message payload', payload);
+          if (payload.new && !isTypingLockRef.current) {
+            onNewMessage(payload.new as Message);
+          }
+        }
+      )
+      .subscribe();
+
+    channelsRef.current.push(channel);
+
+    return () => {
+      cleanupChannels();
+    };
+  }, [huddleId, onNewMessage, cleanupChannels]);
 
   return null;
 };
