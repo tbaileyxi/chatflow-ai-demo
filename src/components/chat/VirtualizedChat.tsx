@@ -36,6 +36,7 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
   const scrollTimeoutRef = useRef<NodeJS.Timeout>();
   const lastScrollStateRef = useRef<boolean>(false);
   const scrollDebounceRef = useRef<any>();
+  const [isAtBottom, setIsAtBottom] = useState(true);
 
   // Aggressively throttled scroll state handler with debugging
   const handleScrollStateChange = useCallback((isScrolling: boolean) => {
@@ -111,7 +112,8 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
         increaseViewportBy={{ top: overscan ?? 200, bottom: overscan ?? 200 }}
         alignToBottom={alignToBottom}
         initialTopMostItemIndex={alignToBottom ? Math.max(0, data.length - 1) : initialIndex}
-        followOutput={followOutput}
+        followOutput={isAtBottom ? 'smooth' : false}
+        atBottomStateChange={setIsAtBottom}
         startReached={loadMoreTop}
         scrollerRef={(ref) => {
           scrollRef.current = ref as HTMLDivElement;
