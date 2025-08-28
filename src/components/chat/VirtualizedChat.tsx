@@ -98,52 +98,19 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
         height: isKeyboardOpen ? `calc(100dvh - ${keyboardHeight}px)` : '100%'
       }}
     >
-      <Virtuoso
-        ref={virtuosoRef}
+      <div
         style={{
           height: height ?? Math.max(Math.floor(window.innerHeight * 0.7), 320),
-          willChange: 'scroll-position',
-          contain: 'content',
-          // Smooth scrolling disabled to avoid flicker
-          scrollBehavior: 'auto',
-          // Prevent scroll jumping during typing
-          overscrollBehavior: 'contain'
+          overflow: 'auto',
+          contain: 'strict'
         }}
-        data={data}
-        computeItemKey={(index, item) => (getItemKey ? getItemKey(item) : index)}
-        defaultItemHeight={defaultItemHeight}
-        // Include max embed height for better estimation
-        increaseViewportBy={{ top: 200, bottom: 600 }}
-        initialTopMostItemIndex={initialIndex !== undefined ? initialIndex : (alignToBottom ? Math.max(0, data.length - 1) : 0)}
-        itemContent={(index, item) => itemContent(index, item)}
-        startReached={async () => {
-          if (loadMoreTop) await loadMoreTop();
-        }}
-        // Conditional follow output - disable during typing to prevent jumps
-        followOutput={false}
-        alignToBottom={alignToBottom}
-        overscan={overscan ?? 400}
-        scrollSeekConfiguration={{
-          enter: (v) => Math.abs(v) > 1200,
-          exit: (v) => Math.abs(v) < 30,
-        }}
-        isScrolling={handleScrollStateChange}
-        components={{
-          // Custom components to handle iOS scroll behavior
-          List: React.forwardRef<HTMLDivElement, any>((props, ref) => (
-            <div 
-              {...props} 
-              ref={ref}
-              style={{
-                ...(props.style || {}),
-                // iOS Safari specific fixes
-                WebkitOverflowScrolling: 'touch',
-                transform: 'translateZ(0)', // Force hardware acceleration
-              } as React.CSSProperties}
-            />
-          ))
-        }}
-      />
+      >
+        {data.map((item, index) => (
+          <div key={getItemKey ? getItemKey(item) : index}>
+            {itemContent(index, item)}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
