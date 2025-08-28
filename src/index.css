@@ -365,10 +365,12 @@ All colors MUST be HSL.
   .embed-chat {
     width: 100%;
     max-width: 100%;
-    overflow: hidden;
+    overflow: visible;
     border-radius: 12px;
     background: hsl(var(--background));
     contain: layout paint;
+    min-height: 300px;
+    height: auto;
   }
   .embed-chat .twitter-tweet,
   .embed-chat .embed-content,
@@ -378,6 +380,8 @@ All colors MUST be HSL.
   .embed-chat embed {
     width: 100% !important;
     max-width: 100% !important;
+    height: auto !important;
+    min-height: 280px !important;
     display: block;
   }
 
