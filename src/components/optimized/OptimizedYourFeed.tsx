@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { VirtualizedChat } from "@/components/chat/VirtualizedChat";
-import { PostCard } from "@/components/PostCard";
+import { ModernPostCard } from "@/components/modern/ModernPostCard";
 import { FeedSkeleton } from "./PostSkeleton";
 import { useYourFeedPosts } from "@/hooks/useInfiniteQuery";
 import { useQuery } from "@tanstack/react-query";
@@ -84,10 +84,17 @@ export const OptimizedYourFeed = () => {
         loadMoreTop={handleLoadMore}
         itemContent={(index, post) => (
           <div className="px-4 py-2">
-            <PostCard key={`post-${post.id}`} post={post} />
+            <ModernPostCard 
+              key={`post-${post.id}`} 
+              post={post} 
+              index={index}
+            />
             {index === allPosts.length - 1 && isFetchingNextPage && (
               <div className="flex justify-center py-4">
-                <div className="text-sm text-muted-foreground">Loading more...</div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  Loading more...
+                </div>
               </div>
             )}
           </div>

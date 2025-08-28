@@ -123,13 +123,35 @@ All colors MUST be HSL.
     color-scheme: dark;
   }
 
-  /* Modern depth and shadows */
+  /* Modern depth and shadows with premium feel */
   .card-shadow {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
   }
 
   .button-shadow {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.2);
+  }
+
+  .modern-card {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+  }
+
+  .modern-card:hover {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+  }
+
+  .feed-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+  }
+
+  .chat-bubble {
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 }
 
