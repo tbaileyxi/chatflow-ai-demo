@@ -459,19 +459,20 @@ All colors MUST be HSL.
   /* Improve tap responsiveness */
   button, a, input, textarea { touch-action: manipulation; }
 
-  /* X embed container - completely static to prevent flashing */
+  /* X embed container - static and isolated to prevent flashing */
   .x-embed-container {
     width: 100%;
     max-width: 100%;
     min-width: 0;
     contain: strict;
+    content-visibility: auto;
+    contain-intrinsic-size: 560px 600px;
     overflow: hidden;
     position: relative;
     min-height: 200px;
-    max-height: 600px;
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
-    /* Disable all transitions and animations */
+    /* Disable transitions and animations to avoid flashes */
     transition: none !important;
     animation: none !important;
   }

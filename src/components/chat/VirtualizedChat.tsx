@@ -35,8 +35,6 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
   const scrollTimeoutRef = useRef<NodeJS.Timeout>();
   const lastScrollStateRef = useRef<boolean>(false);
   const scrollDebounceRef = useRef<any>();
-  const [dynamicDefaultItemHeight, setDynamicDefaultItemHeight] = useState<number>(defaultItemHeight ?? 220);
-  const measureEmbedsRef = useRef<() => void>();
 
   // Aggressively throttled scroll state handler with debugging
   const handleScrollStateChange = useCallback((isScrolling: boolean) => {
@@ -85,32 +83,9 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
     };
   }, [isKeyboardOpen, keyboardHeight]);
 
-  // Dynamically estimate item height based on largest rendered X embed
-  useEffect(() => {
-    if (!containerRef.current) return;
+  // Removed dynamic default item height estimation to avoid re-render churn
+  // This prevents flashing during embed height changes
 
-    const updateEstimate = debounce(() => {
-      if (!containerRef.current) return;
-      const embeds = containerRef.current.querySelectorAll('.x-embed-container');
-      let max = 0;
-      embeds.forEach((el) => {
-        const h = (el as HTMLElement).offsetHeight || 0;
-        if (h > max) max = h;
-      });
-      const capped = Math.min(700, Math.max(220, max));
-      setDynamicDefaultItemHeight((prev) => (Math.abs(prev - capped) > 40 ? capped : prev));
-      console.log('[VirtualizedChat] dynamic default item height:', capped);
-    }, 750);
-
-    updateEstimate();
-
-    const ro = new ResizeObserver(() => updateEstimate());
-    ro.observe(containerRef.current);
-
-    return () => {
-      ro.disconnect();
-    };
-  }, [data.length]);
 
   return (
     <div 
@@ -129,14 +104,14 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
           height: height ?? Math.max(Math.floor(window.innerHeight * 0.7), 320),
           willChange: 'scroll-position',
           contain: 'content',
-          // Smooth scrolling for iOS
-          scrollBehavior: 'smooth',
+          // Smooth scrolling disabled to avoid flicker
+          scrollBehavior: 'auto',
           // Prevent scroll jumping during typing
           overscrollBehavior: 'contain'
         }}
         data={data}
         computeItemKey={(index, item) => (getItemKey ? getItemKey(item) : index)}
-        defaultItemHeight={dynamicDefaultItemHeight}
+        defaultItemHeight={defaultItemHeight}
         // Include max embed height for better estimation
         increaseViewportBy={{ top: 200, bottom: 600 }}
         initialTopMostItemIndex={initialIndex !== undefined ? initialIndex : (alignToBottom ? Math.max(0, data.length - 1) : 0)}
@@ -145,7 +120,7 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
           if (loadMoreTop) await loadMoreTop();
         }}
         // Conditional follow output - disable during typing to prevent jumps
-        followOutput={isTyping ? false : followOutput}
+        followOutput={false}
         alignToBottom={alignToBottom}
         overscan={overscan ?? 400}
         scrollSeekConfiguration={{
