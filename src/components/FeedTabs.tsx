@@ -1,60 +1,85 @@
 import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { OptimizedYourFeed } from "@/components/optimized/OptimizedYourFeed";
-import { OptimizedSpotlightFeed } from "@/components/optimized/OptimizedSpotlightFeed";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { OptimizedSpotlightFeed } from "@/components/optimized/OptimizedSpotlightFeed";
+import { OptimizedYourFeed } from "@/components/optimized/OptimizedYourFeed";
+import { Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export const FeedTabs = () => {
-  const [activeTab, setActiveTab] = useState("spotlight");
-  const isMobile = useIsMobile();
+  const [activeTab, setActiveTab] = useState<"spotlight" | "your-feed">("spotlight");
 
   return (
-    <div className="flex-1 flex flex-col">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <div className="flex w-full p-4 bg-gradient-to-r from-background to-muted/30 border-b border-border">
-          <div className="flex space-x-2 mx-auto glassmorphism rounded-full p-1 shadow-lg">
-            <button
-              onClick={() => setActiveTab("spotlight")}
-              className={`px-6 py-3 rounded-full text-lg font-semibold transition-all duration-300 ${
+    <div className="flex flex-col h-full">
+      {/* Modern Tab Header */}
+      <div className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="flex items-center justify-center p-2">
+          <div className="flex bg-muted rounded-lg p-1 gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "px-6 py-2 text-sm font-medium transition-all duration-200 rounded-md relative",
                 activeTab === "spotlight"
-                  ? "bg-primary text-primary-foreground shadow-lg transform scale-105"
+                  ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-              }`}
+              )}
+              onClick={() => setActiveTab("spotlight")}
             >
               Spotlight
-            </button>
-            <button
-              onClick={() => setActiveTab("your-feed")}
-              className={`px-6 py-3 rounded-full text-lg font-semibold transition-all duration-300 flex items-center gap-2 ${
+              <div className={cn(
+                "absolute bottom-0 left-0 right-0 h-0.5 bg-primary transition-all duration-200",
+                activeTab === "spotlight" ? "opacity-100" : "opacity-0"
+              )} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "px-6 py-2 text-sm font-medium transition-all duration-200 rounded-md relative flex items-center gap-2",
                 activeTab === "your-feed"
-                  ? "bg-primary text-primary-foreground shadow-lg transform scale-105"
+                  ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-              }`}
+              )}
+              onClick={() => setActiveTab("your-feed")}
             >
               Your Feed
               {activeTab === "your-feed" && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0 ml-1 hover:bg-white/20 rounded-full"
+                  className="h-5 w-5 p-0 ml-1 hover:bg-primary/20 rounded-full"
                   onClick={(e) => {
                     e.stopPropagation();
                     window.location.href = '/teams';
                   }}
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3 h-3" />
                 </Button>
               )}
-            </button>
+              <div className={cn(
+                "absolute bottom-0 left-0 right-0 h-0.5 bg-primary transition-all duration-200",
+                activeTab === "your-feed" ? "opacity-100" : "opacity-0"
+              )} />
+            </Button>
           </div>
         </div>
-        <div className="flex-1 mt-0">
-          {activeTab === "spotlight" && <OptimizedSpotlightFeed />}
-          {activeTab === "your-feed" && <OptimizedYourFeed />}
+      </div>
+
+      {/* Tab Content with smooth transitions */}
+      <div className="flex-1 min-h-0 relative overflow-hidden">
+        <div className={cn(
+          "absolute inset-0 transition-transform duration-300 ease-in-out",
+          activeTab === "spotlight" ? "translate-x-0" : "-translate-x-full"
+        )}>
+          <OptimizedSpotlightFeed />
         </div>
-      </Tabs>
+        <div className={cn(
+          "absolute inset-0 transition-transform duration-300 ease-in-out",
+          activeTab === "your-feed" ? "translate-x-0" : "translate-x-full"
+        )}>
+          <OptimizedYourFeed />
+        </div>
+      </div>
     </div>
   );
 };

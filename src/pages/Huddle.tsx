@@ -12,10 +12,12 @@ import { CollapsibleMemberList } from "@/components/CollapsibleMemberList";
 import { MakePublicButton } from "@/components/MakePublicButton";
 import { HuddleManagement } from "@/components/HuddleManagement";
 import { VirtualizedChat } from "@/components/chat/VirtualizedChat";
-import { ChatInput } from "@/components/chat/ChatInput";
-import { MessageBubble } from "@/components/chat/MessageBubble";
+import { ModernChatInput } from "@/components/chat/ModernChatInput";
+import { ModernMessageBubble } from "@/components/chat/ModernMessageBubble";
+import { EnhancedTypingIndicator } from "@/components/chat/EnhancedTypingIndicator";
+
 import { formatDistanceToNow } from "date-fns";
-import { TypingIndicator } from "@/components/chat/TypingIndicator";
+
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { HuddleVerificationDialog } from "@/components/HuddleVerificationDialog";
 import { HuddleRequestsManager } from "@/components/HuddleRequestsManager";
@@ -776,7 +778,7 @@ useEffect(() => {
               new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() < 300000; // 5 minutes
             
             return (
-              <MessageBubble
+              <ModernMessageBubble
                 key={message.id}
                 message={message}
                 previousMessage={previousMessage}
@@ -795,26 +797,34 @@ useEffect(() => {
           }}
         />
 
-        {/* Typing Indicator */}
-        <TypingIndicator typingUsers={typingUsers} />
+        {/* Enhanced Typing Indicator */}
+        <EnhancedTypingIndicator 
+          typingUsers={typingUsers.map(name => ({ 
+            id: name, 
+            name, 
+            avatar: undefined 
+          }))} 
+        />
 
-        {/* Message Input */}
-        <ChatInput
+        {/* Modern Message Input */}
+        <ModernChatInput
           onSendMessage={sendMessage}
           onSendMedia={sendMediaMessage}
           placeholder="Type your message..."
           disabled={loading}
-          onTyping={() => {
-            // Throttle typing broadcasts to avoid flooding
-            const now = Date.now();
-            if (now - (lastTypingSentRef.current || 0) > 1200 && user?.id) {
-              lastTypingSentRef.current = now;
-              const name = displayName || user.email?.split('@')[0] || 'User';
-              typingChannelRef.current?.send({
-                type: 'broadcast',
-                event: 'typing',
-                payload: { userId: user.id, name: name }
-              });
+          onTyping={(isTyping) => {
+            if (isTyping) {
+              // Throttle typing broadcasts to avoid flooding
+              const now = Date.now();
+              if (now - (lastTypingSentRef.current || 0) > 1200 && user?.id) {
+                lastTypingSentRef.current = now;
+                const name = displayName || user.email?.split('@')[0] || 'User';
+                typingChannelRef.current?.send({
+                  type: 'broadcast',
+                  event: 'typing',
+                  payload: { userId: user.id, name: name }
+                });
+              }
             }
           }}
         />
