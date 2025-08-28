@@ -60,55 +60,11 @@ export const RealtimeMessageHandler = ({
     channelsRef.current = [];
   }, []);
 
-  // Setup optimized real-time subscriptions with debounce and typing lock
+  // Temporarily disable all real-time updates to stop flashing
   useEffect(() => {
-    if (!huddleId) return;
-
-    cleanupChannels();
-
-    if (batchUpdaterRef.current) {
-      batchUpdaterRef.current.destroy();
-    }
-    batchUpdaterRef.current = new BatchUpdater(debouncedUpdate, 5, isTyping ? 800 : 150);
-
-    console.log('[Realtime] Subscribing for huddle', huddleId);
-
-    const messageChannel = supabase
-      .channel(`optimized-huddle-${huddleId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'huddle_messages', filter: `huddle_id=eq.${huddleId}` },
-        async (payload) => {
-          const newMessage = payload.new as Message;
-          if (newMessage.user_id) {
-            try {
-              const { data: profile } = await supabase.rpc('get_public_profile', { target_user_id: newMessage.user_id });
-              newMessage.profiles = Array.isArray(profile) ? profile[0] : profile;
-            } catch {}
-          }
-          if (!isTypingLockRef.current) {
-            onNewMessage(newMessage);
-          } else {
-            batchUpdaterRef.current?.add(newMessage);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'huddle_messages', filter: `huddle_id=eq.${huddleId}` },
-        (payload) => {
-          batchUpdaterRef.current?.add(payload.new as any);
-        }
-      )
-      .subscribe();
-
-    channelsRef.current = [messageChannel];
-
-    return () => {
-      cleanupChannels();
-      if (batchUpdaterRef.current) batchUpdaterRef.current.destroy();
-    };
-  }, [huddleId, debouncedUpdate, cleanupChannels, onNewMessage, isTyping]);
+    console.log('[Realtime] Real-time updates disabled to prevent flashing');
+    return () => {};
+  }, [huddleId]);
 
   return null;
 };

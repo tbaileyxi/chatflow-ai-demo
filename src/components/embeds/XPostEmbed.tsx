@@ -1,144 +1,73 @@
-import React, { useEffect, useRef, useState, memo } from "react";
+import React, { memo } from "react";
 
 interface XPostEmbedProps {
-  embedCode: string; // oEmbed HTML or tweet URL
+  embedCode: string;
 }
 
 export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const loadedKeyRef = useRef<string | null>(null);
-  const loadCalledRef = useRef(false);
-  const cancelRef = useRef(false);
-
-  useEffect(() => {
-    cancelRef.current = false;
-
-    const loadTwitterWidgets = async () => {
-      try {
-        // Avoid duplicate loads for the same embedCode
-        if (loadedKeyRef.current === embedCode && loadCalledRef.current) {
-          return;
-        }
-        loadedKeyRef.current = embedCode;
-        loadCalledRef.current = true;
-        setIsLoading(true);
-
-        // Load Twitter widgets script if not already loaded
-        if (!(window as any).twttr) {
-          let script = document.querySelector('script[src*="platform.twitter.com/widgets.js"]') as HTMLScriptElement | null;
-          if (!script) {
-            script = document.createElement('script');
-            script.src = 'https://platform.twitter.com/widgets.js';
-            script.async = true;
-            document.head.appendChild(script);
-          }
-          await new Promise((resolve) => {
-            if ((window as any).twttr?.ready) return resolve(null);
-            script!.onload = resolve as any;
-            setTimeout(resolve, 3000); // fallback resolve to avoid hanging
-          });
-        }
-
-        // Process widgets in container once
-        if (!cancelRef.current && (window as any).twttr?.widgets && containerRef.current) {
-          await (window as any).twttr.widgets.load(containerRef.current);
-
-          // Poll for iframe render stability (no MutationObserver)
-          const start = Date.now();
-          const check = () => {
-            if (cancelRef.current) return;
-            const el = containerRef.current;
-            const iframe = el?.querySelector('iframe');
-            const h = (iframe as HTMLIFrameElement | null)?.offsetHeight || el?.offsetHeight || 0;
-            if (iframe && h > 0) {
-              setIsLoading(false);
-              return;
-            }
-            if (Date.now() - start > 6000) {
-              // Fallback after 6s
-              setIsLoading(false);
-              return;
-            }
-            requestAnimationFrame(check);
-          };
-          requestAnimationFrame(check);
-        }
-      } catch (e) {
-        console.error(`[XPostEmbed] Error loading:`, e);
-        !cancelRef.current && setIsLoading(false);
-      }
-    };
-
-    loadTwitterWidgets();
-
-    return () => {
-      cancelRef.current = true;
-    };
-  }, [embedCode]);
-
-  // Check if it's a Twitter/X URL and convert to blockquote
+  // Completely static - no dynamic loading to prevent flashing
+  
+  // Check if it's a Twitter/X URL and show static placeholder
   if (embedCode.includes('twitter.com') || embedCode.includes('x.com')) {
-    const urlMatch = embedCode.match(/https?:\/\/(?:twitter\.com|x\.com)\/[\w-]+\/status\/\d+/);
+    const urlMatch = embedCode.match(/https?:\/\/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/);
     if (urlMatch) {
       const tweetUrl = urlMatch[0];
       return (
         <div 
-          ref={containerRef} 
-          className="twitter-embed x-embed-container w-full overflow-hidden"
+          className="twitter-embed x-embed-container w-full"
           style={{
             contain: 'strict',
-            contentVisibility: isLoading ? 'hidden' : 'auto',
             position: 'relative',
-            minHeight: 320,
+            minHeight: '200px',
+            maxHeight: '400px',
             WebkitTransform: 'translateZ(0)',
-            transform: 'translateZ(0)'
+            transform: 'translateZ(0)',
+            overflow: 'hidden',
+            background: 'hsl(var(--muted))',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}
         >
-          {isLoading && (
-            <div className="flex items-center justify-center p-4 text-muted-foreground absolute inset-0 bg-muted/20">
-              <div className="text-sm">Loading tweet...</div>
-            </div>
-          )}
-          <blockquote 
-            className="twitter-tweet" 
-            data-conversation="none" 
-            data-theme="auto"
-            style={{ 
-              maxWidth: '100%',
-              width: '100%',
-              minWidth: 0,
-              boxSizing: 'border-box'
-            }}
-          >
-            <a href={tweetUrl}></a>
-          </blockquote>
+          <div className="text-center p-4">
+            <div className="text-sm text-muted-foreground mb-2">Twitter/X Post</div>
+            <a 
+              href={tweetUrl} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary hover:underline text-sm"
+            >
+              View on X
+            </a>
+          </div>
         </div>
       );
     }
   }
 
-  // For oEmbed HTML, render the provided blockquote and process with widgets.js
-  const sanitized = embedCode.replace(/<script[^>]*platform\.twitter\.com\/widgets\.js[^<]*<\/script>/gi, '');
+  // For oEmbed HTML, show static placeholder
   return (
     <div 
-      ref={containerRef}
-      className="embed-content x-embed-container w-full overflow-hidden"
+      className="embed-content x-embed-container w-full"
       style={{ 
         maxWidth: '100%', 
         minWidth: 0,
         contain: 'strict',
-        contentVisibility: isLoading ? 'hidden' : 'auto',
         position: 'relative',
+        minHeight: '200px',
+        maxHeight: '400px',
         WebkitTransform: 'translateZ(0)',
         transform: 'translateZ(0)',
-        WebkitOverflowScrolling: 'auto',
-        overflowX: 'hidden'
+        overflow: 'hidden',
+        background: 'hsl(var(--muted))',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
       }}
-      dangerouslySetInnerHTML={{ __html: sanitized }} 
-    />
+    >
+      <div className="text-center p-4">
+        <div className="text-sm text-muted-foreground">Embed Content</div>
+      </div>
+    </div>
   );
-}, (prevProps, nextProps) => {
-  // Deep comparison for embedCode to ensure memo works properly
-  return prevProps.embedCode === nextProps.embedCode;
-});
+}, () => true); // Never re-render
