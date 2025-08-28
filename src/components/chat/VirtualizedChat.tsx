@@ -98,19 +98,41 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
         height: isKeyboardOpen ? `calc(100dvh - ${keyboardHeight}px)` : '100%'
       }}
     >
-      <div
+      <Virtuoso
+        ref={virtuosoRef}
         style={{
           height: height ?? Math.max(Math.floor(window.innerHeight * 0.7), 320),
-          overflow: 'auto',
-          contain: 'strict'
+          willChange: 'scroll-position',
+          contain: 'content',
+          scrollBehavior: 'auto',
+          overscrollBehavior: 'contain'
         }}
-      >
-        {data.map((item, index) => (
-          <div key={getItemKey ? getItemKey(item) : index}>
-            {itemContent(index, item)}
-          </div>
-        ))}
-      </div>
+        data={data}
+        computeItemKey={(index, item) => (getItemKey ? getItemKey(item) : index)}
+        defaultItemHeight={defaultItemHeight ?? 220}
+        increaseViewportBy={{ top: 200, bottom: 400 }}
+        initialTopMostItemIndex={initialIndex !== undefined ? initialIndex : (alignToBottom ? Math.max(0, data.length - 1) : 0)}
+        itemContent={(index, item) => itemContent(index, item)}
+        startReached={async () => {
+          if (loadMoreTop) await loadMoreTop();
+        }}
+        followOutput={false}
+        alignToBottom={alignToBottom}
+        overscan={overscan ?? 400}
+        components={{
+          List: React.forwardRef<HTMLDivElement, any>((props, ref) => (
+            <div 
+              {...props} 
+              ref={ref}
+              style={{
+                ...(props.style || {}),
+                WebkitOverflowScrolling: 'touch',
+                transform: 'translateZ(0)',
+              } as React.CSSProperties}
+            />
+          ))
+        }}
+      />
     </div>
   );
 }
