@@ -329,7 +329,12 @@ All colors MUST be HSL.
     box-sizing: border-box;
   }
 
-  .embed-content iframe,
+  /* Do not override iframe height for dynamic widgets (e.g., X/Twitter) */
+  .embed-content iframe {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: block;
+  }
   .embed-content video,
   .embed-content object,
   .embed-content embed {

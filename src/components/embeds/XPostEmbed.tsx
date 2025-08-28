@@ -12,13 +12,17 @@ export function XPostEmbed({ embedCode }: XPostEmbedProps) {
     const loadTwitterWidgets = async () => {
       // Load Twitter widgets script if not already loaded
       if (!(window as any).twttr) {
-        const script = document.createElement('script');
-        script.src = 'https://platform.twitter.com/widgets.js';
-        script.async = true;
-        document.head.appendChild(script);
-        
+        let script = document.querySelector('script[src*="platform.twitter.com/widgets.js"]') as HTMLScriptElement | null;
+        if (!script) {
+          script = document.createElement('script');
+          script.src = 'https://platform.twitter.com/widgets.js';
+          script.async = true;
+          document.head.appendChild(script);
+        }
         await new Promise((resolve) => {
-          script.onload = resolve;
+          if ((window as any).twttr?.ready) return resolve(null);
+          script!.onload = resolve as any;
+          setTimeout(resolve, 3000); // fallback resolve to avoid hanging
         });
       }
 
@@ -52,12 +56,13 @@ export function XPostEmbed({ embedCode }: XPostEmbedProps) {
     }
   }
 
-  // For oEmbed HTML, render directly
+  // For oEmbed HTML, render the provided blockquote and process with widgets.js
+  const sanitized = embedCode.replace(/<script[^>]*platform\.twitter\.com\/widgets\.js[^<]*<\/script>/gi, '');
   return (
     <div 
       ref={containerRef}
       className="embed-content w-full max-w-full" 
-      dangerouslySetInnerHTML={{ __html: embedCode }} 
+      dangerouslySetInnerHTML={{ __html: sanitized }} 
     />
   );
 }
