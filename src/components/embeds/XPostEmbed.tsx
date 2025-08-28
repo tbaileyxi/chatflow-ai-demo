@@ -1,119 +1,63 @@
 import { useEffect, useRef, useState } from "react";
 
-// Load Twitter/X widgets.js once per app
-const loadTwitterWidgets = (): Promise<any> => {
-  const w = window as any;
-  if (w.twttr?.widgets) return Promise.resolve(w.twttr);
-  if (w.__twWidgetsPromise) return w.__twWidgetsPromise as Promise<any>;
-
-  w.__twWidgetsPromise = new Promise((resolve, reject) => {
-    const existing = document.querySelector(
-      'script[src*="platform.twitter.com/widgets.js"]'
-    ) as HTMLScriptElement | null;
-
-    const finish = () => resolve((window as any).twttr);
-
-    if (existing) {
-      existing.addEventListener("load", finish, { once: true });
-      existing.addEventListener("error", () => reject(new Error("widgets.js failed")), { once: true });
-    } else {
-      const s = document.createElement("script");
-      s.src = "https://platform.twitter.com/widgets.js";
-      s.async = true;
-      s.defer = true;
-      s.onload = finish;
-      s.onerror = () => reject(new Error("widgets.js failed"));
-      document.head.appendChild(s);
-    }
-
-    // Safety timeout
-    setTimeout(() => {
-      if ((window as any).twttr) finish();
-    }, 8000);
-  });
-
-  return w.__twWidgetsPromise as Promise<any>;
-};
-
-const extractTweetId = (input: string): string | null => {
-  const match = input.match(/status\/(\d+)/);
-  return match?.[1] ?? null;
-};
-
 interface XPostEmbedProps {
-  embedCode: string; // raw embed html or a tweet url
+  embedCode: string; // oEmbed HTML or tweet URL
 }
 
 export function XPostEmbed({ embedCode }: XPostEmbedProps) {
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    let cancelled = false;
-    let ro: ResizeObserver | null = null;
-
-    const mount = async () => {
-      const id = extractTweetId(embedCode);
-      const el = hostRef.current;
-      if (!el || !id) {
-        setError("Invalid X post");
-        setLoading(false);
-        return;
-      }
-
-      // Reserve space to avoid layout jumps
-      el.style.minHeight = "200px";
-      el.innerHTML = "";
-
-      try {
-        const tw = await loadTwitterWidgets();
-        if (cancelled) return;
-
-        const created = await tw.widgets.createTweet(id, el, {
-          dnt: true,
-          width: "100%",
-          conversation: "none",
-          align: "center",
-          theme: document.documentElement.classList.contains("dark") ? "dark" : "light",
+    const loadTwitterWidgets = async () => {
+      // Load Twitter widgets script if not already loaded
+      if (!(window as any).twttr) {
+        const script = document.createElement('script');
+        script.src = 'https://platform.twitter.com/widgets.js';
+        script.async = true;
+        document.head.appendChild(script);
+        
+        await new Promise((resolve) => {
+          script.onload = resolve;
         });
+      }
 
-        setLoading(false);
-        el.style.minHeight = "0px";
-
-        // Track size changes to ensure parents recalc height
-        if (created) {
-          ro = new ResizeObserver(() => {
-            if (!el) return;
-            // Force layout to pick up height changes
-            el.style.height = "auto";
-          });
-          ro.observe(created as HTMLElement);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError("Failed to load X post");
-          setLoading(false);
-        }
+      // Process widgets in container
+      if ((window as any).twttr?.widgets && containerRef.current) {
+        await (window as any).twttr.widgets.load(containerRef.current);
+        setIsLoading(false);
       }
     };
 
-    mount();
-    return () => {
-      cancelled = true;
-      ro?.disconnect();
-    };
+    loadTwitterWidgets().catch(() => setIsLoading(false));
   }, [embedCode]);
 
-  const fallbackUrl = (embedCode.match(/https?:\/\/[^"'\s]+/) || ["#"])[0];
+  // Check if it's a Twitter/X URL and convert to blockquote
+  if (embedCode.includes('twitter.com') || embedCode.includes('x.com')) {
+    const urlMatch = embedCode.match(/https?:\/\/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/);
+    if (urlMatch) {
+      const tweetUrl = urlMatch[0];
+      return (
+        <div ref={containerRef} className="twitter-embed w-full max-w-full">
+          {isLoading && (
+            <div className="flex items-center justify-center p-4 text-muted-foreground">
+              <div className="text-sm">Loading tweet...</div>
+            </div>
+          )}
+          <blockquote className="twitter-tweet" data-conversation="none" data-width="100%">
+            <a href={tweetUrl}></a>
+          </blockquote>
+        </div>
+      );
+    }
+  }
 
+  // For oEmbed HTML, render directly
   return (
-    <div ref={hostRef} className="x-embed w-full max-w-full" aria-busy={loading}>
-      {error && (
-        <a href={fallbackUrl} target="_blank" rel="noopener noreferrer" className="text-sm underline">
-          View on X
-        </a>
-      )}
-    </div>
+    <div 
+      ref={containerRef}
+      className="embed-content w-full max-w-full" 
+      dangerouslySetInnerHTML={{ __html: embedCode }} 
+    />
   );
 }
