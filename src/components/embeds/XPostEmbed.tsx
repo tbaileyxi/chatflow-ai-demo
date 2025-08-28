@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, memo } from "react";
+import React, { useEffect, useRef, useState, memo, useCallback } from "react";
 
 interface XPostEmbedProps {
   embedCode: string; // oEmbed HTML or tweet URL
@@ -10,19 +10,49 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
   const loadedKeyRef = useRef<string | null>(null);
   const loadCalledRef = useRef(false);
   const observerRef = useRef<MutationObserver | null>(null);
+  const heightStabilityRef = useRef<{ height: number; timestamp: number } | null>(null);
+  const renderCountRef = useRef(0);
+
+  // Enhanced height stability check
+  const checkHeightStability = useCallback(() => {
+    if (!containerRef.current) return false;
+    
+    const currentHeight = containerRef.current.offsetHeight;
+    const now = Date.now();
+    
+    if (!heightStabilityRef.current) {
+      heightStabilityRef.current = { height: currentHeight, timestamp: now };
+      return false;
+    }
+    
+    // Check if height hasn't changed for 500ms
+    if (heightStabilityRef.current.height === currentHeight) {
+      return now - heightStabilityRef.current.timestamp > 500;
+    } else {
+      heightStabilityRef.current = { height: currentHeight, timestamp: now };
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
+    renderCountRef.current++;
+    console.log(`[XPostEmbed] Render ${renderCountRef.current}, embedCode: ${embedCode.substring(0, 50)}...`);
+    
     let cancelled = false;
+    let fallbackTimeout: NodeJS.Timeout;
 
     const loadTwitterWidgets = async () => {
       try {
         // Avoid duplicate loads for the same embedCode
         if (loadedKeyRef.current === embedCode && loadCalledRef.current) {
+          console.log(`[XPostEmbed] Skip duplicate load for: ${embedCode.substring(0, 30)}...`);
           return;
         }
         loadedKeyRef.current = embedCode;
         loadCalledRef.current = true;
         setIsLoading(true);
+
+        console.log(`[XPostEmbed] Loading widgets for: ${embedCode.substring(0, 30)}...`);
 
         // Load Twitter widgets script if not already loaded
         if (!(window as any).twttr) {
@@ -42,24 +72,39 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
 
         // Process widgets in container once
         if (!cancelled && (window as any).twttr?.widgets && containerRef.current) {
+          console.log(`[XPostEmbed] Calling twttr.widgets.load`);
           await (window as any).twttr.widgets.load(containerRef.current);
 
-          // Observe for the rendered tweet to stabilize height, then stop
+          // Enhanced observer for height stability
           if (observerRef.current) observerRef.current.disconnect();
           observerRef.current = new MutationObserver(() => {
-            if (!containerRef.current) return;
+            if (!containerRef.current || cancelled) return;
+            
             const rendered = containerRef.current.querySelector('.twitter-tweet-rendered, iframe');
-            if (rendered) {
+            if (rendered && checkHeightStability()) {
+              console.log(`[XPostEmbed] Height stabilized, stopping loading`);
               setIsLoading(false);
               observerRef.current?.disconnect();
             }
           });
-          observerRef.current.observe(containerRef.current, { childList: true, subtree: true });
+          observerRef.current.observe(containerRef.current, { 
+            childList: true, 
+            subtree: true, 
+            attributes: true,
+            attributeFilter: ['style']
+          });
 
-          // Safety timeout in case MutationObserver misses
-          setTimeout(() => !cancelled && setIsLoading(false), 2000);
+          // Safety timeout with fallback static render
+          fallbackTimeout = setTimeout(() => {
+            if (!cancelled) {
+              console.log(`[XPostEmbed] Fallback timeout reached`);
+              setIsLoading(false);
+              observerRef.current?.disconnect();
+            }
+          }, 5000);
         }
       } catch (e) {
+        console.error(`[XPostEmbed] Error loading:`, e);
         !cancelled && setIsLoading(false);
       }
     };
@@ -69,8 +114,10 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
     return () => {
       cancelled = true;
       observerRef.current?.disconnect();
+      clearTimeout(fallbackTimeout);
+      heightStabilityRef.current = null;
     };
-  }, [embedCode]);
+  }, [embedCode, checkHeightStability]);
 
   // Check if it's a Twitter/X URL and convert to blockquote
   if (embedCode.includes('twitter.com') || embedCode.includes('x.com')) {
@@ -78,9 +125,20 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
     if (urlMatch) {
       const tweetUrl = urlMatch[0];
       return (
-        <div ref={containerRef} className="twitter-embed x-embed-container w-full overflow-hidden">
+        <div 
+          ref={containerRef} 
+          className="twitter-embed x-embed-container w-full overflow-hidden"
+          style={{
+            contain: 'strict',
+            contentVisibility: isLoading ? 'hidden' : 'auto',
+            position: 'relative',
+            minHeight: 0,
+            WebkitTransform: 'translateZ(0)',
+            transform: 'translateZ(0)'
+          }}
+        >
           {isLoading && (
-            <div className="flex items-center justify-center p-4 text-muted-foreground">
+            <div className="flex items-center justify-center p-4 text-muted-foreground absolute inset-0 bg-muted/20">
               <div className="text-sm">Loading tweet...</div>
             </div>
           )}
@@ -112,10 +170,18 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
       style={{ 
         maxWidth: '100%', 
         minWidth: 0,
+        contain: 'strict',
+        contentVisibility: isLoading ? 'hidden' : 'auto',
+        position: 'relative',
+        WebkitTransform: 'translateZ(0)',
+        transform: 'translateZ(0)',
         WebkitOverflowScrolling: 'auto',
-        overflowX: 'auto'
+        overflowX: 'hidden'
       }}
       dangerouslySetInnerHTML={{ __html: sanitized }} 
     />
   );
+}, (prevProps, nextProps) => {
+  // Deep comparison for embedCode to ensure memo works properly
+  return prevProps.embedCode === nextProps.embedCode;
 });

@@ -27,11 +27,27 @@ export const RealtimeMessageHandler = ({
   const batchUpdaterRef = useRef<BatchUpdater>();
   const channelsRef = useRef<ReturnType<typeof supabase.channel>[]>([]);
   const { isTyping } = useIOSKeyboard();
+  const isTypingLockRef = useRef(false);
 
-  // Longer debounce when user is typing to prevent iOS scroll jumps
+  // Much longer debounce when user is typing to prevent iOS scroll jumps
   const debouncedUpdate = useDebounce((messages: Message[]) => {
-    onMessagesUpdate(messages);
-  }, isTyping ? 500 : 100);
+    if (!isTypingLockRef.current) {
+      onMessagesUpdate(messages);
+    }
+  }, isTyping ? 750 : 100);
+
+  // Lock updates during typing
+  useEffect(() => {
+    if (isTyping) {
+      isTypingLockRef.current = true;
+    } else {
+      // Release lock after typing stops
+      const timer = setTimeout(() => {
+        isTypingLockRef.current = false;
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isTyping]);
 
   // Cleanup function for channels
   const cleanupChannels = useCallback(() => {
@@ -52,7 +68,7 @@ export const RealtimeMessageHandler = ({
     if (batchUpdaterRef.current) {
       batchUpdaterRef.current.destroy();
     }
-    batchUpdaterRef.current = new BatchUpdater(debouncedUpdate, 5, isTyping ? 500 : 150);
+    batchUpdaterRef.current = new BatchUpdater(debouncedUpdate, 5, isTyping ? 750 : 150);
 
     console.log('[Realtime] Setting up optimized subscriptions for huddle', huddleId);
 
@@ -85,9 +101,10 @@ export const RealtimeMessageHandler = ({
           }
 
           // Don't immediately update during typing on iOS to prevent jumps
-          if (!isTyping) {
+          if (!isTyping && !isTypingLockRef.current) {
             onNewMessage(newMessage);
           } else {
+            console.log('[Realtime] Queuing message due to typing lock');
             // Queue the message for later when typing stops
             if (batchUpdaterRef.current) {
               batchUpdaterRef.current.add(newMessage);

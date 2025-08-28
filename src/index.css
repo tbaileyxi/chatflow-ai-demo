@@ -464,10 +464,24 @@ All colors MUST be HSL.
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    contain: layout paint;
+    contain: strict;
     content-visibility: auto;
     contain-intrinsic-size: 600px;
-    overflow-x: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     will-change: contents;
+    position: relative;
+    min-height: 0;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+
+  /* Prevent unintended animations during embed load */
+  body.embed-loading {
+    transition: none !important;
+  }
+  
+  body.embed-loading * {
+    transition: none !important;
+    animation: none !important;
   }

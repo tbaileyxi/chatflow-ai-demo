@@ -2,6 +2,15 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { Virtuoso } from "react-virtuoso";
 import { useIOSKeyboard } from "@/hooks/useIOSKeyboard";
 
+// Debounce utility for scroll state updates
+const debounce = (func: Function, wait: number) => {
+  let timeout: NodeJS.Timeout;
+  return (...args: any[]) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+};
+
 interface VirtualizedChatProps<T> {
   items: T[];
   loadMoreTop?: () => Promise<void> | void;
@@ -25,14 +34,26 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout>();
   const lastScrollStateRef = useRef<boolean>(false);
+  const scrollDebounceRef = useRef<any>();
 
-  // Handle iOS-specific scroll behavior during typing
+  // Aggressively throttled scroll state handler with debugging
   const handleScrollStateChange = useCallback((isScrolling: boolean) => {
+    console.log(`[VirtualizedChat] Scroll state change: ${isScrolling}`);
+    
     // Avoid redundant state updates
     if (lastScrollStateRef.current === isScrolling) return;
     lastScrollStateRef.current = isScrolling;
 
-    setIsUserScrolling(isScrolling);
+    // Debounce the state update
+    if (!scrollDebounceRef.current) {
+      scrollDebounceRef.current = debounce((scrolling: boolean) => {
+        console.log(`[VirtualizedChat] Setting scroll state: ${scrolling}`);
+        setIsUserScrolling(scrolling);
+      }, 500);
+    }
+    
+    scrollDebounceRef.current(isScrolling);
+    
     if (scrollTimeoutRef.current) {
       clearTimeout(scrollTimeoutRef.current);
     }
@@ -40,7 +61,7 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
     scrollTimeoutRef.current = setTimeout(() => {
       lastScrollStateRef.current = false;
       setIsUserScrolling(false);
-    }, 250);
+    }, 750);
   }, []);
 
   useEffect(() => {
@@ -109,7 +130,8 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
         data={data}
         computeItemKey={(index, item) => (getItemKey ? getItemKey(item) : index)}
         defaultItemHeight={defaultItemHeight}
-        increaseViewportBy={{ top: 200, bottom: 400 }}
+        // Include max embed height for better estimation
+        increaseViewportBy={{ top: 200, bottom: 600 }}
         initialTopMostItemIndex={initialIndex !== undefined ? initialIndex : (alignToBottom ? Math.max(0, data.length - 1) : 0)}
         itemContent={(index, item) => itemContent(index, item)}
         startReached={async () => {

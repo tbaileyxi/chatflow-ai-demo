@@ -118,12 +118,17 @@ export const ModernMessageBubble = memo(({
       {!showProfile && <div className="w-10 shrink-0" />}
 
       {/* Message Content */}
-      <div className={cn(
-        "flex-1 min-w-0",
-        // Use wider max-width for embeds to prevent X embed cutoff
-        message.embed_code ? "max-w-[90%]" : "max-w-[75%]",
-        isOwnMessage ? "text-right" : "text-left"
-      )}>
+      <div 
+        className={cn(
+          "flex-1 min-w-0",
+          isOwnMessage ? "text-right" : "text-left"
+        )}
+        style={{
+          '--avatar-width': '3rem',
+          width: message.embed_code ? 'calc(100% - var(--avatar-width))' : 'auto',
+          maxWidth: message.embed_code ? '90%' : '75%'
+        } as React.CSSProperties}
+      >
         {/* User info with timestamp */}
         {showProfile && (
           <div className={cn(
@@ -226,7 +231,20 @@ export const ModernMessageBubble = memo(({
 
               {/* Embed Content with layout shift prevention */}
               {message.embed_code && (
-                <div className="mt-3 embed-chat rounded-xl x-embed-container" style={{ contain: 'layout paint', contentVisibility: 'auto', WebkitOverflowScrolling: 'auto' }}>
+                <div 
+                  className="mt-3 embed-chat rounded-xl x-embed-container" 
+                  style={{ 
+                    contain: 'layout paint', 
+                    contentVisibility: 'auto', 
+                    WebkitOverflowScrolling: 'auto',
+                    overflowX: 'hidden',
+                    display: 'block',
+                    position: 'relative',
+                    minHeight: 0,
+                    WebkitTransform: 'translateZ(0)',
+                    transform: 'translateZ(0)'
+                  }}
+                >
                   <LazyEmbed>
                     <XPostEmbed embedCode={message.embed_code} />
                   </LazyEmbed>
