@@ -192,7 +192,7 @@ export const BroadcastCenter = () => {
       // Create actual huddle messages for each huddle
       if (huddles?.length) {
         for (const huddle of huddles) {
-          const { data: createdMessage, error: huddleMessageError } = await supabase
+          const { error: huddleMessageError } = await supabase
             .from('huddle_messages')
             .insert({
               content: postData.content,
@@ -207,8 +207,8 @@ export const BroadcastCenter = () => {
               embed_code: postData.embed_code,
               poll_data: postData.poll_data,
               is_team_agent_message: postData.is_team_agent_message || false
-            })
-            .select();
+            });
+
 
           if (huddleMessageError) {
             console.error(`Failed to broadcast to huddle ${huddle.name}:`, huddleMessageError);
