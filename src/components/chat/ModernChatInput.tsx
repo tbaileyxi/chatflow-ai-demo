@@ -1,12 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Send, Paperclip, Smile, Image, Video, X } from 'lucide-react';
-import { MediaUpload } from '@/components/MediaUpload';
+import { Send, Plus, Smile, Image, Video, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ChatInputProps {
   onSendMessage: (content: string) => Promise<void>;
@@ -29,7 +28,7 @@ export const ModernChatInput = ({
   disabled = false 
 }: ChatInputProps) => {
   const [message, setMessage] = useState('');
-  const [mediaSheetOpen, setMediaSheetOpen] = useState(false);
+  
   const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -109,6 +108,31 @@ export const ModernChatInput = ({
     setDragOver(false);
   }, []);
 
+  const uploadSingleFile = useCallback(async (file: File) => {
+    try {
+      const ext = file.name.split('.').pop() || 'dat';
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { data, error } = await supabase.storage
+        .from('chat-media')
+        .upload(fileName, file);
+      if (error) throw error;
+      const { data: pub } = supabase.storage
+        .from('chat-media')
+        .getPublicUrl(data.path);
+      const type: 'image' | 'video' = file.type.startsWith('video/') ? 'video' : 'image';
+      await onSendMedia(pub.publicUrl, type);
+    } catch (error) {
+      console.error('Error uploading media:', error);
+      toast({
+        title: "Upload failed",
+        description: "Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setUploadingFiles(prev => prev.filter(f => f !== file));
+    }
+  }, [onSendMedia, toast]);
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
@@ -119,33 +143,18 @@ export const ModernChatInput = ({
     );
     
     if (mediaFiles.length > 0) {
-      setUploadingFiles(mediaFiles);
-      setMediaSheetOpen(true);
+      setUploadingFiles(prev => [...prev, ...mediaFiles]);
+      mediaFiles.forEach(file => uploadSingleFile(file));
     }
-  }, []);
+  }, [uploadSingleFile]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
-      setUploadingFiles(files);
-      setMediaSheetOpen(true);
+      setUploadingFiles(prev => [...prev, ...files]);
+      files.forEach(file => uploadSingleFile(file));
     }
-  }, []);
-
-  const handleMediaSelected = useCallback(async (url: string, type: 'image' | 'video') => {
-    try {
-      await onSendMedia(url, type);
-      setMediaSheetOpen(false);
-      setUploadingFiles([]);
-    } catch (error) {
-      console.error('Error sending media:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send media. Please try again.",
-        variant: "destructive"
-      });
-    }
-  }, [onSendMedia, toast]);
+  }, [uploadSingleFile]);
 
   const removeUploadingFile = useCallback((index: number) => {
     setUploadingFiles(prev => prev.filter((_, i) => i !== index));
@@ -166,7 +175,7 @@ export const ModernChatInput = ({
       )}
       
       <div 
-        className="p-4 bg-card border-t border-border"
+        className="p-4 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 border-t border-border sticky bottom-0 left-0 right-0 pb-[env(safe-area-inset-bottom)]"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -204,10 +213,11 @@ export const ModernChatInput = ({
               value={message}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              onFocus={() => setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100)}
               placeholder={placeholder}
               disabled={disabled || sending}
               className={cn(
-                "resize-none min-h-[48px] max-h-[120px] pl-4 pr-12 py-3",
+                "resize-none min-h-[72px] max-h-[180px] pl-4 pr-12 py-3",
                 "border-2 border-border focus:border-primary transition-colors",
                 "bg-background text-foreground placeholder:text-muted-foreground",
                 "rounded-2xl"
@@ -255,36 +265,16 @@ export const ModernChatInput = ({
               className="hidden"
               onChange={handleFileSelect}
             />
-            
-            <Sheet open={mediaSheetOpen} onOpenChange={setMediaSheetOpen}>
-              <SheetTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-12 w-12 p-0 hover:bg-muted rounded-full"
-                  disabled={disabled || sending}
-                  onClick={() => {
-                    if (uploadingFiles.length === 0) {
-                      fileInputRef.current?.click();
-                    }
-                  }}
-                >
-                  <Paperclip className="w-5 h-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="h-[60vh]">
-                <SheetHeader>
-                  <SheetTitle>Upload Media</SheetTitle>
-                </SheetHeader>
-                <div className="mt-4">
-              <MediaUpload 
-                onMediaSelected={handleMediaSelected}
-                bucket="chat-media"
-              />
-                </div>
-              </SheetContent>
-            </Sheet>
-
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-12 w-12 p-0 hover:bg-muted rounded-full"
+              disabled={disabled || sending}
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Add media"
+            >
+              <Plus className="w-5 h-5" />
+            </Button>
             <Button
               onClick={handleSend}
               disabled={!message.trim() || sending || disabled}

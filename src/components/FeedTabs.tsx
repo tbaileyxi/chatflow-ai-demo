@@ -65,21 +65,15 @@ export const FeedTabs = () => {
         </div>
       </div>
 
-      {/* Tab Content with smooth transitions */}
-      <div className="flex-1 min-h-0 relative overflow-hidden">
-        <div className={cn(
-          "absolute inset-0 transition-transform duration-300 ease-in-out",
-          activeTab === "spotlight" ? "translate-x-0" : "-translate-x-full"
-        )}>
+      {/* Tab Content */}
+      <div className="flex-1 min-h-0">
+        {activeTab === "spotlight" ? (
           <OptimizedSpotlightFeed />
-        </div>
-        <div className={cn(
-          "absolute inset-0 transition-transform duration-300 ease-in-out",
-          activeTab === "your-feed" ? "translate-x-0" : "translate-x-full"
-        )}>
+        ) : (
           <OptimizedYourFeed />
-        </div>
+        )}
       </div>
+
     </div>
   );
 };
