@@ -284,3 +284,42 @@ All colors MUST be HSL.
     flex: none;
     width: 40px;
   }
+
+  /* Inline media containment to prevent overflow and shifts */
+  .media-inline {
+    position: relative;
+    width: 100%;
+    height: auto;
+    background: hsl(var(--background));
+    border-radius: 12px;
+    overflow: hidden;
+    aspect-ratio: 16/9; /* reserve space */
+    contain: content;
+  }
+  .media-inline > video,
+  .media-inline > img,
+  .media-inline iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: hsl(var(--background));
+  }
+  .media-inline iframe {
+    border: 0;
+    max-width: 100%;
+    contain: layout paint;
+    transform: translateZ(0);
+  }
+
+  /* Prevent layout overflow in placeholders */
+  .media-placeholder { overflow: hidden; contain: layout paint; }
+
+  /* iOS zoom prevention and mobile typing improvements */
+  @supports (-webkit-touch-callout: none) {
+    input, textarea, select { font-size: 16px !important; }
+  }
+  html { -webkit-text-size-adjust: 100%; }
+
+  /* Improve tap responsiveness */
+  button, a, input, textarea { touch-action: manipulation; }

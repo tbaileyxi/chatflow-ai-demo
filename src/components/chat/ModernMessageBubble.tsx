@@ -201,11 +201,12 @@ export const ModernMessageBubble = ({
 
               {/* Media Content with layout shift prevention */}
               {message.media_url && (
-                <div className="mt-3 media-placeholder" style={{ aspectRatio: '16/9' }}>
+                <div className="mt-3">
                   <MediaViewer 
                     mediaUrl={message.media_url} 
                     mediaType={message.media_type || 'image'}
-                    className="rounded-xl overflow-hidden w-full h-full object-cover"
+                    showLightbox={message.media_type === 'image'}
+                    className="rounded-xl"
                   />
                 </div>
               )}
