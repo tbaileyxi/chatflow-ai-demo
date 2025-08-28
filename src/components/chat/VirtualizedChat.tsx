@@ -102,18 +102,31 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
         style={{
           height: height ?? Math.max(Math.floor(window.innerHeight * 0.7), 320),
           overflow: 'auto',
-          contain: 'strict'
+          contain: 'strict',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+        onLoad={() => {
+          // Scroll to bottom on initial load
+          const container = containerRef.current?.querySelector('div[style*="overflow: auto"]');
+          if (container) {
+            container.scrollTop = container.scrollHeight;
+          }
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column-reverse' }}>
-          {data.slice().reverse().map((item, index) => {
-            const actualIndex = data.length - 1 - index;
-            return (
-              <div key={getItemKey ? getItemKey(item) : actualIndex}>
-                {itemContent(actualIndex, item)}
-              </div>
-            );
-          })}
+        <div 
+          style={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            minHeight: '100%',
+            justifyContent: 'flex-end'
+          }}
+        >
+          {data.map((item, index) => (
+            <div key={getItemKey ? getItemKey(item) : index}>
+              {itemContent(index, item)}
+            </div>
+          ))}
         </div>
       </div>
     </div>

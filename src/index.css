@@ -461,13 +461,13 @@ All colors MUST be HSL.
 
   /* X embed container - mobile responsive, no big boxes */
   .x-embed-container {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     contain: layout;
-    overflow: hidden;
+    overflow: visible !important;
     position: relative;
-    min-height: 280px;
+    min-height: 200px;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: none;
     touch-action: pan-y;
