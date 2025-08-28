@@ -175,7 +175,7 @@ export const ModernChatInput = ({
       )}
       
       <div 
-        className="p-4 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 border-t border-border sticky bottom-0 left-0 right-0 pb-[env(safe-area-inset-bottom)]"
+        className="p-4 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 border-t border-border sticky bottom-0 left-0 right-0 pb-[calc(env(safe-area-inset-bottom)+12px)]"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -217,7 +217,7 @@ export const ModernChatInput = ({
               placeholder={placeholder}
               disabled={disabled || sending}
               className={cn(
-                "resize-none min-h-[72px] max-h-[180px] pl-4 pr-12 py-3",
+                "resize-none min-h-[96px] max-h-[180px] pl-4 pr-12 py-3",
                 "border-2 border-border focus:border-primary transition-colors",
                 "bg-background text-foreground placeholder:text-muted-foreground",
                 "rounded-2xl"

@@ -5,9 +5,12 @@ interface VirtualizedChatProps<T> {
   items: T[];
   loadMoreTop?: () => Promise<void> | void;
   itemContent: (index: number, item: T) => React.ReactNode;
+  getItemKey?: (item: T) => React.Key; // stable key to prevent re-renders
+  defaultItemHeight?: number; // helps Virtuoso estimate before measurement
+  overscan?: number; // control how much extra content to render
 }
 
-export function VirtualizedChat<T>({ items, loadMoreTop, itemContent }: VirtualizedChatProps<T>) {
+export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey, defaultItemHeight, overscan }: VirtualizedChatProps<T>) {
   const data = useMemo(() => items, [items]);
 
   // Ensure the list always has a real height even if parents aren't sized correctly
@@ -48,15 +51,26 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent }: Virtuali
   return (
     <div ref={containerRef} className="flex-1 min-h-0">
       <Virtuoso
-        style={{ height: height ?? Math.max(Math.floor(window.innerHeight * 0.7), 320) }}
+        style={{
+          height: height ?? Math.max(Math.floor(window.innerHeight * 0.7), 320),
+          willChange: 'scroll-position',
+          contain: 'content'
+        }}
         data={data}
+        computeItemKey={(index, item) => (getItemKey ? getItemKey(item) : index)}
+        defaultItemHeight={defaultItemHeight}
+        increaseViewportBy={{ top: 200, bottom: 400 }}
         initialTopMostItemIndex={Math.max(0, data.length - 1)}
         itemContent={(index, item) => itemContent(index, item)}
         startReached={async () => {
           if (loadMoreTop) await loadMoreTop();
         }}
         followOutput="auto"
-        overscan={300}
+        overscan={overscan ?? 400}
+        scrollSeekConfiguration={{
+          enter: (v) => Math.abs(v) > 1200,
+          exit: (v) => Math.abs(v) < 30,
+        }}
       />
     </div>
   );
