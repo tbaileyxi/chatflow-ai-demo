@@ -65,7 +65,8 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
         startReached={async () => {
           if (loadMoreTop) await loadMoreTop();
         }}
-        followOutput="auto"
+        followOutput="smooth"
+        alignToBottom={true}
         overscan={overscan ?? 400}
         scrollSeekConfiguration={{
           enter: (v) => Math.abs(v) > 1200,

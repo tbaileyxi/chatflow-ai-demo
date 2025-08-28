@@ -42,13 +42,18 @@ export function XPostEmbed({ embedCode }: XPostEmbedProps) {
     if (urlMatch) {
       const tweetUrl = urlMatch[0];
       return (
-        <div ref={containerRef} className="twitter-embed w-full max-w-full">
+        <div ref={containerRef} className="twitter-embed w-full max-w-full overflow-hidden">
           {isLoading && (
             <div className="flex items-center justify-center p-4 text-muted-foreground">
               <div className="text-sm">Loading tweet...</div>
             </div>
           )}
-          <blockquote className="twitter-tweet" data-conversation="none" data-width="100%">
+          <blockquote 
+            className="twitter-tweet" 
+            data-conversation="none" 
+            data-width="300"
+            data-theme="auto"
+          >
             <a href={tweetUrl}></a>
           </blockquote>
         </div>
@@ -61,7 +66,8 @@ export function XPostEmbed({ embedCode }: XPostEmbedProps) {
   return (
     <div 
       ref={containerRef}
-      className="embed-content w-full max-w-full" 
+      className="embed-content w-full max-w-full overflow-hidden" 
+      style={{ maxWidth: '300px' }}
       dangerouslySetInnerHTML={{ __html: sanitized }} 
     />
   );

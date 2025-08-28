@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { OptimizedSpotlightFeed } from "@/components/optimized/OptimizedSpotlightFeed";
-import { OptimizedYourFeed } from "@/components/optimized/OptimizedYourFeed";
+import { VirtualizedOptimizedSpotlightFeed } from "@/components/optimized/VirtualizedOptimizedSpotlightFeed";
+import { VirtualizedOptimizedYourFeed } from "@/components/optimized/VirtualizedOptimizedYourFeed";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -68,9 +68,9 @@ export const FeedTabs = () => {
       {/* Tab Content */}
       <div className="flex-1 min-h-0">
         {activeTab === "spotlight" ? (
-          <OptimizedSpotlightFeed />
+          <VirtualizedOptimizedSpotlightFeed />
         ) : (
-          <OptimizedYourFeed />
+          <VirtualizedOptimizedYourFeed />
         )}
       </div>
 
