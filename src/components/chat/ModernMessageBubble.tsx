@@ -213,7 +213,7 @@ export const ModernMessageBubble = ({
 
               {/* Embed Content with layout shift prevention */}
               {message.embed_code && (
-                <div className="mt-3 embed-chat media-inline rounded-xl">
+                <div className="mt-3 embed-chat rounded-xl">
                   <LazyEmbed>
                     <TwitterEmbed embedCode={message.embed_code} />
                   </LazyEmbed>

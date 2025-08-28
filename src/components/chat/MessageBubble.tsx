@@ -171,7 +171,7 @@ export const MessageBubble = ({
 
               {/* Embed Content */}
               {message.embed_code && (
-                <div className="mt-2 embed-chat media-inline rounded-xl">
+                <div className="mt-2 embed-chat rounded-xl">
                   <LazyEmbed>
                     <TwitterEmbed embedCode={message.embed_code} />
                   </LazyEmbed>

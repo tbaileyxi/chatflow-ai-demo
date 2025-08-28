@@ -368,9 +368,21 @@ All colors MUST be HSL.
     overflow: visible;
     border-radius: 12px;
     background: hsl(var(--background));
-    contain: layout paint;
-    min-height: 300px;
+    /* Allow the embed to size itself based on its content */
+    contain: paint;
+    aspect-ratio: auto;
     height: auto;
+    min-height: 180px;
+  }
+  .embed-chat.media-inline { /* override the media-inline defaults for embeds */
+    aspect-ratio: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  /* Relax containment for embedded containers inside chat to allow height growth */
+  .embed-chat .embed-container {
+    contain: paint !important;
+    overflow: visible !important;
   }
   .embed-chat .twitter-tweet,
   .embed-chat .embed-content,
@@ -381,7 +393,7 @@ All colors MUST be HSL.
     width: 100% !important;
     max-width: 100% !important;
     height: auto !important;
-    min-height: 280px !important;
+    min-height: 0 !important;
     display: block;
   }
 
