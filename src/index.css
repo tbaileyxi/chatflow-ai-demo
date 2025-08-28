@@ -2,6 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* iOS-specific fixes for chat scrolling */
+@supports (-webkit-touch-callout: none) {
+  .chat-container {
+    /* Use dynamic viewport height for iOS */
+    height: 100dvh;
+    /* Prevent scroll bounce */
+    overscroll-behavior: contain;
+    /* Hardware acceleration */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+  
+  .chat-input-container {
+    /* Prevent iOS input zoom */
+    -webkit-text-size-adjust: 100%;
+    /* Better touch handling */
+    -webkit-user-select: text;
+    -webkit-appearance: none;
+  }
+  
+  .text-input {
+    /* iOS Safari input fixes */
+    -webkit-appearance: none;
+    border-radius: 0;
+    /* Prevent zoom on focus */
+    font-size: 16px;
+    /* Better touch response */
+    touch-action: manipulation;
+  }
+}
+
 /* Chat animations and smooth scrolling */
 @keyframes slide-up {
   0% {

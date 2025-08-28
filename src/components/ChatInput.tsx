@@ -1,10 +1,12 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Send, Paperclip } from 'lucide-react';
 import { MediaUpload } from '@/components/MediaUpload';
 import { useToast } from '@/hooks/use-toast';
+import { useIOSKeyboard } from '@/hooks/useIOSKeyboard';
+import { useThrottle } from '@/utils/performance';
 
 interface ChatInputProps {
   onSendMessage: (content: string) => Promise<void>;
@@ -24,6 +26,7 @@ export const ChatInput = ({
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+  const { setTypingState, isOpen: isKeyboardOpen } = useIOSKeyboard();
 
   const handleSend = useCallback(async () => {
     if (!message.trim() || sending || disabled) return;
@@ -71,19 +74,51 @@ export const ChatInput = ({
     }
   }, [onSendMedia, toast]);
 
-  const adjustTextareaHeight = useCallback(() => {
+  // Throttled height adjustment for better iOS performance
+  const adjustTextareaHeight = useThrottle(() => {
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
       textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
     }
-  }, []);
+  }, 16); // 60fps throttling
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setMessage(value);
     adjustTextareaHeight();
   }, [adjustTextareaHeight]);
+
+  // Handle focus/blur for iOS keyboard detection
+  const handleFocus = useCallback(() => {
+    setTypingState(true);
+  }, [setTypingState]);
+
+  const handleBlur = useCallback(() => {
+    setTypingState(false);
+  }, [setTypingState]);
+
+  // iOS-specific input handling
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    // Add iOS-specific event listeners
+    const handleTouchStart = (e: TouchEvent) => {
+      // Prevent iOS scroll jumping when touching input
+      e.stopPropagation();
+    };
+
+    textarea.addEventListener('touchstart', handleTouchStart, { passive: false });
+    textarea.addEventListener('focus', handleFocus);
+    textarea.addEventListener('blur', handleBlur);
+
+    return () => {
+      textarea.removeEventListener('touchstart', handleTouchStart);
+      textarea.removeEventListener('focus', handleFocus);
+      textarea.removeEventListener('blur', handleBlur);
+    };
+  }, [handleFocus, handleBlur]);
 
   // Function to make URLs clickable
   const linkifyText = (text: string) => {
@@ -92,7 +127,17 @@ export const ChatInput = ({
   };
 
   return (
-    <div className="p-4 bg-card border-t border-border">
+    <div 
+      className="p-4 bg-card border-t border-border"
+      style={{
+        // iOS keyboard handling
+        position: isKeyboardOpen ? 'fixed' : 'relative',
+        bottom: isKeyboardOpen ? '0' : 'auto',
+        left: isKeyboardOpen ? '0' : 'auto',
+        right: isKeyboardOpen ? '0' : 'auto',
+        zIndex: isKeyboardOpen ? 1000 : 'auto',
+      }}
+    >
       <div className="flex gap-2 items-end">
         <div className="flex-1 chat-input-container">
           <Textarea
@@ -103,6 +148,12 @@ export const ChatInput = ({
             placeholder={placeholder}
             disabled={disabled || sending}
             className="text-input resize-none min-h-[44px] max-h-[120px] pr-12"
+            style={{
+              // iOS-specific touch handling
+              touchAction: 'manipulation',
+              WebkitAppearance: 'none',
+              WebkitUserSelect: 'text',
+            }}
             rows={1}
           />
         </div>

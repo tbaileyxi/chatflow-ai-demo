@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { BatchUpdater, useDebounce } from '@/utils/performance';
+import { useIOSKeyboard } from '@/hooks/useIOSKeyboard';
 
 interface Message {
   id: string;
@@ -25,11 +26,12 @@ export const RealtimeMessageHandler = ({
 }: RealtimeMessageHandlerProps) => {
   const batchUpdaterRef = useRef<BatchUpdater>();
   const channelsRef = useRef<ReturnType<typeof supabase.channel>[]>([]);
+  const { isTyping } = useIOSKeyboard();
 
-  // Debounce frequent updates for better performance
+  // Longer debounce when user is typing to prevent iOS scroll jumps
   const debouncedUpdate = useDebounce((messages: Message[]) => {
     onMessagesUpdate(messages);
-  }, 100);
+  }, isTyping ? 500 : 100);
 
   // Cleanup function for channels
   const cleanupChannels = useCallback(() => {
@@ -82,8 +84,15 @@ export const RealtimeMessageHandler = ({
             }
           }
 
-          // Use immediate update for new messages to feel instant
-          onNewMessage(newMessage);
+          // Don't immediately update during typing on iOS to prevent jumps
+          if (!isTyping) {
+            onNewMessage(newMessage);
+          } else {
+            // Queue the message for later when typing stops
+            if (batchUpdaterRef.current) {
+              batchUpdaterRef.current.add(newMessage);
+            }
+          }
         }
       )
       .on(

@@ -29,6 +29,16 @@ export default {
 			}
 		},
 		extend: {
+			height: {
+				'screen-dynamic': '100dvh',
+				'screen-small': '100svh', 
+				'screen-large': '100lvh',
+			},
+			minHeight: {
+				'screen-dynamic': '100dvh',
+				'screen-small': '100svh',
+				'screen-large': '100lvh',
+			},
 			fontFamily: {
 				sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'sans-serif'],
 			},
