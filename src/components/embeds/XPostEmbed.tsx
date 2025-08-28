@@ -42,7 +42,7 @@ export function XPostEmbed({ embedCode }: XPostEmbedProps) {
     if (urlMatch) {
       const tweetUrl = urlMatch[0];
       return (
-        <div ref={containerRef} className="twitter-embed w-full max-w-full overflow-hidden">
+        <div ref={containerRef} className="twitter-embed w-full overflow-hidden">
           {isLoading && (
             <div className="flex items-center justify-center p-4 text-muted-foreground">
               <div className="text-sm">Loading tweet...</div>
@@ -52,7 +52,14 @@ export function XPostEmbed({ embedCode }: XPostEmbedProps) {
             className="twitter-tweet" 
             data-conversation="none" 
             data-theme="auto"
-            style={{ maxWidth: '100%' }}
+            style={{ 
+              maxWidth: '100%',
+              width: '100%',
+              minWidth: 0,
+              // iOS-specific fixes for embed width
+              WebkitBoxSizing: 'border-box',
+              boxSizing: 'border-box'
+            }}
           >
             <a href={tweetUrl}></a>
           </blockquote>
@@ -66,8 +73,14 @@ export function XPostEmbed({ embedCode }: XPostEmbedProps) {
   return (
     <div 
       ref={containerRef}
-      className="embed-content w-full max-w-full overflow-hidden"
-      style={{ maxWidth: '100%', minWidth: 0 }}
+      className="embed-content w-full overflow-hidden"
+      style={{ 
+        maxWidth: '100%', 
+        minWidth: 0,
+        // Ensure iOS compatibility for X embeds
+        WebkitOverflowScrolling: 'auto',
+        overflowX: 'visible'
+      }}
       dangerouslySetInnerHTML={{ __html: sanitized }} 
     />
   );

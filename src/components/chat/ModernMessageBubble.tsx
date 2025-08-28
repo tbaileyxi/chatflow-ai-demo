@@ -119,7 +119,9 @@ export const ModernMessageBubble = memo(({
 
       {/* Message Content */}
       <div className={cn(
-        "flex-1 min-w-0 max-w-[75%]",
+        "flex-1 min-w-0",
+        // Use wider max-width for embeds to prevent X embed cutoff
+        message.embed_code ? "max-w-[90%]" : "max-w-[75%]",
         isOwnMessage ? "text-right" : "text-left"
       )}>
         {/* User info with timestamp */}
