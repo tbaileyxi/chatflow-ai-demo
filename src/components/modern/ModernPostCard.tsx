@@ -142,9 +142,10 @@ interface ModernPostCardProps {
   };
   isSpotlight?: boolean;
   index?: number;
+  disableReply?: boolean;
 }
 
-export const ModernPostCard = ({ post, isSpotlight = false, index = 0 }: ModernPostCardProps) => {
+export const ModernPostCard = ({ post, isSpotlight = false, index = 0, disableReply = false }: ModernPostCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [reactions, setReactions] = useState(post.post_reactions);
@@ -429,15 +430,17 @@ export const ModernPostCard = ({ post, isSpotlight = false, index = 0 }: ModernP
             <span className="text-sm font-medium">{fireCount}</span>
           </AnimatedButton>
 
-          <AnimatedButton
-            variant="ghost"
-            size="sm"
-            animation="scale"
-            className="h-9 px-3 gap-2 rounded-full hover:bg-muted/50"
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span className="text-sm font-medium">Reply</span>
-          </AnimatedButton>
+          {!disableReply && (
+            <AnimatedButton
+              variant="ghost"
+              size="sm"
+              animation="scale"
+              className="h-9 px-3 gap-2 rounded-full hover:bg-muted/50"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span className="text-sm font-medium">Reply</span>
+            </AnimatedButton>
+          )}
         </div>
 
         <AnimatedButton

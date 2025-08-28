@@ -138,9 +138,10 @@ interface PostCardProps {
     }>;
   };
   isSpotlight?: boolean;
+  disableReply?: boolean;
 }
 
-export const PostCard = ({ post, isSpotlight = false }: PostCardProps) => {
+export const PostCard = ({ post, isSpotlight = false, disableReply = false }: PostCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [reactions, setReactions] = useState(post.post_reactions);

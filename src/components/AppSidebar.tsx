@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import { StartHuddleDialog } from '@/components/StartHuddleDialog';
 import { useAuth } from '@/hooks/useAuth';
+import { useHuddleStatus } from '@/hooks/useHuddleStatus';
 import { HuddleSearchSidebar } from "./HuddleSearchSidebar";
 import { supabase } from '@/integrations/supabase/client';
 
@@ -24,6 +25,7 @@ export function AppSidebar() {
   const isCollapsed = state === 'collapsed';
   const { user, isAdmin, signOut } = useAuth();
   const [huddles, setHuddles] = useState<Huddle[]>([]);
+  const huddleStatus = useHuddleStatus();
 
   useEffect(() => {
     if (user) {
@@ -204,7 +206,18 @@ export function AppSidebar() {
             <Separator className="bg-sidebar-border" />
             <SidebarGroup>
               <SidebarGroupLabel className="flex items-center justify-between text-sidebar-foreground font-semibold">
-                {!isCollapsed && 'Your Side Huddles'}
+                <div className="flex items-center gap-2">
+                  {!isCollapsed && 'Your Side Huddles'}
+                  {!isCollapsed && huddleStatus.totalMembers > 0 && (
+                    <Badge 
+                      variant={huddleStatus.hasUnread ? "destructive" : huddleStatus.onlineMembers > 0 ? "default" : "secondary"}
+                      className="text-xs px-1.5 py-0.5"
+                    >
+                      {huddleStatus.totalMembers} • {huddleStatus.onlineMembers} online
+                      {huddleStatus.hasUnread && " • new"}
+                    </Badge>
+                  )}
+                </div>
                 {!isCollapsed && (
                   <StartHuddleDialog 
                     onHuddleCreated={fetchUserHuddles}

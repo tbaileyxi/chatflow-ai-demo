@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PostCard } from "@/components/PostCard";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { Helmet } from "react-helmet-async";
 
 interface SpotlightPost {
   id: string;
@@ -39,6 +40,37 @@ export const SpotlightPost = () => {
     
     fetchPost();
   }, [id]);
+
+  // Update document title and meta tags when post loads
+  useEffect(() => {
+    if (post) {
+      const title = `${post.author?.display_name || post.team?.name} on Side Huddle`;
+      const description = post.content.length > 160 
+        ? post.content.substring(0, 157) + "..." 
+        : post.content;
+      
+      document.title = title;
+      
+      // Update meta tags for better sharing
+      const updateMetaTag = (property: string, content: string) => {
+        let meta = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
+        if (!meta) {
+          meta = document.createElement('meta');
+          meta.setAttribute('property', property);
+          document.head.appendChild(meta);
+        }
+        meta.content = content;
+      };
+      
+      updateMetaTag('og:title', title);
+      updateMetaTag('og:description', description);
+      updateMetaTag('og:url', window.location.href);
+      updateMetaTag('og:type', 'article');
+      if (post.media_url) {
+        updateMetaTag('og:image', post.media_url);
+      }
+    }
+  }, [post]);
 
   const fetchPost = async () => {
     try {
@@ -111,28 +143,47 @@ export const SpotlightPost = () => {
     );
   }
 
-  return (
-    <div className="container max-w-2xl mx-auto p-4">
-      <div className="mb-4">
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={() => window.location.href = '/'}
-          className="text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Feed
-        </Button>
-      </div>
-      
-      <div className="bg-gradient-to-r from-spotlight/10 to-transparent rounded-lg p-4 mb-4">
-        <h2 className="text-lg font-semibold text-spotlight mb-2">Spotlight Post</h2>
-        <p className="text-sm text-muted-foreground">
-          Join the conversation on Side Huddle to see more content like this!
-        </p>
-      </div>
+  const title = post ? `${post.author?.display_name || post.team?.name} on Side Huddle` : "Side Huddle Post";
+  const description = post ? (post.content.length > 160 ? post.content.substring(0, 157) + "..." : post.content) : "Join the conversation on Side Huddle";
 
-      <PostCard post={post} isSpotlight />
-    </div>
+  return (
+    <>
+      <Helmet>
+        <title>{title}</title>
+        <meta name="description" content={description} />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:url" content={window.location.href} />
+        <meta property="og:type" content="article" />
+        {post?.media_url && <meta property="og:image" content={post.media_url} />}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={description} />
+        {post?.media_url && <meta name="twitter:image" content={post.media_url} />}
+      </Helmet>
+      
+      <div className="container max-w-2xl mx-auto p-4">
+        <div className="mb-4">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => window.location.href = '/'}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Feed
+          </Button>
+        </div>
+        
+        <div className="bg-gradient-to-r from-spotlight/10 to-transparent rounded-lg p-4 mb-4">
+          <h2 className="text-lg font-semibold text-spotlight mb-2">Spotlight Post</h2>
+          <p className="text-sm text-muted-foreground">
+            Join the conversation on Side Huddle to see more content like this!
+          </p>
+        </div>
+
+        <PostCard post={post} isSpotlight />
+      </div>
+    </>
   );
 };
