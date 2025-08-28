@@ -406,14 +406,16 @@ All colors MUST be HSL.
   }
   .embed-chat .twitter-tweet,
   .embed-chat .embed-content,
-  .embed-chat iframe,
   .embed-chat video,
   .embed-chat object,
   .embed-chat embed {
     width: 100% !important;
     max-width: 100% !important;
-    height: auto !important;
-    min-height: 0 !important;
+    display: block;
+  }
+  .embed-chat iframe {
+    width: 100% !important;
+    max-width: 100% !important;
     display: block;
   }
 
