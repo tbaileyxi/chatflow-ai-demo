@@ -103,15 +103,10 @@ export const RealtimeMessageHandler = ({
             }
           }
 
-          // Don't immediately update during typing on iOS to prevent jumps
-          if (!isTyping && !isTypingLockRef.current) {
-            onNewMessage(newMessage);
-          } else {
-            console.log('[Realtime] Queuing message due to typing lock');
-            // Queue the message for later when typing stops
-            if (batchUpdaterRef.current) {
-              batchUpdaterRef.current.add(newMessage);
-            }
+          // Always queue messages during any activity to prevent flashing
+          console.log('[Realtime] Queuing message to prevent flashing');
+          if (batchUpdaterRef.current) {
+            batchUpdaterRef.current.add(newMessage);
           }
         }
       )

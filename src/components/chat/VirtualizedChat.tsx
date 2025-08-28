@@ -40,28 +40,8 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
 
   // Aggressively throttled scroll state handler with debugging
   const handleScrollStateChange = useCallback((isScrolling: boolean) => {
-    // Avoid redundant state updates & logs
-    if (lastScrollStateRef.current === isScrolling) return;
-    lastScrollStateRef.current = isScrolling;
-    console.log(`[VirtualizedChat] Scroll state change: ${isScrolling}`);
-
-    // Debounce the state update
-    if (!scrollDebounceRef.current) {
-      scrollDebounceRef.current = debounce((scrolling: boolean) => {
-        console.log(`[VirtualizedChat] Setting scroll state: ${scrolling}`);
-        setIsUserScrolling(scrolling);
-      }, 750);
-    }
-    scrollDebounceRef.current(isScrolling);
-
-    if (scrollTimeoutRef.current) {
-      clearTimeout(scrollTimeoutRef.current);
-    }
-    // Reset scroll state after user stops scrolling
-    scrollTimeoutRef.current = setTimeout(() => {
-      lastScrollStateRef.current = false;
-      setIsUserScrolling(false);
-    }, 900);
+    // Completely disable scroll state updates to prevent flashing
+    return;
   }, []);
 
   useEffect(() => {
@@ -165,7 +145,7 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
           if (loadMoreTop) await loadMoreTop();
         }}
         // Conditional follow output - disable during typing to prevent jumps
-        followOutput={isTyping || isUserScrolling ? false : followOutput}
+        followOutput={isTyping ? false : followOutput}
         alignToBottom={alignToBottom}
         overscan={overscan ?? 400}
         scrollSeekConfiguration={{
