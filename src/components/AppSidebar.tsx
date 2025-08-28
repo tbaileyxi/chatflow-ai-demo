@@ -35,6 +35,8 @@ export function AppSidebar() {
 
   // Update unread status and listen for events
   useEffect(() => {
+    if (!user) return;
+
     const currentPath = window.location.pathname;
     const huddleMatch = currentPath.match(/\/huddle\/(.+)/);
 
@@ -59,9 +61,23 @@ export function AppSidebar() {
     window.addEventListener('huddleRead', onHuddleRead);
     window.addEventListener('huddlesChanged', onHuddlesChanged);
 
+    // Set up real-time subscription for sidebar huddle list updates
+    const sidebarChannel = supabase
+      .channel('sidebar-huddle-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'huddles' }, 
+        () => fetchUserHuddles()
+      )
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'huddle_members' }, 
+        () => fetchUserHuddles()
+      )
+      .subscribe();
+
     return () => {
       window.removeEventListener('huddleRead', onHuddleRead);
       window.removeEventListener('huddlesChanged', onHuddlesChanged);
+      supabase.removeChannel(sidebarChannel);
     };
   }, [user]);
 
