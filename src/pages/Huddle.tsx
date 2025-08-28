@@ -743,7 +743,7 @@ useEffect(() => {
               </p>
             </div>
           </div>
-          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
             {user?.id === huddle.owner_id && !huddle.is_verified && (
               <HuddleVerificationDialog huddleId={huddle.id} isVerified={huddle.is_verified} />
             )}
@@ -757,7 +757,7 @@ useEffect(() => {
               }}
               isOwner={user?.id === huddle.owner_id}
             />
-            <InviteButton huddleId={huddle.id} />
+            <InviteButton huddleId={huddle.id} className="w-full sm:w-auto" />
             <HuddleManagement huddleId={huddle.id} ownerId={huddle.owner_id} huddle={huddle} />
           </div>
         </div>

@@ -11,6 +11,22 @@ const debounce = (func: Function, wait: number) => {
   };
 };
 
+// Dynamic size estimation for embeds
+const estimateItemSize = (): number => {
+  const embedContainers = document.querySelectorAll('.x-embed-container');
+  let maxHeight = 120; // default
+  
+  embedContainers.forEach(container => {
+    const height = (container as HTMLElement).offsetHeight;
+    if (height > maxHeight && height <= 700) { // cap at 700px
+      maxHeight = height;
+    }
+  });
+  
+  console.log('[VirtualizedChat] Estimated item size:', maxHeight);
+  return maxHeight;
+};
+
 interface VirtualizedChatProps<T> {
   items: T[];
   loadMoreTop?: () => Promise<void> | void;
@@ -27,23 +43,46 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
   const data = useMemo(() => items, [items]);
   const { isOpen: isKeyboardOpen, height: keyboardHeight, isTyping } = useIOSKeyboard();
 
-  // Ensure the list always has a real height even if parents aren't sized correctly
+  // State management for scroll behavior
   const containerRef = useRef<HTMLDivElement | null>(null);
   const virtuosoRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState<number | null>(null);
-  const [isUserScrolling, setIsUserScrolling] = useState(false);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
-  const lastScrollStateRef = useRef<boolean>(false);
-  const scrollDebounceRef = useRef<any>();
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const [shouldFollowOutput, setShouldFollowOutput] = useState(true);
+  const lastItemCountRef = useRef(data.length);
+  
+  // Debounced follow output function to prevent flashing
+  const debouncedSetShouldFollow = useMemo(
+    () => debounce((shouldFollow: boolean) => {
+      console.log('[VirtualizedChat] Setting follow output:', shouldFollow);
+      setShouldFollowOutput(shouldFollow);
+    }, 300),
+    []
+  );
 
-  // Aggressively throttled scroll state handler with debugging
-  const handleScrollStateChange = useCallback((isScrolling: boolean) => {
-    // Completely disable scroll state updates to prevent flashing
-    return;
-  }, []);
+  // Monitor scroll position to determine if user is at bottom
+  const checkIfAtBottom = useCallback(() => {
+    if (!scrollRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const threshold = 50; // pixels from bottom
+    const atBottom = scrollHeight - scrollTop - clientHeight < threshold;
+    
+    if (atBottom !== isAtBottom) {
+      setIsAtBottom(atBottom);
+      debouncedSetShouldFollow(atBottom);
+      console.log('[VirtualizedChat] At bottom:', atBottom);
+    }
+  }, [isAtBottom, debouncedSetShouldFollow]);
 
+  // Handle scroll events with throttling
+  const handleScroll = useMemo(
+    () => debounce(checkIfAtBottom, 100),
+    [checkIfAtBottom]
+  );
+
+  // Effect to handle height calculations and scroll event listeners
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -79,11 +118,36 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
     return () => {
       window.removeEventListener("resize", onResize);
       ro?.disconnect();
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
     };
   }, [isKeyboardOpen, keyboardHeight]);
+
+  // Effect to attach scroll listener
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    
+    const scrollElement = scrollRef.current;
+    scrollElement.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      scrollElement.removeEventListener('scroll', handleScroll);
+    };
+  }, [handleScroll]);
+
+  // iOS keyboard focus handling
+  useEffect(() => {
+    if (!isKeyboardOpen || !scrollRef.current) return;
+
+    const handleInputFocus = () => {
+      setTimeout(() => {
+        if (scrollRef.current && isAtBottom) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      }, 300);
+    };
+
+    window.addEventListener('focusin', handleInputFocus);
+    return () => window.removeEventListener('focusin', handleInputFocus);
+  }, [isKeyboardOpen, isAtBottom]);
 
   // Removed dynamic default item height estimation to avoid re-render churn
   // This prevents flashing during embed height changes
@@ -103,16 +167,20 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
       <Virtuoso
         ref={virtuosoRef}
         style={{
-          height: height ?? Math.max(Math.floor(window.innerHeight * 0.7), 320)
+          height: height ?? Math.max(Math.floor(window.innerHeight * 0.7), 320),
+          scrollBehavior: 'smooth'
         }}
         data={data}
         itemContent={itemContent}
         computeItemKey={getItemKey ? (index, item) => getItemKey(item) : undefined}
-        defaultItemHeight={defaultItemHeight ?? 120}
-        increaseViewportBy={{ top: overscan ?? 200, bottom: overscan ?? 400 }}
-        initialTopMostItemIndex={alignToBottom ? (data.length > 0 ? data.length - 1 : 0) : (initialIndex ?? 0)}
-        followOutput="auto"
-        atBottomStateChange={setIsAtBottom}
+        defaultItemHeight={defaultItemHeight ?? estimateItemSize()}
+        increaseViewportBy={{ top: 600, bottom: 600 }}
+        initialTopMostItemIndex={alignToBottom ? Math.max(0, data.length - 1) : (initialIndex ?? 0)}
+        followOutput={shouldFollowOutput ? "auto" : false}
+        atBottomStateChange={(atBottom) => {
+          console.log('[VirtualizedChat] Virtuoso atBottom:', atBottom);
+          setIsAtBottom(atBottom);
+        }}
         startReached={loadMoreTop}
         scrollerRef={(ref) => {
           scrollRef.current = ref as HTMLDivElement;
