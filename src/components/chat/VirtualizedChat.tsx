@@ -114,33 +114,37 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
         height: isKeyboardOpen ? `calc(100dvh - ${keyboardHeight}px)` : '100%'
       }}
     >
-      <div
-        ref={scrollRef}
+      <Virtuoso
+        ref={virtuosoRef}
         style={{
-          height: height ?? Math.max(Math.floor(window.innerHeight * 0.7), 320),
-          overflow: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          overscrollBehavior: 'contain',
-          scrollBehavior: 'smooth',
-          display: 'flex',
-          flexDirection: 'column'
+          height: height ?? Math.max(Math.floor(window.innerHeight * 0.7), 320)
         }}
-      >
-        <div 
-          style={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            minHeight: '100%',
-            justifyContent: 'flex-end'
-          }}
-        >
-          {data.map((item, index) => (
-            <div key={getItemKey ? getItemKey(item) : index}>
-              {itemContent(index, item)}
-            </div>
-          ))}
-        </div>
-      </div>
+        data={data}
+        itemContent={itemContent}
+        computeItemKey={getItemKey ? (index, item) => getItemKey(item) : undefined}
+        defaultItemHeight={defaultItemHeight}
+        overscan={overscan}
+        alignToBottom={alignToBottom}
+        initialTopMostItemIndex={alignToBottom ? Math.max(0, data.length - 1) : initialIndex}
+        followOutput={followOutput}
+        startReached={loadMoreTop}
+        scrollerRef={(ref) => {
+          scrollRef.current = ref as HTMLDivElement;
+        }}
+        components={{
+          Scroller: React.forwardRef<HTMLDivElement, any>((props, ref) => (
+            <div
+              {...props}
+              ref={ref}
+              style={{
+                ...(props.style || {}),
+                WebkitOverflowScrolling: 'touch',
+                overscrollBehavior: 'contain'
+              }}
+            />
+          ))
+        }}
+      />
     </div>
   );
 }
