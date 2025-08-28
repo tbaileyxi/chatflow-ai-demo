@@ -315,6 +315,52 @@ All colors MUST be HSL.
   /* Prevent layout overflow in placeholders */
   .media-placeholder { overflow: hidden; contain: layout paint; }
 
+  /* Embed containment styles for consistent inline display */
+  .embed-container {
+    width: 100%;
+    max-width: 100%;
+    contain: layout style;
+    overflow: hidden;
+  }
+
+  .embed-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  .embed-content iframe,
+  .embed-content video,
+  .embed-content object,
+  .embed-content embed {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    object-fit: contain;
+    display: block;
+  }
+
+  /* Twitter-specific embed fixes */
+  .twitter-tweet {
+    margin: 0 auto !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .twitter-tweet iframe {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* X/Twitter video fixes */
+  .twitter-tweet video,
+  .twitter-tweet .video-player {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    object-fit: contain !important;
+  }
+
   /* iOS zoom prevention and mobile typing improvements */
   @supports (-webkit-touch-callout: none) {
     input, textarea, select { font-size: 16px !important; }

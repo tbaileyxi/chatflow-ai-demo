@@ -20,7 +20,7 @@ declare global {
   }
 }
 
-// Twitter Embed Component
+// Twitter Embed Component with inline containment
 export const TwitterEmbed = ({ embedCode }: { embedCode: string }) => {
   const [isLoading, setIsLoading] = useState(true);
 
@@ -78,22 +78,31 @@ export const TwitterEmbed = ({ embedCode }: { embedCode: string }) => {
     if (urlMatch) {
       const tweetUrl = urlMatch[0];
       return (
-        <div className="twitter-embed min-h-[200px] relative">
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded">
-              <div className="text-sm text-muted-foreground">Loading tweet...</div>
-            </div>
-          )}
-          <blockquote className="twitter-tweet" data-conversation="none">
-            <a href={tweetUrl}></a>
-          </blockquote>
+        <div className="embed-container max-w-full overflow-hidden">
+          <div className="twitter-embed min-h-[200px] max-w-full relative">
+            {isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded">
+                <div className="text-sm text-muted-foreground">Loading tweet...</div>
+              </div>
+            )}
+            <blockquote className="twitter-tweet max-w-full" data-conversation="none" data-width="100%">
+              <a href={tweetUrl}></a>
+            </blockquote>
+          </div>
         </div>
       );
     }
   }
 
-  // For other embeds, use dangerouslySetInnerHTML as fallback
-  return <div dangerouslySetInnerHTML={{ __html: embedCode }} />;
+  // For other embeds, use dangerouslySetInnerHTML with containment
+  return (
+    <div className="embed-container max-w-full overflow-hidden">
+      <div 
+        className="embed-content max-w-full"
+        dangerouslySetInnerHTML={{ __html: embedCode }} 
+      />
+    </div>
+  );
 };
 
 interface PostCardProps {

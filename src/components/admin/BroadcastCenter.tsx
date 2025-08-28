@@ -343,7 +343,9 @@ export const BroadcastCenter = () => {
         // Broadcast the source team's message to all destination teams' huddles
         const allTargetTeams = [sourceTeam, ...selectedTeams];
         const huddleContent = tags.trim() ? `${finalContent} ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}` : finalContent;
-        const huddleResult = await broadcastToHuddles({
+        
+        // Ensure embed_code is properly included for X video embeds
+        const huddlePostData = {
           content: huddleContent,
           team_id: sourceTeam, // Keep source team context
           origin_team_id: sourceTeam, // Track the original source team
@@ -355,7 +357,10 @@ export const BroadcastCenter = () => {
           embed_code: messageType === 'embed' ? embedCode : null,
           is_team_agent_message: true,
           post_id: createdPost.id // Include the post ID for linking
-        }, allTargetTeams);
+        };
+        
+        console.log('Broadcasting to huddles with data:', huddlePostData);
+        const huddleResult = await broadcastToHuddles(huddlePostData, allTargetTeams);
 
         // Add delivery status for each team's huddles
         for (const teamId of allTargetTeams) {
