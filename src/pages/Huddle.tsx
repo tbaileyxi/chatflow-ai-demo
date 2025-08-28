@@ -743,7 +743,7 @@ useEffect(() => {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:flex-wrap">
             {user?.id === huddle.owner_id && !huddle.is_verified && (
               <HuddleVerificationDialog huddleId={huddle.id} isVerified={huddle.is_verified} />
             )}
