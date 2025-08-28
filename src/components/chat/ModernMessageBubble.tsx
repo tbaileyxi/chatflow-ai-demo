@@ -199,20 +199,20 @@ export const ModernMessageBubble = ({
                 />
               )}
 
-              {/* Media Content */}
+              {/* Media Content with layout shift prevention */}
               {message.media_url && (
-                <div className="mt-3">
+                <div className="mt-3 media-placeholder" style={{ aspectRatio: '16/9' }}>
                   <MediaViewer 
                     mediaUrl={message.media_url} 
                     mediaType={message.media_type || 'image'}
-                    className="rounded-xl overflow-hidden"
+                    className="rounded-xl overflow-hidden w-full h-full object-cover"
                   />
                 </div>
               )}
 
-              {/* Embed Content */}
+              {/* Embed Content with layout shift prevention */}
               {message.embed_code && (
-                <div className="mt-3">
+                <div className="mt-3 media-placeholder" style={{ minHeight: '300px' }}>
                   <LazyEmbed>
                     <TwitterEmbed embedCode={message.embed_code} />
                   </LazyEmbed>

@@ -766,11 +766,14 @@ useEffect(() => {
         </div>
       </div>
 
-      <div className="flex-1 w-full flex flex-col min-h-0">
+      <div className="flex-1 w-full flex flex-col min-h-0 chat-container">
         {/* Messages Area */}
         <VirtualizedChat
           items={messages}
           loadMoreTop={loadOlderMessages}
+          getItemKey={(message) => message.id}
+          defaultItemHeight={120}
+          overscan={300}
           itemContent={(index, message) => {
             const previousMessage = index > 0 ? messages[index - 1] : null;
             const isConsecutive = previousMessage && 
@@ -778,33 +781,37 @@ useEffect(() => {
               new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() < 300000; // 5 minutes
             
             return (
-              <ModernMessageBubble
-                key={message.id}
-                message={message}
-                previousMessage={previousMessage}
-                isConsecutive={isConsecutive}
-                onAddReaction={addReaction}
-                currentUserId={user?.id}
-                teamName={huddle.team?.name}
-                teamLogoUrl={huddle.team?.logo_url}
-                teamId={huddle.team?.id}
-                originTeamName={message.origin_teams?.name}
-                onPollVote={handlePollVote}
-                pollVotes={pollVotes[message.id]}
-                userVote={userVotes[message.id]}
-              />
+              <div className="message-enter">
+                <ModernMessageBubble
+                  key={message.id}
+                  message={message}
+                  previousMessage={previousMessage}
+                  isConsecutive={isConsecutive}
+                  onAddReaction={addReaction}
+                  currentUserId={user?.id}
+                  teamName={huddle.team?.name}
+                  teamLogoUrl={huddle.team?.logo_url}
+                  teamId={huddle.team?.id}
+                  originTeamName={message.origin_teams?.name}
+                  onPollVote={handlePollVote}
+                  pollVotes={pollVotes[message.id]}
+                  userVote={userVotes[message.id]}
+                />
+              </div>
             );
           }}
         />
 
-        {/* Enhanced Typing Indicator */}
-        <EnhancedTypingIndicator 
-          typingUsers={typingUsers.map(name => ({ 
-            id: name, 
-            name, 
-            avatar: undefined 
-          }))} 
-        />
+        {/* Enhanced Typing Indicator with animation */}
+        <div className="px-6 py-2">
+          <EnhancedTypingIndicator 
+            typingUsers={typingUsers.map(name => ({ 
+              id: name, 
+              name, 
+              avatar: undefined 
+            }))} 
+          />
+        </div>
 
         {/* Modern Message Input */}
         <ModernChatInput

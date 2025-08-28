@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Chat animations */
+/* Chat animations and smooth scrolling */
 @keyframes slide-up {
   0% {
     transform: translateY(10px);
@@ -27,6 +27,46 @@
   90% {
     transform: translate3d(0, -1px, 0);
   }
+}
+
+@keyframes typing-dots {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Performance-optimized chat container */
+.chat-container {
+  scroll-behavior: smooth;
+  will-change: scroll-position;
+  contain: layout style paint;
+  transform: translateZ(0);
+}
+
+/* Media placeholder to prevent layout shifts */
+.media-placeholder {
+  background: hsl(var(--muted));
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  aspect-ratio: 16/9;
+  contain: layout;
+}
+
+/* Smooth message transitions */
+.message-enter {
+  animation: slide-up 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.typing-animation {
+  animation: typing-dots 1.4s infinite;
 }
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
