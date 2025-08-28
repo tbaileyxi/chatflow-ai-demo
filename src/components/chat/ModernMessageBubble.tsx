@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import React, { useState, useCallback, memo, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ interface ModernMessageBubbleProps {
 
 const QUICK_REACTIONS = ['👍', '👎', '❤️', '😂', '😮', '😢', '🔥', '💯'];
 
-export const ModernMessageBubble = ({ 
+export const ModernMessageBubble = memo(({ 
   message, 
   previousMessage, 
   isConsecutive = false,
@@ -45,20 +45,31 @@ export const ModernMessageBubble = ({
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [hovering, setHovering] = useState(false);
   
-  const isOwnMessage = message.user_id === currentUserId;
-  const isTeamAgent = !!message.is_team_agent_message;
-  const showProfile = !isConsecutive || previousMessage?.user_id !== message.user_id;
-  const reactionsEnabled = !message.poll_data;
-  const showContent = message.content && !(message.poll_data && typeof message.poll_data.question === 'string' && message.content.trim() === message.poll_data.question.trim());
-  
-  // Extract tags from content
-  const extractTags = (content: string) => {
+  // Memoize expensive calculations
+  const messageData = useMemo(() => {
+    const isOwnMessage = message.user_id === currentUserId;
+    const isTeamAgent = !!message.is_team_agent_message;
+    const showProfile = !isConsecutive || previousMessage?.user_id !== message.user_id;
+    const reactionsEnabled = !message.poll_data;
+    const showContent = message.content && !(message.poll_data && typeof message.poll_data.question === 'string' && message.content.trim() === message.poll_data.question.trim());
+    
+    // Extract tags from content
     const tagRegex = /#[\w]+/g;
-    return content.match(tagRegex) || [];
-  };
-  
-  const tags = extractTags(message.content || '');
-  const contentWithoutTags = (message.content || '').replace(/#[\w]+/g, '').trim();
+    const tags = message.content?.match(tagRegex) || [];
+    const contentWithoutTags = (message.content || '').replace(/#[\w]+/g, '').trim();
+
+    return {
+      isOwnMessage,
+      isTeamAgent,
+      showProfile,
+      reactionsEnabled,
+      showContent,
+      tags,
+      contentWithoutTags
+    };
+  }, [message, previousMessage, currentUserId, isConsecutive]);
+
+  const { isOwnMessage, isTeamAgent, showProfile, reactionsEnabled, showContent, tags, contentWithoutTags } = messageData;
   
   const handleReaction = useCallback((emoji: string) => {
     if (onAddReaction) {
@@ -346,4 +357,15 @@ export const ModernMessageBubble = ({
       </div>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison function for React.memo
+  return (
+    prevProps.message.id === nextProps.message.id &&
+    prevProps.message.content === nextProps.message.content &&
+    prevProps.message.reactions === nextProps.message.reactions &&
+    prevProps.currentUserId === nextProps.currentUserId &&
+    prevProps.isConsecutive === nextProps.isConsecutive &&
+    JSON.stringify(prevProps.pollVotes) === JSON.stringify(nextProps.pollVotes) &&
+    prevProps.userVote === nextProps.userVote
+  );
+});

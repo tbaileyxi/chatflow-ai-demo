@@ -8,6 +8,17 @@ export default {
 		"./app/**/*.{ts,tsx}",
 		"./src/**/*.{ts,tsx}",
 	],
+	// Enable better purging for performance
+	safelist: [
+		// Keep essential dynamic classes
+		'bg-primary',
+		'text-primary-foreground',
+		'bg-muted',
+		'text-foreground',
+		'animate-pulse',
+		'opacity-0',
+		'opacity-100',
+	],
 	prefix: "",
 	theme: {
 		container: {
