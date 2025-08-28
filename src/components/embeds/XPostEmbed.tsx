@@ -25,9 +25,9 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
       return false;
     }
     
-    // Check if height hasn't changed for 500ms
+    // Check if height hasn't changed for 750ms
     if (heightStabilityRef.current.height === currentHeight) {
-      return now - heightStabilityRef.current.timestamp > 500;
+      return now - heightStabilityRef.current.timestamp > 750;
     } else {
       heightStabilityRef.current = { height: currentHeight, timestamp: now };
       return false;
@@ -37,6 +37,13 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
   useEffect(() => {
     renderCountRef.current++;
     console.log(`[XPostEmbed] Render ${renderCountRef.current}, embedCode: ${embedCode.substring(0, 50)}...`);
+
+    if (renderCountRef.current > 3) {
+      console.warn('[XPostEmbed] Render count exceeded 3, using static fallback');
+      setIsLoading(false);
+      document.body.classList.remove('embed-loading');
+      return;
+    }
     
     let cancelled = false;
     let fallbackTimeout: NodeJS.Timeout;
@@ -51,6 +58,7 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
         loadedKeyRef.current = embedCode;
         loadCalledRef.current = true;
         setIsLoading(true);
+        document.body.classList.add('embed-loading');
 
         console.log(`[XPostEmbed] Loading widgets for: ${embedCode.substring(0, 30)}...`);
 
@@ -84,6 +92,7 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
             if (rendered && checkHeightStability()) {
               console.log(`[XPostEmbed] Height stabilized, stopping loading`);
               setIsLoading(false);
+              document.body.classList.remove('embed-loading');
               observerRef.current?.disconnect();
             }
           });
@@ -99,9 +108,10 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
             if (!cancelled) {
               console.log(`[XPostEmbed] Fallback timeout reached`);
               setIsLoading(false);
+              document.body.classList.remove('embed-loading');
               observerRef.current?.disconnect();
             }
-          }, 5000);
+          }, 6000);
         }
       } catch (e) {
         console.error(`[XPostEmbed] Error loading:`, e);
@@ -116,8 +126,9 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
       observerRef.current?.disconnect();
       clearTimeout(fallbackTimeout);
       heightStabilityRef.current = null;
+      document.body.classList.remove('embed-loading');
     };
-  }, [embedCode, checkHeightStability]);
+  }, [embedCode]);
 
   // Check if it's a Twitter/X URL and convert to blockquote
   if (embedCode.includes('twitter.com') || embedCode.includes('x.com')) {

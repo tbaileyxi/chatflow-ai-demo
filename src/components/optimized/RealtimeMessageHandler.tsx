@@ -34,17 +34,20 @@ export const RealtimeMessageHandler = ({
     if (!isTypingLockRef.current) {
       onMessagesUpdate(messages);
     }
-  }, isTyping ? 750 : 100);
+  }, isTyping ? 800 : 100);
 
   // Lock updates during typing
   useEffect(() => {
+    console.log('[Realtime] Typing state changed:', { isTyping });
     if (isTyping) {
+      console.log('[Realtime] Activating typing lock');
       isTypingLockRef.current = true;
     } else {
-      // Release lock after typing stops
+      // Release lock shortly after typing stops
       const timer = setTimeout(() => {
         isTypingLockRef.current = false;
-      }, 200);
+        console.log('[Realtime] Typing lock released');
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [isTyping]);
@@ -68,7 +71,7 @@ export const RealtimeMessageHandler = ({
     if (batchUpdaterRef.current) {
       batchUpdaterRef.current.destroy();
     }
-    batchUpdaterRef.current = new BatchUpdater(debouncedUpdate, 5, isTyping ? 750 : 150);
+    batchUpdaterRef.current = new BatchUpdater(debouncedUpdate, 5, isTyping ? 800 : 150);
 
     console.log('[Realtime] Setting up optimized subscriptions for huddle', huddleId);
 

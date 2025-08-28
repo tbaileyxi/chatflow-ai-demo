@@ -35,25 +35,25 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
   const scrollTimeoutRef = useRef<NodeJS.Timeout>();
   const lastScrollStateRef = useRef<boolean>(false);
   const scrollDebounceRef = useRef<any>();
+  const [dynamicDefaultItemHeight, setDynamicDefaultItemHeight] = useState<number>(defaultItemHeight ?? 220);
+  const measureEmbedsRef = useRef<() => void>();
 
   // Aggressively throttled scroll state handler with debugging
   const handleScrollStateChange = useCallback((isScrolling: boolean) => {
-    console.log(`[VirtualizedChat] Scroll state change: ${isScrolling}`);
-    
-    // Avoid redundant state updates
+    // Avoid redundant state updates & logs
     if (lastScrollStateRef.current === isScrolling) return;
     lastScrollStateRef.current = isScrolling;
+    console.log(`[VirtualizedChat] Scroll state change: ${isScrolling}`);
 
     // Debounce the state update
     if (!scrollDebounceRef.current) {
       scrollDebounceRef.current = debounce((scrolling: boolean) => {
         console.log(`[VirtualizedChat] Setting scroll state: ${scrolling}`);
         setIsUserScrolling(scrolling);
-      }, 500);
+      }, 750);
     }
-    
     scrollDebounceRef.current(isScrolling);
-    
+
     if (scrollTimeoutRef.current) {
       clearTimeout(scrollTimeoutRef.current);
     }
@@ -61,7 +61,7 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
     scrollTimeoutRef.current = setTimeout(() => {
       lastScrollStateRef.current = false;
       setIsUserScrolling(false);
-    }, 750);
+    }, 900);
   }, []);
 
   useEffect(() => {
@@ -105,6 +105,33 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
     };
   }, [isKeyboardOpen, keyboardHeight]);
 
+  // Dynamically estimate item height based on largest rendered X embed
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const updateEstimate = debounce(() => {
+      if (!containerRef.current) return;
+      const embeds = containerRef.current.querySelectorAll('.x-embed-container');
+      let max = 0;
+      embeds.forEach((el) => {
+        const h = (el as HTMLElement).offsetHeight || 0;
+        if (h > max) max = h;
+      });
+      const capped = Math.min(700, Math.max(220, max));
+      setDynamicDefaultItemHeight((prev) => (Math.abs(prev - capped) > 40 ? capped : prev));
+      console.log('[VirtualizedChat] dynamic default item height:', capped);
+    }, 750);
+
+    updateEstimate();
+
+    const ro = new ResizeObserver(() => updateEstimate());
+    ro.observe(containerRef.current);
+
+    return () => {
+      ro.disconnect();
+    };
+  }, [data.length]);
+
   return (
     <div 
       ref={containerRef} 
@@ -129,7 +156,7 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
         }}
         data={data}
         computeItemKey={(index, item) => (getItemKey ? getItemKey(item) : index)}
-        defaultItemHeight={defaultItemHeight}
+        defaultItemHeight={dynamicDefaultItemHeight}
         // Include max embed height for better estimation
         increaseViewportBy={{ top: 200, bottom: 600 }}
         initialTopMostItemIndex={initialIndex !== undefined ? initialIndex : (alignToBottom ? Math.max(0, data.length - 1) : 0)}

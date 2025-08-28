@@ -234,15 +234,16 @@ export const ModernMessageBubble = memo(({
                 <div 
                   className="mt-3 embed-chat rounded-xl x-embed-container" 
                   style={{ 
-                    contain: 'layout paint', 
+                    contain: 'layout', 
                     contentVisibility: 'auto', 
                     WebkitOverflowScrolling: 'auto',
                     overflowX: 'hidden',
-                    display: 'block',
+                    display: 'flex',
                     position: 'relative',
                     minHeight: 0,
                     WebkitTransform: 'translateZ(0)',
-                    transform: 'translateZ(0)'
+                    transform: 'translateZ(0)',
+                    width: 'calc(100% - var(--avatar-width))'
                   }}
                 >
                   <LazyEmbed>
