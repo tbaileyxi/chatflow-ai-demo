@@ -87,13 +87,13 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
       return (
         <div 
           ref={containerRef} 
-          className="twitter-embed x-embed-container w-full overflow-hidden"
+          className="twitter-embed x-embed-container w-full"
           style={{
-            contain: 'layout',
             position: 'relative',
-            minHeight: 280,
+            minHeight: 0,
             WebkitTransform: 'translateZ(0)',
-            transform: 'translateZ(0)'
+            transform: 'translateZ(0)',
+            overflow: 'visible'
           }}
         >
           {isLoading && (
@@ -124,17 +124,16 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
   return (
     <div 
       ref={containerRef}
-      className="embed-content x-embed-container w-full overflow-hidden"
+      className="embed-content x-embed-container w-full"
       style={{ 
         maxWidth: '100%', 
         minWidth: 0,
-        contain: 'layout',
         position: 'relative',
-        minHeight: 280,
+        minHeight: 0,
         WebkitTransform: 'translateZ(0)',
         transform: 'translateZ(0)',
-        WebkitOverflowScrolling: 'auto',
-        overflowX: 'hidden'
+        WebkitOverflowScrolling: 'touch',
+        overflow: 'visible'
       }}
       dangerouslySetInnerHTML={{ __html: sanitized }} 
     />

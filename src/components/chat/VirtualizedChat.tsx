@@ -30,6 +30,7 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
   // Ensure the list always has a real height even if parents aren't sized correctly
   const containerRef = useRef<HTMLDivElement | null>(null);
   const virtuosoRef = useRef<any>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState<number | null>(null);
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout>();
@@ -86,6 +87,21 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
   // Removed dynamic default item height estimation to avoid re-render churn
   // This prevents flashing during embed height changes
 
+  // Always keep scrolled to bottom on mount and when new items arrive (iOS-safe)
+  useEffect(() => {
+    const sc = scrollRef.current;
+    if (!sc) return;
+    sc.scrollTop = sc.scrollHeight;
+  }, []);
+
+  useEffect(() => {
+    const sc = scrollRef.current;
+    if (!sc) return;
+    const nearBottom = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 120;
+    if (nearBottom || alignToBottom) {
+      sc.scrollTop = sc.scrollHeight;
+    }
+  }, [data, isKeyboardOpen]);
 
   return (
     <div 
@@ -99,19 +115,15 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
       }}
     >
       <div
+        ref={scrollRef}
         style={{
           height: height ?? Math.max(Math.floor(window.innerHeight * 0.7), 320),
           overflow: 'auto',
-          contain: 'strict',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
+          scrollBehavior: 'smooth',
           display: 'flex',
           flexDirection: 'column'
-        }}
-        onLoad={() => {
-          // Scroll to bottom on initial load
-          const container = containerRef.current?.querySelector('div[style*="overflow: auto"]');
-          if (container) {
-            container.scrollTop = container.scrollHeight;
-          }
         }}
       >
         <div 

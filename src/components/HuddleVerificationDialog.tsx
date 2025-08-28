@@ -57,11 +57,12 @@ export const HuddleVerificationDialog = ({
         {trigger || (
           <Button 
             variant="outline" 
-            size="sm"
-            className="border-verified-primary text-verified-primary hover:bg-verified-background"
+            size="xs"
+            className="border-verified-primary text-verified-primary hover:bg-verified-background h-8 px-2 gap-1 sm:h-9 sm:px-3"
           >
-            <Shield className="w-4 h-4 mr-2" />
-            Get Verified
+            <Shield className="w-4 h-4 mr-1" />
+            <span className="hidden sm:inline">Get Verified</span>
+            <span className="sm:hidden inline">Verify</span>
           </Button>
         )}
       </DialogTrigger>
