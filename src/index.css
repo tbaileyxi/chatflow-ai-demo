@@ -351,6 +351,21 @@ All colors MUST be HSL.
     max-width: 100% !important;
     width: 100% !important;
   }
+  /* Ensure rendered tweet container expands fully in chat */
+  .embed-chat .twitter-tweet-rendered {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+  .embed-chat iframe[src*="twitter.com"],
+  .embed-chat iframe[src*="x.com"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: block;
+  }
+  .x-embed, .x-embed * {
+    max-width: 100% !important;
+  }
 
   /* X/Twitter video fixes */
   .twitter-tweet video,

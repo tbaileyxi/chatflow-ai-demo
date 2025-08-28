@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatDistanceToNow } from "date-fns";
 import { MediaViewer } from "@/components/MediaViewer";
-import { TwitterEmbed } from "@/components/PostCard";
 import { LazyEmbed } from "./LazyEmbed";
 import { MakePublicButton } from "@/components/MakePublicButton";
 import { cn } from "@/lib/utils";
+import { XPostEmbed } from "@/components/embeds/XPostEmbed";
 
 interface ModernMessageBubbleProps {
   message: any;
@@ -215,7 +215,7 @@ export const ModernMessageBubble = ({
               {message.embed_code && (
                 <div className="mt-3 embed-chat rounded-xl">
                   <LazyEmbed>
-                    <TwitterEmbed embedCode={message.embed_code} />
+                    <XPostEmbed embedCode={message.embed_code} />
                   </LazyEmbed>
                 </div>
               )}
