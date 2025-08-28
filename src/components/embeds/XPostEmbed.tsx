@@ -90,7 +90,7 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
           className="twitter-embed x-embed-container w-full"
           style={{
             position: 'relative',
-            minHeight: 280,
+            height: 450,
             WebkitTransform: 'translateZ(0)',
             transform: 'translateZ(0)'
           }}
@@ -128,7 +128,7 @@ export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProp
         maxWidth: '100%', 
         minWidth: 0,
         position: 'relative',
-        minHeight: 280,
+        height: 450,
         WebkitTransform: 'translateZ(0)',
         transform: 'translateZ(0)'
       }}

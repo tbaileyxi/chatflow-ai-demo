@@ -108,27 +108,13 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
         data={data}
         itemContent={itemContent}
         computeItemKey={getItemKey ? (index, item) => getItemKey(item) : undefined}
-        defaultItemHeight={defaultItemHeight}
-        increaseViewportBy={{ top: overscan ?? 200, bottom: overscan ?? 200 }}
-        alignToBottom={alignToBottom}
-        initialTopMostItemIndex={alignToBottom ? Math.max(0, data.length - 1) : initialIndex}
-        followOutput={isAtBottom ? 'smooth' : false}
-        atBottomStateChange={setIsAtBottom}
+        defaultItemHeight={defaultItemHeight ?? 120}
+        increaseViewportBy={{ top: 100, bottom: 100 }}
+        initialTopMostItemIndex={data.length > 0 ? data.length - 1 : 0}
+        followOutput={false}
         startReached={loadMoreTop}
         scrollerRef={(ref) => {
           scrollRef.current = ref as HTMLDivElement;
-        }}
-        components={{
-          Scroller: React.forwardRef<HTMLDivElement, any>((props, ref) => (
-            <div
-              {...props}
-              ref={ref}
-              style={{
-                ...(props.style || {}),
-                WebkitOverflowScrolling: 'touch'
-              }}
-            />
-          ))
         }}
       />
     </div>
