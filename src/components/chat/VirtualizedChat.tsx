@@ -23,7 +23,7 @@ interface VirtualizedChatProps<T> {
   followOutput?: boolean | 'smooth' | 'auto'; // control auto-follow behavior
 }
 
-export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey, defaultItemHeight, overscan, alignToBottom = true, initialIndex, followOutput = 'smooth' }: VirtualizedChatProps<T>) {
+export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey, defaultItemHeight, overscan, alignToBottom = true, initialIndex, followOutput = 'auto' }: VirtualizedChatProps<T>) {
   const data = useMemo(() => items, [items]);
   const { isOpen: isKeyboardOpen, height: keyboardHeight, isTyping } = useIOSKeyboard();
 
@@ -87,21 +87,6 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
   // Removed dynamic default item height estimation to avoid re-render churn
   // This prevents flashing during embed height changes
 
-  // Always keep scrolled to bottom on mount and when new items arrive (iOS-safe)
-  useEffect(() => {
-    const sc = scrollRef.current;
-    if (!sc) return;
-    sc.scrollTop = sc.scrollHeight;
-  }, []);
-
-  useEffect(() => {
-    const sc = scrollRef.current;
-    if (!sc) return;
-    const nearBottom = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 120;
-    if (nearBottom || alignToBottom) {
-      sc.scrollTop = sc.scrollHeight;
-    }
-  }, [data, isKeyboardOpen]);
 
   return (
     <div 
@@ -123,7 +108,7 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
         itemContent={itemContent}
         computeItemKey={getItemKey ? (index, item) => getItemKey(item) : undefined}
         defaultItemHeight={defaultItemHeight}
-        overscan={overscan}
+        increaseViewportBy={{ top: overscan ?? 200, bottom: overscan ?? 200 }}
         alignToBottom={alignToBottom}
         initialTopMostItemIndex={alignToBottom ? Math.max(0, data.length - 1) : initialIndex}
         followOutput={followOutput}
@@ -138,8 +123,7 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
               ref={ref}
               style={{
                 ...(props.style || {}),
-                WebkitOverflowScrolling: 'touch',
-                overscrollBehavior: 'contain'
+                WebkitOverflowScrolling: 'touch'
               }}
             />
           ))
