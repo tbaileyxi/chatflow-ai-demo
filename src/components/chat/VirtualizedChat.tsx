@@ -1,34 +1,18 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Virtuoso } from "react-virtuoso";
 import { useIOSKeyboard } from "@/hooks/useIOSKeyboard";
 
-// Optimized debounce for 60fps (16ms)
-const debounce = (func: Function, wait: number = 16) => {
+// Simple debounce for scroll events
+const debounce = (func: Function, wait: number) => {
   let timeout: NodeJS.Timeout;
-  let rafId: number;
   return (...args: any[]) => {
     clearTimeout(timeout);
-    cancelAnimationFrame(rafId);
-    timeout = setTimeout(() => {
-      rafId = requestAnimationFrame(() => func(...args));
-    }, wait);
+    timeout = setTimeout(() => func(...args), wait);
   };
 };
 
-// Dynamic size estimation for embeds (cached to prevent recalculation)
-const estimateItemSize = (): number => {
-  const embedContainers = document.querySelectorAll('.x-embed-container');
-  let maxHeight = 120; // default
-  
-  embedContainers.forEach(container => {
-    const height = (container as HTMLElement).offsetHeight;
-    if (height > maxHeight && height <= 700) { // cap at 700px
-      maxHeight = height;
-    }
-  });
-  
-  return maxHeight;
-};
+// Static item height to prevent flashing
+const ESTIMATED_ITEM_HEIGHT = 150;
 
 interface VirtualizedChatProps<T> {
   items: T[];
@@ -47,8 +31,8 @@ export function VirtualizedChat<T>({
   loadMoreTop, 
   itemContent, 
   getItemKey, 
-  defaultItemHeight, 
-  overscan, 
+  defaultItemHeight = ESTIMATED_ITEM_HEIGHT, 
+  overscan = 300, 
   alignToBottom = true, 
   initialIndex, 
   followOutput = 'auto' 
@@ -56,127 +40,92 @@ export function VirtualizedChat<T>({
   const data = useMemo(() => items, [items]);
   const { isOpen: isKeyboardOpen, height: keyboardHeight } = useIOSKeyboard();
 
-  // Refs for anti-flashing optimization
   const containerRef = useRef<HTMLDivElement | null>(null);
   const virtuosoRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
-  const rafIdRef = useRef<number>();
-  
-  // State management optimized for no flashing
   const [height, setHeight] = useState<number | null>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
-  const [shouldFollowOutput, setShouldFollowOutput] = useState(true);
   
-  // Cached item height to prevent re-estimation flashing
-  const estimatedItemHeight = useMemo(() => {
-    return Math.max(defaultItemHeight ?? estimateItemSize(), 120);
-  }, [defaultItemHeight]);
-
-  // Simplified at-bottom detection using scroll events only
-  const checkAtBottom = useCallback(() => {
-    if (!scrollRef.current) return;
+  // Simple at-bottom check
+  const checkIfAtBottom = useCallback(() => {
+    if (!scrollRef.current) return false;
     
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    const threshold = 50;
+    const threshold = 100; // Larger threshold for reliability
     const atBottom = scrollHeight - scrollTop - clientHeight <= threshold;
     
     if (atBottom !== isAtBottom) {
       setIsAtBottom(atBottom);
-      setShouldFollowOutput(atBottom);
     }
+    
+    return atBottom;
   }, [isAtBottom]);
 
   // Debounced scroll handler
-  const debouncedScrollHandler = useMemo(
-    () => debounce(checkAtBottom, 50),
-    [checkAtBottom]
+  const handleScroll = useMemo(
+    () => debounce(checkIfAtBottom, 150),
+    [checkIfAtBottom]
   );
 
-  // Height calculation effect
-  useLayoutEffect(() => {
+  // Height calculation
+  useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    const setMeasuredHeight = () => {
-      requestAnimationFrame(() => {
-        let baseHeight = el.clientHeight;
-        
-        if (baseHeight < 100) {
-          baseHeight = Math.max(Math.floor(window.innerHeight * 0.7), 320);
-        }
-        
-        if (isKeyboardOpen && keyboardHeight > 0) {
-          baseHeight = Math.max(baseHeight - keyboardHeight, 200);
-        }
-        
-        setHeight(baseHeight);
-      });
+    const updateHeight = () => {
+      let baseHeight = el.clientHeight;
+      
+      if (baseHeight < 100) {
+        baseHeight = Math.max(Math.floor(window.innerHeight * 0.7), 320);
+      }
+      
+      if (isKeyboardOpen && keyboardHeight > 0) {
+        baseHeight = Math.max(baseHeight - keyboardHeight, 200);
+      }
+      
+      setHeight(baseHeight);
     };
 
-    setMeasuredHeight();
+    updateHeight();
 
-    const ResizeObserverImpl = (window as any).ResizeObserver as typeof ResizeObserver | undefined;
-    let ro: ResizeObserver | undefined;
-    if (ResizeObserverImpl) {
-      ro = new ResizeObserverImpl(setMeasuredHeight);
-      ro.observe(el);
-    }
+    const resizeObserver = new ResizeObserver(updateHeight);
+    resizeObserver.observe(el);
 
-    const onResize = debounce(setMeasuredHeight, 100);
-    window.addEventListener("resize", onResize, { passive: true });
+    window.addEventListener("resize", updateHeight);
     
     return () => {
-      window.removeEventListener("resize", onResize);
-      ro?.disconnect();
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current);
-      }
+      window.removeEventListener("resize", updateHeight);
+      resizeObserver.disconnect();
     };
   }, [isKeyboardOpen, keyboardHeight]);
 
-  // Scroll event listener setup
-  useLayoutEffect(() => {
+  // Scroll event setup
+  useEffect(() => {
     if (!scrollRef.current) return;
     
     const scrollElement = scrollRef.current;
-    scrollElement.addEventListener('scroll', debouncedScrollHandler, { passive: true });
+    scrollElement.addEventListener('scroll', handleScroll, { passive: true });
 
     // Initial check
-    setTimeout(checkAtBottom, 0);
+    checkIfAtBottom();
     
     return () => {
-      scrollElement.removeEventListener('scroll', debouncedScrollHandler);
+      scrollElement.removeEventListener('scroll', handleScroll);
     };
-  }, [debouncedScrollHandler, checkAtBottom, data.length]);
+  }, [handleScroll, checkIfAtBottom]);
 
-  // iOS keyboard focus handling with smooth positioning
-  useLayoutEffect(() => {
-    if (!isKeyboardOpen || !scrollRef.current || !isAtBottom) return;
+  // iOS keyboard handling
+  useEffect(() => {
+    if (!isKeyboardOpen || !isAtBottom) return;
 
-    const handleInputFocus = () => {
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current);
+    const timer = setTimeout(() => {
+      if (scrollRef.current && isAtBottom) {
+        const { scrollHeight, clientHeight } = scrollRef.current;
+        scrollRef.current.scrollTop = scrollHeight - clientHeight;
       }
-      
-      rafIdRef.current = requestAnimationFrame(() => {
-        if (scrollRef.current && isAtBottom) {
-          const { scrollHeight, clientHeight } = scrollRef.current;
-          scrollRef.current.scrollTo({
-            top: scrollHeight - clientHeight,
-            behavior: 'smooth'
-          });
-        }
-      });
-    };
+    }, 300);
 
-    const timeoutId = setTimeout(handleInputFocus, 100);
-    window.addEventListener('focusin', handleInputFocus, { passive: true });
-    
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener('focusin', handleInputFocus);
-    };
+    return () => clearTimeout(timer);
   }, [isKeyboardOpen, isAtBottom]);
 
   return (
@@ -184,38 +133,22 @@ export function VirtualizedChat<T>({
       ref={containerRef} 
       className="flex-1 min-h-0"
       style={{
-        position: 'relative',
-        contain: 'layout style paint',
-        willChange: 'scroll-position',
-        transform: 'translate3d(0,0,0)', // GPU acceleration
-        touchAction: 'pan-y manipulation',
-        WebkitOverflowScrolling: 'touch',
         height: isKeyboardOpen ? `calc(100dvh - ${keyboardHeight}px)` : '100%'
       }}
     >
       <Virtuoso
         ref={virtuosoRef}
         style={{
-          height: height ?? Math.max(Math.floor(window.innerHeight * 0.7), 320),
-          scrollBehavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+          height: height ?? 400,
         }}
         data={data}
         itemContent={itemContent}
         computeItemKey={getItemKey ? (index, item) => getItemKey(item) : undefined}
-        defaultItemHeight={estimatedItemHeight}
-        increaseViewportBy={{ 
-          top: Math.max(overscan ?? 400, 400), 
-          bottom: Math.max(overscan ?? 400, 400) 
-        }}
+        defaultItemHeight={defaultItemHeight}
+        increaseViewportBy={{ top: overscan, bottom: overscan }}
         initialTopMostItemIndex={alignToBottom ? Math.max(0, data.length - 1) : (initialIndex ?? 0)}
-        followOutput={shouldFollowOutput ? 'auto' : false}
-        atBottomStateChange={(atBottom) => {
-          // Use requestAnimationFrame for smooth state updates
-          requestAnimationFrame(() => {
-            setIsAtBottom(atBottom);
-            setShouldFollowOutput(atBottom);
-          });
-        }}
+        followOutput={isAtBottom ? "auto" : false}
+        atBottomStateChange={setIsAtBottom}
         startReached={loadMoreTop}
         scrollerRef={(ref) => {
           scrollRef.current = ref as HTMLDivElement;
@@ -228,11 +161,7 @@ export function VirtualizedChat<T>({
               style={{
                 ...(props.style || {}),
                 WebkitOverflowScrolling: 'touch',
-                overscrollBehavior: 'contain',
-                scrollSnapType: 'y proximity',
-                contain: 'layout style paint',
-                willChange: 'scroll-position',
-                transform: 'translate3d(0,0,0)'
+                overscrollBehavior: 'contain'
               }}
             />
           ))
