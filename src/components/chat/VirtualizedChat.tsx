@@ -45,6 +45,9 @@ export function VirtualizedChat<T>({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState<number | null>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  // Prevent auto-follow while user is scrolling away from bottom
+  const userHoldRef = useRef(false);
+  const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Simple at-bottom check
   const checkIfAtBottom = useCallback(() => {
@@ -61,9 +64,18 @@ export function VirtualizedChat<T>({
     return atBottom;
   }, [isAtBottom]);
 
-  // Debounced scroll handler
+  // Debounced scroll handler that also toggles user hold
   const handleScroll = useMemo(
-    () => debounce(checkIfAtBottom, 150),
+    () => debounce(() => {
+      const atBottom = checkIfAtBottom();
+      if (!atBottom) {
+        userHoldRef.current = true;
+        if (holdTimeoutRef.current) clearTimeout(holdTimeoutRef.current);
+        holdTimeoutRef.current = setTimeout(() => {
+          userHoldRef.current = false;
+        }, 1500);
+      }
+    }, 100),
     [checkIfAtBottom]
   );
 
@@ -147,8 +159,15 @@ export function VirtualizedChat<T>({
         defaultItemHeight={defaultItemHeight}
         increaseViewportBy={{ top: overscan, bottom: overscan }}
         initialTopMostItemIndex={alignToBottom ? Math.max(0, data.length - 1) : (initialIndex ?? 0)}
-        followOutput={isAtBottom ? "auto" : false}
-        atBottomStateChange={setIsAtBottom}
+        followOutput={(bottom) => bottom && !userHoldRef.current}
+        atBottomStateChange={(bottom) => {
+          setIsAtBottom(bottom);
+          if (bottom) {
+            userHoldRef.current = false;
+            if (holdTimeoutRef.current) clearTimeout(holdTimeoutRef.current);
+            holdTimeoutRef.current = null;
+          }
+        }}
         startReached={loadMoreTop}
         scrollerRef={(ref) => {
           scrollRef.current = ref as HTMLDivElement;
