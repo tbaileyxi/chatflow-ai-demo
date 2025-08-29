@@ -62,7 +62,6 @@ export function VirtualizedChat<T>({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
   const rafIdRef = useRef<number>();
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
   
   // State management optimized for no flashing
   const [height, setHeight] = useState<number | null>(null);
@@ -74,72 +73,25 @@ export function VirtualizedChat<T>({
     return Math.max(defaultItemHeight ?? estimateItemSize(), 120);
   }, [defaultItemHeight]);
 
-  // Optimized at-bottom detection using Intersection Observer
-  const setupIntersectionObserver = useCallback(() => {
-    if (!scrollRef.current || intersectionObserverRef.current) return;
-
-    // Create sentinel element for bottom detection
-    const sentinel = document.createElement('div');
-    sentinel.style.cssText = `
-      height: 1px;
-      position: absolute;
-      bottom: 0;
-      width: 100%;
-      pointer-events: none;
-      z-index: -1;
-    `;
-    sentinelRef.current = sentinel;
-    scrollRef.current.appendChild(sentinel);
-
-    intersectionObserverRef.current = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (entry) {
-          const newIsAtBottom = entry.isIntersecting;
-          if (newIsAtBottom !== isAtBottom) {
-            requestAnimationFrame(() => {
-              setIsAtBottom(newIsAtBottom);
-              setShouldFollowOutput(newIsAtBottom);
-            });
-          }
-        }
-      },
-      { 
-        root: scrollRef.current, 
-        threshold: 0,
-        rootMargin: '0px 0px -10px 0px' // 10px buffer from bottom
-      }
-    );
-
-    intersectionObserverRef.current.observe(sentinel);
+  // Simplified at-bottom detection using scroll events only
+  const checkAtBottom = useCallback(() => {
+    if (!scrollRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const threshold = 50;
+    const atBottom = scrollHeight - scrollTop - clientHeight <= threshold;
+    
+    if (atBottom !== isAtBottom) {
+      setIsAtBottom(atBottom);
+      setShouldFollowOutput(atBottom);
+    }
   }, [isAtBottom]);
 
-  // Cleanup intersection observer with safe DOM manipulation
-  const cleanupIntersectionObserver = useCallback(() => {
-    if (intersectionObserverRef.current) {
-      intersectionObserverRef.current.disconnect();
-      intersectionObserverRef.current = null;
-    }
-    if (sentinelRef.current && scrollRef.current) {
-      // Safe removal - check if the sentinel is actually a child
-      try {
-        if (scrollRef.current.contains(sentinelRef.current)) {
-          scrollRef.current.removeChild(sentinelRef.current);
-        }
-      } catch (error) {
-        console.warn('[VirtualizedChat] Error removing sentinel:', error);
-      }
-      sentinelRef.current = null;
-    }
-  }, []);
-
-  // Effect for intersection observer setup
-  useLayoutEffect(() => {
-    if (scrollRef.current) {
-      setupIntersectionObserver();
-    }
-    return cleanupIntersectionObserver;
-  }, [setupIntersectionObserver, cleanupIntersectionObserver, data.length]);
+  // Debounced scroll handler
+  const debouncedScrollHandler = useMemo(
+    () => debounce(checkAtBottom, 50),
+    [checkAtBottom]
+  );
 
   // Height calculation effect
   useLayoutEffect(() => {
@@ -182,6 +134,21 @@ export function VirtualizedChat<T>({
       }
     };
   }, [isKeyboardOpen, keyboardHeight]);
+
+  // Scroll event listener setup
+  useLayoutEffect(() => {
+    if (!scrollRef.current) return;
+    
+    const scrollElement = scrollRef.current;
+    scrollElement.addEventListener('scroll', debouncedScrollHandler, { passive: true });
+
+    // Initial check
+    setTimeout(checkAtBottom, 0);
+    
+    return () => {
+      scrollElement.removeEventListener('scroll', debouncedScrollHandler);
+    };
+  }, [debouncedScrollHandler, checkAtBottom, data.length]);
 
   // iOS keyboard focus handling with smooth positioning
   useLayoutEffect(() => {
