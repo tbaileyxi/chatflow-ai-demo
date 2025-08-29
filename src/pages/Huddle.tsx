@@ -702,10 +702,10 @@ useEffect(() => {
   };
 
   // Memoized itemContent function to prevent re-renders and flashing
-  const renderMessageItem = useCallback((index: number, message: any) => {
-    const isConsecutive = index > 0 && 
-      messages[index - 1]?.user_id === message.user_id && 
-      new Date(message.created_at).getTime() - new Date(messages[index - 1]?.created_at).getTime() < 300000;
+  const renderMessageItem = useCallback((index: number, message: any, previousMessage?: any) => {
+    const isConsecutive = previousMessage && 
+      previousMessage.user_id === message.user_id && 
+      new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() < 300000;
     
     return (
       <MessageBubble
@@ -718,6 +718,7 @@ useEffect(() => {
         onAddReaction={addReaction}
         onPollVote={handlePollVote}
         isConsecutive={isConsecutive}
+        previousMessage={previousMessage}
       />
     );
   }, [messages, user?.id, huddle?.team, addReaction, handlePollVote]);
@@ -744,45 +745,31 @@ useEffect(() => {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Huddle Header - Compact for mobile */}
-      <div className="p-2 sm:p-4 border-b bg-card">
-        <div className="flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/20 flex items-center justify-center">
-              {huddle.team.logo_url ? (
-                <img src={huddle.team.logo_url} alt={huddle.team.name} className="w-6 h-6 sm:w-8 sm:h-8 rounded-full" />
-              ) : (
-                <span className="text-primary font-bold text-xs sm:text-sm">
-                  {huddle.team.name.substring(0, 2).toUpperCase()}
-                </span>
-              )}
-            </div>
-            <div>
+      {/* Compact Chat Header */}
+      <div className="p-3 border-b bg-card sticky top-0 z-10" style={{ height: '56px' }}>
+        <div className="flex items-center justify-between h-full">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <Avatar className="h-8 w-8 shrink-0">
+              <AvatarImage src={huddle.team.logo_url} alt={huddle.team.name} />
+              <AvatarFallback className="text-xs">
+                {huddle.team.name.substring(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h2 className="font-bold text-base sm:text-lg">{huddle.name}</h2>
+                <h2 className="font-semibold text-sm truncate">{huddle.name}</h2>
                 {huddle.is_verified && <VerifiedBadge size="sm" />}
               </div>
-              <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
-                <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+              <p className="text-xs text-muted-foreground truncate">
                 {huddle.team.name} Side Huddle
               </p>
             </div>
           </div>
-          <div className="flex flex-col w-full items-stretch gap-1 sm:gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex items-center gap-2 shrink-0">
             {user?.id === huddle.owner_id && !huddle.is_verified && (
               <HuddleVerificationDialog huddleId={huddle.id} isVerified={huddle.is_verified} />
             )}
-            <HuddleOwnerPanel 
-              huddle={{
-                id: huddle.id,
-                name: huddle.name,
-                is_verified: huddle.is_verified || false,
-                member_count: 0, // This will be updated in the component
-                owner_id: huddle.owner_id
-              }}
-              isOwner={user?.id === huddle.owner_id}
-            />
-            <InviteButton huddleId={huddle.id} className="w-full sm:w-auto" />
+            <InviteButton huddleId={huddle.id} className="h-7 text-xs px-2" />
             <HuddleManagement huddleId={huddle.id} ownerId={huddle.owner_id} huddle={huddle} />
           </div>
         </div>

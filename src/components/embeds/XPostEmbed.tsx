@@ -1,138 +1,113 @@
-import React, { useEffect, useRef, useState, memo } from "react";
+import React, { memo, useEffect, useRef, useState } from 'react';
 
 interface XPostEmbedProps {
-  embedCode: string; // oEmbed HTML or tweet URL
+  embedCode: string;
 }
 
-// Robust, one-time X/Twitter embed loader without MutationObserver
-export const XPostEmbed = memo(function XPostEmbed({ embedCode }: XPostEmbedProps) {
+export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const loadedKeyRef = useRef<string | null>(null);
-  const loadCalledRef = useRef(false);
-  const cancelRef = useRef(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const loadedRef = useRef(false);
 
   useEffect(() => {
-    cancelRef.current = false;
+    if (loadedRef.current) return;
+    loadedRef.current = true;
 
-    const loadTwitterWidgets = async () => {
-      try {
-        // Avoid duplicate loads for the same embedCode
-        if (loadedKeyRef.current === embedCode && loadCalledRef.current) {
+    const loadTwitterWidgets = () => {
+      return new Promise<void>((resolve) => {
+        if ((window as any).twttr?.widgets) {
+          resolve();
           return;
         }
-        loadedKeyRef.current = embedCode;
-        loadCalledRef.current = true;
-        setIsLoading(true);
 
-        // Load Twitter widgets script if not already loaded
-        if (!(window as any).twttr) {
-          let script = document.querySelector('script[src*="platform.twitter.com/widgets.js"]') as HTMLScriptElement | null;
-          if (!script) {
-            script = document.createElement('script');
-            script.src = 'https://platform.twitter.com/widgets.js';
-            script.async = true;
-            document.head.appendChild(script);
-          }
-          await new Promise((resolve) => {
-            if ((window as any).twttr?.ready) return resolve(null);
-            script!.onload = resolve as any;
-            setTimeout(resolve, 3000); // fallback resolve to avoid hanging
-          });
-        }
+        const script = document.createElement('script');
+        script.src = 'https://platform.twitter.com/widgets.js';
+        script.async = true;
+        script.onload = () => {
+          resolve();
+        };
+        script.onerror = () => {
+          setIsLoading(false);
+          resolve();
+        };
+        document.head.appendChild(script);
+      });
+    };
 
-        // Process widgets in container once (guard for ref)
-        if (!cancelRef.current && (window as any).twttr?.widgets && containerRef.current) {
+    const processEmbed = async () => {
+      try {
+        await loadTwitterWidgets();
+        
+        if (containerRef.current && (window as any).twttr?.widgets) {
           await (window as any).twttr.widgets.load(containerRef.current);
-
-          // Poll for iframe render stability (no MutationObserver)
-          const start = Date.now();
-          const check = () => {
-            if (cancelRef.current) return;
-            const el = containerRef.current;
-            if (!el) return; // safety
-            const iframe = el.querySelector('iframe');
-            const h = (iframe as HTMLIFrameElement | null)?.offsetHeight || el.offsetHeight || 0;
-            if (iframe && h > 0) {
+          
+          // Poll for iframe to appear and be stable
+          let pollCount = 0;
+          const pollForIframe = () => {
+            const iframe = containerRef.current?.querySelector('iframe');
+            if (iframe && iframe.offsetHeight > 0) {
               setIsLoading(false);
-              return;
-            }
-            if (Date.now() - start > 6000) {
-              // Fallback after 6s
+              setIsLoaded(true);
+            } else if (pollCount < 50) {
+              pollCount++;
+              setTimeout(pollForIframe, 100);
+            } else {
               setIsLoading(false);
-              return;
             }
-            requestAnimationFrame(check);
           };
-          requestAnimationFrame(check);
+          
+          setTimeout(pollForIframe, 200);
+        } else {
+          setIsLoading(false);
         }
-      } catch (e) {
-        console.error(`[XPostEmbed] Error loading:`, e);
-        !cancelRef.current && setIsLoading(false);
+      } catch (error) {
+        console.error('Error loading Twitter widgets:', error);
+        setIsLoading(false);
       }
     };
 
-    loadTwitterWidgets();
-
-    return () => {
-      cancelRef.current = true;
-    };
+    processEmbed();
   }, [embedCode]);
 
-  // Check if it's a Twitter/X URL and convert to blockquote
-  if (embedCode.includes('twitter.com') || embedCode.includes('x.com')) {
-    const urlMatch = embedCode.match(/https?:\/\/(?:twitter\.com|x\.com)\/[\w-]+\/status\/\d+/);
-    if (urlMatch) {
-      const tweetUrl = urlMatch[0];
-      return (
-        <div 
-          ref={containerRef} 
-          className="twitter-embed x-embed-container w-full"
-          style={{
-            position: 'relative',
-            height: 450,
-            WebkitTransform: 'translateZ(0)',
-            transform: 'translateZ(0)'
-          }}
-        >
-          {isLoading && (
-            <div className="flex items-center justify-center p-4 text-muted-foreground absolute inset-0 bg-muted/20">
-              <div className="text-sm">Loading tweet...</div>
-            </div>
-          )}
-          <blockquote 
-            className="twitter-tweet" 
-            data-conversation="none" 
-            data-theme="auto"
-            style={{ 
-              maxWidth: '100%',
-              width: '100%',
-              minWidth: 0,
-              boxSizing: 'border-box'
-            }}
-          >
-            <a href={tweetUrl}></a>
-          </blockquote>
-        </div>
-      );
-    }
+  // Check if embedCode is a Twitter/X URL
+  const tweetUrlMatch = embedCode.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/);
+  
+  if (tweetUrlMatch) {
+    const tweetUrl = embedCode.startsWith('http') ? embedCode : `https://${embedCode}`;
+    
+    return (
+      <div 
+        ref={containerRef}
+        className="rounded-xl overflow-hidden shadow max-w-[85%] my-2"
+        style={{ pointerEvents: 'auto' }}
+      >
+        <blockquote className="twitter-tweet" data-theme="auto">
+          <a href={tweetUrl}>Loading tweet...</a>
+        </blockquote>
+        {isLoading && (
+          <div className="flex items-center justify-center p-4 bg-muted rounded-xl">
+            <div className="text-sm text-muted-foreground">Loading tweet...</div>
+          </div>
+        )}
+      </div>
+    );
   }
 
-  // For oEmbed HTML, render the provided blockquote and process with widgets.js
-  const sanitized = embedCode.replace(/<script[^>]*platform\.twitter\.com\/widgets\.js[^<]*<\/script>/gi, '');
+  // Handle oEmbed HTML
+  const sanitizedHtml = embedCode.replace(
+    /<script[^>]*src="https:\/\/platform\.twitter\.com\/widgets\.js"[^>]*><\/script>/gi,
+    ''
+  );
+
   return (
     <div 
       ref={containerRef}
-      className="embed-content x-embed-container w-full"
-      style={{ 
-        maxWidth: '100%', 
-        minWidth: 0,
-        position: 'relative',
-        height: 450,
-        WebkitTransform: 'translateZ(0)',
-        transform: 'translateZ(0)'
-      }}
-      dangerouslySetInnerHTML={{ __html: sanitized }} 
+      className="rounded-xl overflow-hidden shadow max-w-[85%] my-2"
+      style={{ pointerEvents: 'auto' }}
+      dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
     />
   );
-}, (prevProps, nextProps) => prevProps.embedCode === nextProps.embedCode);
+});
+
+XPostEmbed.displayName = 'XPostEmbed';

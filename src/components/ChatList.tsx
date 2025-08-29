@@ -5,7 +5,7 @@ import { JumpToLatest } from '@/components/JumpToLatest';
 interface ChatListProps {
   messages: any[];
   loadOlderMessages: () => Promise<void>;
-  renderMessage: (index: number, message: any) => React.ReactNode;
+  renderMessage: (index: number, message: any, previousMessage?: any) => React.ReactNode;
   hasMore: boolean;
   isLoadingMore?: boolean;
 }
@@ -66,7 +66,7 @@ export const ChatList = forwardRef<ChatListRef, ChatListProps>(({
         totalCount={messages.length}
         itemContent={(index, message) => (
           <div key={message.id || index}>
-            {renderMessage(index, message)}
+            {renderMessage(index, message, index > 0 ? messages[index - 1] : null)}
           </div>
         )}
         followOutput="auto"
