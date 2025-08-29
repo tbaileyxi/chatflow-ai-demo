@@ -717,6 +717,32 @@ useEffect(() => {
     );
   }
 
+  // Memoized itemContent function to prevent re-renders and flashing
+  const renderMessageItem = useCallback((index: number, message: any) => {
+    const previousMessage = index > 0 ? messages[index - 1] : null;
+    const isConsecutive = previousMessage && 
+      previousMessage.user_id === message.user_id &&
+      new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() < 300000;
+    
+    return (
+      <ModernMessageBubble
+        key={message.id}
+        message={message}
+        previousMessage={previousMessage}
+        isConsecutive={isConsecutive}
+        onAddReaction={addReaction}
+        currentUserId={user?.id}
+        teamName={huddle.team?.name}
+        teamLogoUrl={huddle.team?.logo_url}
+        teamId={huddle.team?.id}
+        originTeamName={message.origin_teams?.name}
+        onPollVote={handlePollVote}
+        pollVotes={pollVotes[message.id]}
+        userVote={userVotes[message.id]}
+      />
+    );
+  }, [messages, addReaction, user?.id, huddle.team?.name, huddle.team?.logo_url, huddle.team?.id, handlePollVote, pollVotes, userVotes]);
+
   return (
     <div className="flex flex-col h-full">
       {/* Huddle Header */}
@@ -774,30 +800,7 @@ useEffect(() => {
           getItemKey={(message) => message.id}
           defaultItemHeight={120}
           overscan={300}
-          itemContent={useCallback((index: number, message: any) => {
-            const previousMessage = index > 0 ? messages[index - 1] : null;
-            const isConsecutive = previousMessage && 
-              previousMessage.user_id === message.user_id &&
-              new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() < 300000;
-            
-            return (
-              <ModernMessageBubble
-                key={message.id}
-                message={message}
-                previousMessage={previousMessage}
-                isConsecutive={isConsecutive}
-                onAddReaction={addReaction}
-                currentUserId={user?.id}
-                teamName={huddle.team?.name}
-                teamLogoUrl={huddle.team?.logo_url}
-                teamId={huddle.team?.id}
-                originTeamName={message.origin_teams?.name}
-                onPollVote={handlePollVote}
-                pollVotes={pollVotes[message.id]}
-                userVote={userVotes[message.id]}
-              />
-            );
-          }, [messages, addReaction, user?.id, huddle.team?.name, huddle.team?.logo_url, huddle.team?.id, handlePollVote, pollVotes, userVotes])}
+          itemContent={renderMessageItem}
         />
 
         {/* Enhanced Typing Indicator with animation */}
