@@ -177,6 +177,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({
         "flex gap-3 px-4 py-1 hover:bg-muted/30 transition-colors group",
         isOwnMessage ? "flex-row-reverse" : "flex-row"
       )}
+      data-message-id={message.id}
       onContextMenu={(e) => {
         e.preventDefault();
         handleLongPress();

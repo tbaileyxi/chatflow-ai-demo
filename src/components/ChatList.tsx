@@ -1,6 +1,7 @@
-import React, { useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useCallback, useRef, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { JumpToLatest } from '@/components/JumpToLatest';
+import { useScrollAnchor } from '@/hooks/useScrollAnchor';
 
 interface ChatListProps {
   messages: any[];
@@ -24,6 +25,7 @@ export const ChatList = forwardRef<ChatListRef, ChatListProps>(({
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const [atBottom, setAtBottom] = React.useState(true);
   const [showJumpToLatest, setShowJumpToLatest] = React.useState(false);
+  const scrollAnchor = useScrollAnchor({ threshold: 100 });
 
   useImperativeHandle(ref, () => ({
     scrollToBottom: (behavior = 'smooth') => {
@@ -58,6 +60,18 @@ export const ChatList = forwardRef<ChatListRef, ChatListProps>(({
     }
   }, [messages.length]);
 
+  // Initialize scroll anchor when virtuoso ref changes
+  useEffect(() => {
+    if (virtuosoRef.current) {
+      // Access the actual scrollable element via the virtuoso instance
+      const virtuosoElement = (virtuosoRef.current as any).getScrollElement?.() || 
+                              document.querySelector('[data-virtuoso-scroller]');
+      if (virtuosoElement) {
+        scrollAnchor.initialize(virtuosoElement as HTMLElement);
+      }
+    }
+  }, [scrollAnchor, messages.length]);
+
   return (
     <div className="relative flex-1 h-full">
       <Virtuoso
@@ -65,7 +79,7 @@ export const ChatList = forwardRef<ChatListRef, ChatListProps>(({
         data={messages}
         totalCount={messages.length}
         itemContent={(index, message) => (
-          <div key={message.id || index}>
+          <div key={message.id || index} data-message-id={message.id || index}>
             {renderMessage(index, message, index > 0 ? messages[index - 1] : null)}
           </div>
         )}
