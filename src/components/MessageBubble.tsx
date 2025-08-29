@@ -7,6 +7,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Heart, Smile, ThumbsUp, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import DOMPurify from 'dompurify';
+import { XPostEmbed } from '@/components/embeds/XPostEmbed';
 
 interface MessageBubbleProps {
   message: {
@@ -154,6 +155,11 @@ export const MessageBubble = memo<MessageBubbleProps>(({
     });
   }, []);
 
+  const isXEmbed = useMemo(() => {
+    const code = message.embed_code || '';
+    return /(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/\w+\/status\//.test(code) || /twitter-tweet/.test(code);
+  }, [message.embed_code]);
+
   // Debounced content rendering for streaming
   const renderedContent = useMemo(() => {
     const content = message.content;
@@ -239,17 +245,15 @@ export const MessageBubble = memo<MessageBubbleProps>(({
 
         {/* Embedded Content */}
         {message.embed_code && (
-          <div 
-            className="rounded-xl overflow-hidden my-2 max-w-[85%] shadow"
-            style={{ pointerEvents: 'auto' }}
-          >
-            <div 
-              className="w-full h-auto aspect-video"
-              dangerouslySetInnerHTML={{ 
-                __html: sanitizeEmbedCode(message.embed_code) 
-              }}
+          isXEmbed ? (
+            <XPostEmbed embedCode={message.embed_code} />
+          ) : (
+            <div
+              className="rounded-xl overflow-hidden my-2 max-w-[85%] shadow [&>iframe]:w-full [&>iframe]:h-auto"
+              style={{ pointerEvents: 'auto' }}
+              dangerouslySetInnerHTML={{ __html: sanitizeEmbedCode(message.embed_code) }}
             />
-          </div>
+          )
         )}
 
         {message.media_url && (
