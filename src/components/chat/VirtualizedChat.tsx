@@ -159,15 +159,7 @@ export function VirtualizedChat<T>({
         defaultItemHeight={defaultItemHeight}
         increaseViewportBy={{ top: overscan, bottom: overscan }}
         initialTopMostItemIndex={alignToBottom ? Math.max(0, data.length - 1) : (initialIndex ?? 0)}
-        followOutput={(bottom) => bottom && !userHoldRef.current}
-        atBottomStateChange={(bottom) => {
-          setIsAtBottom(bottom);
-          if (bottom) {
-            userHoldRef.current = false;
-            if (holdTimeoutRef.current) clearTimeout(holdTimeoutRef.current);
-            holdTimeoutRef.current = null;
-          }
-        }}
+        followOutput={false}
         startReached={loadMoreTop}
         scrollerRef={(ref) => {
           scrollRef.current = ref as HTMLDivElement;
