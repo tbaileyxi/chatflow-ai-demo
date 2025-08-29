@@ -11,7 +11,7 @@ import { InviteButton } from "@/components/InviteButton";
 import { CollapsibleMemberList } from "@/components/CollapsibleMemberList";
 import { MakePublicButton } from "@/components/MakePublicButton";
 import { HuddleManagement } from "@/components/HuddleManagement";
-import { VirtualizedChat } from "@/components/chat/VirtualizedChat";
+import { OptimizedVirtualizedChat } from "@/components/optimized/OptimizedVirtualizedChat";
 import { ModernChatInput } from "@/components/chat/ModernChatInput";
 import { ModernMessageBubble } from "@/components/chat/ModernMessageBubble";
 import { EnhancedTypingIndicator } from "@/components/chat/EnhancedTypingIndicator";
@@ -746,31 +746,31 @@ useEffect(() => {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Huddle Header */}
-      <div className="p-4 border-b bg-card">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+      {/* Huddle Header - Compact for mobile */}
+      <div className="p-2 sm:p-4 border-b bg-card">
+        <div className="flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/20 flex items-center justify-center">
               {huddle.team.logo_url ? (
-                <img src={huddle.team.logo_url} alt={huddle.team.name} className="w-8 h-8 rounded-full" />
+                <img src={huddle.team.logo_url} alt={huddle.team.name} className="w-6 h-6 sm:w-8 sm:h-8 rounded-full" />
               ) : (
-                <span className="text-primary font-bold text-sm">
+                <span className="text-primary font-bold text-xs sm:text-sm">
                   {huddle.team.name.substring(0, 2).toUpperCase()}
                 </span>
               )}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-bold text-lg">{huddle.name}</h2>
+                <h2 className="font-bold text-base sm:text-lg">{huddle.name}</h2>
                 {huddle.is_verified && <VerifiedBadge size="sm" />}
               </div>
-              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                <Users className="w-4 h-4" />
+              <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
+                <Users className="w-3 h-3 sm:w-4 sm:h-4" />
                 {huddle.team.name} Side Huddle
               </p>
             </div>
           </div>
-          <div className="flex flex-col w-full items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex flex-col w-full items-stretch gap-1 sm:gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             {user?.id === huddle.owner_id && !huddle.is_verified && (
               <HuddleVerificationDialog huddleId={huddle.id} isVerified={huddle.is_verified} />
             )}
@@ -788,20 +788,25 @@ useEffect(() => {
             <HuddleManagement huddleId={huddle.id} ownerId={huddle.owner_id} huddle={huddle} />
           </div>
         </div>
-        <div className="mt-3">
+        <div className="mt-2 sm:mt-3">
           <CollapsibleMemberList huddleId={huddle.id} ownerId={huddle.owner_id} />
         </div>
       </div>
 
       <div className="flex-1 w-full flex flex-col min-h-0 chat-container">
         {/* Messages Area */}
-        <VirtualizedChat
-          items={messages}
+        <OptimizedVirtualizedChat
+          messages={messages}
+          currentUserId={user?.id}
+          teamName={huddle?.team?.name}
+          teamLogoUrl={huddle?.team?.logo_url}
+          teamId={huddle?.team?.id}
           loadMoreTop={loadOlderMessages}
-          getItemKey={(message) => message.id}
-          defaultItemHeight={120}
-          overscan={300}
-          itemContent={renderMessageItem}
+          onAddReaction={addReaction}
+          onPollVote={handlePollVote}
+          pollVotes={Object.values(pollVotes).flat()}
+          userVotes={userVotes}
+          hasMore={hasMore}
         />
 
         {/* Enhanced Typing Indicator with animation */}
