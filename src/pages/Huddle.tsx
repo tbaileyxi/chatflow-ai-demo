@@ -11,7 +11,7 @@ import { InviteButton } from "@/components/InviteButton";
 import { CollapsibleMemberList } from "@/components/CollapsibleMemberList";
 import { MakePublicButton } from "@/components/MakePublicButton";
 import { HuddleManagement } from "@/components/HuddleManagement";
-import { OptimizedVirtualizedChat } from "@/components/optimized/OptimizedVirtualizedChat";
+import { VirtualizedChat } from "@/components/chat/VirtualizedChat";
 import { ModernChatInput } from "@/components/chat/ModernChatInput";
 import { ModernMessageBubble } from "@/components/chat/ModernMessageBubble";
 import { EnhancedTypingIndicator } from "@/components/chat/EnhancedTypingIndicator";
@@ -795,18 +795,11 @@ useEffect(() => {
 
       <div className="flex-1 w-full flex flex-col min-h-0 chat-container">
         {/* Messages Area */}
-        <OptimizedVirtualizedChat
-          messages={messages}
-          currentUserId={user?.id}
-          teamName={huddle?.team?.name}
-          teamLogoUrl={huddle?.team?.logo_url}
-          teamId={huddle?.team?.id}
+        <VirtualizedChat
+          items={messages}
           loadMoreTop={loadOlderMessages}
-          onAddReaction={addReaction}
-          onPollVote={handlePollVote}
-          pollVotes={Object.values(pollVotes).flat()}
-          userVotes={userVotes}
-          hasMore={hasMore}
+          getItemKey={(message) => message.id}
+          itemContent={renderMessageItem}
         />
 
         {/* Enhanced Typing Indicator with animation */}
