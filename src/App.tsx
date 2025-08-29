@@ -7,7 +7,7 @@ import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sid
 import { AppSidebar } from "@/components/AppSidebar";
 import { MessageSquare, MessageSquareMore } from "lucide-react";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { useAuth } from "@/hooks/useAuth";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useHuddleStatus } from "@/hooks/useHuddleStatus";
 import { HelmetProvider } from "react-helmet-async";
 import Index from "./pages/Index";
@@ -34,6 +34,39 @@ const AppContent = () => {
   const navigate = useNavigate();
   const onlineStatus = useHuddleStatus();
 
+  // Check if we're on a mobile route
+  const location = window.location.pathname;
+  const isMobileRoute = ['/app', '/spotlight', '/huddle/', '/onboard'].some(route => 
+    location.startsWith(route)
+  );
+
+  // For mobile routes, show without sidebar
+  if (isMobileRoute) {
+    return (
+      <div className="min-h-screen w-full bg-mobile-background">
+        <div className="flex-1 overflow-hidden">
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/onboard" element={<Index />} />
+          <Route path="/app" element={<MobileHome />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/teams" element={<TeamDirectory />} />
+          <Route path="/teams/:teamId" element={<TeamFeed />} />
+          <Route path="/huddle/:huddleId" element={<MobileChat />} />
+          <Route path="/join-huddle/:huddleId" element={<JoinHuddle />} />
+          <Route path="/huddle-search" element={<HuddleSearch />} />
+          <Route path="/spotlight" element={<MobileSpotlight />} />
+          <Route path="/spotlight/:id" element={<SpotlightPost />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop sidebar layout for other routes
   return (
     <div className="flex min-h-screen w-full bg-background">
       <AppSidebar />
@@ -66,22 +99,23 @@ const AppContent = () => {
             </button>
           </div>
         </header>
-        <div className="flex-1 overflow-hidden">{/* Overflow container */}
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/app" element={<MobileHome />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/teams" element={<TeamDirectory />} />
-          <Route path="/teams/:teamId" element={<TeamFeed />} />
-          <Route path="/huddle/:huddleId" element={<MobileChat />} />
-          <Route path="/join-huddle/:huddleId" element={<JoinHuddle />} />
-          <Route path="/huddle-search" element={<HuddleSearch />} />
-          <Route path="/spotlight" element={<MobileSpotlight />} />
-          <Route path="/spotlight/:id" element={<SpotlightPost />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <div className="flex-1 overflow-hidden">
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/onboard" element={<Index />} />
+            <Route path="/app" element={<MobileHome />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/teams" element={<TeamDirectory />} />
+            <Route path="/teams/:teamId" element={<TeamFeed />} />
+            <Route path="/huddle/:huddleId" element={<MobileChat />} />
+            <Route path="/join-huddle/:huddleId" element={<JoinHuddle />} />
+            <Route path="/huddle-search" element={<HuddleSearch />} />
+            <Route path="/spotlight" element={<MobileSpotlight />} />
+            <Route path="/spotlight/:id" element={<SpotlightPost />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
         </div>
       </main>
     </div>
@@ -90,19 +124,21 @@ const AppContent = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      <TooltipProvider>
-        <HelmetProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <SidebarProvider>
-              <AppContent />
-            </SidebarProvider>
-          </BrowserRouter>
-        </HelmetProvider>
-      </TooltipProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+        <TooltipProvider>
+          <HelmetProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <SidebarProvider>
+                <AppContent />
+              </SidebarProvider>
+            </BrowserRouter>
+          </HelmetProvider>
+        </TooltipProvider>
+      </ThemeProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

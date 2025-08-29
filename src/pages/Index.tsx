@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { FeedTabs } from "@/components/FeedTabs";
 import { HuddleBar } from "@/components/HuddleBar";
 import { useAuth } from '@/hooks/useAuth';
-import { EnhancedOnboarding } from "@/components/EnhancedOnboarding";
+import { MobileOnboarding } from "@/components/MobileOnboarding";
 import { ProfileSetup } from "@/components/ProfileSetup";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -89,17 +89,11 @@ const Index = () => {
 
   // Show onboarding if user hasn't seen it before
   if (showOnboarding && profileComplete) {
-    return <EnhancedOnboarding onComplete={handleOnboardingComplete} />;
+    return <MobileOnboarding onComplete={handleOnboardingComplete} />;
   }
 
-  return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        <FeedTabs />
-      </div>
-    </div>
-  );
+  // Redirect to mobile-first home
+  return <Navigate to="/app" replace />;
 };
 
 export default Index;
