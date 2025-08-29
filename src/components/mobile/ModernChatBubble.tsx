@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { LazyEmbed } from '@/components/chat/LazyEmbed';
+import DOMPurify from 'dompurify';
 
 interface ModernChatBubbleProps {
   message: {
@@ -151,10 +153,17 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
         {/* Embedded content */}
         {message.embed_code && (
           <div className="mt-2 rounded-xl overflow-hidden max-w-sm">
-            <div
-              className="embed-container rounded-xl overflow-hidden"
-              dangerouslySetInnerHTML={{ __html: message.embed_code }}
-            />
+            <LazyEmbed>
+              <div
+                className="embed-container rounded-xl overflow-hidden w-full max-w-full"
+                dangerouslySetInnerHTML={{ 
+                  __html: DOMPurify.sanitize(message.embed_code, {
+                    ADD_TAGS: ['iframe', 'blockquote', 'script'],
+                    ADD_ATTR: ['src', 'width', 'height', 'frameborder', 'allowfullscreen', 'class', 'id']
+                  })
+                }}
+              />
+            </LazyEmbed>
           </div>
         )}
       </div>
