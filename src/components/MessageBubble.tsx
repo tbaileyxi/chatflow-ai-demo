@@ -20,6 +20,10 @@ interface MessageBubbleProps {
     embed_code?: string;
     reactions?: any[];
     poll_data?: any;
+    source?: {
+      posterName?: string;
+      posterAvatar?: string;
+    };
   };
   user: {
     id: string;
@@ -105,14 +109,16 @@ export const MessageBubble = memo<MessageBubbleProps>(({
   }, [message.created_at]);
 
   const displayName = useMemo(() => {
+    if (message.source?.posterName) return message.source.posterName;
     if (isTeamAgent && teamName) return `${teamName} Bot`;
     return user?.display_name || user?.username || 'Unknown User';
-  }, [isTeamAgent, teamName, user]);
+  }, [message.source?.posterName, isTeamAgent, teamName, user]);
 
   const avatarUrl = useMemo(() => {
+    if (message.source?.posterAvatar) return message.source.posterAvatar;
     if (isTeamAgent && teamLogoUrl) return teamLogoUrl;
     return user?.avatar_url;
-  }, [isTeamAgent, teamLogoUrl, user]);
+  }, [message.source?.posterAvatar, isTeamAgent, teamLogoUrl, user]);
 
   const handleReaction = useCallback((emoji: string) => {
     onAddReaction?.(message.id, emoji);
@@ -141,9 +147,10 @@ export const MessageBubble = memo<MessageBubbleProps>(({
 
   const sanitizeEmbedCode = useCallback((embedCode: string) => {
     return DOMPurify.sanitize(embedCode, {
-      ALLOWED_TAGS: ['blockquote', 'a', 'p', 'div', 'span', 'iframe', 'script'],
-      ALLOWED_ATTR: ['href', 'class', 'src', 'width', 'height', 'frameborder', 'allowfullscreen', 'data-tweet-id', 'data-theme'],
-      ALLOW_DATA_ATTR: true
+      ALLOWED_TAGS: ['blockquote', 'a', 'p', 'div', 'span', 'iframe', 'script', 'img', 'video', 'source'],
+      ALLOWED_ATTR: ['href', 'class', 'src', 'width', 'height', 'frameborder', 'allowfullscreen', 'data-tweet-id', 'data-theme', 'controls', 'preload', 'poster', 'alt'],
+      ALLOW_DATA_ATTR: true,
+      ADD_ATTR: ['allowfullscreen']
     });
   }, []);
 
@@ -212,33 +219,38 @@ export const MessageBubble = memo<MessageBubbleProps>(({
           </div>
         )}
         
-        <div className={cn(
-          "rounded-xl px-3 py-2 max-w-fit",
-          isOwnMessage 
-            ? "bg-primary text-primary-foreground ml-auto" 
-            : "bg-muted text-foreground",
-          shouldShowAvatar && !isConsecutive 
-            ? "rounded-xl" 
-            : isOwnMessage 
-              ? "rounded-l-xl rounded-tr-md rounded-br-xl"
-              : "rounded-r-xl rounded-tl-md rounded-bl-xl"
-        )}>
-          <div className="text-base font-normal leading-snug">
-            {message.embed_code ? (
-              <div 
-                className="rounded-xl overflow-hidden shadow max-w-[85%]"
-                style={{ pointerEvents: 'auto' }}
-                dangerouslySetInnerHTML={{ 
-                  __html: sanitizeEmbedCode(message.embed_code) 
-                }}
-              />
-            ) : (
-              <>
-                {renderedContent}
-              </>
-            )}
+        {message.content && (
+          <div className={cn(
+            "rounded-xl px-3 py-2 max-w-fit",
+            isOwnMessage 
+              ? "bg-primary text-primary-foreground ml-auto" 
+              : "bg-muted text-foreground",
+            shouldShowAvatar && !isConsecutive 
+              ? "rounded-xl" 
+              : isOwnMessage 
+                ? "rounded-l-xl rounded-tr-md rounded-br-xl"
+                : "rounded-r-xl rounded-tl-md rounded-bl-xl"
+          )}>
+            <div className="text-base font-normal leading-snug">
+              {renderedContent}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Embedded Content */}
+        {message.embed_code && (
+          <div 
+            className="rounded-xl overflow-hidden my-2 max-w-[85%] shadow"
+            style={{ pointerEvents: 'auto' }}
+          >
+            <div 
+              className="w-full h-auto aspect-video"
+              dangerouslySetInnerHTML={{ 
+                __html: sanitizeEmbedCode(message.embed_code) 
+              }}
+            />
+          </div>
+        )}
 
         {message.media_url && (
           <div className="mt-2">
