@@ -11,7 +11,9 @@ import { InviteButton } from "@/components/InviteButton";
 import { CollapsibleMemberList } from "@/components/CollapsibleMemberList";
 import { MakePublicButton } from "@/components/MakePublicButton";
 import { HuddleManagement } from "@/components/HuddleManagement";
-import { VirtualizedChat } from "@/components/chat/VirtualizedChat";
+import { ChatList, ChatListRef } from "@/components/ChatList";
+import { MessageBubble } from "@/components/MessageBubble";
+import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { ModernChatInput } from "@/components/chat/ModernChatInput";
 import { ModernMessageBubble } from "@/components/chat/ModernMessageBubble";
 import { EnhancedTypingIndicator } from "@/components/chat/EnhancedTypingIndicator";
@@ -78,7 +80,8 @@ export const Huddle = () => {
   const PAGE_SIZE = 40;
   const [oldestCreatedAt, setOldestCreatedAt] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
-const [loadingOlder, setLoadingOlder] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const chatListRef = useRef<ChatListRef>(null);
 const [typingUsers, setTypingUsers] = useState<string[]>([]);
 const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 const msgChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -400,8 +403,8 @@ useEffect(() => {
   };
 
   const loadOlderMessages = async () => {
-    if (!hasMore || loadingOlder || !oldestCreatedAt) return;
-    setLoadingOlder(true);
+    if (!hasMore || loadingMore || !oldestCreatedAt) return;
+    setLoadingMore(true);
     try {
       const { data: olderData, error } = await supabase
         .from("huddle_messages")
@@ -446,7 +449,7 @@ useEffect(() => {
     } catch (err) {
       console.error('Error loading older messages:', err);
     } finally {
-      setLoadingOlder(false);
+      setLoadingMore(false);
     }
   };
 
@@ -700,29 +703,24 @@ useEffect(() => {
 
   // Memoized itemContent function to prevent re-renders and flashing
   const renderMessageItem = useCallback((index: number, message: any) => {
-    const previousMessage = index > 0 ? messages[index - 1] : null;
-    const isConsecutive = previousMessage && 
-      previousMessage.user_id === message.user_id &&
-      new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() < 300000;
+    const isConsecutive = index > 0 && 
+      messages[index - 1]?.user_id === message.user_id && 
+      new Date(message.created_at).getTime() - new Date(messages[index - 1]?.created_at).getTime() < 300000;
     
     return (
-      <ModernMessageBubble
+      <MessageBubble
         key={message.id}
         message={message}
-        previousMessage={previousMessage}
-        isConsecutive={isConsecutive}
-        onAddReaction={addReaction}
+        user={message.user || message.profiles}
         currentUserId={user?.id}
         teamName={huddle?.team?.name}
         teamLogoUrl={huddle?.team?.logo_url}
-        teamId={huddle?.team?.id}
-        originTeamName={message.origin_teams?.name}
+        onAddReaction={addReaction}
         onPollVote={handlePollVote}
-        pollVotes={pollVotes[message.id]}
-        userVote={userVotes[message.id]}
+        isConsecutive={isConsecutive}
       />
     );
-  }, [messages, addReaction, user?.id, huddle?.team?.name, huddle?.team?.logo_url, huddle?.team?.id, handlePollVote, pollVotes, userVotes]);
+  }, [messages, user?.id, huddle?.team, addReaction, handlePollVote]);
 
   if (loading) {
     return (
@@ -795,11 +793,13 @@ useEffect(() => {
 
       <div className="flex-1 w-full flex flex-col min-h-0 chat-container">
         {/* Messages Area */}
-        <VirtualizedChat
-          items={messages}
-          loadMoreTop={loadOlderMessages}
-          getItemKey={(message) => message.id}
-          itemContent={renderMessageItem}
+        <ChatList
+          ref={chatListRef}
+          messages={messages}
+          loadOlderMessages={loadOlderMessages}
+          renderMessage={renderMessageItem}
+          hasMore={hasMore}
+          isLoadingMore={loadingMore}
         />
 
         {/* Enhanced Typing Indicator with animation */}
