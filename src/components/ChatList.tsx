@@ -1,7 +1,6 @@
 import React, { useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
-import { Button } from '@/components/ui/button';
-import { ChevronDown } from 'lucide-react';
+import { JumpToLatest } from '@/components/JumpToLatest';
 
 interface ChatListProps {
   messages: any[];
@@ -90,17 +89,10 @@ export const ChatList = forwardRef<ChatListRef, ChatListProps>(({
         }}
       />
       
-      {showJumpToLatest && (
-        <Button
-          onClick={jumpToLatest}
-          size="sm"
-          className="fixed bottom-20 right-4 z-10 shadow-lg animate-scale-in"
-          variant="secondary"
-        >
-          <ChevronDown className="h-4 w-4 mr-1" />
-          Jump to latest
-        </Button>
-      )}
+      <JumpToLatest
+        visible={showJumpToLatest}
+        onClick={jumpToLatest}
+      />
     </div>
   );
 });
