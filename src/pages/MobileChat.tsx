@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Send, Paperclip, Users, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   id: string;
@@ -32,7 +33,7 @@ interface HuddleData {
   id: string;
   name: string;
   team_name: string;
-  team_logo_url: string;
+  team_logo_url?: string;
   participant_count: number;
   is_verified?: boolean;
 }
@@ -46,15 +47,8 @@ export const MobileChat = () => {
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<Record<string, User>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Mock users data
-  const users: Record<string, User> = {
-    'user1': { id: 'user1', display_name: 'You', avatar_url: undefined },
-    'bot1': { id: 'bot1', display_name: 'Lakers Bot', avatar_url: '/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png' },
-    'user2': { id: 'user2', display_name: 'Sarah', avatar_url: undefined },
-    'user3': { id: 'user3', display_name: 'Mike', avatar_url: undefined }
-  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -65,89 +59,113 @@ export const MobileChat = () => {
   }, [messages]);
 
   useEffect(() => {
-    // Mock data for demo
-    const mockHuddle: HuddleData = {
-      id: huddleId || '1',
-      name: 'Lakers Core',
-      team_name: 'Los Angeles Lakers',
-      team_logo_url: '/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png',
-      participant_count: 4,
-      is_verified: true
+    if (!huddleId || !currentUser) return;
+
+    const fetchHuddleData = async () => {
+      try {
+        // Fetch huddle data with team info
+        const { data: huddleData, error: huddleError } = await supabase
+          .from('huddles')
+          .select(`
+            id,
+            name,
+            member_count,
+            is_verified,
+            team:teams(name, logo_url)
+          `)
+          .eq('id', huddleId)
+          .single();
+
+        if (huddleError) throw huddleError;
+
+        // Fetch messages
+        const { data: messagesData, error: messagesError } = await supabase
+          .from('huddle_messages')
+          .select('*')
+          .eq('huddle_id', huddleId)
+          .order('created_at', { ascending: true })
+          .limit(50);
+
+        if (messagesError) throw messagesError;
+
+        // Fetch users for messages
+        const userIds = [...new Set(messagesData?.map(m => m.user_id) || [])];
+        const { data: usersData, error: usersError } = await supabase
+          .from('profiles')
+          .select('user_id, display_name, avatar_url')
+          .in('user_id', userIds);
+
+        if (usersError) throw usersError;
+
+        // Create users map
+        const usersMap: Record<string, User> = {};
+        usersData?.forEach(user => {
+          usersMap[user.user_id] = {
+            id: user.user_id,
+            display_name: user.display_name || 'Unknown User',
+            avatar_url: user.avatar_url
+          };
+        });
+
+        // Add system bot user for team messages
+        const teamName = huddleData.team?.name || 'Team';
+        usersMap['system_bot'] = {
+          id: 'system_bot',
+          display_name: `${teamName} Bot`,
+          avatar_url: huddleData.team?.logo_url
+        };
+
+        setHuddle({
+          id: huddleData.id,
+          name: huddleData.name,
+          team_name: huddleData.team?.name || 'Team',
+          team_logo_url: huddleData.team?.logo_url,
+          participant_count: huddleData.member_count || 1,
+          is_verified: huddleData.is_verified
+        });
+
+        setMessages(messagesData || []);
+        setUsers(usersMap);
+      } catch (error) {
+        console.error('Error fetching huddle data:', error);
+        navigate('/app');
+      } finally {
+        setLoading(false);
+      }
     };
 
-    const mockMessages: Message[] = [
-      {
-        id: '1',
-        content: 'Welcome to the Lakers Core huddle! 🏀 I\'ll keep you updated with the latest news, highlights, and game updates.',
-        created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        user_id: 'bot1',
-        is_bot_message: true
-      },
-      {
-        id: '2',
-        content: 'Hey everyone! Ready for tonight\'s game? 💜💛',
-        created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        user_id: 'user2'
-      },
-      {
-        id: '3',
-        content: 'Can\'t wait! LeBron has been on fire lately',
-        created_at: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
-        user_id: 'user3'
-      },
-      {
-        id: '4',
-        content: '🚨 INJURY UPDATE: Anthony Davis is probable for tonight\'s game with a minor ankle issue. Should be good to go! 💪',
-        created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-        user_id: 'bot1',
-        is_bot_message: true
-      },
-      {
-        id: '5',
-        content: 'That\'s great news! We need AD healthy for the playoffs',
-        created_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-        user_id: 'user1'
-      }
-    ];
-
-    setTimeout(() => {
-      setHuddle(mockHuddle);
-      setMessages(mockMessages);
-      setLoading(false);
-    }, 500);
-  }, [huddleId]);
+    fetchHuddleData();
+  }, [huddleId, currentUser, navigate]);
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || sending) return;
+    if (!newMessage.trim() || sending || !currentUser || !huddleId) return;
 
     setSending(true);
     const messageText = newMessage.trim();
     setNewMessage('');
 
-    // Add user message immediately
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: messageText,
-      created_at: new Date().toISOString(),
-      user_id: 'user1'
-    };
+    try {
+      // Insert message to database
+      const { data, error } = await supabase
+        .from('huddle_messages')
+        .insert({
+          huddle_id: huddleId,
+          user_id: currentUser.id,
+          content: messageText,
+          media_type: 'text'
+        })
+        .select()
+        .single();
 
-    setMessages(prev => [...prev, userMessage]);
+      if (error) throw error;
 
-    // Simulate bot response after user message
-    setTimeout(() => {
-      if (messageText.toLowerCase().includes('score') || messageText.toLowerCase().includes('game')) {
-        const botMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content: '🏀 Current score: Lakers 85 - Celtics 82 (3rd Quarter, 4:23 remaining). LeBron leading with 24 points!',
-          created_at: new Date().toISOString(),
-          user_id: 'bot1',
-          is_bot_message: true
-        };
-        setMessages(prev => [...prev, botMessage]);
-      }
+      // Add to local state
+      setMessages(prev => [...prev, data]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+    } finally {
       setSending(false);
-    }, 1000);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -218,7 +236,7 @@ export const MobileChat = () => {
                 key={message.id}
                 message={message}
                 user={users[message.user_id]}
-                currentUserId="user1"
+                currentUserId={currentUser?.id}
                 teamName={huddle.team_name}
                 teamLogoUrl={huddle.team_logo_url}
                 isConsecutive={isConsecutive}
