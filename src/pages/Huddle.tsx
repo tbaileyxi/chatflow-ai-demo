@@ -721,7 +721,7 @@ useEffect(() => {
     <div className="flex flex-col h-full">
       {/* Huddle Header */}
       <div className="p-4 border-b bg-card">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
               {huddle.team.logo_url ? (
@@ -743,7 +743,7 @@ useEffect(() => {
               </p>
             </div>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+          <div className="flex flex-col w-full items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             {user?.id === huddle.owner_id && !huddle.is_verified && (
               <HuddleVerificationDialog huddleId={huddle.id} isVerified={huddle.is_verified} />
             )}

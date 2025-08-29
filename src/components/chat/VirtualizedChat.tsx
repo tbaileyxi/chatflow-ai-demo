@@ -48,10 +48,11 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
   const virtuosoRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState<number | null>(null);
-  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [isAtBottom, setIsAtBottom] = useState(false);
   const [shouldFollowOutput, setShouldFollowOutput] = useState(true);
   const lastItemCountRef = useRef(data.length);
-  
+  const estimatedItemHeight = useMemo(() => estimateItemSize(), []);
+
   // Debounced follow output function to prevent flashing
   const debouncedSetShouldFollow = useMemo(
     () => debounce((shouldFollow: boolean) => {
@@ -127,11 +128,16 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
     
     const scrollElement = scrollRef.current;
     scrollElement.addEventListener('scroll', handleScroll, { passive: true });
+
+    // Initial check to sync at-bottom state when data changes
+    setTimeout(() => {
+      checkIfAtBottom();
+    }, 0);
     
     return () => {
       scrollElement.removeEventListener('scroll', handleScroll);
     };
-  }, [handleScroll]);
+  }, [handleScroll, data.length, checkIfAtBottom]);
 
   // iOS keyboard focus handling
   useEffect(() => {
@@ -173,10 +179,10 @@ export function VirtualizedChat<T>({ items, loadMoreTop, itemContent, getItemKey
         data={data}
         itemContent={itemContent}
         computeItemKey={getItemKey ? (index, item) => getItemKey(item) : undefined}
-        defaultItemHeight={defaultItemHeight ?? estimateItemSize()}
-        increaseViewportBy={{ top: 600, bottom: 600 }}
+        defaultItemHeight={defaultItemHeight ?? estimatedItemHeight}
+        increaseViewportBy={{ top: Math.max(overscan ?? 600, 600), bottom: Math.max(overscan ?? 600, 600) }}
         initialTopMostItemIndex={alignToBottom ? Math.max(0, data.length - 1) : (initialIndex ?? 0)}
-        followOutput={shouldFollowOutput ? "auto" : false}
+        followOutput={(isBottom: boolean) => isBottom && shouldFollowOutput}
         atBottomStateChange={(atBottom) => {
           console.log('[VirtualizedChat] Virtuoso atBottom:', atBottom);
           setIsAtBottom(atBottom);
