@@ -150,7 +150,8 @@ const TeamSelectionScreen = ({ onNext, onBack }: { onNext: (teamIds: string[]) =
           name: `${team.city} ${team.name} Core`,
           owner_id: user?.id,
           team_id: team.id,
-          is_private: true
+          is_private: true,
+          member_count: 1
         })
         .select()
         .single();

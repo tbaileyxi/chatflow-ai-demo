@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ChevronDown, ChevronRight, Bot, Users } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, Bot, Users, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
+import { StartHuddleDialog } from '@/components/StartHuddleDialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface Huddle {
   id: string;
@@ -33,8 +35,10 @@ interface TeamGroup {
 export const HuddleList = () => {
   const [teamGroups, setTeamGroups] = useState<TeamGroup[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const { user, userRole } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const toggleTeamExpansion = (teamName: string) => {
     setTeamGroups(prev => 
@@ -50,38 +54,49 @@ export const HuddleList = () => {
     if (!user) return;
 
     try {
-      // Mock data for demo - in real app, fetch from Supabase
-      const mockHuddles: Huddle[] = [
-        {
-          id: '1',
-          name: 'Lakers Core',
-          team_name: 'Los Angeles Lakers',
-          team_logo_url: '/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png',
-          participant_count: 4,
-          latest_message: {
-            content: 'LeBron with the clutch three! 🔥',
-            created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-            is_bot_message: true
-          },
-          unread_count: 2
+      // Fetch user's huddles from database
+      const { data: huddles, error } = await supabase
+        .from('huddles')
+        .select(`
+          id,
+          name,
+          member_count,
+          last_message_at,
+          teams (
+            name,
+            city,
+            logo_url
+          )
+        `)
+        .or(`owner_id.eq.${user.id},id.in.(${
+          // Subquery to get huddles where user is a member
+          await supabase
+            .from('huddle_members')
+            .select('huddle_id')
+            .eq('user_id', user.id)
+            .then(({ data }) => data?.map(m => m.huddle_id).join(',') || 'null')
+        })`)
+        .order('last_message_at', { ascending: false, nullsFirst: false });
+
+      if (error) throw error;
+
+      // Transform data to match our interface
+      const transformedHuddles: Huddle[] = (huddles || []).map(huddle => ({
+        id: huddle.id,
+        name: huddle.name,
+        team_name: `${huddle.teams?.city} ${huddle.teams?.name}`,
+        team_logo_url: huddle.teams?.logo_url || '/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png',
+        participant_count: huddle.member_count || 1,
+        latest_message: {
+          content: 'Welcome to your huddle!',
+          created_at: huddle.last_message_at || new Date().toISOString(),
+          is_bot_message: true
         },
-        {
-          id: '2',
-          name: 'Family Chat',
-          team_name: 'Los Angeles Lakers',
-          team_logo_url: '/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png',
-          participant_count: 3,
-          latest_message: {
-            content: 'Anyone watching the game tonight?',
-            created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-            is_bot_message: false
-          },
-          unread_count: 0
-        }
-      ];
+        unread_count: 0
+      }));
 
       // Group by team
-      const grouped = mockHuddles.reduce((acc, huddle) => {
+      const grouped = transformedHuddles.reduce((acc, huddle) => {
         const existing = acc.find(g => g.team_name === huddle.team_name);
         if (existing) {
           existing.huddles.push(huddle);
@@ -99,6 +114,11 @@ export const HuddleList = () => {
       setTeamGroups(grouped);
     } catch (error) {
       console.error('Error fetching huddles:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load huddles",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -113,7 +133,7 @@ export const HuddleList = () => {
   };
 
   const handleCreateHuddle = () => {
-    navigate('/create-huddle');
+    setShowCreateDialog(true);
   };
 
   if (loading) {
@@ -126,17 +146,33 @@ export const HuddleList = () => {
 
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
-      {/* Header with create button */}
+      {/* Header with create button and settings */}
       <div className="px-4 py-3 border-b border-white/10">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Your Huddles</h2>
-          <Button
-            size="sm"
-            onClick={handleCreateHuddle}
-            className="bg-primary hover:bg-primary/90 rounded-full h-8 w-8 p-0"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {userRole === 'admin' && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => navigate('/admin')}
+                className="rounded-full h-8 w-8 p-0"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            )}
+            <StartHuddleDialog 
+              onHuddleCreated={fetchHuddles}
+              trigger={
+                <Button
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90 rounded-full h-8 w-8 p-0"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              }
+            />
+          </div>
         </div>
       </div>
 
@@ -149,10 +185,15 @@ export const HuddleList = () => {
             </div>
             <h3 className="text-lg font-medium text-foreground mb-2">No huddles yet</h3>
             <p className="text-muted-foreground mb-4">Create your first huddle to start chatting with friends</p>
-            <Button onClick={handleCreateHuddle} className="bg-primary hover:bg-primary/90">
-              <Plus className="h-4 w-4 mr-2" />
-              Create Huddle
-            </Button>
+            <StartHuddleDialog 
+              onHuddleCreated={fetchHuddles}
+              trigger={
+                <Button className="bg-primary hover:bg-primary/90">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Huddle
+                </Button>
+              }
+            />
           </div>
         ) : (
           <div className="space-y-1">
