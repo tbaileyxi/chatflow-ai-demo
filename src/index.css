@@ -151,30 +151,39 @@ All colors MUST be HSL.
   }
 
   .dark {
-    /* Dark Charcoal with Yellow Accents */
-    --background: 0 0% 20%;
+    /* Dark Slate Grey Base with Mobile PWA optimization */
+    --background: 217 33% 17%;
     --foreground: 0 0% 100%;
 
-    --card: 0 0% 20%;
+    --card: 217 33% 17%;
     --card-foreground: 0 0% 100%;
 
-    --popover: 0 0% 20%;
+    --popover: 217 33% 19%;
     --popover-foreground: 0 0% 100%;
 
-    /* Bright Yellow Primary */
+    /* Bright Yellow Primary - Main accent */
     --primary: 45 100% 51%;
     --primary-foreground: 0 0% 0%;
 
-    /* Dark Charcoal Secondary */
-    --secondary: 0 0% 25%;
+    /* Dark Slate Secondary */
+    --secondary: 217 33% 22%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 0 0% 25%;
+    --muted: 217 33% 22%;
     --muted-foreground: 0 0% 70%;
 
-    /* Bright Yellow Accent */
-    --accent: 45 100% 51%;
+    /* Baby Blue Subtle */
+    --accent: 203 89% 53%;
     --accent-foreground: 0 0% 0%;
+
+    /* Glassmorphism colors */
+    --glass-bg: 217 33% 17% / 0.8;
+    --glass-border: 0 0% 100% / 0.1;
+    --glass-blur: blur(20px);
+
+    /* Bot message styling */
+    --bot-bubble: 203 89% 53% / 0.1;
+    --bot-border: 203 89% 53% / 0.2;
 
     /* Success and Destructive */
     --success: 120 100% 40%;
@@ -282,10 +291,38 @@ All colors MUST be HSL.
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
+  /* Mobile-first Glassmorphism styles */
   .glassmorphism {
-    backdrop-filter: blur(10px);
-    background: rgba(255, 255, 255, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: var(--glass-blur);
+    background: hsla(var(--glass-bg));
+    border: 1px solid hsla(var(--glass-border));
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  }
+
+  .glass-header {
+    backdrop-filter: blur(16px);
+    background: hsla(217 33% 17% / 0.9);
+    border-bottom: 1px solid hsla(0 0% 100% / 0.1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  }
+
+  .glass-card {
+    backdrop-filter: blur(12px);
+    background: hsla(217 33% 19% / 0.6);
+    border: 1px solid hsla(0 0% 100% / 0.08);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .glass-bubble {
+    backdrop-filter: blur(8px);
+    background: hsla(217 33% 22% / 0.8);
+    border: 1px solid hsla(0 0% 100% / 0.1);
+  }
+
+  .glass-bot-bubble {
+    backdrop-filter: blur(8px);
+    background: hsla(var(--bot-bubble));
+    border: 1px solid hsla(var(--bot-border));
   }
 
   /* Chat message font sizes - iOS standard */

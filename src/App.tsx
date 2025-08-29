@@ -22,6 +22,9 @@ import { JoinHuddle } from "./pages/JoinHuddle";
 import { SpotlightPost } from "./pages/SpotlightPost";
 import { HuddleSearch } from "./pages/HuddleSearch";
 import NotFound from "./pages/NotFound";
+import { MobileHome } from "./pages/MobileHome";
+import { MobileSpotlight } from "./pages/MobileSpotlight";
+import { MobileChat } from "./pages/MobileChat";
 
 const queryClient = new QueryClient();
 
@@ -66,15 +69,16 @@ const AppContent = () => {
         <div className="flex-1 overflow-hidden">{/* Overflow container */}
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/app" element={<Index />} />
+          <Route path="/app" element={<MobileHome />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/teams" element={<TeamDirectory />} />
           <Route path="/teams/:teamId" element={<TeamFeed />} />
-          <Route path="/huddle/:id" element={<Huddle />} />
+          <Route path="/huddle/:huddleId" element={<MobileChat />} />
           <Route path="/join-huddle/:huddleId" element={<JoinHuddle />} />
           <Route path="/huddle-search" element={<HuddleSearch />} />
+          <Route path="/spotlight" element={<MobileSpotlight />} />
           <Route path="/spotlight/:id" element={<SpotlightPost />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

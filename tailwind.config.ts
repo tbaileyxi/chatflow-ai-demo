@@ -48,6 +48,10 @@ export default {
 				ring: 'hsl(var(--ring))',
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
+				
+				// Glassmorphism colors
+				'glass-bg': 'hsla(var(--glass-bg))',
+				'glass-border': 'hsla(var(--glass-border))',
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
 					foreground: 'hsl(var(--primary-foreground))'
@@ -97,7 +101,11 @@ export default {
 				},
 				spotlight: 'hsl(var(--spotlight))',
 				'like-button': 'hsl(var(--like-button))',
-				'fire-button': 'hsl(var(--fire-button))'
+				'fire-button': 'hsl(var(--fire-button))',
+				
+				// Bot colors
+				'bot-bubble': 'hsla(var(--bot-bubble))',
+				'bot-border': 'hsla(var(--bot-border))'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
