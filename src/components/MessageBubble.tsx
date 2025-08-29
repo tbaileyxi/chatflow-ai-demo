@@ -214,10 +214,15 @@ export const MessageBubble = memo<MessageBubbleProps>(({
             <span className="font-medium text-sm text-muted-foreground opacity-60 truncate">
               {displayName}
             </span>
-            {isTeamAgent && (
+            {isTeamAgent && !message.source?.posterName && (
               <Badge variant="secondary" className="text-xs h-5">
                 Bot
               </Badge>
+            )}
+            {message.source?.posterName && (
+              <span className="text-xs text-muted-foreground opacity-40">
+                via broadcast
+              </span>
             )}
             <span className="text-xs text-muted-foreground opacity-60 shrink-0">
               {formattedTime}
