@@ -114,14 +114,21 @@ export function VirtualizedChat<T>({
     intersectionObserverRef.current.observe(sentinel);
   }, [isAtBottom]);
 
-  // Cleanup intersection observer
+  // Cleanup intersection observer with safe DOM manipulation
   const cleanupIntersectionObserver = useCallback(() => {
     if (intersectionObserverRef.current) {
       intersectionObserverRef.current.disconnect();
       intersectionObserverRef.current = null;
     }
     if (sentinelRef.current && scrollRef.current) {
-      scrollRef.current.removeChild(sentinelRef.current);
+      // Safe removal - check if the sentinel is actually a child
+      try {
+        if (scrollRef.current.contains(sentinelRef.current)) {
+          scrollRef.current.removeChild(sentinelRef.current);
+        }
+      } catch (error) {
+        console.warn('[VirtualizedChat] Error removing sentinel:', error);
+      }
       sentinelRef.current = null;
     }
   }, []);
