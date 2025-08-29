@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Maximize, X } from 'lucide-react';
+import { extractVideoFrame } from '@/utils/videoThumbnail';
 
 interface MediaViewerProps {
   mediaUrl: string;
@@ -17,6 +18,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
   showLightbox = false
 }) => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [videoPoster, setVideoPoster] = useState<string | null>(null);
 
   if (mediaType === 'image') {
     const imageEl = (
@@ -60,11 +62,21 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
     );
   }
 
+  // Generate video thumbnail on mount
+  useEffect(() => {
+    if (mediaType === 'video') {
+      extractVideoFrame(mediaUrl)
+        .then(setVideoPoster)
+        .catch(console.warn);
+    }
+  }, [mediaUrl, mediaType]);
+
   // Video: always inline by default, no overlay controls/lightbox to avoid conflicts
   return (
     <div className={`media-inline ${className}`}>
       <video
         src={mediaUrl}
+        poster={videoPoster || undefined}
         className="w-full h-full object-contain"
         preload="metadata"
         controls

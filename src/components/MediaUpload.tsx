@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { generateVideoThumbnail } from '@/utils/videoThumbnail';
 
 interface MediaUploadProps {
   onMediaSelected: (url: string, type: 'image' | 'video', commentary?: string) => void;
@@ -32,6 +33,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
   const [commentary, setCommentary] = useState('');
   const { toast } = useToast();
   
@@ -64,7 +66,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
     return file.type.startsWith('video/') ? 'video' : 'image';
   };
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = async (file: File) => {
     const error = validateFile(file);
     if (error) {
       toast({
@@ -80,6 +82,16 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
     if (showPreview) {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
+      
+      // Generate thumbnail for videos
+      if (getFileType(file) === 'video') {
+        try {
+          const thumbnail = await generateVideoThumbnail(file);
+          setVideoThumbnail(thumbnail);
+        } catch (error) {
+          console.warn('Failed to generate video thumbnail:', error);
+        }
+      }
     } else {
       handleUpload(file);
     }
@@ -152,6 +164,10 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
     }
+    if (videoThumbnail) {
+      URL.revokeObjectURL(videoThumbnail);
+      setVideoThumbnail(null);
+    }
   };
 
   const triggerFileInput = (inputRef: React.RefObject<HTMLInputElement>) => {
@@ -216,13 +232,21 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
                   className="max-w-full h-auto max-h-64 rounded object-contain bg-muted/50"
                   style={{ aspectRatio: 'auto' }}
                 />
-              ) : (
-                <video
-                  src={previewUrl}
-                  controls
-                  className="max-w-full h-auto max-h-64 rounded"
-                />
-              )}
+               ) : (
+                <div className="relative">
+                  <video
+                    src={previewUrl}
+                    poster={videoThumbnail || undefined}
+                    controls
+                    className="max-w-full h-auto max-h-64 rounded"
+                  />
+                  {videoThumbnail && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <PlayCircle className="h-12 w-12 text-white opacity-80 drop-shadow-lg" />
+                    </div>
+                  )}
+                </div>
+               )}
             </div>
           )}
           

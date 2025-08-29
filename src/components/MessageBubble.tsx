@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useCallback, useState } from 'react';
+import React, { memo, useMemo, useCallback, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { Heart, Smile, ThumbsUp, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import DOMPurify from 'dompurify';
 import { XPostEmbed } from '@/components/embeds/XPostEmbed';
+import { extractVideoFrame } from '@/utils/videoThumbnail';
 
 interface MessageBubbleProps {
   message: {
@@ -100,6 +101,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({
 }) => {
   const [showReactions, setShowReactions] = useState(false);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [videoPoster, setVideoPoster] = useState<string | null>(null);
   
   const isOwnMessage = currentUserId === message.user_id;
   const isTeamAgent = message.is_bot_message;
@@ -159,6 +161,15 @@ export const MessageBubble = memo<MessageBubbleProps>(({
     const code = message.embed_code || '';
     return /(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/\w+\/status\//.test(code) || /twitter-tweet/.test(code);
   }, [message.embed_code]);
+
+  // Generate video poster for messages with video media
+  useEffect(() => {
+    if (message.media_url && message.media_type === 'video') {
+      extractVideoFrame(message.media_url)
+        .then(setVideoPoster)
+        .catch(console.warn);
+    }
+  }, [message.media_url, message.media_type]);
 
   // Debounced content rendering for streaming
   const renderedContent = useMemo(() => {
@@ -274,6 +285,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({
             ) : (
               <video
                 src={message.media_url}
+                poster={videoPoster || undefined}
                 controls
                 className="max-w-xs rounded-lg shadow-sm"
                 preload="metadata"
