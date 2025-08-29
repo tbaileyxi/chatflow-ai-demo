@@ -1,20 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Virtuoso } from "react-virtuoso";
-import { useIOSKeyboard } from "@/hooks/useIOSKeyboard";
+import React, { useEffect, useRef, useLayoutEffect } from "react";
 
-// Simple debounce for scroll events
-const debounce = (func: Function, wait: number) => {
-  let timeout: NodeJS.Timeout;
-  return (...args: any[]) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-};
-
-// Static item height to prevent flashing
-const ESTIMATED_ITEM_HEIGHT = 150;
-
-interface VirtualizedChatProps<T> {
+interface SimpleChatProps<T> {
   items: T[];
   loadMoreTop?: () => Promise<void> | void;
   itemContent: (index: number, item: T) => React.ReactNode;
@@ -30,154 +16,79 @@ export function VirtualizedChat<T>({
   items, 
   loadMoreTop, 
   itemContent, 
-  getItemKey, 
-  defaultItemHeight = ESTIMATED_ITEM_HEIGHT, 
-  overscan = 300, 
-  alignToBottom = true, 
-  initialIndex, 
-  followOutput = 'auto' 
-}: VirtualizedChatProps<T>) {
-  const data = useMemo(() => items, [items]);
-  const { isOpen: isKeyboardOpen, height: keyboardHeight } = useIOSKeyboard();
-
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const virtuosoRef = useRef<any>(null);
+  getItemKey
+}: SimpleChatProps<T>) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [height, setHeight] = useState<number | null>(null);
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  // Prevent auto-follow while user is scrolling away from bottom
-  const userHoldRef = useRef(false);
-  const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Simple at-bottom check
-  const checkIfAtBottom = useCallback(() => {
-    if (!scrollRef.current) return false;
+  const wasAtBottomRef = useRef(true);
+  const isFirstLoadRef = useRef(true);
+
+  // Scroll to bottom on first load and when new messages arrive (if user was at bottom)
+  useLayoutEffect(() => {
+    if (!scrollRef.current) return;
+
+    const scrollElement = scrollRef.current;
     
-    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    const threshold = 100; // Larger threshold for reliability
-    const atBottom = scrollHeight - scrollTop - clientHeight <= threshold;
-    
-    if (atBottom !== isAtBottom) {
-      setIsAtBottom(atBottom);
+    if (isFirstLoadRef.current) {
+      // First load - always scroll to bottom
+      scrollElement.scrollTop = scrollElement.scrollHeight;
+      isFirstLoadRef.current = false;
+      wasAtBottomRef.current = true;
+    } else if (wasAtBottomRef.current) {
+      // New message and user was at bottom - follow
+      scrollElement.scrollTop = scrollElement.scrollHeight;
     }
-    
-    return atBottom;
-  }, [isAtBottom]);
+  }, [items.length]);
 
-  // Debounced scroll handler that also toggles user hold
-  const handleScroll = useMemo(
-    () => debounce(() => {
-      const atBottom = checkIfAtBottom();
-      if (!atBottom) {
-        userHoldRef.current = true;
-        if (holdTimeoutRef.current) clearTimeout(holdTimeoutRef.current);
-        holdTimeoutRef.current = setTimeout(() => {
-          userHoldRef.current = false;
-        }, 1500);
-      }
-    }, 100),
-    [checkIfAtBottom]
-  );
-
-  // Height calculation
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const updateHeight = () => {
-      let baseHeight = el.clientHeight;
-      
-      if (baseHeight < 100) {
-        baseHeight = Math.max(Math.floor(window.innerHeight * 0.7), 320);
-      }
-      
-      if (isKeyboardOpen && keyboardHeight > 0) {
-        baseHeight = Math.max(baseHeight - keyboardHeight, 200);
-      }
-      
-      setHeight(baseHeight);
-    };
-
-    updateHeight();
-
-    const resizeObserver = new ResizeObserver(updateHeight);
-    resizeObserver.observe(el);
-
-    window.addEventListener("resize", updateHeight);
-    
-    return () => {
-      window.removeEventListener("resize", updateHeight);
-      resizeObserver.disconnect();
-    };
-  }, [isKeyboardOpen, keyboardHeight]);
-
-  // Scroll event setup
-  useEffect(() => {
+  // Track if user is at bottom
+  const handleScroll = () => {
     if (!scrollRef.current) return;
     
-    const scrollElement = scrollRef.current;
-    scrollElement.addEventListener('scroll', handleScroll, { passive: true });
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const threshold = 50;
+    wasAtBottomRef.current = scrollHeight - scrollTop - clientHeight <= threshold;
+  };
 
-    // Initial check
-    checkIfAtBottom();
+  // Load more on scroll to top
+  const handleScrollToTop = () => {
+    if (!scrollRef.current || !loadMoreTop) return;
     
-    return () => {
-      scrollElement.removeEventListener('scroll', handleScroll);
-    };
-  }, [handleScroll, checkIfAtBottom]);
-
-  // iOS keyboard handling
-  useEffect(() => {
-    if (!isKeyboardOpen || !isAtBottom) return;
-
-    const timer = setTimeout(() => {
-      if (scrollRef.current && isAtBottom) {
-        const { scrollHeight, clientHeight } = scrollRef.current;
-        scrollRef.current.scrollTop = scrollHeight - clientHeight;
+    if (scrollRef.current.scrollTop === 0) {
+      const oldScrollHeight = scrollRef.current.scrollHeight;
+      const result = loadMoreTop();
+      if (result && typeof result.then === 'function') {
+        result.then(() => {
+          // Maintain scroll position after loading more
+          if (scrollRef.current) {
+            const newScrollHeight = scrollRef.current.scrollHeight;
+            scrollRef.current.scrollTop = newScrollHeight - oldScrollHeight;
+          }
+        });
       }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [isKeyboardOpen, isAtBottom]);
+    }
+  };
 
   return (
-    <div 
-      ref={containerRef} 
-      className="flex-1 min-h-0"
-      style={{
-        height: isKeyboardOpen ? `calc(100dvh - ${keyboardHeight}px)` : '100%'
-      }}
-    >
-      <Virtuoso
-        ref={virtuosoRef}
+    <div className="flex-1 min-h-0">
+      <div
+        ref={scrollRef}
+        className="h-full overflow-y-auto"
+        onScroll={(e) => {
+          handleScroll();
+          handleScrollToTop();
+        }}
         style={{
-          height: height ?? 400,
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain'
         }}
-        data={data}
-        itemContent={itemContent}
-        computeItemKey={getItemKey ? (index, item) => getItemKey(item) : undefined}
-        defaultItemHeight={defaultItemHeight}
-        increaseViewportBy={{ top: overscan, bottom: overscan }}
-        initialTopMostItemIndex={alignToBottom ? Math.max(0, data.length - 1) : (initialIndex ?? 0)}
-        followOutput={false}
-        startReached={loadMoreTop}
-        scrollerRef={(ref) => {
-          scrollRef.current = ref as HTMLDivElement;
-        }}
-        components={{
-          Scroller: React.forwardRef<HTMLDivElement, any>((props, ref) => (
-            <div
-              {...props}
-              ref={ref}
-              style={{
-                ...(props.style || {}),
-                WebkitOverflowScrolling: 'touch',
-                overscrollBehavior: 'contain'
-              }}
-            />
-          ))
-        }}
-      />
+      >
+        <div className="flex flex-col">
+          {items.map((item, index) => (
+            <div key={getItemKey ? getItemKey(item) : index}>
+              {itemContent(index, item)}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
