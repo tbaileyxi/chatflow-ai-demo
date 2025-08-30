@@ -160,6 +160,7 @@ export const MobileChat = () => {
     };
 
     fetchHuddleData();
+  }, [huddleId, currentUser, navigate]);
 
   // Typing presence channel
   useEffect(() => {
@@ -338,6 +339,13 @@ export const MobileChat = () => {
           <div ref={messagesEndRef} />
         </div>
       </div>
+
+      {/* Typing indicator */}
+      {typingUsers.filter(id => id !== currentUser?.id).length > 0 && (
+        <div className="px-4 pb-2 text-xs text-muted-foreground">
+          {typingUsers.filter(id => id !== currentUser?.id).map(id => users[id]?.display_name || 'Someone').join(', ')} is typing...
+        </div>
+      )}
 
       {/* Chat input */}
       <div className="glass-header border-t border-white/10 p-4">
