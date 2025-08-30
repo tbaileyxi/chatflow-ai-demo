@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Send, Plus, Users, Settings, UserPlus } from 'lucide-react';
+import { Send, Plus, Users, Settings, UserPlus, Camera, Image } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,6 +57,8 @@ export const MobileChat = () => {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -166,38 +168,113 @@ export const MobileChat = () => {
   useEffect(() => {
     if (!huddleId || !currentUser) return;
 
+    console.log('[Typing] Setting up typing channel for huddle:', huddleId);
+    
     const channel = supabase.channel(`huddle-typing-${huddleId}`, {
-      config: { presence: { key: currentUser.id } }
+      config: { 
+        presence: { key: currentUser.id },
+        broadcast: { self: true }
+      }
     });
 
     channel.on('presence', { event: 'sync' }, () => {
-      const state = channel.presenceState() as Record<string, Array<{ typing?: boolean }>>;
+      const state = channel.presenceState() as Record<string, Array<{ typing?: boolean, display_name?: string }>>;
+      console.log('[Typing] Presence state sync:', state);
+      
       const typing = Object.entries(state)
-        .filter(([key, presences]) => presences?.some(p => p.typing))
+        .filter(([key, presences]) => {
+          const isTyping = presences?.some(p => p.typing);
+          console.log(`[Typing] User ${key} typing:`, isTyping);
+          return isTyping && key !== currentUser.id;
+        })
         .map(([key]) => key);
+      
+      console.log('[Typing] Active typing users:', typing);
       setTypingUsers(typing);
     });
 
+    channel.on('presence', { event: 'join' }, ({ key, newPresences }) => {
+      console.log('[Typing] User joined:', key, newPresences);
+    });
+
+    channel.on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+      console.log('[Typing] User left:', key, leftPresences);
+    });
+
     channel.subscribe((status) => {
+      console.log('[Typing] Channel subscription status:', status);
       if (status === 'SUBSCRIBED') {
-        channel.track({ typing: false });
+        channel.track({ typing: false, display_name: users[currentUser.id]?.display_name || 'You' });
       }
     });
 
     typingChannelRef.current = channel;
     return () => {
+      console.log('[Typing] Cleaning up typing channel');
       supabase.removeChannel(channel);
     };
-  }, [huddleId, currentUser]);
+  }, [huddleId, currentUser, users]);
 
   const signalTyping = () => {
     const channel = typingChannelRef.current;
-    if (!channel) return;
-    channel.track({ typing: true });
+    if (!channel || !currentUser) return;
+    
+    console.log('[Typing] Signaling typing for user:', currentUser.id);
+    channel.track({ 
+      typing: true, 
+      display_name: users[currentUser.id]?.display_name || 'You' 
+    });
+    
     if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = window.setTimeout(() => {
-      channel.track({ typing: false });
+      console.log('[Typing] Stopping typing signal');
+      channel.track({ 
+        typing: false, 
+        display_name: users[currentUser.id]?.display_name || 'You' 
+      });
     }, 1500);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser || !huddleId) return;
+
+    const formData = new FormData();
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random()}.${fileExt}`;
+    
+    try {
+      const { data, error } = await supabase.storage
+        .from('chat-media')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-media')
+        .getPublicUrl(data.path);
+
+      const mediaType = file.type.startsWith('video/') ? 'video' : 'image';
+      
+      const { data: messageData, error: messageError } = await supabase
+        .from('huddle_messages')
+        .insert({
+          huddle_id: huddleId,
+          user_id: currentUser.id,
+          content: '',
+          media_url: publicUrl,
+          media_type: mediaType
+        })
+        .select()
+        .single();
+
+      if (messageError) throw messageError;
+
+      // Reset file input
+      e.target.value = '';
+    } catch (err) {
+      console.error('Error uploading media:', err);
+    }
   };
 
   const handleMediaSelected = async (url: string, type: 'image' | 'video', commentary?: string) => {
@@ -215,9 +292,6 @@ export const MobileChat = () => {
         .select()
         .single();
       if (error) throw error;
-      if (data) {
-        setMessages(prev => [...prev, data]);
-      }
     } catch (err) {
       console.error('Error sending media message:', err);
     } finally {
@@ -350,14 +424,31 @@ export const MobileChat = () => {
       {/* Chat input */}
       <div className="glass-header border-t border-white/10 p-4">
         <div className="flex items-end gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="p-2 hover:bg-white/10 rounded-full shrink-0"
-            onClick={() => setIsMediaOpen(true)}
-          >
-            <Plus className="h-5 w-5 text-muted-foreground" />
-          </Button>
+          <div className="relative shrink-0">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-2 hover:bg-white/10 rounded-full"
+              onClick={() => setIsMediaOpen(true)}
+            >
+              <Plus className="h-5 w-5 text-muted-foreground" />
+            </Button>
+          </div>
           
           <div className="flex-1 relative">
             <Input
@@ -380,13 +471,36 @@ export const MobileChat = () => {
         </div>
       </div>
 
-      {/* Media upload dialog */}
+      {/* Simple camera/photos sheet */}
       <Dialog open={isMediaOpen} onOpenChange={setIsMediaOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Attach media</DialogTitle>
+        <DialogContent className="sm:max-w-md p-6">
+          <DialogHeader className="pb-4">
+            <DialogTitle>Share</DialogTitle>
           </DialogHeader>
-          <MediaUpload bucket="chat-media" onMediaSelected={handleMediaSelected} />
+          <div className="grid grid-cols-2 gap-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                fileInputRef.current?.click();
+                setIsMediaOpen(false);
+              }}
+              className="flex flex-col items-center gap-2 h-20"
+            >
+              <Camera className="h-6 w-6" />
+              <span className="text-sm">Camera</span>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                photoInputRef.current?.click();
+                setIsMediaOpen(false);
+              }}
+              className="flex flex-col items-center gap-2 h-20"
+            >
+              <Image className="h-6 w-6" />
+              <span className="text-sm">Photos</span>
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -396,9 +510,17 @@ export const MobileChat = () => {
           huddleId={huddle.id}
           userId={currentUser?.id}
           onNewMessage={async (msg) => {
-            setMessages(prev => [...prev, msg]);
+            console.log('[Realtime] Received new message:', msg);
+            setMessages(prev => {
+              // Prevent duplicates
+              const exists = prev.some(m => m.id === msg.id);
+              if (exists) return prev;
+              return [...prev, msg];
+            });
+            
             // Ensure sender profile is loaded
             if (!users[msg.user_id]) {
+              console.log('[Realtime] Loading profile for user:', msg.user_id);
               const { data: u } = await supabase
                 .from('profiles')
                 .select('user_id, display_name, avatar_url, username')
