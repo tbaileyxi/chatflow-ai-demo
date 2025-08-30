@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Send, Paperclip, Users, Settings } from 'lucide-react';
+import { Send, Plus, Users, Settings, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { InviteButton } from '@/components/InviteButton';
 
 interface Message {
   id: string;
@@ -90,22 +91,39 @@ export const MobileChat = () => {
 
         // Fetch users for messages
         const userIds = [...new Set(messagesData?.map(m => m.user_id) || [])];
+        
+        // Get current user profile if not in the list
+        if (currentUser?.id && !userIds.includes(currentUser.id)) {
+          userIds.push(currentUser.id);
+        }
+        
         const { data: usersData, error: usersError } = await supabase
           .from('profiles')
-          .select('user_id, display_name, avatar_url')
+          .select('user_id, display_name, avatar_url, username')
           .in('user_id', userIds);
 
-        if (usersError) throw usersError;
+        if (usersError) {
+          console.error('Error fetching users:', usersError);
+        }
 
-        // Create users map
+        // Create users map with better fallback handling
         const usersMap: Record<string, User> = {};
         usersData?.forEach(user => {
           usersMap[user.user_id] = {
             id: user.user_id,
-            display_name: user.display_name || 'Unknown User',
+            display_name: user.display_name || user.username || `User ${user.user_id.slice(0, 8)}`,
             avatar_url: user.avatar_url
           };
         });
+
+        // Ensure current user is in the map
+        if (currentUser?.id && !usersMap[currentUser.id]) {
+          usersMap[currentUser.id] = {
+            id: currentUser.id,
+            display_name: 'You',
+            avatar_url: undefined
+          };
+        }
 
         // Add system bot user for team messages
         const teamName = huddleData.team?.name || 'Team';
@@ -210,6 +228,10 @@ export const MobileChat = () => {
                 Verified
               </Badge>
             )}
+            <InviteButton 
+              huddleId={huddle.id}
+              className="p-2 hover:bg-white/10 rounded-full h-8 w-8"
+            />
             <Button
               variant="ghost"
               size="sm"
@@ -256,7 +278,7 @@ export const MobileChat = () => {
             size="sm"
             className="p-2 hover:bg-white/10 rounded-full shrink-0"
           >
-            <Paperclip className="h-5 w-5 text-muted-foreground" />
+            <Plus className="h-5 w-5 text-muted-foreground" />
           </Button>
           
           <div className="flex-1 relative">

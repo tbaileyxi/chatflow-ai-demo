@@ -58,15 +58,9 @@ export const InviteButton: React.FC<InviteButtonProps> = ({ huddleId, className 
       className={className}
     >
       {copied ? (
-        <>
-          <Check className="h-4 w-4 mr-2" />
-          Copied!
-        </>
+        <Check className="h-4 w-4" />
       ) : (
-        <>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Invite
-        </>
+        <UserPlus className="h-4 w-4" />
       )}
     </Button>
   );
