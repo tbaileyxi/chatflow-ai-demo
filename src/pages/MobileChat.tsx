@@ -12,6 +12,9 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { InviteButton } from '@/components/InviteButton';
+import { RealtimeMessageHandler } from '@/components/optimized/RealtimeMessageHandler';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { MediaUpload } from '@/components/MediaUpload';
 
 interface Message {
   id: string;
@@ -50,6 +53,10 @@ export const MobileChat = () => {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<Record<string, User>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isMediaOpen, setIsMediaOpen] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const typingTimeoutRef = useRef<number | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -153,7 +160,69 @@ export const MobileChat = () => {
     };
 
     fetchHuddleData();
-  }, [huddleId, currentUser, navigate]);
+
+  // Typing presence channel
+  useEffect(() => {
+    if (!huddleId || !currentUser) return;
+
+    const channel = supabase.channel(`huddle-typing-${huddleId}`, {
+      config: { presence: { key: currentUser.id } }
+    });
+
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState() as Record<string, Array<{ typing?: boolean }>>;
+      const typing = Object.entries(state)
+        .filter(([key, presences]) => presences?.some(p => p.typing))
+        .map(([key]) => key);
+      setTypingUsers(typing);
+    });
+
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        channel.track({ typing: false });
+      }
+    });
+
+    typingChannelRef.current = channel;
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [huddleId, currentUser]);
+
+  const signalTyping = () => {
+    const channel = typingChannelRef.current;
+    if (!channel) return;
+    channel.track({ typing: true });
+    if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = window.setTimeout(() => {
+      channel.track({ typing: false });
+    }, 1500);
+  };
+
+  const handleMediaSelected = async (url: string, type: 'image' | 'video', commentary?: string) => {
+    if (!currentUser || !huddleId) return;
+    try {
+      const { data, error } = await supabase
+        .from('huddle_messages')
+        .insert({
+          huddle_id: huddleId,
+          user_id: currentUser.id,
+          content: commentary || '',
+          media_url: url,
+          media_type: type
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      if (data) {
+        setMessages(prev => [...prev, data]);
+      }
+    } catch (err) {
+      console.error('Error sending media message:', err);
+    } finally {
+      setIsMediaOpen(false);
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || sending || !currentUser || !huddleId) return;
@@ -277,6 +346,7 @@ export const MobileChat = () => {
             variant="ghost"
             size="sm"
             className="p-2 hover:bg-white/10 rounded-full shrink-0"
+            onClick={() => setIsMediaOpen(true)}
           >
             <Plus className="h-5 w-5 text-muted-foreground" />
           </Button>
@@ -284,7 +354,7 @@ export const MobileChat = () => {
           <div className="flex-1 relative">
             <Input
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={(e) => { setNewMessage(e.target.value); signalTyping(); }}
               onKeyPress={handleKeyPress}
               placeholder="Type a message..."
               className="pr-12 rounded-full bg-muted/20 border-white/10 text-foreground placeholder:text-muted-foreground"
@@ -301,6 +371,46 @@ export const MobileChat = () => {
           </div>
         </div>
       </div>
+
+      {/* Media upload dialog */}
+      <Dialog open={isMediaOpen} onOpenChange={setIsMediaOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Attach media</DialogTitle>
+          </DialogHeader>
+          <MediaUpload bucket="chat-media" onMediaSelected={handleMediaSelected} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Realtime handler for new messages */}
+      {huddle?.id && (
+        <RealtimeMessageHandler
+          huddleId={huddle.id}
+          userId={currentUser?.id}
+          onNewMessage={async (msg) => {
+            setMessages(prev => [...prev, msg]);
+            // Ensure sender profile is loaded
+            if (!users[msg.user_id]) {
+              const { data: u } = await supabase
+                .from('profiles')
+                .select('user_id, display_name, avatar_url, username')
+                .eq('user_id', msg.user_id)
+                .single();
+              if (u) {
+                setUsers(prev => ({
+                  ...prev,
+                  [u.user_id]: {
+                    id: u.user_id,
+                    display_name: u.display_name || u.username || `User ${u.user_id.slice(0,8)}`,
+                    avatar_url: u.avatar_url
+                  }
+                }));
+              }
+            }
+          }}
+          onMessagesUpdate={() => {}}
+        />
+      )}
     </MobileLayout>
   );
 };
