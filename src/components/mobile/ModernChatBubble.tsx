@@ -164,8 +164,13 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
         {/* Embedded content */}
         {message.embed_code && (
           <div className={cn(
-            "mt-2 rounded-xl overflow-hidden",
-            isOwnMessage ? "ml-auto max-w-[85%]" : "max-w-[85%]"
+            "mt-2 rounded-xl overflow-hidden w-full",
+            // Agent/bot messages should always be left-aligned, only user messages align right
+            (isTeamBot || message.is_team_agent_message) 
+              ? "max-w-[90%]" 
+              : isOwnMessage 
+                ? "ml-auto max-w-[85%]" 
+                : "max-w-[85%]"
           )}>
             <LazyEmbed>
               <XPostEmbed embedCode={message.embed_code} />
