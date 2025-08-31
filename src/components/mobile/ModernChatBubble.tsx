@@ -56,7 +56,7 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
 
   const displayName = useMemo(() => {
     if (message.is_team_agent_message && message.origin_teams?.name) {
-      return `${message.origin_teams.name} Broadcast Agent`;
+      return `${message.origin_teams.name} Agent`;
     }
     if (isTeamBot && teamName) return `${teamName} Bot`;
     return user?.display_name || 'Unknown User';
@@ -109,7 +109,7 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
               <div className="flex items-center gap-1">
                 <Bot className="h-3 w-3 text-accent" />
                 <Badge variant="secondary" className="text-xs h-5 bg-accent/20 text-accent border-accent/30">
-                  {message.is_team_agent_message ? 'Broadcast' : 'Bot'}
+                  {message.is_team_agent_message ? 'Agent' : 'Bot'}
                 </Badge>
               </div>
             )}
