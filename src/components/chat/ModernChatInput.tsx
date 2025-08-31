@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Send, Plus, Smile } from 'lucide-react';
+import { Send, Plus, Smile, Camera, Image } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,10 +29,12 @@ export const ModernChatInput = ({
 }: ChatInputProps) => {
   const [message, setMessage] = useState('');
   const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
+  const [mediaOptionsOpen, setMediaOptionsOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const handleSend = useCallback(async () => {
@@ -134,12 +136,23 @@ export const ModernChatInput = ({
     }
   }, [uploading, onSendMedia, toast]);
 
-  const handleMediaButtonClick = useCallback(() => {
-    if (fileInputRef.current) {
-      fileInputRef.current.accept = "image/*,video/*";
-      fileInputRef.current.click();
+  const handleCameraClick = useCallback(() => {
+    if (cameraInputRef.current) {
+      cameraInputRef.current.click();
     }
+    setMediaOptionsOpen(false);
   }, []);
+
+  const handlePhotoLibraryClick = useCallback(() => {
+    if (photoInputRef.current) {
+      photoInputRef.current.click();
+    }
+    setMediaOptionsOpen(false);
+  }, []);
+
+  const handleMediaButtonClick = useCallback(() => {
+    setMediaOptionsOpen(!mediaOptionsOpen);
+  }, [mediaOptionsOpen]);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -157,10 +170,19 @@ export const ModernChatInput = ({
 
   return (
     <div className="relative">
-      {/* Hidden file input */}
+      {/* Hidden file inputs */}
       <input
-        ref={fileInputRef}
+        ref={cameraInputRef}
         type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
         onChange={handleFileChange}
         style={{ display: 'none' }}
       />
@@ -218,7 +240,33 @@ export const ModernChatInput = ({
           </div>
           
           {/* Action buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-end">
+            {/* Media options */}
+            {mediaOptionsOpen && (
+              <div className="flex gap-2 mb-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-12 w-12 p-0 hover:bg-muted rounded-full"
+                  disabled={disabled || sending || uploading}
+                  aria-label="Take photo"
+                  onClick={handleCameraClick}
+                >
+                  <Camera className="w-5 h-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-12 w-12 p-0 hover:bg-muted rounded-full"
+                  disabled={disabled || sending || uploading}
+                  aria-label="Photo library"
+                  onClick={handlePhotoLibraryClick}
+                >
+                  <Image className="w-5 h-5" />
+                </Button>
+              </div>
+            )}
+            
             <Button
               variant="ghost"
               size="sm"
