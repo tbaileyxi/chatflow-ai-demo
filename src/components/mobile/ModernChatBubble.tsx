@@ -56,7 +56,7 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
 
   const displayName = useMemo(() => {
     if (message.is_team_agent_message && message.origin_teams?.name) {
-      return `${message.origin_teams.name} Agent`;
+      return `${message.origin_teams.name} Broadcast Agent`;
     }
     if (isTeamBot && teamName) return `${teamName} Bot`;
     return user?.display_name || 'Unknown User';
@@ -109,7 +109,7 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
               <div className="flex items-center gap-1">
                 <Bot className="h-3 w-3 text-accent" />
                 <Badge variant="secondary" className="text-xs h-5 bg-accent/20 text-accent border-accent/30">
-                  {message.is_team_agent_message ? 'Agent' : 'Bot'}
+                  {message.is_team_agent_message ? 'Broadcast' : 'Bot'}
                 </Badge>
               </div>
             )}
@@ -119,24 +119,46 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
           </div>
         )}
         
-        {/* Message bubble */}
-        {message.content && (
+        {/* Combined message content and embed */}
+        {(message.content || message.embed_code) && (
           <div className={cn(
-            "rounded-2xl px-4 py-3 max-w-fit break-words",
-            isOwnMessage 
-              ? "bg-primary text-primary-foreground ml-auto" 
-              : isTeamBot
-                ? "glass-bot-bubble text-foreground"
-                : "glass-bubble text-foreground",
-            shouldShowAvatar && !isConsecutive 
-              ? "rounded-2xl" 
+            "max-w-fit break-words",
+            (isTeamBot || message.is_team_agent_message) 
+              ? "max-w-[95%]" 
               : isOwnMessage 
-                ? "rounded-l-2xl rounded-tr-md rounded-br-2xl"
-                : "rounded-r-2xl rounded-tl-md rounded-bl-2xl"
+                ? "ml-auto max-w-[85%]" 
+                : "max-w-[85%]"
           )}>
-            <div className="text-base leading-relaxed whitespace-pre-wrap">
-              {message.content}
-            </div>
+            {/* Text content */}
+            {message.content && (
+              <div className={cn(
+                "rounded-2xl px-4 py-3",
+                isOwnMessage 
+                  ? "bg-primary text-primary-foreground" 
+                  : isTeamBot || message.is_team_agent_message
+                    ? "glass-bot-bubble text-foreground"
+                    : "glass-bubble text-foreground",
+                shouldShowAvatar && !isConsecutive 
+                  ? "rounded-2xl" 
+                  : isOwnMessage 
+                    ? "rounded-l-2xl rounded-tr-md rounded-br-2xl"
+                    : "rounded-r-2xl rounded-tl-md rounded-bl-2xl",
+                message.embed_code ? "mb-3" : ""
+              )}>
+                <div className="text-base leading-relaxed whitespace-pre-wrap">
+                  {message.content}
+                </div>
+              </div>
+            )}
+
+            {/* Embedded content */}
+            {message.embed_code && (
+              <div className="rounded-xl overflow-hidden w-full">
+                <LazyEmbed>
+                  <XPostEmbed embedCode={message.embed_code} />
+                </LazyEmbed>
+              </div>
+            )}
           </div>
         )}
 
@@ -158,23 +180,6 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
                 preload="metadata"
               />
             )}
-          </div>
-        )}
-
-        {/* Embedded content */}
-        {message.embed_code && (
-          <div className={cn(
-            "mt-2 rounded-xl overflow-hidden w-full",
-            // Agent/bot messages should always be left-aligned, only user messages align right
-            (isTeamBot || message.is_team_agent_message) 
-              ? "max-w-[90%]" 
-              : isOwnMessage 
-                ? "ml-auto max-w-[85%]" 
-                : "max-w-[85%]"
-          )}>
-            <LazyEmbed>
-              <XPostEmbed embedCode={message.embed_code} />
-            </LazyEmbed>
           </div>
         )}
       </div>

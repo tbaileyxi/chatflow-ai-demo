@@ -79,14 +79,20 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
     return (
       <div 
         ref={containerRef}
-        className="rounded-xl overflow-hidden shadow w-full my-2"
-        style={{ pointerEvents: 'auto', minHeight: isLoading ? '200px' : 'auto' }}
+        className="rounded-xl overflow-hidden shadow w-full my-1"
+        style={{ pointerEvents: 'auto' }}
       >
-        <blockquote className="twitter-tweet" data-theme="auto" data-width="100%">
+        <blockquote 
+          className="twitter-tweet" 
+          data-theme="auto" 
+          data-width="100%" 
+          data-cards="visible"
+          data-conversation="none"
+        >
           <a href={tweetUrl}>Loading tweet...</a>
         </blockquote>
         {isLoading && (
-          <div className="flex items-center justify-center p-4 bg-muted rounded-xl h-48">
+          <div className="flex items-center justify-center p-6 bg-muted rounded-xl min-h-[300px]">
             <div className="text-sm text-muted-foreground">Loading tweet...</div>
           </div>
         )}
