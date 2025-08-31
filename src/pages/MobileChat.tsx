@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Send, Plus, Users, Settings, UserPlus, Camera, Image } from 'lucide-react';
+import { Send, Plus, Users, Settings, UserPlus, Camera, Image, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -436,6 +436,21 @@ const { data: messagesData, error: messagesError } = await supabase
     );
   }
 
+  // Update last read when user opens the chat
+  useEffect(() => {
+    if (!huddleId || !currentUser) return;
+    
+    const updateLastRead = async () => {
+      await supabase
+        .from('huddle_members')
+        .update({ last_read_at: new Date().toISOString() })
+        .eq('huddle_id', huddleId)
+        .eq('user_id', currentUser.id);
+    };
+
+    updateLastRead();
+  }, [huddleId, currentUser]);
+
   return (
     <MobileLayout hasBottomNav={false}>
       <GlassHeader
@@ -464,6 +479,16 @@ const { data: messagesData, error: messagesError } = await supabase
           </div>
         }
       />
+
+      {/* Floating Back Button */}
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => navigate('/app')}
+        className="fixed top-20 left-4 z-40 rounded-full h-10 w-10 p-0 bg-background/80 backdrop-blur-sm border border-border/50 shadow-lg hover:bg-background/90"
+      >
+        <ArrowLeft className="h-5 w-5" />
+      </Button>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
