@@ -54,7 +54,7 @@ export const HuddleList = () => {
     if (!user) return;
 
     try {
-      // Fetch user's huddles from database
+      // Fetch user's huddles from database with latest message and member counts
       const { data: huddles, error } = await supabase
         .from('huddles')
         .select(`
@@ -80,20 +80,71 @@ export const HuddleList = () => {
 
       if (error) throw error;
 
+      // Get latest messages and unread counts for each huddle
+      const huddleIds = huddles?.map(h => h.id) || [];
+      const { data: latestMessages } = await supabase
+        .from('huddle_messages')
+        .select(`
+          huddle_id,
+          content,
+          created_at,
+          is_bot_message,
+          is_team_agent_message,
+          origin_teams:teams!origin_team_id(name)
+        `)
+        .in('huddle_id', huddleIds)
+        .order('created_at', { ascending: false });
+
+      // Get actual member counts
+      const { data: memberCounts } = await supabase
+        .from('huddle_members')
+        .select('huddle_id')
+        .in('huddle_id', huddleIds);
+
+      // Get unread counts for user
+      const { data: unreadData } = await supabase
+        .from('huddle_members')
+        .select('huddle_id, last_read_at')
+        .eq('user_id', user.id)
+        .in('huddle_id', huddleIds);
+
+      const { data: unreadMessages } = await supabase
+        .from('huddle_messages')
+        .select('huddle_id, created_at')
+        .in('huddle_id', huddleIds);
+
+      // Calculate unread counts
+      const unreadCounts = unreadData?.reduce((acc, member) => {
+        const messagesAfterRead = unreadMessages?.filter(msg => 
+          msg.huddle_id === member.huddle_id && 
+          new Date(msg.created_at) > new Date(member.last_read_at || '1970-01-01')
+        ).length || 0;
+        acc[member.huddle_id] = messagesAfterRead;
+        return acc;
+      }, {} as Record<string, number>) || {};
+
       // Transform data to match our interface
-      const transformedHuddles: Huddle[] = (huddles || []).map(huddle => ({
-        id: huddle.id,
-        name: huddle.name,
-        team_name: `${huddle.teams?.city} ${huddle.teams?.name}`,
-        team_logo_url: huddle.teams?.logo_url || '/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png',
-        participant_count: huddle.member_count || 1,
-        latest_message: {
-          content: 'Welcome to your huddle!',
-          created_at: huddle.last_message_at || new Date().toISOString(),
-          is_bot_message: true
-        },
-        unread_count: 0
-      }));
+      const transformedHuddles: Huddle[] = (huddles || []).map(huddle => {
+        // Get actual member count from database
+        const actualMemberCount = memberCounts?.filter(mc => mc.huddle_id === huddle.id).length || 1;
+        
+        // Get latest message for this huddle
+        const latestMessage = latestMessages?.find(msg => msg.huddle_id === huddle.id);
+        
+        return {
+          id: huddle.id,
+          name: huddle.name,
+          team_name: `${huddle.teams?.city} ${huddle.teams?.name}`,
+          team_logo_url: huddle.teams?.logo_url || '/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png',
+          participant_count: actualMemberCount,
+          latest_message: latestMessage ? {
+            content: latestMessage.content,
+            created_at: latestMessage.created_at,
+            is_bot_message: latestMessage.is_bot_message || latestMessage.is_team_agent_message
+          } : undefined,
+          unread_count: unreadCounts[huddle.id] || 0
+        };
+      });
 
       // Group by team
       const grouped = transformedHuddles.reduce((acc, huddle) => {
