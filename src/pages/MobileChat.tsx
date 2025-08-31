@@ -292,6 +292,21 @@ const { data: messagesData, error: messagesError } = await supabase
     };
   }, [huddleId, currentUser, users]);
 
+  // Update last read when user opens the chat
+  useEffect(() => {
+    if (!huddleId || !currentUser) return;
+    
+    const updateLastRead = async () => {
+      await supabase
+        .from('huddle_members')
+        .update({ last_read_at: new Date().toISOString() })
+        .eq('huddle_id', huddleId)
+        .eq('user_id', currentUser.id);
+    };
+
+    updateLastRead();
+  }, [huddleId, currentUser]);
+
   const signalTyping = () => {
     const channel = typingChannelRef.current;
     if (!channel || !currentUser) return;
@@ -436,20 +451,6 @@ const { data: messagesData, error: messagesError } = await supabase
     );
   }
 
-  // Update last read when user opens the chat
-  useEffect(() => {
-    if (!huddleId || !currentUser) return;
-    
-    const updateLastRead = async () => {
-      await supabase
-        .from('huddle_members')
-        .update({ last_read_at: new Date().toISOString() })
-        .eq('huddle_id', huddleId)
-        .eq('user_id', currentUser.id);
-    };
-
-    updateLastRead();
-  }, [huddleId, currentUser]);
 
   return (
     <MobileLayout hasBottomNav={false}>
