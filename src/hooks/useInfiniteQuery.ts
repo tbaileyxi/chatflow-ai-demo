@@ -52,7 +52,6 @@ export const useSpotlightPosts = () => {
           post_reactions(reaction_type)
         `)
         .eq('is_spotlight', true)
-        .contains('target_audience', ['spotlight'])
         .eq("delivery_status", "sent")
         .order("created_at", { ascending: false })
         .range(pageParam * POSTS_PER_PAGE, (pageParam + 1) * POSTS_PER_PAGE - 1);
@@ -65,8 +64,10 @@ export const useSpotlightPosts = () => {
       return allPages.length;
     },
     initialPageParam: 0,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchInterval: 10000, // Refresh every 10 seconds for real-time updates
+    refetchOnWindowFocus: true,
+    staleTime: 30 * 1000, // 30 seconds - more aggressive refresh
+    gcTime: 5 * 60 * 1000, // 5 minutes
   });
 };
 

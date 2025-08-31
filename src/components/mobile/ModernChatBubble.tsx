@@ -105,11 +105,11 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
             <span className="font-medium text-sm text-muted-foreground">
               {displayName}
             </span>
-            {isTeamBot && (
+            {(isTeamBot || message.is_team_agent_message) && (
               <div className="flex items-center gap-1">
                 <Bot className="h-3 w-3 text-accent" />
                 <Badge variant="secondary" className="text-xs h-5 bg-accent/20 text-accent border-accent/30">
-                  Bot
+                  {message.is_team_agent_message ? 'Agent' : 'Bot'}
                 </Badge>
               </div>
             )}
