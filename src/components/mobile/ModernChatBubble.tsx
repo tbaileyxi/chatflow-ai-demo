@@ -5,7 +5,7 @@ import { Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { LazyEmbed } from '@/components/chat/LazyEmbed';
-import DOMPurify from 'dompurify';
+import { XPostEmbed } from '@/components/embeds/XPostEmbed';
 
 interface ModernChatBubbleProps {
   message: {
@@ -163,17 +163,12 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
 
         {/* Embedded content */}
         {message.embed_code && (
-          <div className="mt-2 rounded-xl overflow-hidden max-w-sm">
+          <div className={cn(
+            "mt-2 rounded-xl overflow-hidden",
+            isOwnMessage ? "ml-auto max-w-[85%]" : "max-w-[85%]"
+          )}>
             <LazyEmbed>
-              <div
-                className="embed-container rounded-xl overflow-hidden w-full max-w-full"
-                dangerouslySetInnerHTML={{ 
-                  __html: DOMPurify.sanitize(message.embed_code, {
-                    ADD_TAGS: ['iframe', 'blockquote', 'script'],
-                    ADD_ATTR: ['src', 'width', 'height', 'frameborder', 'allowfullscreen', 'class', 'id']
-                  })
-                }}
-              />
+              <XPostEmbed embedCode={message.embed_code} />
             </LazyEmbed>
           </div>
         )}
