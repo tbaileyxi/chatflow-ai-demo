@@ -268,8 +268,51 @@ export const BroadcastCenter = () => {
       const sourceTeamName = sourceTeamInfo ? `${sourceTeamInfo.city} ${sourceTeamInfo.name}` : 'Source Team';
 
       try {
-        // Create the single post from the source team
-        const targetAudience = addToSpotlight ? ['team_feed', 'spotlight'] : ['team_feed'];
+        // Create the main spotlight post if enabled (only for source team)
+        if (addToSpotlight) {
+          const spotlightData = {
+            content: finalContent,
+            team_id: sourceTeam,
+            origin_team_id: sourceTeam,
+            author_id: user.id,
+            message_type: messageType,
+            is_agent_post: true,
+            is_spotlight: true,
+            poll_data: pollData,
+            media_url: messageType === 'upload' ? mediaUrl : null,
+            embed_code: messageType === 'embed' ? embedCode : null,
+            target_audience: ['spotlight'],
+            delivery_status: 'sent'
+          };
+
+          // Add tags if provided
+          if (tags.trim()) {
+            spotlightData.content += ` ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}`;
+          }
+
+          const { data: spotlightPost, error: spotlightError } = await supabase
+            .from('posts')
+            .insert(spotlightData)
+            .select()
+            .single();
+
+          if (spotlightError) {
+            console.error('Spotlight post error:', spotlightError);
+            deliveryResults.push({
+              channel: 'Spotlight Feed',
+              status: 'failed',
+              error: spotlightError.message
+            });
+          } else {
+            deliveryResults.push({
+              channel: 'Spotlight Feed',
+              status: 'delivered'
+            });
+          }
+        }
+
+        // Create team feed posts for source and destination teams
+        const targetAudience = ['team_feed'];
         
         const postData = {
           content: finalContent,
@@ -282,7 +325,7 @@ export const BroadcastCenter = () => {
           media_url: messageType === 'upload' ? mediaUrl : null,
           embed_code: messageType === 'embed' ? embedCode : null,
           target_audience: targetAudience,
-          is_spotlight: addToSpotlight
+          is_spotlight: false
         };
 
         // Add tags if provided
@@ -340,8 +383,8 @@ export const BroadcastCenter = () => {
           });
         }
 
-        // Broadcast the source team's message to all destination teams' huddles
-        const allTargetTeams = [sourceTeam, ...selectedTeams];
+        // Broadcast to all destination teams' huddles (including source team)
+        const allTargetTeams = Array.from(new Set([sourceTeam, ...selectedTeams])); // Remove duplicates
         const huddleContent = tags.trim() ? `${finalContent} ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}` : finalContent;
         
         // Ensure embed_code is properly included for X video embeds

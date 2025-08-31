@@ -14,9 +14,14 @@ interface ModernChatBubbleProps {
     created_at: string;
     user_id: string;
     is_bot_message?: boolean;
+    is_team_agent_message?: boolean;
     media_url?: string;
     media_type?: string;
     embed_code?: string;
+    origin_teams?: {
+      name: string;
+      logo_url?: string;
+    };
   };
   user: {
     id: string;
@@ -50,14 +55,20 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
   }, [message.created_at]);
 
   const displayName = useMemo(() => {
+    if (message.is_team_agent_message && message.origin_teams?.name) {
+      return `${message.origin_teams.name} Agent`;
+    }
     if (isTeamBot && teamName) return `${teamName} Bot`;
     return user?.display_name || 'Unknown User';
-  }, [isTeamBot, teamName, user]);
+  }, [message.is_team_agent_message, message.origin_teams, isTeamBot, teamName, user]);
 
   const avatarUrl = useMemo(() => {
+    if (message.is_team_agent_message && message.origin_teams?.logo_url) {
+      return message.origin_teams.logo_url;
+    }
     if (isTeamBot && teamLogoUrl) return teamLogoUrl;
     return user?.avatar_url;
-  }, [isTeamBot, teamLogoUrl, user]);
+  }, [message.is_team_agent_message, message.origin_teams, isTeamBot, teamLogoUrl, user]);
 
   return (
     <div className={cn(
