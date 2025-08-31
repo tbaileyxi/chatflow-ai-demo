@@ -5,16 +5,15 @@ import { GlassHeader } from '@/components/mobile/GlassHeader';
 import { ModernChatBubble } from '@/components/mobile/ModernChatBubble';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Send, Plus, Users, Settings, ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Send, Plus, Users, Settings, UserPlus, Camera, Image, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { InviteButton } from '@/components/InviteButton';
 import { RealtimeMessageHandler } from '@/components/optimized/RealtimeMessageHandler';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { MediaUpload } from '@/components/MediaUpload';
+import { ImprovedMediaUpload } from '@/components/chat/ImprovedMediaUpload';
 
 interface Message {
   id: string;
@@ -60,8 +59,6 @@ export const MobileChat = () => {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -327,67 +324,23 @@ const { data: messagesData, error: messagesError } = await supabase
     }, 1500);
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !currentUser || !huddleId) return;
+  const handleMediaSelected = async (url: string, type: 'image' | 'video') => {
+    if (!currentUser || !huddleId) return;
 
-    const formData = new FormData();
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    
     try {
-      const { data, error } = await supabase.storage
-        .from('chat-media')
-        .upload(fileName, file);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('chat-media')
-        .getPublicUrl(data.path);
-
-      const mediaType = file.type.startsWith('video/') ? 'video' : 'image';
-      
-      const { data: messageData, error: messageError } = await supabase
+      await supabase
         .from('huddle_messages')
         .insert({
           huddle_id: huddleId,
           user_id: currentUser.id,
           content: '',
-          media_url: publicUrl,
-          media_type: mediaType
-        })
-        .select()
-        .single();
-
-      if (messageError) throw messageError;
-
-      // Reset file input
-      e.target.value = '';
-    } catch (err) {
-      console.error('Error uploading media:', err);
-    }
-  };
-
-  const handleMediaSelected = async (url: string, type: 'image' | 'video', commentary?: string) => {
-    if (!currentUser || !huddleId) return;
-    try {
-      const { data, error } = await supabase
-        .from('huddle_messages')
-        .insert({
-          huddle_id: huddleId,
-          user_id: currentUser.id,
-          content: commentary || '',
           media_url: url,
           media_type: type
-        })
-        .select()
-        .single();
-      if (error) throw error;
-    } catch (err) {
-      console.error('Error sending media message:', err);
-    } finally {
+        });
+
       setIsMediaOpen(false);
+    } catch (error) {
+      console.error('Error sending media:', error);
     }
   };
 
@@ -528,21 +481,6 @@ const { data: messagesData, error: messagesError } = await supabase
       <div className="glass-header border-t border-white/10 p-4">
         <div className="flex items-end gap-3">
           <div className="relative shrink-0">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <input
-              ref={photoInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
             <Button
               variant="ghost"
               size="sm"
@@ -574,36 +512,17 @@ const { data: messagesData, error: messagesError } = await supabase
         </div>
       </div>
 
-      {/* Simple camera/photos sheet */}
+      {/* Improved media upload dialog */}
       <Dialog open={isMediaOpen} onOpenChange={setIsMediaOpen}>
-        <DialogContent className="sm:max-w-md p-6">
-          <DialogHeader className="pb-4">
-            <DialogTitle>Share</DialogTitle>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Media</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                fileInputRef.current?.click();
-                setIsMediaOpen(false);
-              }}
-              className="flex flex-col items-center gap-2 h-20"
-            >
-              <Camera className="h-6 w-6" />
-              <span className="text-sm">Camera</span>
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                photoInputRef.current?.click();
-                setIsMediaOpen(false);
-              }}
-              className="flex flex-col items-center gap-2 h-20"
-            >
-              <Image className="h-6 w-6" />
-              <span className="text-sm">Photos</span>
-            </Button>
-          </div>
+          <ImprovedMediaUpload
+            onMediaSelected={handleMediaSelected}
+            bucket="chat-media"
+            onClose={() => setIsMediaOpen(false)}
+          />
         </DialogContent>
       </Dialog>
 
