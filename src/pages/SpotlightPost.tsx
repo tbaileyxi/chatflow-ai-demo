@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { PostCard } from "@/components/PostCard";
+import { ModernPostCard } from "@/components/modern/ModernPostCard";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { Helmet } from "react-helmet-async";
@@ -182,7 +182,7 @@ export const SpotlightPost = () => {
           </p>
         </div>
 
-        <PostCard post={post} isSpotlight />
+        <ModernPostCard post={post} isSpotlight />
       </div>
     </>
   );

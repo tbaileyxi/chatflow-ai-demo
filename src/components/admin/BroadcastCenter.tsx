@@ -190,6 +190,8 @@ export const BroadcastCenter = () => {
       if (huddlesError) throw huddlesError;
 
       // Create actual huddle messages for each huddle
+      let hadError = false;
+      let firstError = "";
       if (huddles?.length) {
         for (const huddle of huddles) {
           const { error: huddleMessageError } = await supabase
@@ -197,7 +199,7 @@ export const BroadcastCenter = () => {
             .insert({
               content: postData.content,
               huddle_id: huddle.id,
-              user_id: postData.is_team_agent_message ? '00000000-0000-0000-0000-000000000000' : postData.author_id,
+              user_id: postData.author_id,
               origin_team_id: postData.origin_team_id,
               origin_post_id: postData.post_id, // Link to the original post for cascade deletion
               media_url: postData.media_url,
@@ -212,12 +214,14 @@ export const BroadcastCenter = () => {
 
           if (huddleMessageError) {
             console.error(`Failed to broadcast to huddle ${huddle.name}:`, huddleMessageError);
-            return { success: false, error: `Failed to broadcast to huddle: ${huddle.name}` };
+            if (!firstError) firstError = `Failed to broadcast to huddle: ${huddle.name}`;
+            hadError = true;
+            continue;
           }
         }
       }
 
-      return { success: true };
+      return hadError ? { success: false, error: firstError } : { success: true };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
@@ -325,6 +329,7 @@ export const BroadcastCenter = () => {
           media_url: messageType === 'upload' ? mediaUrl : null,
           embed_code: messageType === 'embed' ? embedCode : null,
           target_audience: targetAudience,
+          delivery_status: 'sent',
           is_spotlight: false
         };
 
@@ -366,6 +371,7 @@ export const BroadcastCenter = () => {
             media_url: messageType === 'upload' ? mediaUrl : null,
             embed_code: messageType === 'embed' ? embedCode : null,
             target_audience: ['team_feed'], // Only team feed, no spotlight
+            delivery_status: 'sent',
             is_spotlight: false
           };
 
