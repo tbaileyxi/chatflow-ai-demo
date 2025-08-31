@@ -47,11 +47,14 @@ export const MobileProfile = () => {
         .from('profiles')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // Profile doesn't exist, create default
+        throw error;
+      }
+
+      if (!data) {
+        // Profile doesn't exist, create default
           const defaultProfile: Partial<UserProfile> = {
             user_id: user.id,
             display_name: user.email?.split('@')[0] || 'User',
@@ -61,9 +64,6 @@ export const MobileProfile = () => {
             phone_number: user.phone || ''
           };
           setProfile(defaultProfile as UserProfile);
-        } else {
-          throw error;
-        }
       } else {
         setProfile(data);
       }
