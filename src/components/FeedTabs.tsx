@@ -43,19 +43,6 @@ export const FeedTabs = () => {
               onClick={() => setActiveTab("your-feed")}
             >
               Your Feed
-              {activeTab === "your-feed" && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0 ml-1 hover:bg-primary/20 rounded-full"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    window.location.href = '/teams';
-                  }}
-                >
-                  <Plus className="w-3 h-3" />
-                </Button>
-              )}
               <div className={cn(
                 "absolute bottom-0 left-0 right-0 h-0.5 bg-primary transition-all duration-200",
                 activeTab === "your-feed" ? "opacity-100" : "opacity-0"

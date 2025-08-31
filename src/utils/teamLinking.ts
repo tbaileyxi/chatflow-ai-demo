@@ -69,7 +69,7 @@ export const linkifyTeamNames = (content: string): string => {
       const regex = new RegExp(`\\b(${pattern})\\b`, 'gi');
       
       processedContent = processedContent.replace(regex, (match) => {
-        return `<a href="/teams/${team.id}" class="team-link text-primary hover:text-primary/80 underline transition-colors font-medium">${match}</a>`;
+        return `<span class="team-mention text-primary font-medium">${match}</span>`;
       });
     }
   }

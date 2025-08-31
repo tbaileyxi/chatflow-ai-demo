@@ -383,15 +383,6 @@ export const TeamDirectory = () => {
                       </p>
                     )}
                     
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/teams/${team.id}`)}
-                      className="w-full flex items-center gap-2"
-                    >
-                      <Eye className="w-4 h-4" />
-                      View Team Feed
-                    </Button>
                   </div>
                 </CardContent>
               </Card>

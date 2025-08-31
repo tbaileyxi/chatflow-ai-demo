@@ -84,7 +84,7 @@ export const TeamFeed = () => {
         description: "Failed to load team information",
         variant: "destructive"
       });
-      navigate('/teams');
+      navigate('/app');
     } finally {
       setLoading(false);
     }
@@ -211,9 +211,9 @@ export const TeamFeed = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">Team Not Found</h2>
-          <Button onClick={() => navigate('/teams')}>
+          <Button onClick={() => navigate('/app')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Teams
+            Back to Huddles
           </Button>
         </div>
       </div>
@@ -228,7 +228,7 @@ export const TeamFeed = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate('/teams')}
+            onClick={() => navigate('/app')}
             className="flex items-center gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
