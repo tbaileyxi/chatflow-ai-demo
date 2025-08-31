@@ -22,9 +22,12 @@ interface Message {
   created_at: string;
   user_id: string;
   is_bot_message?: boolean;
+  is_team_agent_message?: boolean;
+  origin_team_id?: string;
   media_url?: string;
   media_type?: string;
   embed_code?: string;
+  origin_teams?: { name: string; logo_url?: string } | null;
 }
 
 interface User {
@@ -89,12 +92,24 @@ export const MobileChat = () => {
         if (huddleError) throw huddleError;
 
         // Fetch messages
-        const { data: messagesData, error: messagesError } = await supabase
-          .from('huddle_messages')
-          .select('*')
-          .eq('huddle_id', huddleId)
-          .order('created_at', { ascending: true })
-          .limit(50);
+const { data: messagesData, error: messagesError } = await supabase
+  .from('huddle_messages')
+  .select(`
+    id,
+    content,
+    created_at,
+    user_id,
+    is_bot_message,
+    is_team_agent_message,
+    origin_team_id,
+    media_url,
+    media_type,
+    embed_code,
+    origin_teams:teams!origin_team_id(name, logo_url)
+  `)
+  .eq('huddle_id', huddleId)
+  .order('created_at', { ascending: true })
+  .limit(50);
 
         if (messagesError) throw messagesError;
 
@@ -506,40 +521,52 @@ export const MobileChat = () => {
 
       {/* Realtime handler for new messages */}
       {huddle?.id && (
-        <RealtimeMessageHandler
-          huddleId={huddle.id}
-          userId={currentUser?.id}
-          onNewMessage={async (msg) => {
-            console.log('[Realtime] Received new message:', msg);
-            setMessages(prev => {
-              // Prevent duplicates
-              const exists = prev.some(m => m.id === msg.id);
-              if (exists) return prev;
-              return [...prev, msg];
-            });
-            
-            // Ensure sender profile is loaded
-            if (!users[msg.user_id]) {
-              console.log('[Realtime] Loading profile for user:', msg.user_id);
-              const { data: u } = await supabase
-                .from('profiles')
-                .select('user_id, display_name, avatar_url, username')
-                .eq('user_id', msg.user_id)
-                .single();
-              if (u) {
-                setUsers(prev => ({
-                  ...prev,
-                  [u.user_id]: {
-                    id: u.user_id,
-                    display_name: u.display_name || u.username || `User ${u.user_id.slice(0,8)}`,
-                    avatar_url: u.avatar_url
-                  }
-                }));
-              }
-            }
-          }}
-          onMessagesUpdate={() => {}}
-        />
+<RealtimeMessageHandler
+  huddleId={huddle.id}
+  userId={currentUser?.id}
+  onNewMessage={async (msg) => {
+    console.log('[Realtime] Received new message:', msg);
+
+    let enriched = msg as any;
+    if (msg.is_team_agent_message && msg.origin_team_id) {
+      const { data: originTeam } = await supabase
+        .from('teams')
+        .select('name, logo_url')
+        .eq('id', msg.origin_team_id)
+        .single();
+      if (originTeam) {
+        enriched = { ...msg, origin_teams: { name: originTeam.name, logo_url: originTeam.logo_url } };
+      }
+    }
+
+    setMessages(prev => {
+      const exists = prev.some(m => m.id === enriched.id);
+      if (exists) return prev;
+      return [...prev, enriched];
+    });
+    
+    // Ensure sender profile is loaded (skip zero UUID agent)
+    if (msg.user_id && msg.user_id !== '00000000-0000-0000-0000-000000000000' && !users[msg.user_id]) {
+      console.log('[Realtime] Loading profile for user:', msg.user_id);
+      const { data: u } = await supabase
+        .from('profiles')
+        .select('user_id, display_name, avatar_url, username')
+        .eq('user_id', msg.user_id)
+        .single();
+      if (u) {
+        setUsers(prev => ({
+          ...prev,
+          [u.user_id]: {
+            id: u.user_id,
+            display_name: u.display_name || u.username || `User ${u.user_id.slice(0,8)}`,
+            avatar_url: u.avatar_url
+          }
+        }));
+      }
+    }
+  }}
+  onMessagesUpdate={() => {}}
+/>
       )}
     </MobileLayout>
   );
