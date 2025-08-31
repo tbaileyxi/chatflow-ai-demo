@@ -2,11 +2,10 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
-import { Send, Plus, Smile, X } from 'lucide-react';
+import { Send, Plus, Smile } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { ImprovedMediaUpload } from './ImprovedMediaUpload';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ChatInputProps {
   onSendMessage: (content: string) => Promise<void>;
@@ -29,11 +28,11 @@ export const ModernChatInput = ({
   disabled = false 
 }: ChatInputProps) => {
   const [message, setMessage] = useState('');
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
   const [sending, setSending] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const handleSend = useCallback(async () => {
@@ -97,19 +96,59 @@ export const ModernChatInput = ({
     setEmojiPopoverOpen(false);
   }, [message]);
 
-  const handleMediaSelected = useCallback(async (url: string, type: 'image' | 'video') => {
+  const handleFileUpload = useCallback(async (file: File) => {
+    if (uploading) return;
+    
+    setUploading(true);
     try {
-      await onSendMedia(url, type);
-      setUploadDialogOpen(false);
-    } catch (error) {
-      console.error('Error sending media:', error);
+      const fileExt = file.name.split('.').pop() || 'dat';
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('chat-media')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-media')
+        .getPublicUrl(data.path);
+
+      const type = file.type.startsWith('video/') ? 'video' : 'image';
+      await onSendMedia(publicUrl, type);
+      
       toast({
-        title: "Error",
-        description: "Failed to send media. Please try again.",
+        title: "Upload successful",
+        description: `${type} uploaded successfully`,
+      });
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload file. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setUploading(false);
     }
-  }, [onSendMedia, toast]);
+  }, [uploading, onSendMedia, toast]);
+
+  const handleMediaButtonClick = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = "image/*,video/*";
+      fileInputRef.current.click();
+    }
+  }, []);
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+    // Reset input value
+    e.target.value = '';
+  }, [handleFileUpload]);
 
   // Stop typing indicator when component unmounts or message is sent
   useEffect(() => {
@@ -118,6 +157,14 @@ export const ModernChatInput = ({
 
   return (
     <div className="relative">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
+      
       <div className="p-4 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 border-t border-border sticky bottom-0 left-0 right-0 pb-[calc(env(safe-area-inset-bottom)+12px)]">
 
         <div className="flex gap-3 items-end">
@@ -172,26 +219,16 @@ export const ModernChatInput = ({
           
           {/* Action buttons */}
           <div className="flex gap-2">
-            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-12 w-12 p-0 hover:bg-muted rounded-full"
-                  disabled={disabled || sending}
-                  aria-label="Add media"
-                >
-                  <Plus className="w-5 h-5" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <ImprovedMediaUpload
-                  onMediaSelected={handleMediaSelected}
-                  bucket="chat-media"
-                  onClose={() => setUploadDialogOpen(false)}
-                />
-              </DialogContent>
-            </Dialog>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-12 w-12 p-0 hover:bg-muted rounded-full"
+              disabled={disabled || sending || uploading}
+              aria-label="Add media"
+              onClick={handleMediaButtonClick}
+            >
+              <Plus className="w-5 h-5" />
+            </Button>
             <Button
               onClick={handleSend}
               disabled={!message.trim() || sending || disabled}
