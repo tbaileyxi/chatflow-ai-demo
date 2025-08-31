@@ -36,11 +36,13 @@ export const SpotlightFeed = () => {
           id,
           content,
           media_url,
+          embed_code,
           poll_data,
           created_at,
           team:teams!team_id(id, name, logo_url, sponsor),
           post_reactions(reaction_type)
         `)
+        .eq('is_spotlight', true)
         .contains('target_audience', ['spotlight'])
         .eq("delivery_status", "sent")
         .order("created_at", { ascending: false })

@@ -45,9 +45,13 @@ export const useSpotlightPosts = () => {
           embed_code,
           poll_data,
           created_at,
+          is_team_agent_message,
+          is_agent_post,
           team:teams!team_id(id, name, logo_url, sponsor),
+          origin_teams:teams!origin_team_id(name, logo_url),
           post_reactions(reaction_type)
         `)
+        .eq('is_spotlight', true)
         .contains('target_audience', ['spotlight'])
         .eq("delivery_status", "sent")
         .order("created_at", { ascending: false })
