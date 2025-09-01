@@ -42,7 +42,7 @@ serve(async (req) => {
   try {
     const { command, huddleId, userId, teamName } = await req.json();
     
-    console.log(`Sports stats request: ${command} for team: ${teamName} from user: ${userId}`);
+    console.log(`Sports stats request: ${command} for team: ${teamName || 'auto-detect'} from user: ${userId}`);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -78,9 +78,16 @@ serve(async (req) => {
       responseMessage = `Unknown command: ${command}. Available commands: /score, /stats`;
     }
 
+    console.log(`Response message: ${responseMessage.substring(0, 100)}...`);
+
     // Get system user for posting
     const { data: systemUser, error: systemUserError } = await supabase.rpc('get_or_create_system_user');
-    if (systemUserError) throw systemUserError;
+    if (systemUserError) {
+      console.error('Error getting system user:', systemUserError);
+      throw systemUserError;
+    }
+
+    console.log(`Posting message to huddle ${huddleId} as user ${systemUser}`);
 
     // Post the response as a bot message in the huddle
     const { error: messageError } = await supabase
@@ -93,7 +100,12 @@ serve(async (req) => {
         message_type: 'text'
       });
 
-    if (messageError) throw messageError;
+    if (messageError) {
+      console.error('Error posting message:', messageError);
+      throw messageError;
+    }
+
+    console.log('Message posted successfully');
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -169,28 +181,54 @@ async function getScoreUpdate(teamName: string): Promise<string> {
     return `⚽ Please specify a team name. Usage: /score [team name] or just /score if you're in a team huddle.`;
   }
 
+  console.log(`Looking for scores for team: "${teamName}"`);
+
   try {
-    // Try NFL first
+    // Try NFL first (today's games)
+    console.log('Checking NFL games...');
     const nflResponse = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard');
     if (nflResponse.ok) {
       const nflData = await nflResponse.json();
+      console.log(`Found ${nflData.events?.length || 0} NFL games today`);
       const nflGame = findTeamGame(nflData.events, teamName);
       if (nflGame) {
+        console.log('Found NFL game for team');
         return formatScoreUpdate(nflGame, 'NFL');
       }
     }
 
-    // Try College Football
+    // Try College Football (today's games)
+    console.log('Checking College Football games...');
     const cfbResponse = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard');
     if (cfbResponse.ok) {
       const cfbData = await cfbResponse.json();
+      console.log(`Found ${cfbData.events?.length || 0} College Football games today`);
       const cfbGame = findTeamGame(cfbData.events, teamName);
       if (cfbGame) {
+        console.log('Found College Football game for team');
         return formatScoreUpdate(cfbGame, 'College Football');
       }
     }
 
-    return `⚽ No current game found for "${teamName}". They might not be playing today or the team name might need to be more specific.`;
+    // Try yesterday's games for college football
+    console.log('Checking yesterday\'s College Football games...');
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0].replace(/-/g, '');
+    
+    const cfbYesterdayResponse = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=${yesterdayStr}`);
+    if (cfbYesterdayResponse.ok) {
+      const cfbYesterdayData = await cfbYesterdayResponse.json();
+      console.log(`Found ${cfbYesterdayData.events?.length || 0} College Football games yesterday`);
+      const cfbYesterdayGame = findTeamGame(cfbYesterdayData.events, teamName);
+      if (cfbYesterdayGame) {
+        console.log('Found College Football game from yesterday');
+        return formatScoreUpdate(cfbYesterdayGame, 'College Football') + '\n\n*(Game from yesterday)*';
+      }
+    }
+
+    console.log(`No games found for team: "${teamName}"`);
+    return `🏈 No recent games found for "${teamName}".\n\nTry:\n• /score nfl (for all NFL scores)\n• /score college (for all college scores)\n• Make sure the team name is correct (e.g., "Notre Dame" instead of "Fighting Irish")`;
     
   } catch (error) {
     console.error('Error fetching scores:', error);
