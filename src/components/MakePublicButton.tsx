@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
@@ -43,7 +44,7 @@ export const MakePublicButton = ({
     setLoading(true);
     try {
       console.log("Making post public:", {
-        user_id: user.id,
+        author_id: user.id,
         messageContent,
         mediaUrl,
         embedCode,
@@ -51,16 +52,15 @@ export const MakePublicButton = ({
         isOwner
       });
 
-      // Normalize message_type to match database constraints (text, upload, embed, poll)
-      let normalizedMessageType = 'text';
+      // Determine message_type based on content
+      let messageType = 'text';
       if (embedCode) {
-        normalizedMessageType = 'embed';
+        messageType = 'embed';
       } else if (mediaUrl) {
-        // All media files (images, videos, etc.) use 'upload' type
-        normalizedMessageType = 'upload';
+        messageType = 'upload';
       }
 
-      console.log("Normalized message type:", normalizedMessageType);
+      console.log("Message type:", messageType);
 
       // Create a new post in the posts table with spotlight target audience
       const { data, error } = await supabase
@@ -68,7 +68,7 @@ export const MakePublicButton = ({
         .insert({
           content: messageContent,
           media_url: mediaUrl,
-          message_type: normalizedMessageType,
+          message_type: messageType,
           embed_code: embedCode,
           team_id: teamId,
           author_id: user.id,
@@ -95,7 +95,7 @@ export const MakePublicButton = ({
       console.error("Error making post public:", error);
       toast({
         title: "Error",
-        description: "Failed to make post public",
+        description: "Failed to make post public. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -118,9 +118,9 @@ export const MakePublicButton = ({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Make Post Public</DialogTitle>
+          <DialogTitle>Share to Spotlight?</DialogTitle>
           <DialogDescription>
-            This will add your message to the public Spotlight feed where all users can see it.
+            This will add your message to the public Spotlight feed where all users can see it. Are you sure you want to continue?
           </DialogDescription>
         </DialogHeader>
         
@@ -132,6 +132,17 @@ export const MakePublicButton = ({
                 Includes {mediaType === 'image' ? 'image' : 'media'} attachment
               </div>
             )}
+            {embedCode && (
+              <div className="mt-2 text-xs text-muted-foreground">
+                Includes embedded content
+              </div>
+            )}
+          </div>
+          
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <p className="text-sm text-amber-800">
+              <strong>Note:</strong> Once shared to Spotlight, this content will be visible to all users and cannot be easily removed.
+            </p>
           </div>
           
           <div className="flex justify-end gap-2">
@@ -143,7 +154,7 @@ export const MakePublicButton = ({
               disabled={loading}
               className="bg-spotlight text-primary-foreground hover:bg-spotlight/90"
             >
-              {loading ? "Publishing..." : "Make Public"}
+              {loading ? "Sharing..." : "Share to Spotlight"}
             </Button>
           </div>
         </div>
