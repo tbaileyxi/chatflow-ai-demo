@@ -226,10 +226,10 @@ async function processGame(game: ESPNGame, league: string, teamIds: Set<string>,
     if (!previousState) {
       // New game detected
       if (status.type.state === 'in') {
-        await postGameStart(teams, competition.date, supabase)
+        await postGameStart(teams, competition.date, league, supabase)
       }
     } else {
-      await detectAndPostChanges(previousState, currentState, supabase)
+      await detectAndPostChanges(previousState, currentState, league, supabase)
     }
 
     // Update stored state
@@ -248,32 +248,32 @@ async function processGame(game: ESPNGame, league: string, teamIds: Set<string>,
   }
 }
 
-async function detectAndPostChanges(previous: GameState, current: GameState, supabase: any) {
+async function detectAndPostChanges(previous: GameState, current: GameState, league: string, supabase: any) {
   // Score change
   if (previous.lastScore !== current.lastScore) {
-    await postScoreUpdate(current, supabase)
+    await postScoreUpdate(current, league, supabase)
   }
 
   // Period change (quarter/half)
   if (previous.lastPeriod !== current.lastPeriod) {
-    await postPeriodChange(previous, current, supabase)
+    await postPeriodChange(previous, current, league, supabase)
   }
 
   // Game status change (end of game)
   if (previous.lastStatus === 'in' && current.lastStatus === 'post') {
-    await postGameEnd(current, supabase)
+    await postGameEnd(current, league, supabase)
   }
 }
 
-async function postGameStart(teams: any[], gameDate: string, supabase: any) {
+async function postGameStart(teams: any[], gameDate: string, league: string, supabase: any) {
   const content = `🏈 KICKOFF! ${teams[0].name} vs ${teams[1].name} - Game is LIVE!`
   
   console.log('Posting game start:', content)
   
-  await postToTeamFeeds(teams, content, supabase)
+  await postToTeamFeeds(teams, content, league, supabase)
 }
 
-async function postScoreUpdate(gameState: GameState, supabase: any) {
+async function postScoreUpdate(gameState: GameState, league: string, supabase: any) {
   const { teams, lastPeriod, lastClock } = gameState
   const periodText = getPeriodText(lastPeriod)
   
@@ -281,10 +281,10 @@ async function postScoreUpdate(gameState: GameState, supabase: any) {
   
   console.log('Posting score update:', content)
   
-  await postToTeamFeeds(teams, content, supabase)
+  await postToTeamFeeds(teams, content, league, supabase)
 }
 
-async function postPeriodChange(previous: GameState, current: GameState, supabase: any) {
+async function postPeriodChange(previous: GameState, current: GameState, league: string, supabase: any) {
   const periodText = getPeriodEndText(previous.lastPeriod)
   const { teams } = current
   
@@ -292,10 +292,10 @@ async function postPeriodChange(previous: GameState, current: GameState, supabas
   
   console.log('Posting period change:', content)
   
-  await postToTeamFeeds(teams, content, supabase)
+  await postToTeamFeeds(teams, content, league, supabase)
 }
 
-async function postGameEnd(gameState: GameState, supabase: any) {
+async function postGameEnd(gameState: GameState, league: string, supabase: any) {
   const { teams } = gameState
   const winner = teams[0].score > teams[1].score ? teams[0] : teams[1]
   const loser = teams[0].score > teams[1].score ? teams[1] : teams[0]
@@ -304,10 +304,10 @@ async function postGameEnd(gameState: GameState, supabase: any) {
   
   console.log('Posting game end:', content)
   
-  await postToTeamFeeds(teams, content, supabase)
+  await postToTeamFeeds(teams, content, league, supabase)
 }
 
-async function postToTeamFeeds(teams: any[], content: string, supabase: any) {
+async function postToTeamFeeds(teams: any[], content: string, league: string, supabase: any) {
   try {
     // Get or create system user for bot messages
     const { data: systemUserId } = await supabase.rpc('get_or_create_system_user')
@@ -322,27 +322,61 @@ async function postToTeamFeeds(teams: any[], content: string, supabase: any) {
       // Try multiple matching strategies for better NCAA team identification
       let dbTeam = null
       
-      // Strategy 1: Exact name match (works well for NFL)
-      const { data: exactMatch } = await supabase
-        .from('teams')
-        .select('id, name, city')
-        .ilike('name', team.name)
-        .limit(1)
-        .maybeSingle()
+      // Strategy 1: Try exact team name match first (most accurate)
+      const teamWords = team.name.split(' ')
+      const teamNickname = teamWords[teamWords.length - 1] // e.g., "Hurricanes" from "Miami Hurricanes"
       
-      if (exactMatch) {
-        dbTeam = exactMatch
-      } else {
-        // Strategy 2: Match by city and partial name (better for NCAA)
-        const { data: cityMatch } = await supabase
+      // First try exact nickname match
+      const { data: nicknameMatch } = await supabase
+        .from('teams')
+        .select('id, name, city, league')
+        .ilike('name', teamNickname)
+        .limit(5) // Get multiple to handle conflicts
+        
+      if (nicknameMatch && nicknameMatch.length > 0) {
+        // If only one match, use it
+        if (nicknameMatch.length === 1) {
+          dbTeam = nicknameMatch[0]
+        } else {
+          // Multiple matches - prefer by league context and city
+          for (const match of nicknameMatch) {
+            // Check if city matches (for teams like Miami Hurricanes vs Miami Dolphins)
+            if (match.city && team.name.toLowerCase().includes(match.city.toLowerCase())) {
+              // Prefer college teams for college games (ESPN college-football league)
+              if (league === 'college-football' && match.league === 'NCAA') {
+                dbTeam = match
+                break
+              }
+              // Prefer NFL teams for NFL games
+              if (league === 'nfl' && match.league === 'NFL') {
+                dbTeam = match
+                break
+              }
+              // Fallback to first city match
+              if (!dbTeam) {
+                dbTeam = match
+              }
+            }
+          }
+          
+          // If no city match found, use first nickname match
+          if (!dbTeam) {
+            dbTeam = nicknameMatch[0]
+          }
+        }
+      }
+      
+      // Strategy 2: If no nickname match, try full name match
+      if (!dbTeam) {
+        const { data: exactMatch } = await supabase
           .from('teams')
-          .select('id, name, city')
-          .or(`city.ilike.%${team.name.split(' ')[0]}%,name.ilike.%${team.abbreviation}%,name.ilike.%${team.name.split(' ').pop()}%`)
+          .select('id, name, city, league')
+          .ilike('name', team.name)
           .limit(1)
           .maybeSingle()
         
-        if (cityMatch) {
-          dbTeam = cityMatch
+        if (exactMatch) {
+          dbTeam = exactMatch
         }
       }
 
