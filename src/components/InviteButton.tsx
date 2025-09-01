@@ -5,10 +5,12 @@ import { useToast } from '@/hooks/use-toast';
 
 interface InviteButtonProps {
   huddleId: string;
+  ownerDisplayName?: string;
+  teamName?: string;
   className?: string;
 }
 
-export const InviteButton: React.FC<InviteButtonProps> = ({ huddleId, className = '' }) => {
+export const InviteButton: React.FC<InviteButtonProps> = ({ huddleId, ownerDisplayName, teamName, className = '' }) => {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
@@ -17,16 +19,24 @@ export const InviteButton: React.FC<InviteButtonProps> = ({ huddleId, className 
     return `${baseUrl}/join-huddle/${huddleId}`;
   };
 
-  const handleCopyInvite = async () => {
+  const generateInviteMessage = () => {
     const inviteLink = generateInviteLink();
+    if (ownerDisplayName && teamName) {
+      return `You have been invited by ${ownerDisplayName} to a private chat in the ${teamName} Side Huddle.\n\n${inviteLink}`;
+    }
+    return inviteLink;
+  };
+
+  const handleCopyInvite = async () => {
+    const inviteMessage = generateInviteMessage();
     
     try {
-      await navigator.clipboard.writeText(inviteLink);
+      await navigator.clipboard.writeText(inviteMessage);
       setCopied(true);
       
       toast({
-        title: "Invite link copied!",
-        description: "Share this link to invite others to join the huddle",
+        title: "Invite message copied!",
+        description: "Share this personalized invite to join the huddle",
       });
 
       // Reset copied state after 2 seconds
@@ -34,7 +44,7 @@ export const InviteButton: React.FC<InviteButtonProps> = ({ huddleId, className 
     } catch (error) {
       // Fallback for older browsers
       const textArea = document.createElement('textarea');
-      textArea.value = inviteLink;
+      textArea.value = inviteMessage;
       document.body.appendChild(textArea);
       textArea.select();
       document.execCommand('copy');
@@ -42,8 +52,8 @@ export const InviteButton: React.FC<InviteButtonProps> = ({ huddleId, className 
       
       setCopied(true);
       toast({
-        title: "Invite link copied!",
-        description: "Share this link to invite others to join the huddle",
+        title: "Invite message copied!",
+        description: "Share this personalized invite to join the huddle",
       });
       
       setTimeout(() => setCopied(false), 2000);

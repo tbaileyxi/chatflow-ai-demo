@@ -37,6 +37,10 @@ interface HuddleData {
     sponsor?: string;
     sponsor_url?: string;
   };
+  owner?: {
+    display_name?: string;
+    username?: string;
+  };
   created_at: string;
 }
 
@@ -331,7 +335,20 @@ useEffect(() => {
         .single();
 
       if (error) throw error;
-      setHuddle(data);
+      
+      // Fetch owner profile separately
+      if (data.owner_id) {
+        const { data: ownerProfile } = await supabase.rpc('get_public_profile', { 
+          target_user_id: data.owner_id 
+        });
+        
+        setHuddle({
+          ...data,
+          owner: ownerProfile?.[0] || null
+        });
+      } else {
+        setHuddle(data);
+      }
     } catch (error) {
       console.error("Error fetching huddle:", error);
       toast({
@@ -769,7 +786,12 @@ useEffect(() => {
             {user?.id === huddle.owner_id && !huddle.is_verified && (
               <HuddleVerificationDialog huddleId={huddle.id} isVerified={huddle.is_verified} />
             )}
-            <InviteButton huddleId={huddle.id} className="h-7 text-xs px-2" />
+            <InviteButton 
+              huddleId={huddle.id} 
+              ownerDisplayName={huddle.owner?.display_name || huddle.owner?.username || 'Someone'}
+              teamName={huddle.team.name}
+              className="h-7 text-xs px-2" 
+            />
             <HuddleManagement huddleId={huddle.id} ownerId={huddle.owner_id} huddle={huddle} />
           </div>
         </div>
