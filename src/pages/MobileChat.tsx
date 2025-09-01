@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { InviteButton } from '@/components/InviteButton';
 import { RealtimeMessageHandler } from '@/components/optimized/RealtimeMessageHandler';
+import { ModernChatInput } from '@/components/chat/ModernChatInput';
 import { ImprovedMediaUpload } from '@/components/chat/ImprovedMediaUpload';
 
 interface Message {
@@ -50,7 +51,6 @@ export const MobileChat = () => {
   const { user: currentUser } = useAuth();
   const [huddle, setHuddle] = useState<HuddleData | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<Record<string, User>>({});
@@ -284,13 +284,11 @@ const { data: messagesData, error: messagesError } = await supabase
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || sending || !currentUser || !huddleId) return;
+  const handleSendMessage = async (messageText: string) => {
+    if (!messageText.trim() || sending || !currentUser || !huddleId) return;
 
     setSending(true);
-    const messageText = newMessage.trim();
-    setNewMessage('');
-
+    
     try {
       // Insert message to database
       const { data, error } = await supabase
@@ -315,10 +313,31 @@ const { data: messagesData, error: messagesError } = await supabase
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+  const handleSendMedia = async (url: string, type: 'image' | 'video') => {
+    if (!currentUser || sending) return;
+
+    setSending(true);
+    try {
+      const { data, error } = await supabase
+        .from('huddle_messages')
+        .insert({
+          huddle_id: huddleId,
+          user_id: currentUser.id,
+          content: type === 'image' ? '📸 Image' : '🎥 Video',
+          media_url: url,
+          media_type: type
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Add to local state
+      setMessages(prev => [...prev, data]);
+    } catch (error) {
+      console.error('Error sending media:', error);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -418,41 +437,17 @@ const { data: messagesData, error: messagesError } = await supabase
       )}
 
       {/* Chat input */}
-      <div className="glass-header border-t border-white/10 p-4">
-        <div className="flex items-end gap-3">
-          <div className="relative shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="p-2 hover:bg-white/10 rounded-full"
-              onClick={() => setIsMediaOpen(true)}
-            >
-              <Plus className="h-5 w-5 text-muted-foreground" />
-            </Button>
-          </div>
-          
-          <div className="flex-1 relative">
-            <Input
-              value={newMessage}
-              onChange={(e) => { setNewMessage(e.target.value); signalTyping(); }}
-              onKeyPress={handleKeyPress}
-              placeholder="Type a message..."
-              className="pr-12 rounded-full bg-muted/20 border-white/10 text-foreground placeholder:text-muted-foreground"
-              disabled={sending}
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={!newMessage.trim() || sending}
-              size="sm"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0 rounded-full bg-primary hover:bg-primary/90 disabled:opacity-50"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
+      <ModernChatInput
+        onSendMessage={handleSendMessage}
+        onSendMedia={handleSendMedia}
+        onTyping={signalTyping}
+        placeholder="Type a message or /score [team]..."
+        disabled={sending}
+        huddleId={huddle.id}
+        userId={currentUser?.id}
+      />
 
-      {/* Improved media upload dialog */}
+      {/* Improved media upload dialog - kept for backwards compatibility */}
       <Dialog open={isMediaOpen} onOpenChange={setIsMediaOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

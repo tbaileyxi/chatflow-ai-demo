@@ -13,6 +13,8 @@ interface ChatInputProps {
   onTyping?: (isTyping: boolean) => void;
   placeholder?: string;
   disabled?: boolean;
+  huddleId?: string;
+  userId?: string;
 }
 
 const QUICK_EMOJIS = [
@@ -25,7 +27,9 @@ export const ModernChatInput = ({
   onSendMedia, 
   onTyping,
   placeholder = "Type a message...",
-  disabled = false 
+  disabled = false,
+  huddleId,
+  userId
 }: ChatInputProps) => {
   const [message, setMessage] = useState('');
   const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
@@ -42,7 +46,15 @@ export const ModernChatInput = ({
 
     setSending(true);
     try {
-      await onSendMessage(message.trim());
+      const trimmedMessage = message.trim();
+      
+      // Check if it's a slash command
+      if (trimmedMessage.startsWith('/')) {
+        await handleSlashCommand(trimmedMessage);
+      } else {
+        await onSendMessage(trimmedMessage);
+      }
+      
       setMessage('');
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
@@ -162,6 +174,63 @@ export const ModernChatInput = ({
     // Reset input value
     e.target.value = '';
   }, [handleFileUpload]);
+
+  const handleSlashCommand = useCallback(async (command: string) => {
+    if (!huddleId || !userId) {
+      toast({
+        title: "Error",
+        description: "Unable to process command right now.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const parts = command.split(' ');
+    const cmd = parts[0].toLowerCase();
+    const teamName = parts.slice(1).join(' ');
+
+    if ((cmd === '/score' || cmd === '/stats') && !teamName) {
+      toast({
+        title: "Missing team name",
+        description: `Usage: ${cmd} [team name] (e.g., "${cmd} Alabama" or "${cmd} Chiefs")`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (cmd === '/score' || cmd === '/stats') {
+      try {
+        const response = await supabase.functions.invoke('sports-stats', {
+          body: {
+            command: cmd,
+            huddleId,
+            userId,
+            teamName
+          }
+        });
+
+        if (response.error) throw response.error;
+
+        toast({
+          title: "Command sent",
+          description: `Fetching ${cmd === '/score' ? 'score' : 'stats'} for ${teamName}...`,
+        });
+      } catch (error) {
+        console.error('Slash command error:', error);
+        toast({
+          title: "Command failed",
+          description: "Unable to process command. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } else {
+      toast({
+        title: "Unknown command",
+        description: "Available commands: /score [team], /stats [team]",
+        variant: "destructive"
+      });
+    }
+  }, [huddleId, userId, toast]);
 
   // Stop typing indicator when component unmounts or message is sent
   useEffect(() => {

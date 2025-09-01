@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { MobileLayout } from '@/components/mobile/MobileLayout';
 import { GlassHeader } from '@/components/mobile/GlassHeader';
 import { HuddleManagement } from '@/components/HuddleManagement';
+import { HuddleMembersManager } from '@/components/HuddleMembersManager';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -22,6 +23,7 @@ export const HuddleSettings = () => {
   const { user } = useAuth();
   const [huddle, setHuddle] = useState<HuddleData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (!huddleId) return;
@@ -41,6 +43,18 @@ export const HuddleSettings = () => {
 
         if (error) throw error;
         setHuddle(data);
+
+        // Check if user is admin
+        if (user) {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .eq('role', 'admin')
+            .single();
+          
+          setIsAdmin(!!roleData);
+        }
       } catch (error) {
         console.error('Error fetching huddle:', error);
         navigate('/app');
@@ -92,6 +106,15 @@ export const HuddleSettings = () => {
               huddle={huddle} 
             />
           </div>
+          
+          {(user?.id === huddle.owner_id || isAdmin) && (
+            <HuddleMembersManager
+              huddleId={huddle.id}
+              ownerId={huddle.owner_id}
+              isOwner={user?.id === huddle.owner_id}
+              isAdmin={isAdmin}
+            />
+          )}
         </div>
       </div>
     </MobileLayout>

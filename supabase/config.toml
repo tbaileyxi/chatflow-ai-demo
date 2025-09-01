@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.ncaa-live-updates]
 verify_jwt = false
+
+[functions.sports-stats]
+verify_jwt = true
