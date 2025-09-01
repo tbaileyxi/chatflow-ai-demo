@@ -78,8 +78,14 @@ export const RealtimeMessageHandler = ({
         },
         (payload) => {
           console.log('[Realtime] New message payload', payload);
-          if (payload.new && !isTypingLockRef.current) {
-            onNewMessage(payload.new as Message);
+          const message = payload.new as Message;
+          
+          // Always allow bot messages and team agent messages through (scoring updates)
+          // Only apply typing lock to regular user messages
+          const isBotOrAgentMessage = message.is_bot_message || message.is_team_agent_message;
+          
+          if (message && (!isTypingLockRef.current || isBotOrAgentMessage)) {
+            onNewMessage(message);
           }
         }
       )

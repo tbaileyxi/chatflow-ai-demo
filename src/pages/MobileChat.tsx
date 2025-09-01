@@ -176,67 +176,7 @@ const { data: messagesData, error: messagesError } = await supabase
     fetchHuddleData();
   }, [huddleId, currentUser, navigate]);
 
-  // Real-time messages subscription
-  useEffect(() => {
-    if (!huddleId || !currentUser) return;
-
-    const channel = supabase
-      .channel(`huddle-messages-${huddleId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'huddle_messages',
-          filter: `huddle_id=eq.${huddleId}`
-        },
-        async (payload) => {
-          console.log('New message received:', payload);
-          
-          // Fetch the complete message with origin team data
-          const { data: newMessage } = await supabase
-            .from('huddle_messages')
-            .select(`
-              id,
-              content,
-              created_at,
-              user_id,
-              is_bot_message,
-              is_team_agent_message,
-              origin_team_id,
-              media_url,
-              media_type,
-              embed_code,
-              poll_data,
-              origin_teams:teams!origin_team_id(name, logo_url)
-            `)
-            .eq('id', payload.new.id)
-            .single();
-
-          if (newMessage) {
-            // Enrich with origin team data if it's a team agent message
-            if (newMessage.is_team_agent_message && newMessage.origin_teams) {
-              newMessage.origin_teams = newMessage.origin_teams;
-            }
-
-            setMessages(prev => {
-              // Avoid duplicates
-              if (prev.some(m => m.id === newMessage.id)) {
-                return prev;
-              }
-              return [...prev, newMessage].sort((a, b) => 
-                new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-              );
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [huddleId, currentUser]);
+  // Real-time message handling is done by RealtimeMessageHandler component below
 
   // Typing presence channel
   useEffect(() => {
