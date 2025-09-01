@@ -5,6 +5,7 @@ import { GlassHeader } from '@/components/mobile/GlassHeader';
 import { HuddleManagement } from '@/components/HuddleManagement';
 import { HuddleMembersManager } from '@/components/HuddleMembersManager';
 import { HuddleVerificationDialog } from '@/components/HuddleVerificationDialog';
+import { PickEmSettingsCard } from '@/components/PickEmSettingsCard';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useHuddleSubscription } from '@/hooks/useHuddleSubscription';
@@ -176,6 +177,9 @@ export const HuddleSettings = () => {
               />
             </div>
           )}
+
+          {/* Pick 'Em Settings */}
+          <PickEmSettingsCard huddleId={huddle.id} isOwner={isOwner} />
 
           <div className="bg-card/50 backdrop-blur-sm border border-white/10 rounded-xl p-4">
             <h3 className="text-lg font-semibold mb-4 text-foreground">Huddle Management</h3>

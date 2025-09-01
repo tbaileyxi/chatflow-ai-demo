@@ -18,6 +18,7 @@ import { ImprovedMediaUpload } from '@/components/chat/ImprovedMediaUpload';
 import { StartPickEmDialog } from "@/components/pickem/StartPickEmDialog";
 import { PickEmView } from "@/components/pickem/PickEmView";
 import { PickEmCard } from "@/components/pickem/PickEmCard";
+import { PickEmStatusBanner } from "@/components/PickEmStatusBanner";
 import { HuddleVerificationDialog } from "@/components/HuddleVerificationDialog";
 import { useHuddleSubscription } from "@/hooks/useHuddleSubscription";
 import { useToast } from "@/hooks/use-toast";
@@ -646,6 +647,15 @@ const { data: messagesData, error: messagesError } = await supabase
           </div>
         }
       />
+
+      {/* Pick 'Em Status Banner */}
+      {currentUser && (
+        <PickEmStatusBanner
+          huddleId={huddle.id}
+          userId={currentUser.id}
+          onViewDetails={handleViewPickEm}
+        />
+      )}
 
       {/* Floating Back Button */}
       <Button

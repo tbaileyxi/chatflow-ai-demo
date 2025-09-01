@@ -313,6 +313,47 @@ export type Database = {
           },
         ]
       }
+      huddle_pickem_settings: {
+        Row: {
+          auto_create_weekly: boolean
+          created_at: string
+          huddle_id: string
+          id: string
+          is_enabled: boolean
+          league: string
+          max_games: number
+          updated_at: string
+        }
+        Insert: {
+          auto_create_weekly?: boolean
+          created_at?: string
+          huddle_id: string
+          id?: string
+          is_enabled?: boolean
+          league?: string
+          max_games?: number
+          updated_at?: string
+        }
+        Update: {
+          auto_create_weekly?: boolean
+          created_at?: string
+          huddle_id?: string
+          id?: string
+          is_enabled?: boolean
+          league?: string
+          max_games?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "huddle_pickem_settings_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: true
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       huddle_subscriptions: {
         Row: {
           created_at: string
