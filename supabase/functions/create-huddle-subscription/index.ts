@@ -56,7 +56,7 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      success_url: `${req.headers.get("origin")}/huddle/${huddleId}?verified=success`,
+      success_url: `${req.headers.get("origin")}/huddle/${huddleId}?verified=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get("origin")}/huddle/${huddleId}?verified=cancelled`,
       metadata: {
         huddle_id: huddleId,

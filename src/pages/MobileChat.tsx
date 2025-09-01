@@ -18,6 +18,9 @@ import { ImprovedMediaUpload } from '@/components/chat/ImprovedMediaUpload';
 import { StartPickEmDialog } from "@/components/pickem/StartPickEmDialog";
 import { PickEmView } from "@/components/pickem/PickEmView";
 import { PickEmCard } from "@/components/pickem/PickEmCard";
+import { HuddleVerificationDialog } from "@/components/HuddleVerificationDialog";
+import { useHuddleSubscription } from "@/hooks/useHuddleSubscription";
+import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   id: string;
@@ -76,6 +79,10 @@ export const MobileChat = () => {
 
   // Check if current user is the owner
   const isOwner = currentUser?.id === huddle?.owner_id;
+
+  // Subscription status for verification
+  const { subscriptionStatus, refreshSubscriptionStatus } = useHuddleSubscription(huddleId || '');
+  const { toast } = useToast();
 
   const handleStartPickEm = () => {
     setShowPickEmDialog(true);
@@ -238,6 +245,56 @@ const { data: messagesData, error: messagesError } = await supabase
 
     fetchHuddleData();
   }, [huddleId, currentUser, navigate]);
+
+  // Check for verification success/failure on URL parameters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const verificationStatus = urlParams.get('verified');
+    const sessionId = urlParams.get('session_id');
+
+    if (verificationStatus === 'success' && sessionId && isOwner) {
+      // Call check-huddle-subscription to verify the payment
+      const verifySubscription = async () => {
+        try {
+          const { error } = await supabase.functions.invoke('check-huddle-subscription', {
+            body: { sessionId }
+          });
+
+          if (error) throw error;
+
+          // Refresh subscription status
+          refreshSubscriptionStatus();
+          
+          toast({
+            title: "Huddle Verified!",
+            description: "Your huddle is now officially verified.",
+          });
+        } catch (error: any) {
+          console.error('Verification error:', error);
+          toast({
+            title: "Verification Error",
+            description: error.message || "Failed to verify subscription",
+            variant: "destructive",
+          });
+        }
+      };
+
+      verifySubscription();
+      
+      // Clean up URL parameters
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    } else if (verificationStatus === 'cancelled') {
+      toast({
+        title: "Payment Cancelled",
+        description: "Huddle verification was cancelled.",
+      });
+      
+      // Clean up URL parameters
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [isOwner, refreshSubscriptionStatus, toast]);
 
   const loadOlderMessages = async () => {
     if (!hasMore || loadingMore || !oldestCreatedAt) return;
@@ -565,6 +622,12 @@ const { data: messagesData, error: messagesError } = await supabase
               <Badge variant="secondary" className="text-xs bg-verified-background text-verified-primary border-verified-border">
                 Verified
               </Badge>
+            )}
+            {isOwner && !subscriptionStatus?.is_verified && (
+              <HuddleVerificationDialog 
+                huddleId={huddle.id} 
+                isVerified={subscriptionStatus?.is_verified || false}
+              />
             )}
             <InviteButton 
               huddleId={huddle.id}
