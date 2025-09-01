@@ -77,6 +77,7 @@ export const MobileChat = () => {
   const [ephemeralMessages, setEphemeralMessages] = useState<Message[]>([]);
   const [showPickEmDialog, setShowPickEmDialog] = useState(false);
   const [pickEmViewId, setPickEmViewId] = useState<string | null>(null);
+  const profileCacheRef = useRef<Map<string, User>>(new Map());
 
   // Check if current user is the owner
   const isOwner = currentUser?.id === huddle?.owner_id;
@@ -401,6 +402,60 @@ const { data: messagesData, error: messagesError } = await supabase
 
     updateLastRead();
   }, [huddleId, currentUser]);
+
+  // Profile enrichment helper with caching
+  const enrichMessageWithProfile = useCallback(async (message: any): Promise<any> => {
+    // Check cache first
+    let profile = profileCacheRef.current.get(message.user_id);
+    
+    if (!profile) {
+      try {
+        const { data: profileData } = await supabase.rpc('get_public_profile', { 
+          target_user_id: message.user_id 
+        });
+        
+        if (profileData?.[0]) {
+          profile = {
+            id: message.user_id,
+            display_name: profileData[0].display_name || profileData[0].username || 'Unknown User',
+            avatar_url: profileData[0].avatar_url
+          };
+        } else if (message.is_bot_message) {
+          // Fallback for bot messages
+          profile = {
+            id: message.user_id,
+            display_name: 'Game Bot',
+            avatar_url: undefined
+          };
+        } else {
+          // Fallback for regular users
+          profile = {
+            id: message.user_id,
+            display_name: 'Unknown User',
+            avatar_url: undefined
+          };
+        }
+        
+        // Cache the profile
+        profileCacheRef.current.set(message.user_id, profile);
+      } catch (error) {
+        console.error('Error fetching profile for user:', message.user_id, error);
+        
+        // Fallback profile
+        profile = {
+          id: message.user_id,
+          display_name: message.is_bot_message ? 'Game Bot' : 'Unknown User',
+          avatar_url: undefined
+        };
+        profileCacheRef.current.set(message.user_id, profile);
+      }
+    }
+    
+    return {
+      ...message,
+      profiles: profile
+    };
+  }, []);
 
   const signalTyping = () => {
     const channel = typingChannelRef.current;
@@ -760,7 +815,10 @@ const { data: messagesData, error: messagesError } = await supabase
           onNewMessage={async (msg) => {
             console.log('[Realtime] Received new message:', msg);
 
-            let enriched = msg as any;
+            // Enrich with profile data first
+            let enriched = await enrichMessageWithProfile(msg);
+            
+            // Then handle team agent enrichment if needed
             if (msg.is_team_agent_message && msg.origin_team_id) {
               const { data: originTeam } = await supabase
                 .from('teams')
@@ -768,7 +826,7 @@ const { data: messagesData, error: messagesError } = await supabase
                 .eq('id', msg.origin_team_id)
                 .single();
               if (originTeam) {
-                enriched = { ...msg, origin_teams: { name: originTeam.name, logo_url: originTeam.logo_url } };
+                enriched = { ...enriched, origin_teams: { name: originTeam.name, logo_url: originTeam.logo_url } };
               }
             }
 
