@@ -249,8 +249,10 @@ async function processGame(game: ESPNGame, league: string, teamIds: Set<string>,
     
     // Detect changes and post updates
     if (!previousState) {
-      // New game detected
-      if (status.type.state === 'in') {
+      // New game detected - post pregame info for scheduled games
+      if (status.type.state === 'pre') {
+        await postPregameInfo(teams, competition.date, league, supabase)
+      } else if (status.type.state === 'in') {
         await postGameStart(teams, competition.date, league, supabase)
       }
     } else {
@@ -274,26 +276,48 @@ async function processGame(game: ESPNGame, league: string, teamIds: Set<string>,
 }
 
 async function detectAndPostChanges(previous: GameState, current: GameState, league: string, supabase: any) {
-  // Score change
-  if (previous.lastScore !== current.lastScore) {
-    await postScoreUpdate(current, league, supabase)
+  // Game start (pre -> in)
+  if (previous.lastStatus === 'pre' && current.lastStatus === 'in') {
+    await postGameStart(current.teams, '', league, supabase)
   }
 
-  // Period change (quarter/half) - only when the period has actually advanced
-  // and the previous tick ended at 0:00 (or halftime transition 2 -> 3)
-  const periodIncreased = current.lastPeriod > previous.lastPeriod
-  const priorClock = (previous.lastClock || '').trim()
-  const priorClockAtZero = priorClock === '0:00' || priorClock === '00:00'
-  const halftimeTransition = previous.lastPeriod === 2 && current.lastPeriod === 3
+  // Score change - only post if it's an actual score change (not just different display)
+  if (previous.lastScore !== current.lastScore) {
+    // Make sure it's not just a formatting difference
+    const prevScores = previous.lastScore.split('-').map(s => parseInt(s.trim()))
+    const currScores = current.lastScore.split('-').map(s => parseInt(s.trim()))
+    
+    if (prevScores[0] !== currScores[0] || prevScores[1] !== currScores[1]) {
+      await postScoreUpdate(current, league, supabase)
+    }
+  }
 
-  if (periodIncreased && previous.lastPeriod > 0 && (priorClockAtZero || halftimeTransition)) {
+  // Period change - only on actual period transitions
+  const periodIncreased = current.lastPeriod > previous.lastPeriod
+  const isHalftimeTransition = previous.lastPeriod === 2 && current.lastPeriod === 3
+  const isPeriodEnd = periodIncreased && previous.lastPeriod > 0
+
+  if (isPeriodEnd) {
     await postPeriodChange(previous, current, league, supabase)
   }
 
   // Game status change (end of game)
-  if (previous.lastStatus === 'in' && current.lastStatus === 'post') {
+  if (previous.lastStatus !== 'post' && current.lastStatus === 'post') {
     await postGameEnd(current, league, supabase)
   }
+}
+
+async function postPregameInfo(teams: any[], gameDate: string, league: string, supabase: any) {
+  const gameTime = new Date(gameDate).toLocaleTimeString('en-US', { 
+    hour: 'numeric', 
+    minute: '2-digit',
+    timeZone: 'America/New_York'
+  })
+  const content = `🏈 PREGAME: ${teams[0].name} vs ${teams[1].name}\nKickoff: ${gameTime} ET`
+  
+  console.log('Posting pregame info:', content)
+  
+  await postToTeamFeeds(teams, content, league, supabase, `pregame-${teams[0].name}-${teams[1].name}`)
 }
 
 async function postGameStart(teams: any[], gameDate: string, league: string, supabase: any) {
@@ -301,7 +325,7 @@ async function postGameStart(teams: any[], gameDate: string, league: string, sup
   
   console.log('Posting game start:', content)
   
-  await postToTeamFeeds(teams, content, league, supabase)
+  await postToTeamFeeds(teams, content, league, supabase, `kickoff-${teams[0].name}-${teams[1].name}`)
 }
 
 async function postScoreUpdate(gameState: GameState, league: string, supabase: any) {

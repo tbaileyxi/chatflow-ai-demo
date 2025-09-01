@@ -189,14 +189,7 @@ export const ModernChatInput = ({
     const cmd = parts[0].toLowerCase();
     const teamName = parts.slice(1).join(' ');
 
-    if ((cmd === '/score' || cmd === '/stats') && !teamName) {
-      toast({
-        title: "Missing team name",
-        description: `Usage: ${cmd} [team name] (e.g., "${cmd} Alabama" or "${cmd} Chiefs")`,
-        variant: "destructive"
-      });
-      return;
-    }
+    // No longer require team name - slash commands can work without it
 
     if (cmd === '/score' || cmd === '/stats') {
       try {
@@ -213,7 +206,7 @@ export const ModernChatInput = ({
 
         toast({
           title: "Command sent",
-          description: `Fetching ${cmd === '/score' ? 'score' : 'stats'} for ${teamName}...`,
+          description: `Fetching ${cmd === '/score' ? 'score' : 'stats'}${teamName ? ` for ${teamName}` : ''}...`,
         });
       } catch (error) {
         console.error('Slash command error:', error);
@@ -226,7 +219,7 @@ export const ModernChatInput = ({
     } else {
       toast({
         title: "Unknown command",
-        description: "Available commands: /score [team], /stats [team]",
+        description: "Available: /score [team], /stats [team], /score nfl, /score college",
         variant: "destructive"
       });
     }

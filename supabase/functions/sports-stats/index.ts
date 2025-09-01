@@ -49,11 +49,31 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     let responseMessage = '';
+    let finalTeamName = teamName;
 
-    if (command === '/score') {
-      responseMessage = await getScoreUpdate(teamName);
+    // If no team name provided, try to get huddle's team
+    if (!teamName && huddleId) {
+      const { data: huddleData } = await supabase
+        .from('huddles')
+        .select('team:teams(name)')
+        .eq('id', huddleId)
+        .single();
+      
+      if (huddleData?.team?.name) {
+        finalTeamName = huddleData.team.name;
+        console.log(`Using huddle team: ${finalTeamName}`);
+      }
+    }
+
+    // Handle league shortcuts
+    if (finalTeamName?.toLowerCase() === 'nfl') {
+      responseMessage = await getLeagueScoreboard('nfl', command);
+    } else if (finalTeamName?.toLowerCase() === 'college' || finalTeamName?.toLowerCase() === 'ncaa') {
+      responseMessage = await getLeagueScoreboard('college-football', command);
+    } else if (command === '/score') {
+      responseMessage = await getScoreUpdate(finalTeamName);
     } else if (command === '/stats') {
-      responseMessage = await getTeamStats(teamName);
+      responseMessage = await getTeamStats(finalTeamName);
     } else {
       responseMessage = `Unknown command: ${command}. Available commands: /score, /stats`;
     }
@@ -88,7 +108,67 @@ serve(async (req) => {
   }
 });
 
+async function getLeagueScoreboard(league: string, command: string): Promise<string> {
+  try {
+    const apiUrl = `https://site.api.espn.com/apis/site/v2/sports/football/${league}/scoreboard`;
+    const response = await fetch(apiUrl);
+    
+    if (!response.ok) {
+      return `🚨 Unable to fetch ${league.toUpperCase()} scores right now.`;
+    }
+
+    const data = await response.json();
+    const games = data.events || [];
+    
+    if (games.length === 0) {
+      return `🏈 No ${league.toUpperCase()} games today.`;
+    }
+
+    const leagueName = league === 'nfl' ? 'NFL' : 'College Football';
+    let scoreboard = `🏈 **${leagueName} ${command === '/score' ? 'Scores' : 'Games'} Today**\n\n`;
+    
+    games.slice(0, 10).forEach((game: any) => {
+      const competition = game.competitions[0];
+      const competitors = competition.competitors;
+      const homeTeam = competitors.find((c: any) => c.homeAway === 'home') || competitors[0];
+      const awayTeam = competitors.find((c: any) => c.homeAway === 'away') || competitors[1];
+      
+      const status = game.status.type.name;
+      let statusText = '';
+      
+      if (status === 'STATUS_FINAL') {
+        statusText = 'FINAL';
+      } else if (status === 'STATUS_IN_PROGRESS') {
+        statusText = `Q${game.status.period} ${game.status.clock}`;
+      } else if (status === 'STATUS_HALFTIME') {
+        statusText = 'HALFTIME';
+      } else if (status === 'STATUS_SCHEDULED') {
+        const gameTime = new Date(competition.date).toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit',
+          timeZone: 'America/New_York'
+        });
+        statusText = gameTime + ' ET';
+      } else {
+        statusText = status.replace('STATUS_', '');
+      }
+      
+      scoreboard += `${awayTeam.team.abbreviation} ${awayTeam.score} - ${homeTeam.score} ${homeTeam.team.abbreviation} (${statusText})\n`;
+    });
+    
+    return scoreboard;
+    
+  } catch (error) {
+    console.error('Error fetching league scoreboard:', error);
+    return `🚨 Unable to fetch ${league.toUpperCase()} scores right now.`;
+  }
+}
+
 async function getScoreUpdate(teamName: string): Promise<string> {
+  if (!teamName) {
+    return `⚽ Please specify a team name. Usage: /score [team name] or just /score if you're in a team huddle.`;
+  }
+
   try {
     // Try NFL first
     const nflResponse = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard');
@@ -119,6 +199,10 @@ async function getScoreUpdate(teamName: string): Promise<string> {
 }
 
 async function getTeamStats(teamName: string): Promise<string> {
+  if (!teamName) {
+    return `📊 Please specify a team name. Usage: /stats [team name] or just /stats if you're in a team huddle.`;
+  }
+
   try {
     // Try NFL first
     const nflResponse = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard');

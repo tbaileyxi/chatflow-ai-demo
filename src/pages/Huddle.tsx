@@ -806,6 +806,8 @@ useEffect(() => {
           onSendMedia={sendMediaMessage}
           placeholder="Type your message..."
           disabled={loading}
+          huddleId={id}
+          userId={user?.id}
           onTyping={(isTyping) => {
             if (isTyping) {
               // Throttle typing broadcasts to avoid flooding
