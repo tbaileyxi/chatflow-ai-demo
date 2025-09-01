@@ -114,11 +114,27 @@ serve(async (req) => {
     // Fetch all Power 4 NCAA teams (automatically included in monitoring)
     const { data: power4Teams } = await supabase
       .from('teams')
-      .select('id, name, city, conference')
+      .select('id, name, city, conference, league')
       .eq('league', 'NCAA')
       .in('conference', ['SEC', 'Big Ten', 'Big 12', 'ACC'])
 
-    // Combine followed teams and Power 4 teams
+    // Fetch teams that have active huddles (ensure we monitor what users care about)
+    const { data: huddleTeamRefs } = await supabase
+      .from('huddles')
+      .select('team_id')
+      .not('team_id', 'is', null)
+
+    const huddleTeamIds = Array.from(new Set((huddleTeamRefs || []).map(h => h.team_id)))
+    let huddleTeams: any[] = []
+    if (huddleTeamIds.length > 0) {
+      const { data: fetchedHuddleTeams } = await supabase
+        .from('teams')
+        .select('id, name, city, conference, league')
+        .in('id', huddleTeamIds)
+      huddleTeams = fetchedHuddleTeams || []
+    }
+
+    // Combine followed teams, Power 4 teams, and huddle teams
     const allTeams = new Map()
     
     // Add followed teams
@@ -128,7 +144,8 @@ serve(async (req) => {
           id: f.team_id,
           name: f.teams.name,
           city: f.teams.city,
-          conference: f.teams.conference
+          conference: f.teams.conference,
+          league: 'UNKNOWN'
         })
       }
     })
@@ -138,8 +155,13 @@ serve(async (req) => {
       allTeams.set(team.id, team)
     })
 
+    // Add teams that have huddles
+    huddleTeams.forEach(team => {
+      allTeams.set(team.id, team)
+    })
+
     const teamIds = new Set(Array.from(allTeams.keys()))
-    console.log(`Monitoring ${teamIds.size} teams (${followedTeams?.length || 0} followed + ${power4Teams?.length || 0} Power 4 NCAA teams)`)
+    console.log(`Monitoring ${teamIds.size} teams (${followedTeams?.length || 0} followed + ${power4Teams?.length || 0} Power 4 NCAA teams + ${huddleTeamIds.length} huddle teams)`)
 
     // Poll NFL games
     await pollLeague('nfl', teamIds, allTeams, supabase)
@@ -322,63 +344,63 @@ async function postToTeamFeeds(teams: any[], content: string, league: string, su
       // Try multiple matching strategies for better NCAA team identification
       let dbTeam = null
       
-      // Strategy 1: Try exact team name match first (most accurate)
+      // Strategy 1: Try nickname-based match with wildcards (handles multi-word nicknames)
       const teamWords = team.name.split(' ')
-      const teamNickname = teamWords[teamWords.length - 1] // e.g., "Hurricanes" from "Miami Hurricanes"
-      
-      // First try exact nickname match
-      const { data: nicknameMatch } = await supabase
-        .from('teams')
-        .select('id, name, city, league')
-        .ilike('name', teamNickname)
-        .limit(5) // Get multiple to handle conflicts
-        
-      if (nicknameMatch && nicknameMatch.length > 0) {
-        // If only one match, use it
-        if (nicknameMatch.length === 1) {
-          dbTeam = nicknameMatch[0]
-        } else {
-          // Multiple matches - prefer by league context and city
-          for (const match of nicknameMatch) {
-            // Check if city matches (for teams like Miami Hurricanes vs Miami Dolphins)
-            if (match.city && team.name.toLowerCase().includes(match.city.toLowerCase())) {
-              // Prefer college teams for college games (ESPN college-football league)
-              if (league === 'college-football' && match.league === 'NCAA') {
-                dbTeam = match
-                break
-              }
-              // Prefer NFL teams for NFL games
-              if (league === 'nfl' && match.league === 'NFL') {
-                dbTeam = match
-                break
-              }
-              // Fallback to first city match
-              if (!dbTeam) {
-                dbTeam = match
-              }
-            }
-          }
-          
-          // If no city match found, use first nickname match
-          if (!dbTeam) {
-            dbTeam = nicknameMatch[0]
-          }
-        }
-      }
-      
-      // Strategy 2: If no nickname match, try full name match
-      if (!dbTeam) {
-        const { data: exactMatch } = await supabase
+      const nicknameTwoWords = teamWords.slice(-2).join(' ') // e.g., "Fighting Irish"
+      const nicknameOneWord = teamWords[teamWords.length - 1] // e.g., "Hurricanes"
+
+      const orFilters: string[] = []
+      if (nicknameTwoWords) orFilters.push(`name.ilike.%${nicknameTwoWords}%`)
+      if (nicknameOneWord) orFilters.push(`name.ilike.%${nicknameOneWord}%`)
+
+      if (orFilters.length > 0) {
+        const { data: nicknameMatch } = await supabase
           .from('teams')
           .select('id, name, city, league')
-          .ilike('name', team.name)
-          .limit(1)
-          .maybeSingle()
+          .or(orFilters.join(','))
+          .limit(10)
         
-        if (exactMatch) {
-          dbTeam = exactMatch
+        if (nicknameMatch && nicknameMatch.length > 0) {
+          // Prefer by league context and city alignment
+          for (const match of nicknameMatch) {
+            const cityMatches = match.city && team.name.toLowerCase().includes((match.city as string).toLowerCase())
+            if (league === 'college-football' && match.league === 'NCAA') {
+              dbTeam = match
+              if (cityMatches) break
+            } else if (league === 'nfl' && match.league === 'NFL') {
+              dbTeam = match
+              if (cityMatches) break
+            } else if (!dbTeam) {
+              // Fallback to the first candidate
+              dbTeam = match
+            }
+          }
         }
       }
+      
+      // Strategy 2: If still no match, try full name contains
+      if (!dbTeam) {
+        const { data: nameContains } = await supabase
+          .from('teams')
+          .select('id, name, city, league')
+          .ilike('name', `%${team.name}%`)
+          .limit(1)
+          .maybeSingle()
+        if (nameContains) dbTeam = nameContains
+      }
+
+      // Strategy 3: If still no match, try city-based fallback (useful for colleges like "Notre Dame")
+      if (!dbTeam && team.name.includes(' ')) {
+        const cityToken = team.name.split(' ')[0]
+        const { data: cityMatch } = await supabase
+          .from('teams')
+          .select('id, name, city, league')
+          .or(`city.ilike.%${cityToken}%,name.ilike.%${cityToken}%`)
+          .limit(1)
+          .maybeSingle()
+        if (cityMatch) dbTeam = cityMatch
+      }
+
 
       if (dbTeam) {
         console.log(`Matched ESPN team "${team.name}" to DB team "${dbTeam.name}" (${dbTeam.city})`)
@@ -391,8 +413,25 @@ async function postToTeamFeeds(teams: any[], content: string, league: string, su
 
         console.log(`Found ${huddles?.length || 0} huddles for team ${dbTeam.name}`)
 
-        // Post to each team huddle
+        // Post to each team huddle with de-duplication (avoid duplicate messages within 5 minutes)
+        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
         for (const huddle of huddles || []) {
+          const { data: existingMsg } = await supabase
+            .from('huddle_messages')
+            .select('id')
+            .eq('huddle_id', huddle.id)
+            .eq('is_bot_message', true)
+            .eq('message_type', 'game_update')
+            .eq('content', content)
+            .gte('created_at', fiveMinAgo)
+            .limit(1)
+            .maybeSingle()
+
+          if (existingMsg) {
+            console.log(`Skipping duplicate game update in huddle: ${huddle.name}`)
+            continue
+          }
+
           const { error } = await supabase
             .from('huddle_messages')
             .insert({
@@ -410,22 +449,37 @@ async function postToTeamFeeds(teams: any[], content: string, league: string, su
           }
         }
 
-        // Also post to main team feed for visibility
-        const { error: postError } = await supabase
+        // Also post to main team feed for visibility (de-duplicated within 5 minutes)
+        const fiveMinAgoFeed = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+        const { data: existingPost } = await supabase
           .from('posts')
-          .insert({
-            content,
-            team_id: dbTeam.id,
-            is_agent_post: true,
-            is_team_agent_message: true,
-            target_audience: ['team_feed'],
-            delivery_status: 'sent'
-          })
+          .select('id')
+          .eq('team_id', dbTeam.id)
+          .eq('is_team_agent_message', true)
+          .eq('content', content)
+          .gte('created_at', fiveMinAgoFeed)
+          .limit(1)
+          .maybeSingle()
 
-        if (postError) {
-          console.error(`Error posting to team ${dbTeam.name} feed:`, postError)
+        if (!existingPost) {
+          const { error: postError } = await supabase
+            .from('posts')
+            .insert({
+              content,
+              team_id: dbTeam.id,
+              is_agent_post: true,
+              is_team_agent_message: true,
+              target_audience: ['team_feed'],
+              delivery_status: 'sent'
+            })
+
+          if (postError) {
+            console.error(`Error posting to team ${dbTeam.name} feed:`, postError)
+          } else {
+            console.log(`Posted to team ${dbTeam.name} feed and ${huddles?.length || 0} huddles`)
+          }
         } else {
-          console.log(`Posted to team ${dbTeam.name} feed and ${huddles?.length || 0} huddles`)
+          console.log(`Skipping duplicate post to team ${dbTeam.name} feed`)
         }
       } else {
         console.log(`Could not match ESPN team "${team.name}" (${team.abbreviation}) to any team in database`)
