@@ -55,15 +55,15 @@ export const ReportButton = ({ postId, postContent }: ReportButtonProps) => {
     setLoading(true);
     try {
       // Insert report into content_reports table (we'll create this)
-      const { error } = await supabase
-        .from('content_reports')
-        .insert({
-          reported_post_id: postId,
-          reporter_id: user.id,
-          reason: reason,
-          details: details.trim() || null,
-          status: 'pending'
-        });
+        const { error } = await (supabase as any)
+          .from('content_reports')
+          .insert({
+            reported_post_id: postId,
+            reporter_id: user.id,
+            reason,
+            details: details.trim() || null,
+            status: 'pending'
+          });
 
       if (error) {
         console.error("Report error:", error);

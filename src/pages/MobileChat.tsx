@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MobileLayout } from '@/components/mobile/MobileLayout';
 import { GlassHeader } from '@/components/mobile/GlassHeader';
-import { ModernChatBubble } from '@/components/mobile/ModernChatBubble';
+import ModernChatBubble from '@/components/mobile/ModernChatBubble';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -547,13 +547,8 @@ const { data: messagesData, error: messagesError } = await supabase
               <ModernChatBubble
                 key={message.id}
                 message={message}
-                user={users[message.user_id]}
                 currentUserId={currentUser?.id}
-                teamName={huddle.team_name}
-                teamLogoUrl={huddle.team_logo_url}
                 teamId={huddle.team_id}
-                isConsecutive={isConsecutive}
-                previousMessage={previousMessage}
               />
             );
           })}

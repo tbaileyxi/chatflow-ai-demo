@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatDistanceToNow } from "date-fns";
 import { MediaViewer } from "@/components/MediaViewer";
-import { LazyEmbed } from "./LazyEmbed";
+import { LazyEmbed } from "@/components/chat/LazyEmbed";
 import { MakePublicButton } from "@/components/MakePublicButton";
 import { cn } from "@/lib/utils";
 import { XPostEmbed } from "@/components/embeds/XPostEmbed";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ModernChatBubbleProps {
   message: any;
