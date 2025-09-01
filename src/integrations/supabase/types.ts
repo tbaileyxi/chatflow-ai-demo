@@ -407,6 +407,244 @@ export type Database = {
           },
         ]
       }
+      pickem_entries: {
+        Row: {
+          created_at: string
+          id: string
+          instance_id: string
+          total_score: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instance_id: string
+          total_score?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instance_id?: string
+          total_score?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pickem_entries_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "pickem_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pickem_games: {
+        Row: {
+          away_team: string
+          created_at: string
+          espn_game_id: string
+          home_team: string
+          id: string
+          start_time: string
+          status: string
+          updated_at: string
+          week_id: string
+          winning_team: string | null
+        }
+        Insert: {
+          away_team: string
+          created_at?: string
+          espn_game_id: string
+          home_team: string
+          id?: string
+          start_time: string
+          status?: string
+          updated_at?: string
+          week_id: string
+          winning_team?: string | null
+        }
+        Update: {
+          away_team?: string
+          created_at?: string
+          espn_game_id?: string
+          home_team?: string
+          id?: string
+          start_time?: string
+          status?: string
+          updated_at?: string
+          week_id?: string
+          winning_team?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pickem_games_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "pickem_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pickem_instance_games: {
+        Row: {
+          game_id: string
+          instance_id: string
+        }
+        Insert: {
+          game_id: string
+          instance_id: string
+        }
+        Update: {
+          game_id?: string
+          instance_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pickem_instance_games_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "pickem_games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pickem_instance_games_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "pickem_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pickem_instances: {
+        Row: {
+          created_at: string
+          created_by: string
+          huddle_id: string
+          id: string
+          status: string
+          title: string | null
+          updated_at: string
+          week_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          huddle_id: string
+          id?: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+          week_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          huddle_id?: string
+          id?: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+          week_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pickem_instances_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pickem_instances_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "pickem_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pickem_picks: {
+        Row: {
+          created_at: string
+          entry_id: string
+          game_id: string
+          id: string
+          is_correct: boolean | null
+          picked_team: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entry_id: string
+          game_id: string
+          id?: string
+          is_correct?: boolean | null
+          picked_team: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entry_id?: string
+          game_id?: string
+          id?: string
+          is_correct?: boolean | null
+          picked_team?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pickem_picks_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "pickem_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pickem_picks_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "pickem_games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pickem_weeks: {
+        Row: {
+          created_at: string
+          end_at: string
+          id: string
+          league: Database["public"]["Enums"]["pickem_league"]
+          season_year: number
+          start_at: string
+          updated_at: string
+          week_number: number
+        }
+        Insert: {
+          created_at?: string
+          end_at: string
+          id?: string
+          league: Database["public"]["Enums"]["pickem_league"]
+          season_year: number
+          start_at: string
+          updated_at?: string
+          week_number: number
+        }
+        Update: {
+          created_at?: string
+          end_at?: string
+          id?: string
+          league?: Database["public"]["Enums"]["pickem_league"]
+          season_year?: number
+          start_at?: string
+          updated_at?: string
+          week_number?: number
+        }
+        Relationships: []
+      }
       poll_votes: {
         Row: {
           created_at: string | null
@@ -819,7 +1057,35 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      pickem_leaderboard: {
+        Row: {
+          display_name: string | null
+          instance_id: string | null
+          rank: number | null
+          total_score: number | null
+          user_id: string | null
+          username: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pickem_entries_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "pickem_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pickem_user_totals: {
+        Row: {
+          entries_played: number | null
+          league: Database["public"]["Enums"]["pickem_league"] | null
+          season_year: number | null
+          total_correct: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       approve_huddle_join_request: {
@@ -882,9 +1148,14 @@ export type Database = {
         Args: { _huddle_id: string; _user_id: string }
         Returns: boolean
       }
+      recalculate_entry_total: {
+        Args: { _entry_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "member" | "huddle_owner"
+      pickem_league: "nfl" | "ncaaf"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1013,6 +1284,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "member", "huddle_owner"],
+      pickem_league: ["nfl", "ncaaf"],
     },
   },
 } as const

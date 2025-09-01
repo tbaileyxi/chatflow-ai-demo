@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Send, Plus, Smile, Camera, Image } from 'lucide-react';
+import { Send, Plus, Smile, Camera, Image, Trophy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,6 +17,8 @@ interface ChatInputProps {
   userId?: string;
   onSlashStart?: (command: string) => void;
   onSlashComplete?: (success: boolean) => void;
+  onPickEm?: () => void;
+  showPickEm?: boolean;
 }
 
 const QUICK_EMOJIS = [
@@ -33,7 +35,9 @@ export const ModernChatInput = ({
   huddleId,
   userId,
   onSlashStart,
-  onSlashComplete
+  onSlashComplete,
+  onPickEm,
+  showPickEm = false
 }: ChatInputProps) => {
   const [message, setMessage] = useState('');
   const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
@@ -341,6 +345,21 @@ export const ModernChatInput = ({
                 >
                   <Image className="w-5 h-5" />
                 </Button>
+                {showPickEm && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-12 w-12 p-0 hover:bg-muted rounded-full text-primary"
+                    disabled={disabled || sending}
+                    aria-label="Start Pick 'Em"
+                    onClick={() => {
+                      onPickEm?.();
+                      setMediaOptionsOpen(false);
+                    }}
+                  >
+                    <Trophy className="w-5 h-5" />
+                  </Button>
+                )}
               </div>
             )}
             

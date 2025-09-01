@@ -15,6 +15,9 @@ import { InviteButton } from '@/components/InviteButton';
 import { RealtimeMessageHandler } from '@/components/optimized/RealtimeMessageHandler';
 import { ModernChatInput } from '@/components/chat/ModernChatInput';
 import { ImprovedMediaUpload } from '@/components/chat/ImprovedMediaUpload';
+import { StartPickEmDialog } from "@/components/pickem/StartPickEmDialog";
+import { PickEmView } from "@/components/pickem/PickEmView";
+import { PickEmCard } from "@/components/pickem/PickEmCard";
 
 interface Message {
   id: string;
@@ -27,6 +30,8 @@ interface Message {
   media_url?: string;
   media_type?: string;
   embed_code?: string;
+  message_type?: string;
+  poll_data?: any;
   origin_teams?: { name: string; logo_url?: string } | null;
 }
 
@@ -66,6 +71,8 @@ export const MobileChat = () => {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [ephemeralMessages, setEphemeralMessages] = useState<Message[]>([]);
+  const [showPickEmDialog, setShowPickEmDialog] = useState(false);
+  const [pickEmViewId, setPickEmViewId] = useState<string | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -412,6 +419,26 @@ const { data: messagesData, error: messagesError } = await supabase
     }, 2000);
   }, [huddleId, currentUser]);
 
+  const handleStartPickEm = () => {
+    setShowPickEmDialog(true);
+  };
+
+  const handlePickEmCreated = (instanceId: string) => {
+    // Refresh messages to show the new pick'em
+    // The message will be automatically added via realtime subscription
+  };
+
+  const handleViewPickEm = (instanceId: string) => {
+    setPickEmViewId(instanceId);
+  };
+
+  const handleBackToChat = () => {
+    setPickEmViewId(null);
+  };
+
+  // Check if current user is the owner
+  const isOwner = currentUser?.id === huddle?.owner_id;
+
   const handleSendMessage = async (messageText: string) => {
     if (!messageText.trim() || sending || !currentUser || !huddleId) return;
 
@@ -511,6 +538,20 @@ const { data: messagesData, error: messagesError } = await supabase
     );
   }
 
+  // Show Pick'Em view if selected
+  if (pickEmViewId) {
+    return (
+      <div className="h-screen bg-background">
+        <div className="p-4">
+          <PickEmView
+            instanceId={pickEmViewId}
+            onBack={handleBackToChat}
+          />
+        </div>
+      </div>
+    );
+  }
+
 
   return (
     <MobileLayout hasBottomNav={false}>
@@ -605,6 +646,8 @@ const { data: messagesData, error: messagesError } = await supabase
         userId={currentUser?.id}
         onSlashStart={handleSlashStart}
         onSlashComplete={handleSlashComplete}
+        onPickEm={handleStartPickEm}
+        showPickEm={isOwner}
       />
 
       {/* Improved media upload dialog - kept for backwards compatibility */}
@@ -623,72 +666,45 @@ const { data: messagesData, error: messagesError } = await supabase
 
       {/* Realtime handler for new messages */}
       {huddle?.id && (
-<RealtimeMessageHandler
-  huddleId={huddle.id}
-  userId={currentUser?.id}
-  onNewMessage={async (msg) => {
-    console.log('[Realtime] Received new message:', msg);
+        <RealtimeMessageHandler
+          huddleId={huddle.id}
+          userId={currentUser?.id}
+          onNewMessage={async (msg) => {
+            console.log('[Realtime] Received new message:', msg);
 
-    let enriched = msg as any;
-    if (msg.is_team_agent_message && msg.origin_team_id) {
-      const { data: originTeam } = await supabase
-        .from('teams')
-        .select('name, logo_url')
-        .eq('id', msg.origin_team_id)
-        .single();
-      if (originTeam) {
-        enriched = { ...msg, origin_teams: { name: originTeam.name, logo_url: originTeam.logo_url } };
-      }
-    }
+            let enriched = msg as any;
+            if (msg.is_team_agent_message && msg.origin_team_id) {
+              const { data: originTeam } = await supabase
+                .from('teams')
+                .select('name, logo_url')
+                .eq('id', msg.origin_team_id)
+                .single();
+              if (originTeam) {
+                enriched = { ...msg, origin_teams: { name: originTeam.name, logo_url: originTeam.logo_url } };
+              }
+            }
 
-    // Clear ephemeral messages when real bot message arrives
-    if (enriched.is_bot_message) {
-      setEphemeralMessages([]);
-    }
+            // Clear ephemeral messages when real bot message arrives
+            if (enriched.is_bot_message) {
+              setEphemeralMessages([]);
+            }
 
-     // Ensure sender profile is loaded (skip zero UUID agent)
-     if (msg.user_id && msg.user_id !== '00000000-0000-0000-0000-000000000000' && !users[msg.user_id]) {
-       console.log('[Realtime] Loading profile for user:', msg.user_id);
-       const { data: u } = await supabase
-         .from('profiles')
-         .select('user_id, display_name, avatar_url, username')
-         .eq('user_id', msg.user_id)
-         .single();
-       if (u) {
-         const userProfile = {
-           id: u.user_id,
-           display_name: u.display_name || u.username || `User ${u.user_id.slice(0,8)}`,
-           avatar_url: u.avatar_url
-         };
-         
-         setUsers(prev => ({
-           ...prev,
-           [u.user_id]: userProfile
-         }));
-         
-         // Also attach profile to the message
-         enriched = {
-           ...enriched,
-           profiles: userProfile
-         };
-       }
-     } else if (users[msg.user_id]) {
-       // Attach existing user profile to message
-       enriched = {
-         ...enriched,
-         profiles: users[msg.user_id]
-       };
-     }
-
-     setMessages(prev => {
-       const exists = prev.some(m => m.id === enriched.id);
-       if (exists) return prev;
-       return [...prev, enriched];
-     });
-  }}
-  onMessagesUpdate={() => {}}
-/>
+            setMessages(prev => {
+              const exists = prev.some(m => m.id === enriched.id);
+              if (exists) return prev;
+              return [...prev, enriched];
+            });
+          }}
+          onMessagesUpdate={() => {}}
+        />
       )}
+
+      <StartPickEmDialog
+        open={showPickEmDialog}
+        onOpenChange={setShowPickEmDialog}
+        huddleId={huddle.id}
+        onPickEmCreated={handlePickEmCreated}
+      />
     </MobileLayout>
   );
 };
