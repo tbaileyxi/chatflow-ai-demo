@@ -74,6 +74,26 @@ export const MobileChat = () => {
   const [showPickEmDialog, setShowPickEmDialog] = useState(false);
   const [pickEmViewId, setPickEmViewId] = useState<string | null>(null);
 
+  // Check if current user is the owner
+  const isOwner = currentUser?.id === huddle?.owner_id;
+
+  const handleStartPickEm = () => {
+    setShowPickEmDialog(true);
+  };
+
+  const handlePickEmCreated = (instanceId: string) => {
+    // Refresh messages to show the new pick'em
+    // The message will be automatically added via realtime subscription
+  };
+
+  const handleViewPickEm = (instanceId: string) => {
+    setPickEmViewId(instanceId);
+  };
+
+  const handleBackToChat = () => {
+    setPickEmViewId(null);
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -419,26 +439,6 @@ const { data: messagesData, error: messagesError } = await supabase
     }, 2000);
   }, [huddleId, currentUser]);
 
-  const handleStartPickEm = () => {
-    setShowPickEmDialog(true);
-  };
-
-  const handlePickEmCreated = (instanceId: string) => {
-    // Refresh messages to show the new pick'em
-    // The message will be automatically added via realtime subscription
-  };
-
-  const handleViewPickEm = (instanceId: string) => {
-    setPickEmViewId(instanceId);
-  };
-
-  const handleBackToChat = () => {
-    setPickEmViewId(null);
-  };
-
-  // Check if current user is the owner
-  const isOwner = currentUser?.id === huddle?.owner_id;
-
   const handleSendMessage = async (messageText: string) => {
     if (!messageText.trim() || sending || !currentUser || !huddleId) return;
 
@@ -609,6 +609,21 @@ const { data: messagesData, error: messagesError } = await supabase
             </div>
           )}
           {[...messages, ...ephemeralMessages].map((message, index) => {
+            // Handle pick'em messages
+            if (message.message_type === 'pickem' && message.poll_data?.type === 'pickem') {
+              return (
+                <div key={message.id} className="px-4 py-2">
+                  <PickEmCard
+                    instanceId={message.poll_data.instance_id}
+                    title={message.poll_data.title}
+                    gameCount={message.poll_data.game_count}
+                    onViewDetails={handleViewPickEm}
+                  />
+                </div>
+              );
+            }
+
+            // Regular messages  
             const allMessages = [...messages, ...ephemeralMessages];
             const previousMessage = index > 0 ? allMessages[index - 1] : null;
             const isConsecutive = previousMessage && 
