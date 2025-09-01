@@ -279,8 +279,14 @@ async function detectAndPostChanges(previous: GameState, current: GameState, lea
     await postScoreUpdate(current, league, supabase)
   }
 
-  // Period change (quarter/half)
-  if (previous.lastPeriod !== current.lastPeriod) {
+  // Period change (quarter/half) - only when the period has actually advanced
+  // and the previous tick ended at 0:00 (or halftime transition 2 -> 3)
+  const periodIncreased = current.lastPeriod > previous.lastPeriod
+  const priorClock = (previous.lastClock || '').trim()
+  const priorClockAtZero = priorClock === '0:00' || priorClock === '00:00'
+  const halftimeTransition = previous.lastPeriod === 2 && current.lastPeriod === 3
+
+  if (periodIncreased && previous.lastPeriod > 0 && (priorClockAtZero || halftimeTransition)) {
     await postPeriodChange(previous, current, league, supabase)
   }
 
@@ -317,7 +323,9 @@ async function postPeriodChange(previous: GameState, current: GameState, league:
   
   console.log('Posting period change:', content)
   
-  await postToTeamFeeds(teams, content, league, supabase)
+  // Stronger de-duplication: one period-change per gameId+period
+  const dedupeId = `period-${current.gameId}-${previous.lastPeriod}`
+  await postToTeamFeeds(teams, content, league, supabase, dedupeId)
 }
 
 async function postGameEnd(gameState: GameState, league: string, supabase: any) {
@@ -347,7 +355,7 @@ function cleanupCache() {
   }
 }
 
-async function postToTeamFeeds(teams: any[], content: string, league: string, supabase: any) {
+async function postToTeamFeeds(teams: any[], content: string, league: string, supabase: any, dedupeId?: string) {
   try {
     // Get or create system user for bot messages
     const { data: systemUserId } = await supabase.rpc('get_or_create_system_user')
@@ -435,7 +443,7 @@ async function postToTeamFeeds(teams: any[], content: string, league: string, su
         const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
         for (const huddle of huddles || []) {
           // Check in-memory cache first for rapid duplicate prevention
-          const cacheKey = `${huddle.id}-${content}`
+          const cacheKey = dedupeId ? `${huddle.id}-${dedupeId}` : `${huddle.id}-${content}`
           const lastMessageTime = recentMessages.get(cacheKey)
           const now = Date.now()
           
