@@ -41,6 +41,9 @@ interface HuddleData {
   name: string;
   team_name: string;
   team_logo_url?: string;
+  team_id: string;
+  owner_id: string;
+  owner_display_name?: string;
   participant_count: number;
   is_verified?: boolean;
 }
@@ -81,6 +84,8 @@ export const MobileChat = () => {
             name,
             member_count,
             is_verified,
+            team_id,
+            owner_id,
             team:teams(name, logo_url)
           `)
           .eq('id', huddleId)
@@ -88,7 +93,18 @@ export const MobileChat = () => {
 
         if (huddleError) throw huddleError;
 
-        // Fetch messages
+        // Fetch owner profile
+        let ownerDisplayName = 'Someone';
+        if (huddleData.owner_id) {
+          const { data: ownerProfile } = await supabase.rpc('get_public_profile', { 
+            target_user_id: huddleData.owner_id 
+          });
+          if (ownerProfile?.[0]) {
+            ownerDisplayName = ownerProfile[0].display_name || ownerProfile[0].username || 'Someone';
+          }
+        }
+
+// Fetch messages (get latest 50 and reverse)
 const { data: messagesData, error: messagesError } = await supabase
   .from('huddle_messages')
   .select(`
@@ -105,7 +121,7 @@ const { data: messagesData, error: messagesError } = await supabase
     origin_teams:teams!origin_team_id(name, logo_url)
   `)
   .eq('huddle_id', huddleId)
-  .order('created_at', { ascending: true })
+  .order('created_at', { ascending: false })
   .limit(50);
 
         if (messagesError) throw messagesError;
@@ -159,11 +175,14 @@ const { data: messagesData, error: messagesError } = await supabase
           name: huddleData.name,
           team_name: huddleData.team?.name || 'Team',
           team_logo_url: huddleData.team?.logo_url,
+          team_id: huddleData.team_id,
+          owner_id: huddleData.owner_id,
+          owner_display_name: ownerDisplayName,
           participant_count: huddleData.member_count || 1,
           is_verified: huddleData.is_verified
         });
 
-        setMessages(messagesData || []);
+        setMessages((messagesData || []).reverse());
         setUsers(usersMap);
       } catch (error) {
         console.error('Error fetching huddle data:', error);
@@ -379,6 +398,8 @@ const { data: messagesData, error: messagesError } = await supabase
             )}
             <InviteButton 
               huddleId={huddle.id}
+              ownerDisplayName={huddle.owner_display_name}
+              teamName={huddle.team_name}
               className="p-2 hover:bg-white/10 rounded-full h-8 w-8"
             />
             <Button
@@ -420,6 +441,7 @@ const { data: messagesData, error: messagesError } = await supabase
                 currentUserId={currentUser?.id}
                 teamName={huddle.team_name}
                 teamLogoUrl={huddle.team_logo_url}
+                teamId={huddle.team_id}
                 isConsecutive={isConsecutive}
                 previousMessage={previousMessage}
               />
