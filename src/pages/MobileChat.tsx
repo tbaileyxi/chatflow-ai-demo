@@ -138,6 +138,7 @@ const { data: messagesData, error: messagesError } = await supabase
           userIds.push(currentUser.id);
         }
         
+        // Fetch all user profiles for messages
         const { data: usersData, error: usersError } = await supabase
           .from('profiles')
           .select('user_id, display_name, avatar_url, username')
@@ -174,6 +175,16 @@ const { data: messagesData, error: messagesError } = await supabase
           avatar_url: huddleData.team?.logo_url
         };
 
+        // Attach user profiles to messages
+        const enrichedMessages = (messagesData || []).map(message => ({
+          ...message,
+          profiles: usersMap[message.user_id] || {
+            display_name: `User ${message.user_id.slice(0, 8)}`,
+            username: null,
+            avatar_url: null
+          }
+        }));
+
         setHuddle({
           id: huddleData.id,
           name: huddleData.name,
@@ -186,7 +197,7 @@ const { data: messagesData, error: messagesError } = await supabase
           is_verified: huddleData.is_verified
         });
 
-        setMessages((messagesData || []).reverse());
+        setMessages(enrichedMessages.reverse());
         setOldestCreatedAt((messagesData || [])[0]?.created_at || null);
         setHasMore((messagesData?.length || 0) === 50);
         setUsers(usersMap);
@@ -615,31 +626,45 @@ const { data: messagesData, error: messagesError } = await supabase
       setEphemeralMessages([]);
     }
 
-    setMessages(prev => {
-      const exists = prev.some(m => m.id === enriched.id);
-      if (exists) return prev;
-      return [...prev, enriched];
-    });
-    
-    // Ensure sender profile is loaded (skip zero UUID agent)
-    if (msg.user_id && msg.user_id !== '00000000-0000-0000-0000-000000000000' && !users[msg.user_id]) {
-      console.log('[Realtime] Loading profile for user:', msg.user_id);
-      const { data: u } = await supabase
-        .from('profiles')
-        .select('user_id, display_name, avatar_url, username')
-        .eq('user_id', msg.user_id)
-        .single();
-      if (u) {
-        setUsers(prev => ({
-          ...prev,
-          [u.user_id]: {
-            id: u.user_id,
-            display_name: u.display_name || u.username || `User ${u.user_id.slice(0,8)}`,
-            avatar_url: u.avatar_url
-          }
-        }));
-      }
-    }
+     // Ensure sender profile is loaded (skip zero UUID agent)
+     if (msg.user_id && msg.user_id !== '00000000-0000-0000-0000-000000000000' && !users[msg.user_id]) {
+       console.log('[Realtime] Loading profile for user:', msg.user_id);
+       const { data: u } = await supabase
+         .from('profiles')
+         .select('user_id, display_name, avatar_url, username')
+         .eq('user_id', msg.user_id)
+         .single();
+       if (u) {
+         const userProfile = {
+           id: u.user_id,
+           display_name: u.display_name || u.username || `User ${u.user_id.slice(0,8)}`,
+           avatar_url: u.avatar_url
+         };
+         
+         setUsers(prev => ({
+           ...prev,
+           [u.user_id]: userProfile
+         }));
+         
+         // Also attach profile to the message
+         enriched = {
+           ...enriched,
+           profiles: userProfile
+         };
+       }
+     } else if (users[msg.user_id]) {
+       // Attach existing user profile to message
+       enriched = {
+         ...enriched,
+         profiles: users[msg.user_id]
+       };
+     }
+
+     setMessages(prev => {
+       const exists = prev.some(m => m.id === enriched.id);
+       if (exists) return prev;
+       return [...prev, enriched];
+     });
   }}
   onMessagesUpdate={() => {}}
 />

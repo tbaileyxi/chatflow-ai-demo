@@ -6,13 +6,20 @@ interface Post {
   id: string;
   content: string;
   media_url?: string;
+  embed_code?: string;
   poll_data?: any;
   created_at: string;
+  author_id?: string;
   team: {
     id: string;
     name: string;
     logo_url?: string;
     sponsor?: string;
+  };
+  author?: {
+    display_name?: string;
+    username?: string;
+    avatar_url?: string;
   };
   post_reactions: Array<{
     reaction_type: string;
@@ -39,6 +46,7 @@ export const SpotlightFeed = () => {
           embed_code,
           poll_data,
           created_at,
+          author_id,
           team:teams!team_id(id, name, logo_url, sponsor),
           post_reactions(reaction_type)
         `)
@@ -49,7 +57,36 @@ export const SpotlightFeed = () => {
         .limit(20);
 
       if (error) throw error;
-      setPosts(posts || []);
+
+      // Fetch author profiles for posts that have authors
+      const postsWithAuthors = posts || [];
+      const authorIds = [...new Set(postsWithAuthors
+        .filter(post => post.author_id)
+        .map(post => post.author_id)
+      )];
+
+      let authorsMap: Record<string, any> = {};
+      if (authorIds.length > 0) {
+        const { data: authors } = await supabase
+          .from('profiles')
+          .select('user_id, display_name, username, avatar_url')
+          .in('user_id', authorIds);
+
+        if (authors) {
+          authorsMap = authors.reduce((acc, author) => {
+            acc[author.user_id] = author;
+            return acc;
+          }, {} as Record<string, any>);
+        }
+      }
+
+      // Attach author data to posts
+      const enrichedPosts = postsWithAuthors.map(post => ({
+        ...post,
+        author: post.author_id ? authorsMap[post.author_id] : null
+      }));
+
+      setPosts(enrichedPosts);
     } catch (error) {
       console.error("Error fetching spotlight posts:", error);
     } finally {

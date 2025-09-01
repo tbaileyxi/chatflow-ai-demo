@@ -25,7 +25,7 @@ interface ModernMessageBubbleProps {
   userVote?: number | null;
 }
 
-const QUICK_REACTIONS = ['👍', '👎', '❤️', '😂', '😮', '😢', '🔥', '💯'];
+const QUICK_REACTIONS = ['👍', '😂', '🔥'];
 
 export const ModernMessageBubble = memo(({ 
   message, 

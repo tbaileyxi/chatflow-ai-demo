@@ -2,7 +2,7 @@ import React from 'react';
 import { MobileLayout } from '@/components/mobile/MobileLayout';
 import { GlassHeader } from '@/components/mobile/GlassHeader';
 import { BottomNav } from '@/components/mobile/BottomNav';
-import { VirtualizedOptimizedSpotlightFeed } from '@/components/optimized/VirtualizedOptimizedSpotlightFeed';
+import { SpotlightFeed } from '@/components/SpotlightFeed';
 
 export const MobileSpotlight = () => {
   return (
@@ -14,7 +14,7 @@ export const MobileSpotlight = () => {
       />
 
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <VirtualizedOptimizedSpotlightFeed />
+        <SpotlightFeed />
       </div>
 
       <BottomNav />

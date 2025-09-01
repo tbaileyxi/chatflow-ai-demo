@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { MediaViewer } from "@/components/MediaViewer";
+import { ReportButton } from "@/components/ReportButton";
 import { linkifyTeamNames } from "@/utils/teamLinking";
 
 // Twitter global type
@@ -563,29 +564,33 @@ export const PostCard = ({ post, isSpotlight = false, disableReply = false }: Po
         )}
       </div>
 
-      {/* Reaction Buttons - Only show for non-spotlight posts */}
-      {!isSpotlight && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleReaction('like')}
-              className="flex items-center gap-2 text-like-button hover:text-like-button hover:bg-like-button/10"
-            >
-              <Heart className="w-4 h-4" />
-              <span className="text-sm">{likeCount}</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleReaction('fire')}
-              className="flex items-center gap-2 text-fire-button hover:text-fire-button hover:bg-fire-button/10"
-            >
-              <Flame className="w-4 h-4" />
-              <span className="text-sm">{fireCount}</span>
-            </Button>
-          </div>
+      {/* Reaction Buttons */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          {!isSpotlight && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleReaction('like')}
+                className="flex items-center gap-2 text-like-button hover:text-like-button hover:bg-like-button/10"
+              >
+                <Heart className="w-4 h-4" />
+                <span className="text-sm">{likeCount}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleReaction('fire')}
+                className="flex items-center gap-2 text-fire-button hover:text-fire-button hover:bg-fire-button/10"
+              >
+                <Flame className="w-4 h-4" />
+                <span className="text-sm">{fireCount}</span>
+              </Button>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="sm"
@@ -594,8 +599,11 @@ export const PostCard = ({ post, isSpotlight = false, disableReply = false }: Po
           >
             <Share className="w-4 h-4" />
           </Button>
+          {isSpotlight && (
+            <ReportButton postId={post.id} postContent={post.content} />
+          )}
         </div>
-      )}
+      </div>
     </Card>
   );
 };

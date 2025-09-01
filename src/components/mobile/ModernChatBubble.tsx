@@ -18,7 +18,7 @@ interface ModernChatBubbleProps {
   onReaction?: (messageId: string, emoji: string) => void;
 }
 
-const QUICK_REACTIONS = ['👍', '👎', '❤️', '😂', '😮', '😢', '🔥', '💯'];
+const QUICK_REACTIONS = ['👍', '😂', '🔥'];
 
 const ModernChatBubble = ({ message, currentUserId, teamId, onReaction }: ModernChatBubbleProps) => {
   const [reactionPopoverOpen, setReactionPopoverOpen] = useState(false);
