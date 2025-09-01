@@ -432,8 +432,18 @@ const { data: messagesData, error: messagesError } = await supabase
 
       if (error) throw error;
 
+      // Enrich message with current user's profile before adding to local state
+      const enrichedMessage = {
+        ...data,
+        profiles: users[currentUser.id] || {
+          id: currentUser.id,
+          display_name: 'You',
+          avatar_url: undefined
+        }
+      };
+
       // Add to local state
-      setMessages(prev => [...prev, data]);
+      setMessages(prev => [...prev, enrichedMessage]);
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
@@ -460,8 +470,18 @@ const { data: messagesData, error: messagesError } = await supabase
 
       if (error) throw error;
 
+      // Enrich message with current user's profile before adding to local state
+      const enrichedMessage = {
+        ...data,
+        profiles: users[currentUser.id] || {
+          id: currentUser.id,
+          display_name: 'You',
+          avatar_url: undefined
+        }
+      };
+
       // Add to local state
-      setMessages(prev => [...prev, data]);
+      setMessages(prev => [...prev, enrichedMessage]);
     } catch (error) {
       console.error('Error sending media:', error);
     } finally {
