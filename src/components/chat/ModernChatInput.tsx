@@ -15,6 +15,8 @@ interface ChatInputProps {
   disabled?: boolean;
   huddleId?: string;
   userId?: string;
+  onSlashStart?: (command: string) => void;
+  onSlashComplete?: (success: boolean) => void;
 }
 
 const QUICK_EMOJIS = [
@@ -29,7 +31,9 @@ export const ModernChatInput = ({
   placeholder = "Type a message...",
   disabled = false,
   huddleId,
-  userId
+  userId,
+  onSlashStart,
+  onSlashComplete
 }: ChatInputProps) => {
   const [message, setMessage] = useState('');
   const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
@@ -49,7 +53,7 @@ export const ModernChatInput = ({
       const trimmedMessage = message.trim();
       
       // Check if it's a slash command
-      if (trimmedMessage.startsWith('/')) {
+      if (trimmedMessage.startsWith('/') || trimmedMessage.startsWith('?')) {
         await handleSlashCommand(trimmedMessage);
       } else {
         await onSendMessage(trimmedMessage);
@@ -185,11 +189,19 @@ export const ModernChatInput = ({
       return;
     }
 
-    const parts = command.split(' ');
+    // Normalize command - remove punctuation, convert ? to /
+    let normalizedCommand = command.trim();
+    if (normalizedCommand.startsWith('?')) {
+      normalizedCommand = '/' + normalizedCommand.slice(1);
+    }
+    normalizedCommand = normalizedCommand.replace(/[?!.]*$/, ''); // Remove trailing punctuation
+
+    const parts = normalizedCommand.split(' ');
     const cmd = parts[0].toLowerCase();
     const teamName = parts.slice(1).join(' ');
 
-    // No longer require team name - slash commands can work without it
+    // Trigger ephemeral start callback
+    onSlashStart?.(normalizedCommand);
 
     if (cmd === '/score' || cmd === '/stats') {
       try {
@@ -208,6 +220,7 @@ export const ModernChatInput = ({
           title: "Command sent",
           description: `Fetching ${cmd === '/score' ? 'score' : 'stats'}${teamName ? ` for ${teamName}` : ''}...`,
         });
+        onSlashComplete?.(true);
       } catch (error) {
         console.error('Slash command error:', error);
         toast({
@@ -215,13 +228,15 @@ export const ModernChatInput = ({
           description: "Unable to process command. Please try again.",
           variant: "destructive"
         });
+        onSlashComplete?.(false);
       }
     } else {
       toast({
         title: "Unknown command",
-        description: "Available: /score [team], /stats [team], /score nfl, /score college",
+        description: "Available: /score [team], /stats [team], /score nfl, /score college. You can also use ? instead of /",
         variant: "destructive"
       });
+      onSlashComplete?.(false);
     }
   }, [huddleId, userId, toast]);
 

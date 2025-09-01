@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MobileLayout } from '@/components/mobile/MobileLayout';
 import { GlassHeader } from '@/components/mobile/GlassHeader';
@@ -62,6 +62,10 @@ export const MobileChat = () => {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
+  const [oldestCreatedAt, setOldestCreatedAt] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [ephemeralMessages, setEphemeralMessages] = useState<Message[]>([]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -183,6 +187,8 @@ const { data: messagesData, error: messagesError } = await supabase
         });
 
         setMessages((messagesData || []).reverse());
+        setOldestCreatedAt((messagesData || [])[0]?.created_at || null);
+        setHasMore((messagesData?.length || 0) === 50);
         setUsers(usersMap);
       } catch (error) {
         console.error('Error fetching huddle data:', error);
@@ -194,6 +200,43 @@ const { data: messagesData, error: messagesError } = await supabase
 
     fetchHuddleData();
   }, [huddleId, currentUser, navigate]);
+
+  const loadOlderMessages = async () => {
+    if (!hasMore || loadingMore || !oldestCreatedAt) return;
+    setLoadingMore(true);
+    try {
+      const { data: olderData, error } = await supabase
+        .from('huddle_messages')
+        .select(`
+          id,
+          content,
+          created_at,
+          user_id,
+          is_bot_message,
+          is_team_agent_message,
+          origin_team_id,
+          media_url,
+          media_type,
+          embed_code,
+          origin_teams:teams!origin_team_id(name, logo_url)
+        `)
+        .eq('huddle_id', huddleId)
+        .lt('created_at', oldestCreatedAt)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      const batch = (olderData || []).reverse();
+      setMessages(prev => [...batch, ...prev]);
+      setOldestCreatedAt(batch[0]?.created_at || oldestCreatedAt);
+      setHasMore((olderData?.length || 0) === 50);
+    } catch (err) {
+      console.error('Error loading older messages:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // Real-time message handling is done by RealtimeMessageHandler component below
 
@@ -302,6 +345,61 @@ const { data: messagesData, error: messagesError } = await supabase
       console.error('Error sending media:', error);
     }
   };
+
+  const handleSlashStart = useCallback((command: string) => {
+    const ephemeralId = `ephemeral-${Date.now()}`;
+    const ephemeralMessage: Message = {
+      id: ephemeralId,
+      content: `Fetching ${command.includes('score') ? 'scores' : 'stats'}...`,
+      created_at: new Date().toISOString(),
+      user_id: 'bot',
+    };
+    setEphemeralMessages(prev => [...prev, ephemeralMessage]);
+    
+    // Remove ephemeral message after 6 seconds if no bot response
+    setTimeout(() => {
+      setEphemeralMessages(prev => prev.filter(m => m.id !== ephemeralId));
+    }, 6000);
+  }, []);
+
+  const handleSlashComplete = useCallback((success: boolean) => {
+    setEphemeralMessages([]);
+    // Add 2s fallback fetch to ensure bot message appears
+    setTimeout(() => {
+      // Re-fetch the latest messages by calling the fetchHuddleData function inline
+      if (!huddleId || !currentUser) return;
+      
+      const refetchMessages = async () => {
+        try {
+          const { data: messagesData, error: messagesError } = await supabase
+            .from('huddle_messages')
+            .select(`
+              id,
+              content,
+              created_at,
+              user_id,
+              is_bot_message,
+              is_team_agent_message,
+              origin_team_id,
+              media_url,
+              media_type,
+              embed_code,
+              origin_teams:teams!origin_team_id(name, logo_url)
+            `)
+            .eq('huddle_id', huddleId)
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          if (messagesError) throw messagesError;
+          setMessages((messagesData || []).reverse());
+        } catch (error) {
+          console.error('Error refetching messages:', error);
+        }
+      };
+      
+      refetchMessages();
+    }, 2000);
+  }, [huddleId, currentUser]);
 
   const handleSendMessage = async (messageText: string) => {
     if (!messageText.trim() || sending || !currentUser || !huddleId) return;
@@ -427,8 +525,20 @@ const { data: messagesData, error: messagesError } = await supabase
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
         <div className="pb-4">
-          {messages.map((message, index) => {
-            const previousMessage = index > 0 ? messages[index - 1] : null;
+          {hasMore && !loading && (
+            <div className="flex justify-center py-2">
+              <button
+                onClick={loadOlderMessages}
+                disabled={loadingMore}
+                className="text-sm text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg border bg-background hover:bg-muted transition-colors"
+              >
+                {loadingMore ? 'Loading...' : 'Load older messages'}
+              </button>
+            </div>
+          )}
+          {[...messages, ...ephemeralMessages].map((message, index) => {
+            const allMessages = [...messages, ...ephemeralMessages];
+            const previousMessage = index > 0 ? allMessages[index - 1] : null;
             const isConsecutive = previousMessage && 
               previousMessage.user_id === message.user_id &&
               new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() < 2 * 60 * 1000;
@@ -467,6 +577,8 @@ const { data: messagesData, error: messagesError } = await supabase
         disabled={sending}
         huddleId={huddle.id}
         userId={currentUser?.id}
+        onSlashStart={handleSlashStart}
+        onSlashComplete={handleSlashComplete}
       />
 
       {/* Improved media upload dialog - kept for backwards compatibility */}
@@ -501,6 +613,11 @@ const { data: messagesData, error: messagesError } = await supabase
       if (originTeam) {
         enriched = { ...msg, origin_teams: { name: originTeam.name, logo_url: originTeam.logo_url } };
       }
+    }
+
+    // Clear ephemeral messages when real bot message arrives
+    if (enriched.is_bot_message) {
+      setEphemeralMessages([]);
     }
 
     setMessages(prev => {

@@ -4,11 +4,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
-import { Heart, Smile, ThumbsUp, Flame } from 'lucide-react';
+import { Heart, Smile, ThumbsUp, Flame, Megaphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import DOMPurify from 'dompurify';
 import { XPostEmbed } from '@/components/embeds/XPostEmbed';
 import { extractVideoFrame } from '@/utils/videoThumbnail';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface MessageBubbleProps {
   message: {
@@ -102,6 +104,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({
   const [showReactions, setShowReactions] = useState(false);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [videoPoster, setVideoPoster] = useState<string | null>(null);
+  const { toast } = useToast();
   
   const isOwnMessage = currentUserId === message.user_id;
   const isTeamAgent = message.is_bot_message;
@@ -126,6 +129,31 @@ export const MessageBubble = memo<MessageBubbleProps>(({
   const handleReaction = useCallback((emoji: string) => {
     onAddReaction?.(message.id, emoji);
   }, [message.id, onAddReaction]);
+
+  const handleMakePublic = useCallback(async () => {
+    try {
+      await supabase
+        .from('posts')
+        .insert({
+          content: message.content,
+          media_url: message.media_url,
+          media_type: message.media_type,
+          user_id: message.user_id,
+        });
+      
+      toast({
+        title: "Success",
+        description: "Message posted to Spotlight!",
+      });
+    } catch (error) {
+      console.error('Error making post public:', error);
+      toast({
+        title: "Error",
+        description: "Failed to post to Spotlight",
+        variant: "destructive",
+      });
+    }
+  }, [message, toast]);
 
   const handleLongPress = useCallback(() => {
     // Copy message to clipboard
@@ -185,7 +213,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({
   return (
     <div
       className={cn(
-        "flex gap-3 px-4 py-1 hover:bg-muted/30 transition-colors group",
+        "flex gap-3 px-4 py-1 hover:bg-muted/30 transition-colors group relative",
         isOwnMessage ? "flex-row-reverse" : "flex-row"
       )}
       data-message-id={message.id}
@@ -199,6 +227,18 @@ export const MessageBubble = memo<MessageBubbleProps>(({
       onTouchStart={handleMouseDown}
       onTouchEnd={handleMouseUp}
     >
+      {/* Make Public Button - Only show for own messages */}
+      {isOwnMessage && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleMakePublic}
+          className="absolute top-2 right-2 h-6 w-6 p-0 rounded-full bg-black/80 text-white border border-white/30 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          title="Make Public to Spotlight"
+        >
+          <Megaphone className="w-3 h-3" />
+        </Button>
+      )}
       {shouldShowAvatar && (
         <Avatar className="h-8 w-8 shrink-0 object-cover">
           <AvatarImage 

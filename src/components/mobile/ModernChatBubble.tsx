@@ -1,14 +1,15 @@
-import React, { memo, useMemo, useState, useCallback } from 'react';
+import React, { memo, useMemo, useState, useCallback, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
+import { Heart, ThumbsUp, Flame, Smile, Camera, Image as ImageIcon, X, Megaphone, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Bot } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { MakePublicButton } from '@/components/MakePublicButton';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { LazyEmbed } from '@/components/chat/LazyEmbed';
 import { XPostEmbed } from '@/components/embeds/XPostEmbed';
-import { MakePublicButton } from '@/components/MakePublicButton';
-import { supabase } from '@/integrations/supabase/client';
 
 interface ModernChatBubbleProps {
   message: {
@@ -53,8 +54,39 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
   isConsecutive = false,
   previousMessage = null
 }) => {
-  const [showReactions, setShowReactions] = useState(false);
-  const [doubleTapTimer, setDoubleTapTimer] = useState<NodeJS.Timeout | null>(null);
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [isLongPress, setIsLongPress] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
+  const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { toast } = useToast();
+
+  const handleMakePublic = async () => {
+    try {
+      await supabase
+        .from('posts')
+        .insert({
+          content: message.content,
+          media_url: message.media_url,
+          media_type: message.media_type,
+          user_id: message.user_id,
+          team_id: teamId
+        });
+      
+      toast({
+        title: "Success",
+        description: "Message posted to Spotlight!",
+      });
+    } catch (error) {
+      console.error('Error making post public:', error);
+      toast({
+        title: "Error",
+        description: "Failed to post to Spotlight",
+        variant: "destructive",
+      });
+    }
+    setShowReactionPicker(false);
+  };
   
   const isOwnMessage = currentUserId === message.user_id;
   const isTeamBot = message.is_bot_message;
@@ -115,23 +147,31 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
   }, [currentUserId, message.id]);
 
   const handleTap = useCallback(() => {
-    if (doubleTapTimer) {
+    if (tapTimeoutRef.current) {
       // Double tap detected - add thumbs up
-      clearTimeout(doubleTapTimer);
-      setDoubleTapTimer(null);
+      clearTimeout(tapTimeoutRef.current);
+      tapTimeoutRef.current = null;
       handleReaction('👍');
     } else {
       // First tap - start timer
       const timer = setTimeout(() => {
-        setDoubleTapTimer(null);
+        tapTimeoutRef.current = null;
       }, 300);
-      setDoubleTapTimer(timer);
+      tapTimeoutRef.current = timer;
     }
-  }, [doubleTapTimer, handleReaction]);
+  }, [handleReaction]);
 
-  const handleLongPress = useCallback(() => {
-    setShowReactions(true);
-  }, []);
+  const handleLongPress = () => {
+    if (isLongPress) return;
+    setIsLongPress(true);
+    setShowReactionPicker(true);
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      setShowReactionPicker(false);
+      setIsLongPress(false);
+    }, 5000);
+  };
 
   return (
     <div className={cn(
@@ -161,7 +201,7 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
       )}>
 
         {/* Reactions overlay */}
-        {showReactions && (
+        {showReactionPicker && (
           <div className={cn(
             "absolute top-0 z-10 flex items-center gap-2 p-2 bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg",
             isOwnMessage ? "right-0" : "left-0"
@@ -174,17 +214,28 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
                 className="h-8 w-8 p-0 text-lg hover:scale-110 transition-transform"
                 onClick={() => {
                   handleReaction(emoji);
-                  setShowReactions(false);
+                  setShowReactionPicker(false);
                 }}
               >
                 {emoji}
               </Button>
             ))}
+            {isOwnMessage && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 hover:bg-muted"
+                onClick={handleMakePublic}
+                title="Make Public to Spotlight"
+              >
+                <Megaphone className="w-4 h-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm" 
               className="h-8 w-8 p-0 text-sm"
-              onClick={() => setShowReactions(false)}
+              onClick={() => setShowReactionPicker(false)}
             >
               ✕
             </Button>
@@ -255,15 +306,15 @@ export const ModernChatBubble = memo<ModernChatBubbleProps>(({
                 {/* Make Public Button for own messages */}
                 {isOwnMessage && (
                   <div className="absolute -top-2 -left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <MakePublicButton
-                      messageId={message.id}
-                      messageContent={message.content || ''}
-                      mediaUrl={message.media_url}
-                      mediaType={message.media_type}
-                      embedCode={message.embed_code}
-                      teamId={teamId}
-                      isOwner={true}
-                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleMakePublic}
+                      className="h-6 w-6 p-0 rounded-full bg-black/80 text-white border border-white/30 shadow-sm opacity-70 hover:opacity-100 transition-opacity"
+                      title="Make Public to Spotlight"
+                    >
+                      <Megaphone className="w-3 h-3" />
+                    </Button>
                   </div>
                 )}
               </div>
