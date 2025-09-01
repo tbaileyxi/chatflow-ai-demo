@@ -106,6 +106,9 @@ serve(async (req) => {
 
     console.log('Starting live game bot polling...')
 
+    // Clean up old entries from in-memory cache
+    cleanupCache()
+
     // Fetch followed teams to know which games to monitor
     const { data: followedTeams } = await supabase
       .from('user_follows')
@@ -329,6 +332,21 @@ async function postGameEnd(gameState: GameState, league: string, supabase: any) 
   await postToTeamFeeds(teams, content, league, supabase)
 }
 
+// In-memory cache to track recent messages and prevent rapid duplicates
+const recentMessages = new Map<string, number>()
+
+// Clean up old entries from cache (run every 10 minutes)
+function cleanupCache() {
+  const now = Date.now()
+  const tenMinAgo = now - 10 * 60 * 1000
+  
+  for (const [key, timestamp] of recentMessages) {
+    if (timestamp < tenMinAgo) {
+      recentMessages.delete(key)
+    }
+  }
+}
+
 async function postToTeamFeeds(teams: any[], content: string, league: string, supabase: any) {
   try {
     // Get or create system user for bot messages
@@ -413,9 +431,20 @@ async function postToTeamFeeds(teams: any[], content: string, league: string, su
 
         console.log(`Found ${huddles?.length || 0} huddles for team ${dbTeam.name}`)
 
-        // Post to each team huddle with de-duplication (avoid duplicate messages within 5 minutes)
-        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+        // Post to each team huddle with enhanced de-duplication
+        const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
         for (const huddle of huddles || []) {
+          // Check in-memory cache first for rapid duplicate prevention
+          const cacheKey = `${huddle.id}-${content}`
+          const lastMessageTime = recentMessages.get(cacheKey)
+          const now = Date.now()
+          
+          if (lastMessageTime && (now - lastMessageTime) < 2 * 60 * 1000) { // 2 minute rapid check
+            console.log(`Skipping duplicate game update in huddle: ${huddle.name} (in-memory cache)`)
+            continue
+          }
+
+          // Check database for recent duplicates with extended timeframe
           const { data: existingMsg } = await supabase
             .from('huddle_messages')
             .select('id')
@@ -423,7 +452,7 @@ async function postToTeamFeeds(teams: any[], content: string, league: string, su
             .eq('is_bot_message', true)
             .eq('message_type', 'game_update')
             .eq('content', content)
-            .gte('created_at', fiveMinAgo)
+            .gte('created_at', tenMinAgo)
             .limit(1)
             .maybeSingle()
 
@@ -431,6 +460,9 @@ async function postToTeamFeeds(teams: any[], content: string, league: string, su
             console.log(`Skipping duplicate game update in huddle: ${huddle.name}`)
             continue
           }
+
+          // Update in-memory cache
+          recentMessages.set(cacheKey, now)
 
           const { error } = await supabase
             .from('huddle_messages')
@@ -449,15 +481,15 @@ async function postToTeamFeeds(teams: any[], content: string, league: string, su
           }
         }
 
-        // Also post to main team feed for visibility (de-duplicated within 5 minutes)
-        const fiveMinAgoFeed = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+        // Also post to main team feed for visibility (de-duplicated within 10 minutes)
+        const tenMinAgoFeed = new Date(Date.now() - 10 * 60 * 1000).toISOString()
         const { data: existingPost } = await supabase
           .from('posts')
           .select('id')
           .eq('team_id', dbTeam.id)
           .eq('is_team_agent_message', true)
           .eq('content', content)
-          .gte('created_at', fiveMinAgoFeed)
+          .gte('created_at', tenMinAgoFeed)
           .limit(1)
           .maybeSingle()
 
