@@ -184,9 +184,12 @@ async function getScoreUpdate(teamName: string): Promise<string> {
   console.log(`Looking for scores for team: "${teamName}"`);
 
   try {
-    // Try NFL first (today's games)
+    // Get today's date in ET timezone
+    const todayET = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).replace(/-/g, '');
+    
+    // Try NFL first (today's games with explicit date)
     console.log('Checking NFL games...');
-    const nflResponse = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard');
+    const nflResponse = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${todayET}`);
     if (nflResponse.ok) {
       const nflData = await nflResponse.json();
       console.log(`Found ${nflData.events?.length || 0} NFL games today`);
@@ -197,24 +200,28 @@ async function getScoreUpdate(teamName: string): Promise<string> {
       }
     }
 
-    // Try College Football (today's games)
+    // Try College Football (today's games with explicit date)
     console.log('Checking College Football games...');
-    const cfbResponse = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard');
+    const cfbResponse = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=${todayET}`);
     if (cfbResponse.ok) {
       const cfbData = await cfbResponse.json();
       console.log(`Found ${cfbData.events?.length || 0} College Football games today`);
       const cfbGame = findTeamGame(cfbData.events, teamName);
       if (cfbGame) {
         console.log('Found College Football game for team');
-        return formatScoreUpdate(cfbGame, 'College Football');
+        // Check if it's actually a live or recent game vs old game
+        const isLiveOrRecent = cfbGame.status.type.name === 'STATUS_IN_PROGRESS' || 
+                               cfbGame.status.type.name === 'STATUS_FINAL' ||
+                               cfbGame.status.type.name === 'STATUS_HALFTIME';
+        return formatScoreUpdate(cfbGame, 'College Football', isLiveOrRecent);
       }
     }
 
-    // Try yesterday's games for college football
+    // Try yesterday's games for college football only if no today games found
     console.log('Checking yesterday\'s College Football games...');
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0].replace(/-/g, '');
+    const yesterdayET = new Date();
+    yesterdayET.setDate(yesterdayET.getDate() - 1);
+    const yesterdayStr = yesterdayET.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).replace(/-/g, '');
     
     const cfbYesterdayResponse = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=${yesterdayStr}`);
     if (cfbYesterdayResponse.ok) {
@@ -223,7 +230,7 @@ async function getScoreUpdate(teamName: string): Promise<string> {
       const cfbYesterdayGame = findTeamGame(cfbYesterdayData.events, teamName);
       if (cfbYesterdayGame) {
         console.log('Found College Football game from yesterday');
-        return formatScoreUpdate(cfbYesterdayGame, 'College Football') + '\n\n*(Game from yesterday)*';
+        return formatScoreUpdate(cfbYesterdayGame, 'College Football', false, true);
       }
     }
 
@@ -294,7 +301,7 @@ function findTeamGame(events: any[], teamName: string): ESPNGame | null {
   return null;
 }
 
-function formatScoreUpdate(game: ESPNGame, league: string): string {
+function formatScoreUpdate(game: ESPNGame, league: string, isLiveOrRecent: boolean = true, isYesterday: boolean = false): string {
   const competition = game.competitions[0];
   const competitors = competition.competitors;
   
@@ -307,26 +314,39 @@ function formatScoreUpdate(game: ESPNGame, league: string): string {
   const statusText = game.status.type.name;
   const period = game.status.period;
   const clock = game.status.clock;
+  const displayClock = (game.status as any).displayClock || clock;
 
   let gameStatus = '';
   if (statusText === 'STATUS_IN_PROGRESS') {
-    gameStatus = `${getPeriodText(period)} - ${clock}`;
+    gameStatus = `🔴 LIVE - ${getPeriodText(period)} ${displayClock}`;
   } else if (statusText === 'STATUS_HALFTIME') {
-    gameStatus = 'HALFTIME';
+    gameStatus = '🔴 HALFTIME';
   } else if (statusText === 'STATUS_FINAL') {
     gameStatus = 'FINAL';
   } else if (statusText === 'STATUS_SCHEDULED') {
-    gameStatus = 'Scheduled';
+    const gameTime = new Date(competition.date).toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      timeZone: 'America/New_York'
+    });
+    gameStatus = `Scheduled - ${gameTime} ET`;
   } else if (statusText === 'STATUS_POSTPONED') {
     gameStatus = 'Postponed';
   } else {
     gameStatus = statusText.replace('STATUS_', '');
   }
 
-  return `🏈 **${league} Score Update**\n\n` +
-         `${awayTeam.team.displayName}: **${awayTeam.score}**\n` +
-         `${homeTeam.team.displayName}: **${homeTeam.score}**\n\n` +
-         `Status: ${gameStatus}`;
+  let result = `🏈 **${league} Score Update**\n\n` +
+               `${awayTeam.team.displayName}: **${awayTeam.score}**\n` +
+               `${homeTeam.team.displayName}: **${homeTeam.score}**\n\n` +
+               `Status: ${gameStatus}`;
+
+  // Only add yesterday tag if it's actually from yesterday and not live/recent
+  if (isYesterday && !isLiveOrRecent) {
+    result += '\n\n*(Game from yesterday)*';
+  }
+
+  return result;
 }
 
 function formatGameStats(game: ESPNGame, league: string): string {

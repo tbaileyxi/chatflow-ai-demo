@@ -121,7 +121,7 @@ const ModernChatBubble = ({ message, currentUserId, teamId, onReaction }: Modern
           isOwnMessage ? "justify-end" : "justify-start"
         )}>
           <span className="text-sm font-semibold text-foreground">
-            {message.profiles?.display_name || message.profiles?.username || 'Unknown User'}
+            {message.is_bot_message ? 'Game Bot' : (message.profiles?.display_name || message.profiles?.username || 'Unknown User')}
           </span>
           <span className="text-xs text-muted-foreground">
             {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
