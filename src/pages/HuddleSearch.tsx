@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,11 +30,12 @@ interface Huddle {
 }
 
 export const HuddleSearch = () => {
+  const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [allHuddles, setAllHuddles] = useState<Huddle[]>([]);
   const [verifiedHuddles, setVerifiedHuddles] = useState<Huddle[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "all");
   const { toast } = useToast();
   const { user } = useAuth();
 

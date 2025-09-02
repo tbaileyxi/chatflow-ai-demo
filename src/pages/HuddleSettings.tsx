@@ -5,10 +5,12 @@ import { GlassHeader } from '@/components/mobile/GlassHeader';
 import { HuddleManagement } from '@/components/HuddleManagement';
 import { HuddleMembersManager } from '@/components/HuddleMembersManager';
 import { HuddleVerificationDialog } from '@/components/HuddleVerificationDialog';
+import { HuddleRequestsManager } from '@/components/HuddleRequestsManager';
 import { PickEmSettingsCard } from '@/components/PickEmSettingsCard';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useHuddleSubscription } from '@/hooks/useHuddleSubscription';
+import { useJoinRequestNotifications } from '@/hooks/useJoinRequestNotifications';
 import { useToast } from '@/hooks/use-toast';
 
 interface HuddleData {
@@ -33,6 +35,9 @@ export const HuddleSettings = () => {
   const { subscriptionStatus, refreshSubscriptionStatus } = useHuddleSubscription(huddleId || '');
   const { toast } = useToast();
   const isOwner = user?.id === huddle?.owner_id;
+  
+  // Enable join request notifications for huddle owners
+  useJoinRequestNotifications();
 
   useEffect(() => {
     if (!huddleId) return;
@@ -176,6 +181,11 @@ export const HuddleSettings = () => {
                 }
               />
             </div>
+          )}
+
+          {/* Join Requests Management - Only for verified huddle owners */}
+          {isOwner && subscriptionStatus?.is_verified && (
+            <HuddleRequestsManager huddleId={huddle.id} isOwner={isOwner} />
           )}
 
           {/* Pick 'Em Settings */}
