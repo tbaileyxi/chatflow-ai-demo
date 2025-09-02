@@ -24,7 +24,7 @@ export const HuddleVerificationDialog = ({
   const handleUpgrade = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-huddle-subscription', {
+      const { data, error } = await supabase.functions.invoke('create-verification-payment', {
         body: { huddleId }
       });
 
@@ -36,7 +36,7 @@ export const HuddleVerificationDialog = ({
         setOpen(false);
       }
     } catch (error: any) {
-      console.error("Error creating subscription:", error);
+      console.error("Error creating verification payment:", error);
       toast({
         title: "Payment setup failed",
         description: error.message || "Something went wrong",
@@ -107,8 +107,8 @@ export const HuddleVerificationDialog = ({
           </Card>
           
           <div className="text-center p-4 bg-verified-background rounded-lg">
-            <div className="text-2xl font-bold text-verified-primary">$99/year</div>
-            <div className="text-sm text-muted-foreground">Annual subscription</div>
+            <div className="text-2xl font-bold text-verified-primary">$49.99</div>
+            <div className="text-sm text-muted-foreground">One-time payment</div>
           </div>
           
           <div className="flex gap-2 justify-end">

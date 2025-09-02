@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/hooks/useAuth";
 import { HelmetProvider } from "react-helmet-async";
+import { useJoinRequestNotifications } from "@/hooks/useJoinRequestNotifications";
 import Index from "./pages/Index";
 import { Landing } from "./pages/Landing";
 import { Admin } from "./pages/Admin";
@@ -26,6 +27,8 @@ import { HuddleSettings } from "./pages/HuddleSettings";
 const queryClient = new QueryClient();
 
 const AppContent = () => {
+  // Initialize global join request notifications
+  useJoinRequestNotifications();
 
   // Use mobile-first layout for all routes now
   return (

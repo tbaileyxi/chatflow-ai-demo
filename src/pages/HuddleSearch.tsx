@@ -12,6 +12,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { Search, Users, Shield } from "lucide-react";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { HuddleJoinButton } from "@/components/HuddleJoinButton";
+import { MobileLayout } from "@/components/mobile/MobileLayout";
+import { GlassHeader } from "@/components/mobile/GlassHeader";
+import { BottomNav } from "@/components/mobile/BottomNav";
 
 interface Huddle {
   id: string;
@@ -141,50 +144,55 @@ export const HuddleSearch = () => {
   );
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <Shield className="w-6 h-6 text-verified-primary" />
-          <h1 className="text-2xl font-bold">Discover Verified Huddles</h1>
-        </div>
-        <p className="text-muted-foreground">
-          Join official team huddles with curated membership and enhanced features
-        </p>
-      </div>
+    <MobileLayout>
+      <GlassHeader 
+        title="Discover Verified Huddles"
+        onBack={() => window.history.back()}
+      />
+      <div className="flex-1 overflow-auto">
+        <div className="container mx-auto p-4 max-w-4xl">
+          <div className="mb-4">
+            <p className="text-muted-foreground text-sm">
+              Join official team huddles with curated membership and enhanced features
+            </p>
+          </div>
 
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search verified huddles or teams..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
-      </div>
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search verified huddles or teams..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
 
-      <div className="mb-4 p-4 bg-verified-background border border-verified-border rounded-lg">
-        <div className="flex items-center gap-2 mb-2">
-          <Shield className="w-4 h-4 text-verified-primary" />
-          <span className="font-medium text-verified-primary">Official Huddles Only</span>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          These huddles have been verified and are open for join requests. All other huddles are invite-only.
-        </p>
-      </div>
+          <div className="mb-4 p-3 bg-verified-background border border-verified-border rounded-lg">
+            <div className="flex items-center gap-2 mb-1">
+              <Shield className="w-4 h-4 text-verified-primary" />
+              <span className="font-medium text-verified-primary text-sm">Official Huddles Only</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              These huddles have been verified and are open for join requests. All other huddles are invite-only.
+            </p>
+          </div>
 
-      {loading ? (
-        <div className="text-center py-8">Loading verified huddles...</div>
-      ) : (
-        <div className="grid gap-4">
-          {filteredHuddles().length > 0 ? (
-            filteredHuddles().map(renderHuddleCard)
+          {loading ? (
+            <div className="text-center py-8">Loading verified huddles...</div>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              {searchQuery ? "No verified huddles found matching your search" : "No verified huddles available yet"}
+            <div className="grid gap-3 pb-4">
+              {filteredHuddles().length > 0 ? (
+                filteredHuddles().map(renderHuddleCard)
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  {searchQuery ? "No verified huddles found matching your search" : "No verified huddles available yet"}
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
-    </div>
+      </div>
+      <BottomNav />
+    </MobileLayout>
   );
 };
