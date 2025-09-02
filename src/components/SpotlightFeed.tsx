@@ -80,10 +80,10 @@ export const SpotlightFeed = () => {
         }
       }
 
-      // Attach author data to posts
+      // Attach author data to posts, but only for non-agent posts
       const enrichedPosts = postsWithAuthors.map(post => ({
         ...post,
-        author: post.author_id ? authorsMap[post.author_id] : null
+        author: (post.author_id && !post.is_agent_post) ? authorsMap[post.author_id] : null
       }));
 
       setPosts(enrichedPosts);

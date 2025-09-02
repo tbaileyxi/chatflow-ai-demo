@@ -54,6 +54,10 @@ serve(async (req) => {
       );
     }
 
+    // Get system bot user for scheduled posts
+    const { data: systemBot } = await supabaseClient.rpc('get_or_create_system_user');
+    const systemBotId = systemBot || null;
+
     const processedPosts = [];
     const failedPosts = [];
 
@@ -72,7 +76,7 @@ serve(async (req) => {
               poll_data: post.poll_data,
               embed_code: post.embed_code,
               team_id: post.team_id,
-              author_id: post.author_id,
+              author_id: systemBotId || post.author_id, // Use system bot for broadcast posts
               is_spotlight: true,
               is_team_agent_message: post.is_team_agent_message,
               is_agent_post: post.is_agent_post,
@@ -107,7 +111,7 @@ serve(async (req) => {
           if (huddles && huddles.length > 0) {
             const huddleMessages = huddles.map(huddle => ({
               huddle_id: huddle.id,
-              user_id: post.author_id,
+              user_id: systemBotId || post.author_id, // Use system bot for broadcast posts
               content: post.content,
               media_url: post.media_url,
               media_type: post.message_type || 'text',

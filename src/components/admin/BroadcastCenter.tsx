@@ -272,13 +272,17 @@ export const BroadcastCenter = () => {
       const sourceTeamName = sourceTeamInfo ? `${sourceTeamInfo.city} ${sourceTeamInfo.name}` : 'Source Team';
 
       try {
+        // Get system bot user for broadcast posts
+        const { data: systemBot } = await supabase.rpc('get_or_create_system_user');
+        const systemBotId = systemBot || user.id;
+
         // Create the main spotlight post if enabled (only for source team)
         if (addToSpotlight) {
           const spotlightData = {
             content: finalContent,
             team_id: sourceTeam,
             origin_team_id: sourceTeam,
-            author_id: user.id,
+            author_id: systemBotId, // Use system bot for broadcast posts
             message_type: messageType,
             is_agent_post: true,
             is_spotlight: true,
@@ -322,7 +326,7 @@ export const BroadcastCenter = () => {
           content: finalContent,
           team_id: sourceTeam, // The post belongs to the source team
           origin_team_id: sourceTeam, // Track the original source team
-          author_id: user.id,
+          author_id: systemBotId, // Use system bot for broadcast posts
           message_type: messageType,
           is_agent_post: true,
           poll_data: pollData,
@@ -364,7 +368,7 @@ export const BroadcastCenter = () => {
             content: tags.trim() ? `${finalContent} ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}` : finalContent,
             team_id: destTeamId, // Post appears in destination team's feed
             origin_team_id: sourceTeam, // But track the source team for attribution
-            author_id: user.id,
+            author_id: systemBotId, // Use system bot for broadcast posts
             message_type: messageType,
             is_agent_post: true,
             poll_data: pollData,
@@ -398,7 +402,7 @@ export const BroadcastCenter = () => {
           content: huddleContent,
           team_id: sourceTeam, // Keep source team context
           origin_team_id: sourceTeam, // Track the original source team
-          author_id: user.id,
+          author_id: systemBotId, // Use system bot for broadcast posts
           message_type: messageType,
           is_agent_post: true,
           poll_data: pollData,
