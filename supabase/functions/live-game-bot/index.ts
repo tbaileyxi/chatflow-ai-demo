@@ -80,17 +80,24 @@ async function getGameState(gameId: string, supabase: any): Promise<GameState | 
 }
 
 async function setGameState(gameState: GameState, supabase: any) {
-  await supabase
-    .from('game_states')
-    .upsert({
-      game_id: gameState.gameId,
-      last_score: gameState.lastScore,
-      last_period: gameState.lastPeriod,
-      last_clock: gameState.lastClock,
-      last_status: gameState.lastStatus,
-      teams: gameState.teams,
-      updated_at: new Date().toISOString()
-    })
+  try {
+    await supabase
+      .from('game_states')
+      .upsert({
+        game_id: gameState.gameId,
+        last_score: gameState.lastScore,
+        last_period: gameState.lastPeriod,
+        last_clock: gameState.lastClock,
+        last_status: gameState.lastStatus,
+        teams: gameState.teams,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'game_id'
+      })
+  } catch (error) {
+    console.error(`Failed to update game state for ${gameState.gameId}:`, error)
+    // Continue processing other games even if one fails
+  }
 }
 
 serve(async (req) => {
@@ -394,35 +401,55 @@ async function postToTeamFeeds(teams: any[], content: string, league: string, su
       // Try multiple matching strategies for better NCAA team identification
       let dbTeam = null
       
-      // Strategy 1: Try nickname-based match with wildcards (handles multi-word nicknames)
-      const teamWords = team.name.split(' ')
-      const nicknameTwoWords = teamWords.slice(-2).join(' ') // e.g., "Fighting Irish"
-      const nicknameOneWord = teamWords[teamWords.length - 1] // e.g., "Hurricanes"
-
-      const orFilters: string[] = []
-      if (nicknameTwoWords) orFilters.push(`name.ilike.%${nicknameTwoWords}%`)
-      if (nicknameOneWord) orFilters.push(`name.ilike.%${nicknameOneWord}%`)
-
-      if (orFilters.length > 0) {
-        const { data: nicknameMatch } = await supabase
+      // Special handling for North Carolina (UNC Tar Heels)
+      if (team.name.toLowerCase().includes('north carolina') || 
+          team.name.toLowerCase().includes('tar heels') ||
+          team.name.toLowerCase() === 'unc') {
+        console.log(`🎯 Special UNC matching for: ${team.name}`)
+        const { data: uncMatch } = await supabase
           .from('teams')
           .select('id, name, city, league')
-          .or(orFilters.join(','))
-          .limit(10)
-        
-        if (nicknameMatch && nicknameMatch.length > 0) {
-          // Prefer by league context and city alignment
-          for (const match of nicknameMatch) {
-            const cityMatches = match.city && team.name.toLowerCase().includes((match.city as string).toLowerCase())
-            if (league === 'college-football' && match.league === 'NCAA') {
-              dbTeam = match
-              if (cityMatches) break
-            } else if (league === 'nfl' && match.league === 'NFL') {
-              dbTeam = match
-              if (cityMatches) break
-            } else if (!dbTeam) {
-              // Fallback to the first candidate
-              dbTeam = match
+          .or('name.ilike.%Tar Heels%,name.ilike.%North Carolina%,city.ilike.%Chapel Hill%')
+          .eq('league', 'NCAA')
+          .limit(1)
+          .maybeSingle()
+        if (uncMatch) {
+          dbTeam = uncMatch
+          console.log(`✅ UNC match found: ${uncMatch.name} (${uncMatch.city})`)
+        }
+      }
+      
+      // Strategy 1: Try nickname-based match with wildcards (handles multi-word nicknames)
+      if (!dbTeam) {
+        const teamWords = team.name.split(' ')
+        const nicknameTwoWords = teamWords.slice(-2).join(' ') // e.g., "Fighting Irish"
+        const nicknameOneWord = teamWords[teamWords.length - 1] // e.g., "Hurricanes"
+
+        const orFilters: string[] = []
+        if (nicknameTwoWords) orFilters.push(`name.ilike.%${nicknameTwoWords}%`)
+        if (nicknameOneWord) orFilters.push(`name.ilike.%${nicknameOneWord}%`)
+
+        if (orFilters.length > 0) {
+          const { data: nicknameMatch } = await supabase
+            .from('teams')
+            .select('id, name, city, league')
+            .or(orFilters.join(','))
+            .limit(10)
+          
+          if (nicknameMatch && nicknameMatch.length > 0) {
+            // Prefer by league context and city alignment
+            for (const match of nicknameMatch) {
+              const cityMatches = match.city && team.name.toLowerCase().includes((match.city as string).toLowerCase())
+              if (league === 'college-football' && match.league === 'NCAA') {
+                dbTeam = match
+                if (cityMatches) break
+              } else if (league === 'nfl' && match.league === 'NFL') {
+                dbTeam = match
+                if (cityMatches) break
+              } else if (!dbTeam) {
+                // Fallback to the first candidate
+                dbTeam = match
+              }
             }
           }
         }

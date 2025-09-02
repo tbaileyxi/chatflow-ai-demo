@@ -34,6 +34,7 @@ const teamNameMapping: Record<string, string[]> = {
   'Missouri Tigers': ['Missouri', 'Tigers', 'Mizzou'],
   'Vanderbilt Commodores': ['Vanderbilt', 'Commodores'],
   'Texas A&M Aggies': ['Texas A&M', 'Aggies', 'TAMU'],
+  'North Carolina Tar Heels': ['North Carolina', 'Tar Heels', 'UNC', 'Chapel Hill'],
   'Boise State Broncos': ['Boise State', 'Broncos'],
   'BYU Cougars': ['BYU', 'Cougars', 'Brigham Young'],
   'Colorado Buffaloes': ['Colorado', 'Buffaloes', 'Buffs'],
@@ -53,6 +54,24 @@ const teamNameMapping: Record<string, string[]> = {
 }
 
 function findMatchingTeam(teams: any[], gameTeamName: string): any | null {
+  console.log(`🔍 Matching ESPN team: "${gameTeamName}"`);
+  
+  // Special handling for North Carolina variations
+  if (gameTeamName.toLowerCase().includes('north carolina') || 
+      gameTeamName.toLowerCase().includes('tar heels') ||
+      gameTeamName.toLowerCase() === 'unc') {
+    console.log(`🎯 Special UNC matching for: ${gameTeamName}`);
+    const uncMatch = teams.find(team => 
+      team.name.toLowerCase().includes('tar heels') ||
+      team.name.toLowerCase().includes('north carolina') ||
+      team.city.toLowerCase().includes('chapel hill')
+    );
+    if (uncMatch) {
+      console.log(`✅ UNC match found: ${uncMatch.name} (${uncMatch.city})`);
+      return uncMatch;
+    }
+  }
+  
   // Direct name match first
   let match = teams.find(team => 
     team.name.toLowerCase() === gameTeamName.toLowerCase() ||
@@ -60,7 +79,10 @@ function findMatchingTeam(teams: any[], gameTeamName: string): any | null {
     `${team.city} ${team.name}`.toLowerCase() === gameTeamName.toLowerCase()
   );
   
-  if (match) return match;
+  if (match) {
+    console.log(`✅ Direct match found: ${match.name} (${match.city})`);
+    return match;
+  }
 
   // Check mapping
   for (const [fullName, aliases] of Object.entries(teamNameMapping)) {
@@ -74,7 +96,10 @@ function findMatchingTeam(teams: any[], gameTeamName: string): any | null {
         `${team.city} ${team.name}`.toLowerCase() === fullName.toLowerCase() ||
         team.name.toLowerCase() === fullName.split(' ').slice(-1)[0].toLowerCase()
       );
-      if (match) return match;
+      if (match) {
+        console.log(`✅ Alias match found: ${match.name} (${match.city}) via ${fullName}`);
+        return match;
+      }
     }
   }
 
@@ -85,6 +110,12 @@ function findMatchingTeam(teams: any[], gameTeamName: string): any | null {
     team.city.toLowerCase().includes(gameTeamName.toLowerCase()) ||
     gameTeamName.toLowerCase().includes(team.city.toLowerCase())
   );
+
+  if (match) {
+    console.log(`✅ Partial match found: ${match.name} (${match.city})`);
+  } else {
+    console.log(`❌ No match found for: ${gameTeamName}`);
+  }
 
   return match;
 }
@@ -182,28 +213,35 @@ Deno.serve(async (req) => {
                 }
               }
 
-              // Update or insert game state
-              await supabaseClient
-                .from('game_states')
-                .upsert({
-                  game_id: gameId,
-                  last_score: scoreText,
-                  last_period: period,
-                  last_clock: clock,
-                  last_status: status,
-                  teams: {
-                    home: {
-                      name: homeTeam.team?.displayName,
-                      score: homeScore,
-                      dbTeamId: dbHomeTeam?.id
-                    },
-                    away: {
-                      name: awayTeam.team?.displayName,
-                      score: awayScore,
-                      dbTeamId: dbAwayTeam?.id
+              // Update or insert game state with error handling
+              try {
+                await supabaseClient
+                  .from('game_states')
+                  .upsert({
+                    game_id: gameId,
+                    last_score: scoreText,
+                    last_period: period,
+                    last_clock: clock,
+                    last_status: status,
+                    teams: {
+                      home: {
+                        name: homeTeam.team?.displayName,
+                        score: homeScore,
+                        dbTeamId: dbHomeTeam?.id
+                      },
+                      away: {
+                        name: awayTeam.team?.displayName,
+                        score: awayScore,
+                        dbTeamId: dbAwayTeam?.id
+                      }
                     }
-                  }
-                });
+                  }, {
+                    onConflict: 'game_id'
+                  });
+              } catch (stateError) {
+                console.error(`Failed to update game state for ${gameId}:`, stateError);
+                // Continue processing even if state update fails
+              }
 
               // Send notifications to relevant huddles if there's an update
               if (shouldNotify) {
@@ -216,8 +254,27 @@ Deno.serve(async (req) => {
                     .select('id, name')
                     .eq('team_id', team.id);
 
-                  // Send message to each huddle
+                  // Send message to each huddle with deduplication
                   for (const huddle of huddles || []) {
+                    // Check for recent duplicates (within 5 minutes)
+                    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+                    const { data: existingMsg } = await supabaseClient
+                      .from('huddle_messages')
+                      .select('id')
+                      .eq('huddle_id', huddle.id)
+                      .eq('is_bot_message', true)
+                      .eq('content', notificationMessage)
+                      .gte('created_at', fiveMinAgo)
+                      .limit(1)
+                      .maybeSingle();
+
+                    if (existingMsg) {
+                      console.log(`Skipping duplicate game update in huddle: ${huddle.name}`);
+                      continue;
+                    }
+
+                    console.log(`📤 Posting to huddle "${huddle.name}": ${notificationMessage}`);
+                    
                     await supabaseClient
                       .from('huddle_messages')
                       .insert({
@@ -226,7 +283,8 @@ Deno.serve(async (req) => {
                         content: notificationMessage,
                         is_bot_message: true,
                         is_team_agent_message: true,
-                        origin_team_id: team.id
+                        origin_team_id: team.id,
+                        message_type: 'game_update'
                       });
 
                     // Update huddle last_message_at
