@@ -30,6 +30,7 @@ export const HuddleSettings = () => {
   const [huddle, setHuddle] = useState<HuddleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   
   // Subscription status for verification
   const { subscriptionStatus, refreshSubscriptionStatus } = useHuddleSubscription(huddleId || '');
@@ -69,6 +70,17 @@ export const HuddleSettings = () => {
           
           setIsAdmin(!!roleData);
         }
+
+        // Fetch pending requests count for owner
+        if (user?.id === data.owner_id) {
+          const { data: requestsData } = await supabase
+            .from('huddle_join_requests')
+            .select('id')
+            .eq('huddle_id', huddleId)
+            .eq('status', 'pending');
+          
+          setPendingRequestsCount(requestsData?.length || 0);
+        }
       } catch (error) {
         console.error('Error fetching huddle:', error);
         navigate('/app');
@@ -78,7 +90,39 @@ export const HuddleSettings = () => {
     };
 
     fetchHuddle();
-  }, [huddleId, navigate]);
+  }, [huddleId, navigate, user]);
+
+  // Real-time updates for pending requests count
+  useEffect(() => {
+    if (!user || !isOwner) return;
+
+    const channel = supabase
+      .channel('pending-requests-count')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'huddle_join_requests',
+          filter: `huddle_id=eq.${huddleId}`
+        },
+        async () => {
+          // Refetch pending requests count
+          const { data: requestsData } = await supabase
+            .from('huddle_join_requests')
+            .select('id')
+            .eq('huddle_id', huddleId)
+            .eq('status', 'pending');
+          
+          setPendingRequestsCount(requestsData?.length || 0);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [huddleId, user, isOwner]);
 
   // Check for verification success/failure on URL parameters
   useEffect(() => {
@@ -185,7 +229,14 @@ export const HuddleSettings = () => {
 
           {/* Join Requests Management - Only for verified huddle owners */}
           {isOwner && subscriptionStatus?.is_verified && (
-            <HuddleRequestsManager huddleId={huddle.id} isOwner={isOwner} />
+            <div className="relative">
+              {pendingRequestsCount > 0 && (
+                <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold z-10">
+                  {pendingRequestsCount}
+                </div>
+              )}
+              <HuddleRequestsManager huddleId={huddle.id} isOwner={isOwner} />
+            </div>
           )}
 
           {/* Pick 'Em Settings */}

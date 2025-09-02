@@ -163,76 +163,66 @@ export const PickEmSettingsCard = ({ huddleId, isOwner }: PickEmSettingsCardProp
           />
         </div>
 
+        {/* League Selection - Always visible when enabled */}
         {settings.is_enabled && (
-          <>
-            {/* League Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="league">League</Label>
-              <Select
-                value={settings.league}
-                onValueChange={(value) => updateSetting('league', value)}
-                disabled={!isOwner}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select league" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ncaa">NCAA Football</SelectItem>
-                  <SelectItem value="nfl">NFL</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Auto-create Weekly */}
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label htmlFor="auto-create">Auto-create Weekly</Label>
-                <p className="text-xs text-muted-foreground">
-                  Automatically create Pick 'Em games every Tuesday
-                </p>
-              </div>
-              <Switch
-                id="auto-create"
-                checked={settings.auto_create_weekly}
-                onCheckedChange={(checked) => updateSetting('auto_create_weekly', checked)}
-                disabled={!isOwner}
-              />
-            </div>
-
-            {/* Max Games */}
-            <div className="space-y-2">
-              <Label htmlFor="max-games">Max Games per Week</Label>
-              <Select
-                value={settings.max_games.toString()}
-                onValueChange={(value) => updateSetting('max_games', parseInt(value))}
-                disabled={!isOwner}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5">5 Games</SelectItem>
-                  <SelectItem value="10">10 Games</SelectItem>
-                  <SelectItem value="15">15 Games</SelectItem>
-                  <SelectItem value="20">20 Games</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {isOwner && (
-              <Button 
-                onClick={saveSettings} 
-                disabled={saving}
-                className="w-full"
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                {saving ? 'Saving...' : 'Save Settings'}
-              </Button>
-            )}
-          </>
+          <div className="space-y-2">
+            <Label htmlFor="league">League</Label>
+            <Select
+              value={settings.league}
+              onValueChange={(value) => updateSetting('league', value)}
+              disabled={!isOwner}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select league" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ncaa">NCAA Football</SelectItem>
+                <SelectItem value="nfl">NFL</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         )}
 
-        {!settings.is_enabled && isOwner && (
+        {/* Max Games - Always visible when enabled */}
+        {settings.is_enabled && (
+          <div className="space-y-2">
+            <Label htmlFor="max-games">Max Games per Week</Label>
+            <Select
+              value={settings.max_games.toString()}
+              onValueChange={(value) => updateSetting('max_games', parseInt(value))}
+              disabled={!isOwner}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5 Games</SelectItem>
+                <SelectItem value="10">10 Games</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Auto-create Weekly - Optional setting */}
+        {settings.is_enabled && (
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label htmlFor="auto-create">Auto-create Weekly</Label>
+              <p className="text-xs text-muted-foreground">
+                Automatically create Pick 'Em games every Tuesday
+              </p>
+            </div>
+            <Switch
+              id="auto-create"
+              checked={settings.auto_create_weekly}
+              onCheckedChange={(checked) => updateSetting('auto_create_weekly', checked)}
+              disabled={!isOwner}
+            />
+          </div>
+        )}
+
+        {/* Save Button - Always visible for owners */}
+        {isOwner && (
           <Button 
             onClick={saveSettings} 
             disabled={saving}
@@ -242,6 +232,7 @@ export const PickEmSettingsCard = ({ huddleId, isOwner }: PickEmSettingsCardProp
             {saving ? 'Saving...' : 'Save Settings'}
           </Button>
         )}
+
 
         {!isOwner && (
           <p className="text-xs text-muted-foreground text-center">

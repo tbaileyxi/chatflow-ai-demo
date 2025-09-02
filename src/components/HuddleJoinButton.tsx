@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Shield, UserPlus } from "lucide-react";
+import { Shield, UserPlus, CheckCircle, ArrowRight, Home } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface HuddleJoinButtonProps {
   huddle: {
@@ -28,8 +29,11 @@ export const HuddleJoinButton = ({
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [joinType, setJoinType] = useState<'request' | 'direct'>('direct');
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const handleJoinRequest = async () => {
     if (!user) {
@@ -77,10 +81,8 @@ export const HuddleJoinButton = ({
 
         if (error) throw error;
 
-        toast({
-          title: "Join request sent!",
-          description: "The huddle owner will review your request.",
-        });
+        setJoinType('request');
+        setShowSuccessDialog(true);
       } else {
         // Direct join for non-verified huddles
         const { error } = await supabase.from("huddle_members").insert({
@@ -105,15 +107,12 @@ export const HuddleJoinButton = ({
           })
           .eq("id", huddle.id);
 
-        toast({
-          title: "Joined huddle!",
-          description: `You're now a member of ${huddle.name}`,
-        });
+        setJoinType('direct');
+        setShowSuccessDialog(true);
       }
 
       setOpen(false);
       setMessage("");
-      onJoinSuccess?.();
     } catch (error: any) {
       console.error("Error joining huddle:", error);
       toast({
@@ -131,8 +130,9 @@ export const HuddleJoinButton = ({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
         <Button 
           size={compact ? "sm" : "sm"}
           className={compact 
@@ -203,5 +203,61 @@ export const HuddleJoinButton = ({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Success Dialog */}
+    <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-green-500" />
+            {joinType === 'request' ? 'Join Request Sent!' : 'Welcome to the Huddle!'}
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <div className="text-center">
+            {joinType === 'request' ? (
+              <p className="text-muted-foreground">
+                Your request to join "{huddle.name}" has been sent to the huddle owner for review.
+                You'll be notified when they respond.
+              </p>
+            ) : (
+              <p className="text-muted-foreground">
+                You're now a member of "{huddle.name}"! 
+                Start chatting with your fellow fans.
+              </p>
+            )}
+          </div>
+          
+          <div className="flex flex-col gap-2">
+            {joinType === 'direct' && (
+              <Button 
+                onClick={() => {
+                  navigate(`/huddle/${huddle.id}`);
+                  setShowSuccessDialog(false);
+                  onJoinSuccess?.();
+                }}
+                className="bg-huddle-primary hover:bg-huddle-primary/90 text-white"
+              >
+                <ArrowRight className="w-4 h-4 mr-2" />
+                Go to Huddle
+              </Button>
+            )}
+            <Button 
+              variant="outline"
+              onClick={() => {
+                navigate('/app');
+                setShowSuccessDialog(false);
+                onJoinSuccess?.();
+              }}
+            >
+              <Home className="w-4 h-4 mr-2" />
+              Back to Home
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
