@@ -92,11 +92,17 @@ const ModernChatBubble = ({ message, currentUserId, teamId, onReaction }: Modern
       <div className="relative">
         <Avatar className="h-10 w-10 shrink-0 border-2 border-border">
           <AvatarImage
-            src={message.profiles?.avatar_url}
+            src={message.is_bot_message || message.is_team_agent_message ? undefined : message.profiles?.avatar_url}
             className="object-cover"
           />
-          <AvatarFallback className="text-sm font-medium bg-muted">
-            {message.profiles?.display_name?.[0] || message.profiles?.username?.[0] || 'U'}
+          <AvatarFallback className={cn(
+            "text-sm font-medium",
+            message.is_bot_message || message.is_team_agent_message ? "bg-primary text-primary-foreground" : "bg-muted"
+          )}>
+            {message.is_bot_message || message.is_team_agent_message ? 
+              '🎯' : 
+              (message.profiles?.display_name?.[0] || message.profiles?.username?.[0] || 'U')
+            }
           </AvatarFallback>
         </Avatar>
         {/* Online status dot */}
@@ -121,7 +127,10 @@ const ModernChatBubble = ({ message, currentUserId, teamId, onReaction }: Modern
           isOwnMessage ? "justify-end" : "justify-start"
         )}>
           <span className="text-sm font-semibold text-foreground">
-            {message.is_bot_message ? 'Game Bot' : (message.profiles?.display_name || message.profiles?.username || 'Unknown User')}
+            {message.is_bot_message || message.is_team_agent_message ? 
+              'Game Bot' : 
+              (message.profiles?.display_name || message.profiles?.username || 'Unknown User')
+            }
           </span>
           <span className="text-xs text-muted-foreground">
             {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
