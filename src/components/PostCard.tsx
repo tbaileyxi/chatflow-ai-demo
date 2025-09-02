@@ -398,12 +398,16 @@ export const PostCard = ({ post, isSpotlight = false, disableReply = false }: Po
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-semibold text-foreground">
-              {(post.is_team_agent_message || post.is_agent_post || !post.author) ? 
-                `${post.origin_teams?.name || post.team.name} Agent` : 
-                (post.author?.display_name || post.author?.username || post.team.name)
+              {/* Show user name for user-shared posts, Team Bot for broadcast posts */}
+              {post.author && post.author.display_name && !post.is_agent_post ? 
+                post.author.display_name : 
+                (post.is_team_agent_message || post.is_agent_post) ? 
+                  "Team Bot" : 
+                  (post.team.name || 'Unknown')
               }
             </h3>
-            {(post.is_team_agent_message || post.is_agent_post || !post.author) && post.team.sponsor && (
+            {/* Show sponsor for agent/broadcast posts */}
+            {(post.is_team_agent_message || post.is_agent_post) && post.team.sponsor && (
               <span className="text-xs text-muted-foreground font-light">
                 sponsored by: {
                   post.team.sponsor_url ? (
@@ -421,7 +425,8 @@ export const PostCard = ({ post, isSpotlight = false, disableReply = false }: Po
                 }
               </span>
             )}
-            {post.author && !post.is_team_agent_message && !post.is_agent_post && !isSpotlight && (
+            {/* Show team name for user posts */}
+            {post.author && post.author.display_name && !post.is_agent_post && !isSpotlight && (
               <span className="text-xs text-muted-foreground">via {post.team.name}</span>
             )}
             {isSpotlight && (

@@ -47,6 +47,7 @@ export const SpotlightFeed = () => {
           poll_data,
           created_at,
           author_id,
+          is_agent_post,
           team:teams!team_id(id, name, logo_url, sponsor),
           post_reactions(reaction_type)
         `)
