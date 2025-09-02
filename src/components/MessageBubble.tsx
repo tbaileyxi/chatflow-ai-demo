@@ -19,6 +19,7 @@ interface MessageBubbleProps {
     created_at: string;
     user_id: string;
     is_bot_message?: boolean;
+    is_team_agent_message?: boolean;
     media_url?: string;
     media_type?: string;
     embed_code?: string;
@@ -107,7 +108,8 @@ export const MessageBubble = memo<MessageBubbleProps>(({
   const { toast } = useToast();
   
   const isOwnMessage = currentUserId === message.user_id;
-  const isTeamAgent = message.is_bot_message;
+  const isGameBot = message.is_bot_message;
+  const isTeamAgent = message.is_team_agent_message;
   const shouldShowAvatar = !isConsecutive && (!previousMessage || previousMessage.user_id !== message.user_id);
 
   const formattedTime = useMemo(() => {
@@ -116,15 +118,17 @@ export const MessageBubble = memo<MessageBubbleProps>(({
 
   const displayName = useMemo(() => {
     if (message.source?.posterName) return message.source.posterName;
-    if (isTeamAgent && teamName) return `${teamName} Bot`;
+    if (isGameBot) return 'Game Bot';
+    if (isTeamAgent && teamName) return teamName;
     return user?.display_name || user?.username || 'Unknown User';
-  }, [message.source?.posterName, isTeamAgent, teamName, user]);
+  }, [message.source?.posterName, isGameBot, isTeamAgent, teamName, user]);
 
   const avatarUrl = useMemo(() => {
     if (message.source?.posterAvatar) return message.source.posterAvatar;
+    if (isGameBot) return '/sh-logo-updated.png';
     if (isTeamAgent && teamLogoUrl) return teamLogoUrl;
     return user?.avatar_url;
-  }, [message.source?.posterAvatar, isTeamAgent, teamLogoUrl, user]);
+  }, [message.source?.posterAvatar, isGameBot, isTeamAgent, teamLogoUrl, user]);
 
   const handleReaction = useCallback((emoji: string) => {
     onAddReaction?.(message.id, emoji);
@@ -266,7 +270,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({
             <span className="font-medium text-sm text-muted-foreground opacity-60 truncate">
               {displayName}
             </span>
-            {isTeamAgent && !message.source?.posterName && (
+            {isGameBot && (
               <Badge variant="secondary" className="text-xs h-5">
                 Bot
               </Badge>

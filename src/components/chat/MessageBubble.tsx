@@ -77,11 +77,19 @@ export const MessageBubble = ({
       {/* Avatar - only show for first message in sequence */}
       {showProfile && (
         <Avatar className="h-8 w-8 shrink-0">
-          <AvatarImage src={isTeamAgent ? (message.origin_teams?.logo_url || teamLogoUrl) : message.profiles?.avatar_url} />
+          <AvatarImage src={
+            message.is_bot_message 
+              ? '/sh-logo-updated.png'
+              : message.is_team_agent_message 
+                ? (message.origin_teams?.logo_url || teamLogoUrl)
+                : message.profiles?.avatar_url
+          } />
           <AvatarFallback className="text-xs">
-            {isTeamAgent
-              ? ((message.origin_teams?.name || teamName)?.[0] || 'T')
-              : (message.profiles?.display_name?.[0] || message.profiles?.username?.[0] || 'U')}
+            {message.is_bot_message
+              ? 'GB'
+              : message.is_team_agent_message
+                ? ((message.origin_teams?.name || teamName)?.[0] || 'T')
+                : (message.profiles?.display_name?.[0] || message.profiles?.username?.[0] || 'U')}
           </AvatarFallback>
         </Avatar>
       )}
@@ -97,8 +105,10 @@ export const MessageBubble = ({
             isOwnMessage ? 'justify-end' : 'justify-start'
           }`}>
             <span className="text-sm font-medium">
-              {message.is_team_agent_message
-                ? `${message.origin_teams?.name || originTeamName || teamName || 'Team'} Agent`
+              {message.is_bot_message
+                ? 'Game Bot'
+                : message.is_team_agent_message
+                ? (message.origin_teams?.name || originTeamName || teamName || 'Team')
                 : (message.profiles?.display_name || message.profiles?.username || 'Unknown User')}
             </span>
             <span className="text-xs text-muted-foreground">
