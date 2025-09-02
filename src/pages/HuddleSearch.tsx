@@ -30,12 +30,9 @@ interface Huddle {
 }
 
 export const HuddleSearch = () => {
-  const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
-  const [allHuddles, setAllHuddles] = useState<Huddle[]>([]);
   const [verifiedHuddles, setVerifiedHuddles] = useState<Huddle[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "all");
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -46,6 +43,7 @@ export const HuddleSearch = () => {
   const fetchHuddles = async () => {
     setLoading(true);
     try {
+      // Only fetch verified huddles since those are the only ones discoverable
       const { data, error } = await supabase
         .from("huddles")
         .select(`
@@ -60,6 +58,7 @@ export const HuddleSearch = () => {
           )
         `)
         .eq("is_private", false)
+        .eq("is_verified", true)
         .order("member_count", { ascending: false });
 
       if (error) throw error;
@@ -77,12 +76,11 @@ export const HuddleSearch = () => {
         owner_profile: ownerProfiles?.find(p => p.user_id === huddle.owner_id)
       })) || [];
 
-      setAllHuddles(formattedHuddles);
-      setVerifiedHuddles(formattedHuddles.filter(h => h.is_verified));
+      setVerifiedHuddles(formattedHuddles);
     } catch (error: any) {
-      console.error("Error fetching huddles:", error);
+      console.error("Error fetching verified huddles:", error);
       toast({
-        title: "Failed to load huddles",
+        title: "Failed to load verified huddles",
         description: error.message,
         variant: "destructive",
       });
@@ -91,10 +89,10 @@ export const HuddleSearch = () => {
     }
   };
 
-  const filteredHuddles = (huddles: Huddle[]) => {
-    if (!searchQuery.trim()) return huddles;
+  const filteredHuddles = () => {
+    if (!searchQuery.trim()) return verifiedHuddles;
     
-    return huddles.filter(huddle =>
+    return verifiedHuddles.filter(huddle =>
       huddle.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       huddle.team.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -145,73 +143,48 @@ export const HuddleSearch = () => {
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Discover Huddles</h1>
+        <div className="flex items-center gap-2 mb-2">
+          <Shield className="w-6 h-6 text-verified-primary" />
+          <h1 className="text-2xl font-bold">Discover Verified Huddles</h1>
+        </div>
         <p className="text-muted-foreground">
-          Find and join team huddles to connect with other fans
+          Join official team huddles with curated membership and enhanced features
         </p>
       </div>
 
       <div className="relative mb-6">
         <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Search huddles or teams..."
+          placeholder="Search verified huddles or teams..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-10"
         />
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="all">All Huddles</TabsTrigger>
-          <TabsTrigger value="verified" className="flex items-center gap-2">
-            <Shield className="w-3 h-3" />
-            Verified Only
-          </TabsTrigger>
-        </TabsList>
+      <div className="mb-4 p-4 bg-verified-background border border-verified-border rounded-lg">
+        <div className="flex items-center gap-2 mb-2">
+          <Shield className="w-4 h-4 text-verified-primary" />
+          <span className="font-medium text-verified-primary">Official Huddles Only</span>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          These huddles have been verified and are open for join requests. All other huddles are invite-only.
+        </p>
+      </div>
 
-        <TabsContent value="all" className="mt-6">
-          {loading ? (
-            <div className="text-center py-8">Loading huddles...</div>
+      {loading ? (
+        <div className="text-center py-8">Loading verified huddles...</div>
+      ) : (
+        <div className="grid gap-4">
+          {filteredHuddles().length > 0 ? (
+            filteredHuddles().map(renderHuddleCard)
           ) : (
-            <div className="grid gap-4">
-              {filteredHuddles(allHuddles).length > 0 ? (
-                filteredHuddles(allHuddles).map(renderHuddleCard)
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  {searchQuery ? "No huddles found matching your search" : "No public huddles available"}
-                </div>
-              )}
+            <div className="text-center py-8 text-muted-foreground">
+              {searchQuery ? "No verified huddles found matching your search" : "No verified huddles available yet"}
             </div>
           )}
-        </TabsContent>
-
-        <TabsContent value="verified" className="mt-6">
-          <div className="mb-4 p-4 bg-verified-background border border-verified-border rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <Shield className="w-4 h-4 text-verified-primary" />
-              <span className="font-medium text-verified-primary">Verified Huddles</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Official huddles with curated membership and enhanced features.
-            </p>
-          </div>
-
-          {loading ? (
-            <div className="text-center py-8">Loading verified huddles...</div>
-          ) : (
-            <div className="grid gap-4">
-              {filteredHuddles(verifiedHuddles).length > 0 ? (
-                filteredHuddles(verifiedHuddles).map(renderHuddleCard)
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  {searchQuery ? "No verified huddles found matching your search" : "No verified huddles available yet"}
-                </div>
-              )}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
     </div>
   );
 };

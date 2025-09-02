@@ -13,7 +13,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { icon: MessageSquare, label: 'Huddles', to: '/app' },
-  { icon: Compass, label: 'Discover', to: '/huddle-search?tab=verified' },
+  { icon: Compass, label: 'Discover', to: '/huddle-search' },
   { icon: Users, label: 'Spotlight', to: '/spotlight' },
   { icon: User, label: 'Profile', to: '/profile' },
 ];
