@@ -15,12 +15,13 @@ interface ModernChatBubbleProps {
   message: any;
   currentUserId?: string;
   teamId?: string;
+  teamLogoUrl?: string;
   onReaction?: (messageId: string, emoji: string) => void;
 }
 
 const QUICK_REACTIONS = ['👍', '😂', '🔥'];
 
-const ModernChatBubble = ({ message, currentUserId, teamId, onReaction }: ModernChatBubbleProps) => {
+const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, onReaction }: ModernChatBubbleProps) => {
   const [reactionPopoverOpen, setReactionPopoverOpen] = useState(false);
   const [hovering, setHovering] = useState(false);
 
@@ -96,7 +97,7 @@ const ModernChatBubble = ({ message, currentUserId, teamId, onReaction }: Modern
               message.is_bot_message 
                 ? '/sh-logo-updated.png'
                 : message.is_team_agent_message
-                  ? message.origin_teams?.logo_url
+                  ? (message.origin_teams?.logo_url || teamLogoUrl)
                   : message.profiles?.avatar_url
             }
             className="object-cover"
