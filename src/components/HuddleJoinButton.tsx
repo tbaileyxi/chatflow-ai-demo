@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Shield, UserPlus, CheckCircle, ArrowRight, Home } from "lucide-react";
+import { Shield, UserPlus, CheckCircle, ArrowRight, Home, DollarSign } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface HuddleJoinButtonProps {
@@ -18,13 +18,17 @@ interface HuddleJoinButtonProps {
   isAlreadyMember?: boolean;
   onJoinSuccess?: () => void;
   compact?: boolean;
+  membershipRequired?: boolean;
+  membershipPrice?: number;
 }
 
 export const HuddleJoinButton = ({ 
   huddle, 
   isAlreadyMember, 
   onJoinSuccess,
-  compact = false
+  compact = false,
+  membershipRequired = false,
+  membershipPrice = 0
 }: HuddleJoinButtonProps) => {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -47,7 +51,19 @@ export const HuddleJoinButton = ({
 
     setLoading(true);
     try {
-      if (huddle.is_verified) {
+      if (membershipRequired) {
+        // Handle paid membership
+        const { data, error } = await supabase.functions.invoke('create-huddle-membership-checkout', {
+          body: { huddleId: huddle.id }
+        });
+
+        if (error) throw error;
+
+        // Open Stripe checkout in a new tab
+        window.open(data.url, '_blank');
+        setOpen(false);
+        return;
+      } else if (huddle.is_verified) {
         // Check if request already exists
         const { data: existingRequest } = await supabase
           .from("huddle_join_requests")
@@ -142,13 +158,13 @@ export const HuddleJoinButton = ({
         >
           {compact ? (
             <>
-              <UserPlus className="w-3 h-3 mr-1" />
-              {huddle.is_verified ? "Request" : "Join"}
+              {membershipRequired ? <DollarSign className="w-3 h-3 mr-1" /> : <UserPlus className="w-3 h-3 mr-1" />}
+              {membershipRequired ? "Subscribe" : huddle.is_verified ? "Request" : "Join"}
             </>
           ) : (
             <>
-              <UserPlus className="w-4 h-4 mr-2" />
-              {huddle.is_verified ? "Request to Join" : "Join Huddle"}
+              {membershipRequired ? <DollarSign className="w-4 h-4 mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
+              {membershipRequired ? `Subscribe ($${(membershipPrice / 100).toFixed(2)}/mo)` : huddle.is_verified ? "Request to Join" : "Join Huddle"}
             </>
           )}
         </Button>
@@ -157,13 +173,27 @@ export const HuddleJoinButton = ({
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
+            {membershipRequired && <DollarSign className="w-5 h-5 text-primary" />}
             {huddle.is_verified && <Shield className="w-5 h-5 text-verified-primary" />}
-            {huddle.is_verified ? "Request to Join" : "Join"} {huddle.name}
+            {membershipRequired ? "Subscribe to" : huddle.is_verified ? "Request to Join" : "Join"} {huddle.name}
           </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4">
-          {huddle.is_verified && (
+          {membershipRequired && (
+            <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="w-4 h-4 text-primary" />
+                <span className="font-medium text-primary">Premium Membership Required</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                This huddle requires a monthly subscription of ${(membershipPrice / 100).toFixed(2)} to join.
+                You'll be redirected to complete your payment.
+              </p>
+            </div>
+          )}
+          
+          {huddle.is_verified && !membershipRequired && (
             <div className="p-4 bg-verified-background border border-verified-border rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <Shield className="w-4 h-4 text-verified-primary" />
@@ -175,7 +205,7 @@ export const HuddleJoinButton = ({
             </div>
           )}
           
-          {huddle.is_verified && (
+          {huddle.is_verified && !membershipRequired && (
             <div className="space-y-2">
               <Label htmlFor="message">Message (optional)</Label>
               <Textarea
@@ -197,7 +227,7 @@ export const HuddleJoinButton = ({
               disabled={loading}
               className="bg-huddle-primary hover:bg-huddle-primary/90 text-white"
             >
-              {loading ? "Sending..." : (huddle.is_verified ? "Send Request" : "Join")}
+              {loading ? (membershipRequired ? "Redirecting..." : "Sending...") : (membershipRequired ? `Pay $${(membershipPrice / 100).toFixed(2)}/mo` : huddle.is_verified ? "Send Request" : "Join")}
             </Button>
           </div>
         </div>

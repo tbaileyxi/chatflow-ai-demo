@@ -7,6 +7,7 @@ import { HuddleMembersManager } from '@/components/HuddleMembersManager';
 import { HuddleVerificationDialog } from '@/components/HuddleVerificationDialog';
 import { HuddleRequestsManager } from '@/components/HuddleRequestsManager';
 import { PickEmSettingsCard } from '@/components/PickEmSettingsCard';
+import { HuddleMembershipPricing } from '@/components/HuddleMembershipPricing';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useHuddleSubscription } from '@/hooks/useHuddleSubscription';
@@ -202,6 +203,7 @@ export const HuddleSettings = () => {
         title="Huddle Settings"
         subtitle={huddle.name}
         teamLogo={huddle.team?.logo_url}
+        onBack={() => navigate(`/huddle/${huddleId}`)}
       />
       
       <div className="flex-1 p-4">
@@ -237,6 +239,11 @@ export const HuddleSettings = () => {
               )}
               <HuddleRequestsManager huddleId={huddle.id} isOwner={isOwner} />
             </div>
+          )}
+
+          {/* Membership Pricing - Only for verified huddle owners */}
+          {isOwner && subscriptionStatus?.is_verified && (
+            <HuddleMembershipPricing huddleId={huddle.id} isOwner={isOwner} />
           )}
 
           {/* Pick 'Em Settings */}

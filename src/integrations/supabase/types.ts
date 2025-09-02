@@ -183,6 +183,50 @@ export type Database = {
           },
         ]
       }
+      huddle_member_subscriptions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          huddle_id: string
+          id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          huddle_id: string
+          id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          huddle_id?: string
+          id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "huddle_member_subscriptions_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       huddle_members: {
         Row: {
           huddle_id: string
@@ -347,6 +391,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "huddle_pickem_settings_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: true
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      huddle_pricing: {
+        Row: {
+          created_at: string
+          huddle_id: string
+          id: string
+          is_enabled: boolean
+          price_per_month: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          huddle_id: string
+          id?: string
+          is_enabled?: boolean
+          price_per_month: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          huddle_id?: string
+          id?: string
+          is_enabled?: boolean
+          price_per_month?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "huddle_pricing_huddle_id_fkey"
             columns: ["huddle_id"]
             isOneToOne: true
             referencedRelation: "huddles"
