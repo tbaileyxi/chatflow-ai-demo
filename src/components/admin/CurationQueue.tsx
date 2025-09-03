@@ -349,36 +349,26 @@ export const CurationQueue = () => {
                                 />
                                 <label htmlFor={`teamfeed-${item.id}`} className="text-sm">Team Feed</label>
                               </div>
-                              {huddles
-                                .filter(h => h.team_id === item.team_id)
-                                .sort((a, b) => {
-                                  // Sort "Side Huddle" first
-                                  const aIsSideHuddle = a.name.toLowerCase().includes('side huddle');
-                                  const bIsSideHuddle = b.name.toLowerCase().includes('side huddle');
-                                  if (aIsSideHuddle && !bIsSideHuddle) return -1;
-                                  if (!aIsSideHuddle && bIsSideHuddle) return 1;
-                                  return a.name.localeCompare(b.name);
-                                })
-                                .map(huddle => (
-                                <div key={huddle.id} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={`huddle-${huddle.id}-${item.id}`}
-                                    checked={selectedDestinations.huddles.includes(huddle.id)}
-                                    onCheckedChange={(checked) => {
-                                      setSelectedDestinations(prev => ({
-                                        ...prev,
-                                        huddles: checked 
-                                          ? [...prev.huddles, huddle.id]
-                                          : prev.huddles.filter(id => id !== huddle.id)
-                                      }));
-                                    }}
-                                  />
-                                  <label htmlFor={`huddle-${huddle.id}-${item.id}`} className="text-sm">
-                                    {huddle.name}
-                                    {huddle.name.toLowerCase().includes('side huddle') && ' 🏈'}
-                                  </label>
-                                </div>
-                              ))}
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`all-side-huddles-${item.id}`}
+                                  checked={huddles.filter(h => h.team_id === item.team_id).every(huddle => 
+                                    selectedDestinations.huddles.includes(huddle.id)
+                                  )}
+                                  onCheckedChange={(checked) => {
+                                    const teamHuddles = huddles.filter(h => h.team_id === item.team_id);
+                                    setSelectedDestinations(prev => ({
+                                      ...prev,
+                                      huddles: checked 
+                                        ? [...prev.huddles, ...teamHuddles.map(h => h.id).filter(id => !prev.huddles.includes(id))]
+                                        : prev.huddles.filter(id => !teamHuddles.some(h => h.id === id))
+                                    }));
+                                  }}
+                                />
+                                <label htmlFor={`all-side-huddles-${item.id}`} className="text-sm">
+                                  ALL Side Huddles 🏈 ({huddles.filter(h => h.team_id === item.team_id).length})
+                                </label>
+                              </div>
                             </div>
                           </div>
 

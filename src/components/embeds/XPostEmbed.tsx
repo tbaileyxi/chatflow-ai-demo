@@ -8,6 +8,7 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -28,6 +29,7 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
           resolve();
         };
         script.onerror = () => {
+          setError('Failed to load Twitter widgets');
           setIsLoading(false);
           resolve();
         };
@@ -40,29 +42,46 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
         await loadTwitterWidgets();
         
         if (containerRef.current && (window as any).twttr?.widgets) {
-          await (window as any).twttr.widgets.load(containerRef.current);
+          // Clear container to prevent duplicates
+          containerRef.current.innerHTML = '';
           
-          // Poll for iframe to appear and be stable
-          let pollCount = 0;
-          const pollForIframe = () => {
-            const iframe = containerRef.current?.querySelector('iframe');
-            if (iframe && iframe.offsetHeight > 0) {
+          // Extract tweet ID and use createTweet for better inline control
+          const tweetUrlMatch = embedCode.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/);
+          
+          if (tweetUrlMatch) {
+            const tweetId = tweetUrlMatch[1];
+            
+            try {
+              await (window as any).twttr.widgets.createTweet(tweetId, containerRef.current, {
+                theme: 'auto',
+                width: '100%',
+                cards: 'visible',
+                conversation: 'none',
+                align: 'left',
+                dnt: true // Do not track for better privacy
+              });
+              
               setIsLoading(false);
               setIsLoaded(true);
-            } else if (pollCount < 50) {
-              pollCount++;
-              setTimeout(pollForIframe, 100);
-            } else {
+            } catch (createError) {
+              console.warn('createTweet failed, falling back to load:', createError);
+              await (window as any).twttr.widgets.load(containerRef.current);
               setIsLoading(false);
+              setIsLoaded(true);
             }
-          };
-          
-          setTimeout(pollForIframe, 200);
+          } else {
+            // Fallback to standard load for non-URL embeds
+            await (window as any).twttr.widgets.load(containerRef.current);
+            setIsLoading(false);
+            setIsLoaded(true);
+          }
         } else {
+          setError('Twitter widgets not available');
           setIsLoading(false);
         }
       } catch (error) {
         console.error('Error loading Twitter widgets:', error);
+        setError('Failed to load embed');
         setIsLoading(false);
       }
     };
@@ -81,7 +100,10 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
       <div 
         ref={containerRef}
         className="rounded-xl overflow-hidden shadow w-full my-1 relative"
-        style={{ pointerEvents: 'auto' }}
+        style={{ 
+          pointerEvents: 'auto',
+          contain: 'layout style'
+        }}
       >
         <blockquote 
           className="twitter-tweet" 
@@ -93,13 +115,13 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
           <a href={normalizedUrl}>Loading tweet...</a>
         </blockquote>
         {isLoading && (
-          <div className="flex items-center justify-center p-6 bg-muted rounded-xl min-h-[300px]">
+          <div className="flex items-center justify-center p-6 bg-muted rounded-xl min-h-[200px]">
             <div className="text-sm text-muted-foreground animate-pulse">Loading tweet...</div>
           </div>
         )}
-        {!isLoading && !isLoaded && (
+        {error && (
           <div className="flex flex-col items-center justify-center p-6 bg-muted rounded-xl min-h-[200px] space-y-2">
-            <div className="text-sm text-muted-foreground">Unable to load embed</div>
+            <div className="text-sm text-muted-foreground">{error}</div>
             <a 
               href={normalizedUrl} 
               target="_blank" 
@@ -114,17 +136,22 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
     );
   }
 
-  // Handle oEmbed HTML
-  const sanitizedHtml = embedCode.replace(
-    /<script[^>]*src="https:\/\/platform\.twitter\.com\/widgets\.js"[^>]*><\/script>/gi,
-    ''
-  );
+  // Handle oEmbed HTML - aggressively clean to prevent double rendering
+  const sanitizedHtml = embedCode
+    .replace(/<script[^>]*src="https:\/\/platform\.twitter\.com\/widgets\.js"[^>]*><\/script>/gi, '')
+    .replace(/<script[^>]*>.*?<\/script>/gi, '') // Remove any other scripts
+    .replace(/data-tweet-id="[^"]*"/gi, '') // Clean up duplicate tweet markers
+    .trim();
 
   return (
     <div 
       ref={containerRef}
       className="rounded-xl overflow-hidden shadow w-full my-2"
-      style={{ pointerEvents: 'auto', minHeight: '200px' }}
+      style={{ 
+        pointerEvents: 'auto', 
+        minHeight: '200px',
+        contain: 'layout style'
+      }}
       dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
     />
   );
