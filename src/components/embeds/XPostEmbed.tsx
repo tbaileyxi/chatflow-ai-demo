@@ -70,16 +70,17 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
     processEmbed();
   }, [embedCode]);
 
-  // Check if embedCode is a Twitter/X URL
+  // Check if embedCode is a Twitter/X URL and normalize it
   const tweetUrlMatch = embedCode.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/);
   
   if (tweetUrlMatch) {
-    const tweetUrl = embedCode.startsWith('http') ? embedCode : `https://${embedCode}`;
+    const tweetId = tweetUrlMatch[1];
+    const normalizedUrl = `https://twitter.com/user/status/${tweetId}`;
     
     return (
       <div 
         ref={containerRef}
-        className="rounded-xl overflow-hidden shadow w-full my-1"
+        className="rounded-xl overflow-hidden shadow w-full my-1 relative"
         style={{ pointerEvents: 'auto' }}
       >
         <blockquote 
@@ -89,11 +90,24 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
           data-cards="visible"
           data-conversation="none"
         >
-          <a href={tweetUrl}>Loading tweet...</a>
+          <a href={normalizedUrl}>Loading tweet...</a>
         </blockquote>
         {isLoading && (
           <div className="flex items-center justify-center p-6 bg-muted rounded-xl min-h-[300px]">
-            <div className="text-sm text-muted-foreground">Loading tweet...</div>
+            <div className="text-sm text-muted-foreground animate-pulse">Loading tweet...</div>
+          </div>
+        )}
+        {!isLoading && !isLoaded && (
+          <div className="flex flex-col items-center justify-center p-6 bg-muted rounded-xl min-h-[200px] space-y-2">
+            <div className="text-sm text-muted-foreground">Unable to load embed</div>
+            <a 
+              href={normalizedUrl} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary hover:underline text-sm"
+            >
+              View on X/Twitter
+            </a>
           </div>
         )}
       </div>

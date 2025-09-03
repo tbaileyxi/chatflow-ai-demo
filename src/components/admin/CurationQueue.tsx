@@ -232,9 +232,9 @@ export const CurationQueue = () => {
                     
                     <CardContent>
                       <div className="mb-4">
-                        <LazyEmbed>
+                        <div className="bg-muted/50 rounded-lg p-4">
                           <XPostEmbed embedCode={item.embed_url} />
-                        </LazyEmbed>
+                        </div>
                       </div>
                       
                       {activeTab === 'pending' && (
