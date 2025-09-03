@@ -17,17 +17,40 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    console.log('Starting weekly Pick\'em auto-creation...')
+    // Parse request body for optional huddle filtering
+    let requestBody = null
+    try {
+      if (req.body) {
+        requestBody = await req.json()
+      }
+    } catch (e) {
+      // No body or invalid JSON, continue with auto-create for all
+    }
 
-    // Get all huddles with auto-create enabled
-    const { data: settings, error: settingsError } = await supabase
+    const targetHuddleId = requestBody?.huddleId
+
+    console.log(targetHuddleId ? 
+      `Creating Pick'em for specific huddle: ${targetHuddleId}` : 
+      'Starting weekly Pick\'em auto-creation for all enabled huddles...')
+
+    // Get huddles with auto-create enabled (optionally filtered)
+    let query = supabase
       .from('huddle_pickem_settings')
       .select(`
         *,
         huddles!inner(id, name, owner_id)
       `)
-      .eq('auto_create_weekly', true)
       .eq('is_enabled', true)
+
+    if (targetHuddleId) {
+      // For specific huddle, just check if enabled (not necessarily auto_create_weekly)
+      query = query.eq('huddle_id', targetHuddleId)
+    } else {
+      // For auto-create, only huddles with auto_create_weekly enabled
+      query = query.eq('auto_create_weekly', true)
+    }
+
+    const { data: settings, error: settingsError } = await query
 
     if (settingsError) throw settingsError
     if (!settings || settings.length === 0) {
@@ -45,14 +68,19 @@ serve(async (req) => {
       try {
         const league = setting.league
         const currentDate = new Date()
-        const currentYear = currentDate.getFullYear()
         
-        // Get current week for the league
+        // Handle season year logic for college/pro seasons spanning calendar years
+        // For Jan/Feb, use previous year for college football which runs Aug-Jan
+        let seasonYear = currentDate.getFullYear()
+        if (league === 'ncaa' && currentDate.getMonth() <= 1) { // Jan-Feb
+          seasonYear = currentDate.getFullYear() - 1
+        }
+        
+        // Get current week for the league based on date range, not year
         const { data: currentWeek } = await supabase
           .from('pickem_weeks')
           .select('*')
           .eq('league', league)
-          .eq('season_year', currentYear)
           .lte('start_at', currentDate.toISOString())
           .gte('end_at', currentDate.toISOString())
           .single()

@@ -68,6 +68,14 @@ export const StartPickEmDialog = ({ open, onOpenChange, huddleId, onPickEmCreate
 
       if (error) throw error;
       setWeeks(data || []);
+      
+      if (!data || data.length === 0) {
+        toast({
+          title: "No Weeks Available",
+          description: "No game weeks found. Try syncing games from ESPN first in Pick 'Em settings.",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
       console.error('Error fetching weeks:', error);
       toast({
