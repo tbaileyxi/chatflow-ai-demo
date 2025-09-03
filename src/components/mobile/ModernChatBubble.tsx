@@ -10,23 +10,24 @@ import { MakePublicButton } from "@/components/MakePublicButton";
 import { cn } from "@/lib/utils";
 import { XPostEmbed } from "@/components/embeds/XPostEmbed";
 import { supabase } from "@/integrations/supabase/client";
-
+import { shouldShowProfile } from "@/utils/chatMessage";
 interface ModernChatBubbleProps {
   message: any;
   currentUserId?: string;
   teamId?: string;
   teamLogoUrl?: string;
+  previousMessage?: any;
   onReaction?: (messageId: string, emoji: string) => void;
 }
 
 const QUICK_REACTIONS = ['👍', '😂', '🔥'];
 
-const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, onReaction }: ModernChatBubbleProps) => {
+const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previousMessage, onReaction }: ModernChatBubbleProps) => {
   const [reactionPopoverOpen, setReactionPopoverOpen] = useState(false);
   const [hovering, setHovering] = useState(false);
 
   const isOwnMessage = message.user_id === currentUserId;
-
+  const showProfile = shouldShowProfile(message, previousMessage);
   const handleReaction = useCallback((emoji: string) => {
     if (onReaction) {
       onReaction(message.id, emoji);
@@ -89,34 +90,38 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, onReact
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
     >
-      {/* Avatar with online status */}
-      <div className="relative">
-        <Avatar className="h-10 w-10 shrink-0 border-2 border-border">
-          <AvatarImage
-            src={
-              message.is_bot_message 
-                ? '/sh-logo-updated.png'
+      {/* Avatar with online status or spacer for consecutive messages */}
+      {showProfile ? (
+        <div className="relative">
+          <Avatar className="h-10 w-10 shrink-0 border-2 border-border">
+            <AvatarImage
+              src={
+                message.is_bot_message 
+                  ? '/sh-logo-updated.png'
+                  : message.is_team_agent_message
+                    ? (message.origin_teams?.logo_url || teamLogoUrl)
+                    : message.profiles?.avatar_url
+              }
+              className="object-cover"
+            />
+            <AvatarFallback className={cn(
+              "text-sm font-medium",
+              message.is_bot_message || message.is_team_agent_message ? "bg-primary text-primary-foreground" : "bg-muted"
+            )}>
+              {message.is_bot_message
+                ? 'GB'
                 : message.is_team_agent_message
-                  ? (message.origin_teams?.logo_url || teamLogoUrl)
-                  : message.profiles?.avatar_url
-            }
-            className="object-cover"
-          />
-          <AvatarFallback className={cn(
-            "text-sm font-medium",
-            message.is_bot_message || message.is_team_agent_message ? "bg-primary text-primary-foreground" : "bg-muted"
-          )}>
-            {message.is_bot_message
-              ? 'GB'
-              : message.is_team_agent_message
-                ? (message.origin_teams?.name?.[0] || 'T')
-                : (message.profiles?.display_name?.[0] || message.profiles?.username?.[0] || 'U')
-            }
-          </AvatarFallback>
-        </Avatar>
-        {/* Online status dot */}
-        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-background rounded-full" />
-      </div>
+                  ? (message.origin_teams?.name?.[0] || 'T')
+                  : (message.profiles?.display_name?.[0] || message.profiles?.username?.[0] || 'U')
+              }
+            </AvatarFallback>
+          </Avatar>
+          {/* Online status dot */}
+          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-background rounded-full" />
+        </div>
+      ) : (
+        <div className="w-10 shrink-0" aria-hidden="true" />
+      )}
 
       {/* Message Content */}
       <div
@@ -131,22 +136,24 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, onReact
         } as React.CSSProperties}
       >
         {/* User info with timestamp */}
-        <div className={cn(
-          "flex items-center gap-3 mb-2 flex-wrap",
-          isOwnMessage ? "justify-end" : "justify-start"
-        )}>
-          <span className="text-sm font-semibold text-foreground">
-            {message.is_bot_message
-              ? 'Game Bot'
-              : message.is_team_agent_message
-                ? (message.origin_teams?.name || 'Team')
-                : (message.profiles?.display_name || message.profiles?.username || 'Unknown User')
-            }
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
-          </span>
-        </div>
+        {showProfile && (
+          <div className={cn(
+            "flex items-center gap-3 mb-2 flex-wrap",
+            isOwnMessage ? "justify-end" : "justify-start"
+          )}>
+            <span className="text-sm font-semibold text-foreground">
+              {message.is_bot_message
+                ? 'Game Bot'
+                : message.is_team_agent_message
+                  ? (message.origin_teams?.name || 'Team')
+                  : (message.profiles?.display_name || message.profiles?.username || 'Unknown User')
+              }
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+            </span>
+          </div>
+        )}
 
         {/* Message bubble with enhanced styling */}
         <Popover open={reactionPopoverOpen} onOpenChange={setReactionPopoverOpen}>

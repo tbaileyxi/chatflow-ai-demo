@@ -754,16 +754,14 @@ const { data: messagesData, error: messagesError } = await supabase
             // Regular messages  
             const allMessages = [...messages, ...ephemeralMessages];
             const previousMessage = index > 0 ? allMessages[index - 1] : null;
-            const isConsecutive = previousMessage && 
-              previousMessage.user_id === message.user_id &&
-              new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() < 2 * 60 * 1000;
-
             return (
               <ModernChatBubble
                 key={message.id}
                 message={message}
                 currentUserId={currentUser?.id}
                 teamId={huddle.team_id}
+                teamLogoUrl={huddle.team_logo_url}
+                previousMessage={previousMessage}
               />
             );
           })}
