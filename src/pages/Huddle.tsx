@@ -721,6 +721,7 @@ useEffect(() => {
 
   // Memoized itemContent function to prevent re-renders and flashing
   const renderMessageItem = useCallback((index: number, message: any, previousMessage?: any) => {
+    console.log('🔥 HUDDLE RENDER CALLED!', { index, messageId: message?.id, userId: message?.user_id });
     // Unified consecutive check (5 minutes, same user, excludes bot/team agent)
     const isConsecutive = isConsecutiveMessage(message, previousMessage || null);
     
