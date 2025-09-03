@@ -748,7 +748,7 @@ useEffect(() => {
         previousMessage={previousMessage}
       />
     );
-  }, [messages, user?.id, huddle?.team, addReaction, handlePollVote]);
+  }, []); // Remove dependencies to force re-render
 
   if (loading) {
     return (
