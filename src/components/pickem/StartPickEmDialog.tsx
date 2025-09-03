@@ -215,7 +215,7 @@ export const StartPickEmDialog = ({ open, onOpenChange, huddleId, onPickEmCreate
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Trophy className="w-5 h-5" />
-            Start Huddle Pick 'Em
+            Start Pick 'Em for Any Week
           </DialogTitle>
         </DialogHeader>
 
@@ -233,18 +233,28 @@ export const StartPickEmDialog = ({ open, onOpenChange, huddleId, onPickEmCreate
 
           <div className="space-y-2">
             <Label>Select Week</Label>
-            <Select value={selectedWeek} onValueChange={setSelectedWeek}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a week" />
-              </SelectTrigger>
-              <SelectContent>
-                {weeks.map((week) => (
-                  <SelectItem key={week.id} value={week.id}>
-                    {week.league.toUpperCase()} {week.season_year} - Week {week.week_number}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {weeks.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground border border-dashed rounded-lg">
+                <p className="text-sm">No weeks available</p>
+                <p className="text-xs mt-1">Use "Create This Week's Pick 'Em" from settings for current week.</p>
+              </div>
+            ) : (
+              <Select value={selectedWeek} onValueChange={setSelectedWeek}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose any week" />
+                </SelectTrigger>
+                <SelectContent>
+                  {weeks.map((week) => (
+                    <SelectItem key={week.id} value={week.id}>
+                      {week.league.toUpperCase()} {week.season_year} - Week {week.week_number}
+                      <span className="text-sm text-muted-foreground ml-2">
+                        ({new Date(week.start_at).toLocaleDateString()} - {new Date(week.end_at).toLocaleDateString()})
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {selectedWeekData && (

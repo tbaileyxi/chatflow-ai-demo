@@ -1299,6 +1299,20 @@ export type Database = {
           },
         ]
       }
+      pickem_season_leaderboard: {
+        Row: {
+          display_name: string | null
+          entries_played: number | null
+          league: Database["public"]["Enums"]["pickem_league"] | null
+          rank: number | null
+          season_year: number | null
+          total_correct_picks: number | null
+          user_id: string | null
+          username: string | null
+          win_percentage: number | null
+        }
+        Relationships: []
+      }
       pickem_user_totals: {
         Row: {
           entries_played: number | null

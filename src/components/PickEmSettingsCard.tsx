@@ -150,24 +150,16 @@ export const PickEmSettingsCard = ({ huddleId, isOwner }: PickEmSettingsCardProp
   const handleCreateThisWeek = async () => {
     setCreating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('pickem-autocreate', {
+      const { data, error } = await supabase.functions.invoke('pickem-create-week', {
         body: { huddleId }
       });
 
       if (error) throw error;
 
-      const result = data || {};
-      if (result.created > 0) {
-        toast({
-          title: "Pick 'Em Created!",
-          description: "This week's Pick 'Em has been created successfully",
-        });
-      } else {
-        toast({
-          title: "No Pick 'Em Created",
-          description: result.message || "No new Pick 'Em was needed for this week",
-        });
-      }
+      toast({
+        title: "Pick 'Em Created!",
+        description: data?.message || "This week's Pick 'Em has been created successfully",
+      });
     } catch (error: any) {
       console.error('Error creating Pick\'em:', error);
       toast({
@@ -293,83 +285,30 @@ export const PickEmSettingsCard = ({ huddleId, isOwner }: PickEmSettingsCardProp
 
         {/* Owner Actions */}
         {isOwner && settings.is_enabled && (
-          <div className="space-y-3 pt-4 border-t border-border/50">
-            <Label className="text-sm font-medium">Quick Actions</Label>
-            
-            <div className="grid grid-cols-1 gap-2">
-              <Dialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-full">
-                    <Download className="h-4 w-4 mr-2" />
-                    Sync Games from ESPN
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Sync Games from ESPN</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>League</Label>
-                      <Select 
-                        value={syncForm.league} 
-                        onValueChange={(value) => setSyncForm(prev => ({ ...prev, league: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ncaa">NCAA Football</SelectItem>
-                          <SelectItem value="nfl">NFL</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Season Year</Label>
-                      <Input
-                        type="number"
-                        value={syncForm.season_year}
-                        onChange={(e) => setSyncForm(prev => ({ ...prev, season_year: parseInt(e.target.value) }))}
-                        min={2020}
-                        max={2030}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Week Number</Label>
-                      <Input
-                        type="number"
-                        value={syncForm.week_number}
-                        onChange={(e) => setSyncForm(prev => ({ ...prev, week_number: parseInt(e.target.value) }))}
-                        min={1}
-                        max={20}
-                      />
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button variant="outline" onClick={() => setSyncDialogOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button onClick={handleSyncGames} disabled={syncing}>
-                        {syncing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Sync Games
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-              
-              <Button 
-                variant="outline" 
-                size="sm" 
+          <div className="space-y-4 pt-4 border-t border-border/50">
+            <div className="space-y-4">
+              <Button
                 onClick={handleCreateThisWeek}
                 disabled={creating}
                 className="w-full"
+                size="lg"
               >
-                {creating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-                Create This Week Now
+                {creating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Trophy className="h-4 w-4 mr-2" />
+                    Create This Week's {settings.league.toUpperCase()} Pick 'Em
+                  </>
+                )}
               </Button>
+              
+              <p className="text-sm text-muted-foreground text-center">
+                This will sync the latest games and create a Pick 'Em for the current week
+              </p>
             </div>
           </div>
         )}
