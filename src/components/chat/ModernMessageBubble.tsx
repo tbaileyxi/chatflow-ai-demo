@@ -9,6 +9,7 @@ import { LazyEmbed } from "./LazyEmbed";
 import { MakePublicButton } from "@/components/MakePublicButton";
 import { cn } from "@/lib/utils";
 import { XPostEmbed } from "@/components/embeds/XPostEmbed";
+import { shouldShowProfile } from "@/utils/chatMessage";
 
 interface ModernMessageBubbleProps {
   message: any;
@@ -49,7 +50,7 @@ export const ModernMessageBubble = memo(({
   const messageData = useMemo(() => {
     const isOwnMessage = message.user_id === currentUserId;
     const isTeamAgent = !!message.is_team_agent_message;
-    const showProfile = !isConsecutive || isTeamAgent || message.is_bot_message || message.media_url || message.embed_code;
+    const showProfile = shouldShowProfile(message, previousMessage);
     const reactionsEnabled = !message.poll_data;
     const showContent = message.content && !(message.poll_data && typeof message.poll_data.question === 'string' && message.content.trim() === message.poll_data.question.trim());
     

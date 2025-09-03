@@ -8,6 +8,7 @@ import { MediaViewer } from "@/components/MediaViewer";
 import { LazyEmbed } from "./LazyEmbed";
 import { MakePublicButton } from "@/components/MakePublicButton";
 import { XPostEmbed } from "@/components/embeds/XPostEmbed";
+import { shouldShowProfile } from "@/utils/chatMessage";
 
 interface MessageBubbleProps {
   message: any;
@@ -45,7 +46,7 @@ export const MessageBubble = ({
   
   const isOwnMessage = message.user_id === currentUserId;
   const isTeamAgent = !!message.is_team_agent_message;
-  const showProfile = !isConsecutive || previousMessage?.user_id !== message.user_id;
+  const showProfile = shouldShowProfile(message, previousMessage);
   const reactionsEnabled = !message.poll_data;
   const showContent = message.content && !(message.poll_data && typeof message.poll_data.question === 'string' && message.content.trim() === message.poll_data.question.trim());
   

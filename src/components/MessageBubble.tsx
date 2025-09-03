@@ -11,6 +11,7 @@ import { XPostEmbed } from '@/components/embeds/XPostEmbed';
 import { extractVideoFrame } from '@/utils/videoThumbnail';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { shouldShowProfile } from '@/utils/chatMessage';
 
 interface MessageBubbleProps {
   message: {
@@ -110,7 +111,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({
   const isOwnMessage = currentUserId === message.user_id;
   const isGameBot = message.is_bot_message;
   const isTeamAgent = message.is_team_agent_message;
-  const shouldShowAvatar = !isConsecutive || isGameBot || isTeamAgent || message.media_url || message.embed_code;
+  const shouldShowAvatar = shouldShowProfile(message, previousMessage);
 
   const formattedTime = useMemo(() => {
     return formatDistanceToNow(new Date(message.created_at), { addSuffix: true });

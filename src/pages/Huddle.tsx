@@ -17,6 +17,7 @@ import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { ModernChatInput } from "@/components/chat/ModernChatInput";
 import { ModernMessageBubble } from "@/components/chat/ModernMessageBubble";
 import { EnhancedTypingIndicator } from "@/components/chat/EnhancedTypingIndicator";
+import { isConsecutiveMessage } from "@/utils/chatMessage";
 
 import { formatDistanceToNow } from "date-fns";
 
@@ -720,14 +721,8 @@ useEffect(() => {
 
   // Memoized itemContent function to prevent re-renders and flashing
   const renderMessageItem = useCallback((index: number, message: any, previousMessage?: any) => {
-    // Check if this message should be grouped with the previous one
-    const isConsecutive = previousMessage && 
-      previousMessage.user_id === message.user_id && 
-      !message.is_bot_message &&
-      !message.is_team_agent_message &&
-      !previousMessage.is_bot_message &&
-      !previousMessage.is_team_agent_message &&
-      new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() < 300000; // 5 minutes
+    // Unified consecutive check (5 minutes, same user, excludes bot/team agent)
+    const isConsecutive = isConsecutiveMessage(message, previousMessage || null);
     
     return (
       <MessageBubble
