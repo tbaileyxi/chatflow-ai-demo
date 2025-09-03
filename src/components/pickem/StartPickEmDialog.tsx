@@ -44,10 +44,12 @@ export const StartPickEmDialog = ({ open, onOpenChange, huddleId, onPickEmCreate
   const [title, setTitle] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
+  const [maxGames, setMaxGames] = useState<number>(10);
 
   useEffect(() => {
     if (open) {
       fetchWeeks();
+      fetchSettings();
     }
   }, [open]);
 
@@ -86,6 +88,19 @@ export const StartPickEmDialog = ({ open, onOpenChange, huddleId, onPickEmCreate
     }
   };
 
+  const fetchSettings = async () => {
+    try {
+      const { data } = await supabase
+        .from('huddle_pickem_settings')
+        .select('max_games')
+        .eq('huddle_id', huddleId)
+        .maybeSingle();
+      if (data?.max_games) setMaxGames(data.max_games);
+    } catch (e) {
+      // ignore and keep default
+    }
+  };
+
   const fetchGames = async (weekId: string) => {
     try {
       const { data, error } = await supabase
@@ -109,11 +124,18 @@ export const StartPickEmDialog = ({ open, onOpenChange, huddleId, onPickEmCreate
   };
 
   const handleGameToggle = (gameId: string) => {
-    setSelectedGames(prev => 
-      prev.includes(gameId) 
-        ? prev.filter(id => id !== gameId)
-        : [...prev, gameId]
-    );
+    setSelectedGames(prev => {
+      if (prev.includes(gameId)) return prev.filter(id => id !== gameId);
+      if (prev.length >= maxGames) {
+        toast({
+          title: "Limit reached",
+          description: `You can select up to ${maxGames} games`,
+          variant: "destructive"
+        });
+        return prev;
+      }
+      return [...prev, gameId];
+    });
   };
 
   const handleSubmit = async () => {
@@ -126,10 +148,10 @@ export const StartPickEmDialog = ({ open, onOpenChange, huddleId, onPickEmCreate
       return;
     }
 
-    if (selectedGames.length < 3 || selectedGames.length > 15) {
+    if (selectedGames.length < 3 || selectedGames.length > maxGames) {
       toast({
         title: "Invalid Selection",
-        description: "Please select between 3 and 15 games",
+        description: `Please select between 3 and ${maxGames} games`,
         variant: "destructive"
       });
       return;
@@ -137,6 +159,24 @@ export const StartPickEmDialog = ({ open, onOpenChange, huddleId, onPickEmCreate
 
     setLoading(true);
     try {
+      // Prevent duplicate instance for this huddle and week
+      const { data: existing } = await supabase
+        .from('pickem_instances')
+        .select('id')
+        .eq('huddle_id', huddleId)
+        .eq('week_id', selectedWeek)
+        .maybeSingle();
+      if (existing) {
+        toast({
+          title: "Already exists",
+          description: "A Pick 'Em for this week is already active in this huddle.",
+        });
+        onPickEmCreated(existing.id);
+        onOpenChange(false);
+        setLoading(false);
+        return;
+      }
+
       // Create pick'em instance
       const { data: instance, error: instanceError } = await supabase
         .from('pickem_instances')
@@ -266,9 +306,9 @@ export const StartPickEmDialog = ({ open, onOpenChange, huddleId, onPickEmCreate
           {games.length > 0 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label>Select Games (3-15 games)</Label>
+                <Label>Select Games (3-{maxGames} games)</Label>
                 <span className="text-sm text-muted-foreground">
-                  {selectedGames.length} selected
+                  {selectedGames.length} selected of max {maxGames}
                 </span>
               </div>
               
