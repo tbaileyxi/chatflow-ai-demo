@@ -110,7 +110,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({
   const isOwnMessage = currentUserId === message.user_id;
   const isGameBot = message.is_bot_message;
   const isTeamAgent = message.is_team_agent_message;
-  const shouldShowAvatar = true; // Always show avatar and user info - removed consecutive message logic
+  const shouldShowAvatar = !isConsecutive || isGameBot || isTeamAgent || message.media_url || message.embed_code;
 
   const formattedTime = useMemo(() => {
     return formatDistanceToNow(new Date(message.created_at), { addSuffix: true });

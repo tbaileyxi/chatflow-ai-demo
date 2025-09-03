@@ -49,7 +49,7 @@ export const ModernMessageBubble = memo(({
   const messageData = useMemo(() => {
     const isOwnMessage = message.user_id === currentUserId;
     const isTeamAgent = !!message.is_team_agent_message;
-    const showProfile = true; // Always show profile info - removed consecutive message logic
+    const showProfile = !isConsecutive || isTeamAgent || message.is_bot_message || message.media_url || message.embed_code;
     const reactionsEnabled = !message.poll_data;
     const showContent = message.content && !(message.poll_data && typeof message.poll_data.question === 'string' && message.content.trim() === message.poll_data.question.trim());
     
