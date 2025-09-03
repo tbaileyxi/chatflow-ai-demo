@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CheckCircle, XCircle, Send, Star, ExternalLink } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { XPostEmbed } from '@/components/embeds/XPostEmbed';
-import { LazyEmbed } from '@/components/chat/LazyEmbed';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface TeamTrending {
   id: string;
@@ -34,8 +34,14 @@ export const CurationQueue = () => {
   const [trending, setTrending] = useState<TeamTrending[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
   const [teams, setTeams] = useState<any[]>([]);
+  const [huddles, setHuddles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('pending');
+  const [selectedDestinations, setSelectedDestinations] = useState({
+    spotlight: true,
+    teamFeed: true,
+    huddles: [] as string[]
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -54,6 +60,15 @@ export const CurationQueue = () => {
         .order('name');
       
       setTeams(teamsData || []);
+
+      // Fetch huddles for broadcast destination selection
+      const { data: huddlesData } = await supabase
+        .from('huddles')
+        .select('id, name, team_id, teams(name, city)')
+        .eq('is_private', false)
+        .order('name');
+      
+      setHuddles(huddlesData || []);
 
       // Build query
       let query = supabase
@@ -117,23 +132,82 @@ export const CurationQueue = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Create post for team feed and spotlight
-      const postData = {
-        author_id: user.id,
-        team_id: item.team_id,
-        content: `Trending: ${item.content}`,
-        embed_code: item.embed_url,
-        message_type: 'embed',
-        is_spotlight: true,
-        target_audience: ['team_feed', 'spotlight'],
-        delivery_status: 'sent'
-      };
+      const broadcasts = [];
 
-      const { error: postError } = await supabase
-        .from('posts')
-        .insert(postData);
+      // Normalize embed URL to ensure it's a twitter.com URL for proper embedding
+      const normalizedEmbedUrl = item.embed_url.replace('x.com', 'twitter.com');
 
-      if (postError) throw postError;
+      // Broadcast to Spotlight
+      if (selectedDestinations.spotlight) {
+        const spotlightData = {
+          author_id: user.id,
+          team_id: item.team_id,
+          content: item.content,
+          embed_code: normalizedEmbedUrl,
+          message_type: 'embed',
+          is_spotlight: true,
+          is_agent_post: true,
+          is_team_agent_message: true,
+          origin_team_id: item.team_id,
+          target_audience: ['spotlight'],
+          delivery_status: 'sent'
+        };
+
+        const { error: spotlightError } = await supabase
+          .from('posts')
+          .insert(spotlightData);
+
+        if (spotlightError) throw spotlightError;
+        broadcasts.push('Spotlight');
+      }
+
+      // Broadcast to Team Feed
+      if (selectedDestinations.teamFeed) {
+        const teamFeedData = {
+          author_id: user.id,
+          team_id: item.team_id,
+          content: item.content,
+          embed_code: normalizedEmbedUrl,
+          message_type: 'embed',
+          is_spotlight: false,
+          is_agent_post: true,
+          is_team_agent_message: true,
+          origin_team_id: item.team_id,
+          target_audience: ['team_feed'],
+          delivery_status: 'sent'
+        };
+
+        const { error: teamFeedError } = await supabase
+          .from('posts')
+          .insert(teamFeedData);
+
+        if (teamFeedError) throw teamFeedError;
+        broadcasts.push('Team Feed');
+      }
+
+      // Broadcast to selected Huddles
+      for (const huddleId of selectedDestinations.huddles) {
+        const huddleMessageData = {
+          huddle_id: huddleId,
+          user_id: user.id,
+          content: item.content,
+          embed_code: normalizedEmbedUrl,
+          media_type: 'embed',
+          is_team_agent_message: true,
+          origin_team_id: item.team_id
+        };
+
+        const { error: huddleError } = await supabase
+          .from('huddle_messages')
+          .insert(huddleMessageData);
+
+        if (huddleError) throw huddleError;
+        
+        const huddle = huddles.find(h => h.id === huddleId);
+        if (huddle) {
+          broadcasts.push(huddle.name);
+        }
+      }
 
       // Update trending status
       const { error: updateError } = await supabase
@@ -150,7 +224,7 @@ export const CurationQueue = () => {
       setTrending(trending.filter(t => t.id !== item.id));
       toast({
         title: "Success",
-        description: "Post broadcasted to team feed and spotlight",
+        description: `Post broadcasted to: ${broadcasts.join(', ')}`,
       });
     } catch (error: any) {
       toast({
@@ -238,31 +312,78 @@ export const CurationQueue = () => {
                       </div>
                       
                       {activeTab === 'pending' && (
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleBroadcast(item)}
-                            className="bg-gradient-to-r from-blue-600 to-purple-600"
-                          >
-                            <Send className="h-4 w-4 mr-2" />
-                            Broadcast
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleStatusChange(item.id, 'approved')}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Approve Only
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleStatusChange(item.id, 'rejected')}
-                          >
-                            <XCircle className="h-4 w-4 mr-2" />
-                            Reject
-                          </Button>
+                        <div className="space-y-4">
+                          {/* Broadcast Destinations */}
+                          <div className="border rounded-lg p-4 bg-muted/50">
+                            <h4 className="text-sm font-medium mb-3">Broadcast to:</h4>
+                            <div className="space-y-2">
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`spotlight-${item.id}`}
+                                  checked={selectedDestinations.spotlight}
+                                  onCheckedChange={(checked) => 
+                                    setSelectedDestinations(prev => ({ ...prev, spotlight: !!checked }))
+                                  }
+                                />
+                                <label htmlFor={`spotlight-${item.id}`} className="text-sm">Spotlight</label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`teamfeed-${item.id}`}
+                                  checked={selectedDestinations.teamFeed}
+                                  onCheckedChange={(checked) => 
+                                    setSelectedDestinations(prev => ({ ...prev, teamFeed: !!checked }))
+                                  }
+                                />
+                                <label htmlFor={`teamfeed-${item.id}`} className="text-sm">Team Feed</label>
+                              </div>
+                              {huddles.filter(h => h.team_id === item.team_id).map(huddle => (
+                                <div key={huddle.id} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`huddle-${huddle.id}-${item.id}`}
+                                    checked={selectedDestinations.huddles.includes(huddle.id)}
+                                    onCheckedChange={(checked) => {
+                                      setSelectedDestinations(prev => ({
+                                        ...prev,
+                                        huddles: checked 
+                                          ? [...prev.huddles, huddle.id]
+                                          : prev.huddles.filter(id => id !== huddle.id)
+                                      }));
+                                    }}
+                                  />
+                                  <label htmlFor={`huddle-${huddle.id}-${item.id}`} className="text-sm">{huddle.name}</label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleBroadcast(item)}
+                              className="bg-gradient-to-r from-blue-600 to-purple-600"
+                              disabled={!selectedDestinations.spotlight && !selectedDestinations.teamFeed && selectedDestinations.huddles.length === 0}
+                            >
+                              <Send className="h-4 w-4 mr-2" />
+                              Broadcast
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleStatusChange(item.id, 'approved')}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Approve Only
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleStatusChange(item.id, 'rejected')}
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Reject
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </CardContent>

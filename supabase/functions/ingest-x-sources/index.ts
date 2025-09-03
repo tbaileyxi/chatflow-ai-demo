@@ -120,7 +120,8 @@ Deno.serve(async (req) => {
         const listResults = [];
         for (const tweet of twitterData.data) {
           const user = usersMap.get(tweet.author_id);
-          const embedUrl = `https://x.com/${user?.username || 'x'}/status/${tweet.id}`;
+          // Normalize embed URL to twitter.com for better compatibility
+          const embedUrl = `https://twitter.com/${user?.username || 'user'}/status/${tweet.id}`;
           
           const metrics = tweet.public_metrics || {};
           const rankScore = calculateRankScore(metrics, tweet.created_at);

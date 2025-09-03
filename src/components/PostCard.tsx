@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { MediaViewer } from "@/components/MediaViewer";
 import { ReportButton } from "@/components/ReportButton";
 import { linkifyTeamNames } from "@/utils/teamLinking";
+import { XPostEmbed } from "@/components/embeds/XPostEmbed";
 
 // Twitter global type
 declare global {
@@ -461,7 +462,7 @@ export const PostCard = ({ post, isSpotlight = false, disableReply = false }: Po
         {/* Embed Code Display */}
         {post.embed_code && (
           <div className="mt-3 rounded-lg overflow-hidden">
-            <TwitterEmbed embedCode={post.embed_code} />
+            <XPostEmbed embedCode={post.embed_code} />
           </div>
         )}
 
