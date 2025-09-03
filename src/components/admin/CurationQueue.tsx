@@ -48,6 +48,19 @@ export const CurationQueue = () => {
     fetchData();
   }, [selectedTeam, activeTab]);
 
+  // Auto-preselect Side Huddle when huddles change
+  useEffect(() => {
+    if (huddles.length > 0) {
+      const sideHuddle = huddles.find(h => h.name.toLowerCase().includes('side huddle'));
+      if (sideHuddle && !selectedDestinations.huddles.includes(sideHuddle.id)) {
+        setSelectedDestinations(prev => ({
+          ...prev,
+          huddles: [...prev.huddles, sideHuddle.id]
+        }));
+      }
+    }
+  }, [huddles]);
+
   const fetchData = async () => {
     try {
       setIsLoading(true);
@@ -61,11 +74,10 @@ export const CurationQueue = () => {
       
       setTeams(teamsData || []);
 
-      // Fetch huddles for broadcast destination selection
+      // Fetch huddles for broadcast destination selection (now includes private huddles for admins)
       const { data: huddlesData } = await supabase
         .from('huddles')
         .select('id, name, team_id, teams(name, city)')
-        .eq('is_private', false)
         .order('name');
       
       setHuddles(huddlesData || []);
@@ -337,7 +349,17 @@ export const CurationQueue = () => {
                                 />
                                 <label htmlFor={`teamfeed-${item.id}`} className="text-sm">Team Feed</label>
                               </div>
-                              {huddles.filter(h => h.team_id === item.team_id).map(huddle => (
+                              {huddles
+                                .filter(h => h.team_id === item.team_id)
+                                .sort((a, b) => {
+                                  // Sort "Side Huddle" first
+                                  const aIsSideHuddle = a.name.toLowerCase().includes('side huddle');
+                                  const bIsSideHuddle = b.name.toLowerCase().includes('side huddle');
+                                  if (aIsSideHuddle && !bIsSideHuddle) return -1;
+                                  if (!aIsSideHuddle && bIsSideHuddle) return 1;
+                                  return a.name.localeCompare(b.name);
+                                })
+                                .map(huddle => (
                                 <div key={huddle.id} className="flex items-center space-x-2">
                                   <Checkbox
                                     id={`huddle-${huddle.id}-${item.id}`}
@@ -351,7 +373,10 @@ export const CurationQueue = () => {
                                       }));
                                     }}
                                   />
-                                  <label htmlFor={`huddle-${huddle.id}-${item.id}`} className="text-sm">{huddle.name}</label>
+                                  <label htmlFor={`huddle-${huddle.id}-${item.id}`} className="text-sm">
+                                    {huddle.name}
+                                    {huddle.name.toLowerCase().includes('side huddle') && ' 🏈'}
+                                  </label>
                                 </div>
                               ))}
                             </div>
