@@ -8,7 +8,9 @@ import { UserManagement } from '@/components/admin/UserManagement';
 import { FirstAdminSetup } from '@/components/admin/FirstAdminSetup';
 import { ModerationPanel } from '@/components/admin/ModerationPanel';
 import { BearsTrendingManager } from '@/components/admin/BearsTrendingManager';
-import { BarChart3, Radio, Users, Shield, Flag, TrendingUp } from 'lucide-react';
+import { SocialSourceManager } from '@/components/admin/SocialSourceManager';
+import { CurationQueue } from '@/components/admin/CurationQueue';
+import { BarChart3, Radio, Users, Shield, Flag, TrendingUp, Rss, Filter } from 'lucide-react';
 
 export const Admin = () => {
   const { isAdmin, loading, user } = useAuth();
@@ -40,7 +42,7 @@ export const Admin = () => {
           <FirstAdminSetup />
         ) : (
           <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="grid grid-cols-6 w-full max-w-4xl">
+            <TabsList className="grid grid-cols-8 w-full max-w-6xl">
               <TabsTrigger value="dashboard" className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
                 Dashboard
@@ -64,6 +66,14 @@ export const Admin = () => {
               <TabsTrigger value="trending" className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" />
                 Trending
+              </TabsTrigger>
+              <TabsTrigger value="sources" className="flex items-center gap-2">
+                <Rss className="w-4 h-4" />
+                Sources
+              </TabsTrigger>
+              <TabsTrigger value="curation" className="flex items-center gap-2">
+                <Filter className="w-4 h-4" />
+                Curation
               </TabsTrigger>
             </TabsList>
 
@@ -89,6 +99,14 @@ export const Admin = () => {
 
             <TabsContent value="trending">
               <BearsTrendingManager />
+            </TabsContent>
+
+            <TabsContent value="sources">
+              <SocialSourceManager />
+            </TabsContent>
+
+            <TabsContent value="curation">
+              <CurationQueue />
             </TabsContent>
           </Tabs>
         )}

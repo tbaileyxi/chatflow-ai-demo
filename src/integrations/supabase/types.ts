@@ -963,6 +963,47 @@ export type Database = {
         }
         Relationships: []
       }
+      social_sources: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          is_active: boolean
+          source_type: string
+          source_url: string
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          is_active?: boolean
+          source_type?: string
+          source_url: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_active?: boolean
+          source_type?: string
+          source_url?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_sources_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spotlight_reports: {
         Row: {
           created_at: string
@@ -1049,6 +1090,68 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      team_trending: {
+        Row: {
+          author_username: string | null
+          content: string | null
+          created_at: string
+          embed_url: string
+          fetched_at: string
+          id: string
+          likes: number
+          post_id: string
+          rank_score: number
+          replies: number
+          retweets: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          team_id: string | null
+        }
+        Insert: {
+          author_username?: string | null
+          content?: string | null
+          created_at?: string
+          embed_url: string
+          fetched_at?: string
+          id?: string
+          likes?: number
+          post_id: string
+          rank_score?: number
+          replies?: number
+          retweets?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          team_id?: string | null
+        }
+        Update: {
+          author_username?: string | null
+          content?: string | null
+          created_at?: string
+          embed_url?: string
+          fetched_at?: string
+          id?: string
+          likes?: number
+          post_id?: string
+          rank_score?: number
+          replies?: number
+          retweets?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          team_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_trending_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       team_waitlist: {
         Row: {
