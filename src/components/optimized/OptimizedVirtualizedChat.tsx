@@ -49,7 +49,13 @@ export const OptimizedVirtualizedChat = memo(({
   // Memoize the item content renderer to prevent re-renders
   const itemContent = useCallback((index: number, message: Message) => {
     const previousMessage = index > 0 ? messages[index - 1] : null;
-    const isConsecutive = previousMessage?.user_id === message.user_id;
+    const isConsecutive = previousMessage && 
+      previousMessage.user_id === message.user_id &&
+      !message.is_bot_message &&
+      !message.is_team_agent_message &&
+      !previousMessage.is_bot_message &&
+      !previousMessage.is_team_agent_message &&
+      new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() < 300000;
     const messagePollVotes = getMessagePollVotes(message.id);
     const userVote = userVotes[message.id] || null;
 

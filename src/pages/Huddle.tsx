@@ -720,9 +720,14 @@ useEffect(() => {
 
   // Memoized itemContent function to prevent re-renders and flashing
   const renderMessageItem = useCallback((index: number, message: any, previousMessage?: any) => {
+    // Check if this message should be grouped with the previous one
     const isConsecutive = previousMessage && 
       previousMessage.user_id === message.user_id && 
-      new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() < 300000;
+      !message.is_bot_message &&
+      !message.is_team_agent_message &&
+      !previousMessage.is_bot_message &&
+      !previousMessage.is_team_agent_message &&
+      new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() < 300000; // 5 minutes
     
     return (
       <MessageBubble
