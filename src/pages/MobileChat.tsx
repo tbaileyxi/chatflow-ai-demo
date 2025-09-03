@@ -737,7 +737,28 @@ const { data: messagesData, error: messagesError } = await supabase
             </div>
           )}
           {[...messages, ...ephemeralMessages].map((message, index) => {
-            // Handle pick'em messages
+            // Handle pick'em card messages from bot
+            if (message.message_type === 'pickem_card' && message.embed_code) {
+              try {
+                const embedData = JSON.parse(message.embed_code);
+                if (embedData.type === 'pickem_card') {
+                  return (
+                    <div key={message.id} className="px-4 py-2">
+                      <PickEmCard
+                        instanceId={embedData.instanceId}
+                        title={embedData.title}
+                        gameCount={embedData.gameCount}
+                        onViewDetails={handleViewPickEm}
+                      />
+                    </div>
+                  );
+                }
+              } catch (e) {
+                console.error('Failed to parse pickem_card embed_code:', e);
+              }
+            }
+
+            // Handle legacy pick'em messages
             if (message.message_type === 'pickem' && message.poll_data?.type === 'pickem') {
               return (
                 <div key={message.id} className="px-4 py-2">
