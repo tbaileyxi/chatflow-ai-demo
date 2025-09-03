@@ -724,6 +724,15 @@ useEffect(() => {
     // Unified consecutive check (5 minutes, same user, excludes bot/team agent)
     const isConsecutive = isConsecutiveMessage(message, previousMessage || null);
     
+    console.log('🔥 Huddle renderMessageItem:', {
+      index,
+      messageId: message.id,
+      userId: message.user_id,
+      prevUserId: previousMessage?.user_id,
+      isConsecutive,
+      message: message.content?.substring(0, 20) + '...'
+    });
+    
     return (
       <MessageBubble
         key={message.id}
