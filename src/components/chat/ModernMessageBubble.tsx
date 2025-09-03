@@ -10,6 +10,7 @@ import { MakePublicButton } from "@/components/MakePublicButton";
 import { cn } from "@/lib/utils";
 import { XPostEmbed } from "@/components/embeds/XPostEmbed";
 import { shouldShowProfile } from "@/utils/chatMessage";
+import { PickEmCard } from "@/components/pickem/PickEmCard";
 
 interface ModernMessageBubbleProps {
   message: any;
@@ -24,6 +25,7 @@ interface ModernMessageBubbleProps {
   onPollVote?: (messageId: string, optionId: number) => void;
   pollVotes?: Array<{ option_id: number; user_id: string }>;
   userVote?: number | null;
+  onViewPickEm?: (instanceId: string) => void;
 }
 
 const QUICK_REACTIONS = ['👍', '😂', '🔥'];
@@ -40,7 +42,8 @@ export const ModernMessageBubble = memo(({
   originTeamName,
   onPollVote,
   pollVotes,
-  userVote
+  userVote,
+  onViewPickEm
 }: ModernMessageBubbleProps) => {
   const [reactionPopoverOpen, setReactionPopoverOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -85,6 +88,27 @@ export const ModernMessageBubble = memo(({
       setReactionPopoverOpen(true);
     }
   }, [reactionsEnabled]);
+
+  // Handle Pick 'Em card rendering
+  if (message.embed_code) {
+    try {
+      const embedData = JSON.parse(message.embed_code);
+      if (embedData.type === 'pickem_card' && onViewPickEm) {
+        return (
+          <div className="px-4 py-2">
+            <PickEmCard
+              instanceId={embedData.instanceId}
+              title={embedData.title}
+              gameCount={embedData.gameCount}
+              onViewDetails={onViewPickEm}
+            />
+          </div>
+        );
+      }
+    } catch (e) {
+      // Not a Pick 'Em card, continue with normal rendering
+    }
+  }
 
   return (
     <div 

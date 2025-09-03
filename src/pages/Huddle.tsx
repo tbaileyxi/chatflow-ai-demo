@@ -18,6 +18,9 @@ import { ModernChatInput } from "@/components/chat/ModernChatInput";
 import { ModernMessageBubble } from "@/components/chat/ModernMessageBubble";
 import { EnhancedTypingIndicator } from "@/components/chat/EnhancedTypingIndicator";
 import { isConsecutiveMessage } from "@/utils/chatMessage";
+import { PickEmCard } from "@/components/pickem/PickEmCard";
+import { PickEmView } from "@/components/pickem/PickEmView";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { formatDistanceToNow } from "date-fns";
 
@@ -95,6 +98,7 @@ const resubscribeRef = useRef<(() => void) | null>(null);
 const lastTypingSentRef = useRef<number>(0);
 const typingMapRef = useRef<Map<string, { name: string; ts: number }>>(new Map());
 const [displayName, setDisplayName] = useState<string>("");
+const [pickEmViewId, setPickEmViewId] = useState<string | null>(null);
 
 // Fetch display name for typing indicator
 useEffect(() => {
@@ -719,9 +723,49 @@ useEffect(() => {
     }
   };
 
+  const handleViewPickEm = useCallback((instanceId: string) => {
+    setPickEmViewId(instanceId);
+  }, []);
+
   // Memoized itemContent function to prevent re-renders and flashing
   const renderMessageItem = useCallback((index: number, message: any, previousMessage?: any) => {
     console.log('🔥 HUDDLE RENDER CALLED!', { index, messageId: message?.id, userId: message?.user_id });
+    
+    // Handle Pick 'Em card messages from bot
+    if (message.message_type === 'pickem_card' && message.embed_code) {
+      try {
+        const embedData = JSON.parse(message.embed_code);
+        if (embedData.type === 'pickem_card') {
+          return (
+            <div key={message.id} className="px-4 py-2">
+              <PickEmCard
+                instanceId={embedData.instanceId}
+                title={embedData.title}
+                gameCount={embedData.gameCount}
+                onViewDetails={handleViewPickEm}
+              />
+            </div>
+          );
+        }
+      } catch (e) {
+        console.error('Failed to parse pickem_card embed_code:', e);
+      }
+    }
+
+    // Handle legacy pick'em messages
+    if (message.poll_data?.type === 'pickem') {
+      return (
+        <div key={message.id} className="px-4 py-2">
+          <PickEmCard
+            instanceId={message.poll_data.instanceId}
+            title={message.poll_data.title}
+            gameCount={message.poll_data.gameCount}
+            onViewDetails={handleViewPickEm}
+          />
+        </div>
+      );
+    }
+
     // Unified consecutive check (5 minutes, same user, excludes bot/team agent)
     const isConsecutive = isConsecutiveMessage(message, previousMessage || null);
     
@@ -746,9 +790,10 @@ useEffect(() => {
         onPollVote={handlePollVote}
         isConsecutive={isConsecutive}
         previousMessage={previousMessage}
+        onViewPickEm={handleViewPickEm}
       />
     );
-  }, [messages, user?.id, huddle?.team, addReaction, handlePollVote]);
+  }, [messages, user?.id, huddle?.team, addReaction, handlePollVote, handleViewPickEm]);
 
   if (loading) {
     return (
@@ -857,6 +902,21 @@ useEffect(() => {
           }}
         />
       </div>
+
+      {/* Pick 'Em View Dialog */}
+      {pickEmViewId && (
+        <Dialog open={!!pickEmViewId} onOpenChange={() => setPickEmViewId(null)}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Pick 'Em Details</DialogTitle>
+            </DialogHeader>
+            <PickEmView 
+              instanceId={pickEmViewId} 
+              onBack={() => setPickEmViewId(null)} 
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

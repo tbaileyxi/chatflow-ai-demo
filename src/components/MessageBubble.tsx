@@ -12,6 +12,7 @@ import { extractVideoFrame } from '@/utils/videoThumbnail';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { shouldShowProfile } from '@/utils/chatMessage';
+import { PickEmCard } from '@/components/pickem/PickEmCard';
 
 interface MessageBubbleProps {
   message: {
@@ -47,6 +48,7 @@ interface MessageBubbleProps {
   previousMessage?: {
     user_id: string;
   } | null;
+  onViewPickEm?: (instanceId: string) => void;
 }
 
 const StreamingCaret = memo(() => (
@@ -101,7 +103,8 @@ export const MessageBubble = memo<MessageBubbleProps>(({
   onPollVote,
   isStreaming = false,
   isConsecutive = false,
-  previousMessage = null
+  previousMessage = null,
+  onViewPickEm
 }) => {
   const [showReactions, setShowReactions] = useState(false);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
@@ -214,6 +217,27 @@ export const MessageBubble = memo<MessageBubbleProps>(({
       </div>
     );
   }, [message.content, isStreaming]);
+
+  // Handle Pick 'Em card rendering
+  if (message.embed_code) {
+    try {
+      const embedData = JSON.parse(message.embed_code);
+      if (embedData.type === 'pickem_card' && onViewPickEm) {
+        return (
+          <div className="px-4 py-2">
+            <PickEmCard
+              instanceId={embedData.instanceId}
+              title={embedData.title}
+              gameCount={embedData.gameCount}
+              onViewDetails={onViewPickEm}
+            />
+          </div>
+        );
+      }
+    } catch (e) {
+      // Not a Pick 'Em card, continue with normal rendering
+    }
+  }
 
   return (
     <div
