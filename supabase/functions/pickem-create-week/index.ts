@@ -83,6 +83,12 @@ serve(async (req) => {
       if (espnData?.week?.number) {
         currentWeek = espnData.week.number;
         console.log(`Got current week ${currentWeek} from ESPN API`);
+        
+        // Normalize NCAA week (ESPN includes "Week 0" which shifts everything by 1)
+        if (league === 'ncaaf' && currentWeek > 1) {
+          currentWeek = currentWeek - 1;
+          console.log(`Normalized NCAAF week to ${currentWeek} (accounting for Week 0)`);
+        }
       }
       
       if (espnData?.season?.year) {
@@ -124,6 +130,26 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
+    }
+
+    // Safety check: if we got 0 games for NCAAF and no weekOffset, try previous week
+    if (league === 'ncaaf' && weekOffset === 0 && syncResult.data?.gamesCount === 0 && targetWeek > 1) {
+      console.log(`Got 0 games for NCAAF week ${targetWeek}, trying week ${targetWeek - 1}`);
+      const retryWeek = targetWeek - 1;
+      
+      const retrySyncResult = await supabase.functions.invoke('pickem-sync', {
+        body: {
+          league: league,
+          season_year: seasonYear,
+          week_number: retryWeek
+        }
+      });
+      
+      if (!retrySyncResult.error && retrySyncResult.data?.gamesCount > 0) {
+        console.log(`Successfully synced NCAAF week ${retryWeek} with ${retrySyncResult.data.gamesCount} games`);
+        // Update targetWeek for the autocreate step
+        const targetWeek = retryWeek;
+      }
     }
 
     console.log('Sync completed, now creating Pick\'em instance');

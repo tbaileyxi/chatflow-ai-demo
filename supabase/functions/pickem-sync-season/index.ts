@@ -28,6 +28,9 @@ serve(async (req) => {
 
     for (const league of leagues) {
       try {
+        // Normalize league naming
+        const normalizedLeague = league === 'ncaa' ? 'ncaaf' : league;
+        
         let seasonYear = currentYear
         // For NCAA in Jan/Feb, use previous year
         if (league === 'ncaa' && currentDate.getMonth() <= 1) {
@@ -47,6 +50,12 @@ serve(async (req) => {
           if (espnData?.week?.number) {
             currentWeek = espnData.week.number;
             console.log(`Got current week ${currentWeek} from ESPN API for ${league}`);
+            
+            // Normalize NCAA week (ESPN includes "Week 0" which shifts everything by 1)
+            if (normalizedLeague === 'ncaaf' && currentWeek > 1) {
+              currentWeek = currentWeek - 1;
+              console.log(`Normalized NCAAF week to ${currentWeek} (accounting for Week 0)`);
+            }
           }
           
           if (espnData?.season?.year) {
@@ -75,7 +84,7 @@ serve(async (req) => {
           
           const syncResponse = await supabase.functions.invoke('pickem-sync', {
             body: {
-              league,
+              league: normalizedLeague,
               season_year: seasonYear,
               week_number: weekToSync
             }
@@ -86,7 +95,7 @@ serve(async (req) => {
           } else {
             console.log(`Successfully synced ${league} week ${weekToSync}`)
             results.push({
-              league,
+              league: normalizedLeague,
               season_year: seasonYear,
               week_number: weekToSync,
               status: 'synced'
