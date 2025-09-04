@@ -654,8 +654,8 @@ const { data: messagesData, error: messagesError } = await supabase
   // Show Pick'Em view if selected
   if (pickEmViewId) {
     return (
-      <div className="h-screen bg-background">
-        <div className="p-4">
+      <div className="h-[100svh] overflow-y-auto bg-background">
+        <div className="p-4 pb-24">
           <PickEmView
             instanceId={pickEmViewId}
             onBack={handleBackToChat}

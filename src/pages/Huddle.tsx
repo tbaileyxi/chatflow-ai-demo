@@ -908,14 +908,16 @@ useEffect(() => {
       {/* Pick 'Em View Dialog */}
       {pickEmViewId && (
         <Dialog open={!!pickEmViewId} onOpenChange={() => setPickEmViewId(null)}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
+          <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>Pick 'Em Details</DialogTitle>
             </DialogHeader>
-            <PickEmView 
-              instanceId={pickEmViewId} 
-              onBack={() => setPickEmViewId(null)} 
-            />
+            <div className="flex-1 overflow-y-auto">
+              <PickEmView 
+                instanceId={pickEmViewId} 
+                onBack={() => setPickEmViewId(null)} 
+              />
+            </div>
           </DialogContent>
         </Dialog>
       )}
