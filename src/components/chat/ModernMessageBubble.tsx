@@ -9,7 +9,7 @@ import { LazyEmbed } from "./LazyEmbed";
 import { MakePublicButton } from "@/components/MakePublicButton";
 import { cn } from "@/lib/utils";
 import { XPostEmbed } from "@/components/embeds/XPostEmbed";
-import { shouldShowProfile } from "@/utils/chatMessage";
+import { shouldShowProfile, parsePickEmMessage } from "@/utils/chatMessage";
 import { PickEmCard } from "@/components/pickem/PickEmCard";
 
 interface ModernMessageBubbleProps {
@@ -89,46 +89,19 @@ export const ModernMessageBubble = memo(({
     }
   }, [reactionsEnabled]);
 
-  // Handle Pick 'Em card rendering (from embed_code)
-  if (message.embed_code) {
-    try {
-      const embedData = JSON.parse(message.embed_code);
-      if (embedData.type === 'pickem_card' && onViewPickEm) {
-        return (
-          <div className="px-4 py-2">
-            <PickEmCard
-              instanceId={embedData.instanceId}
-              title={embedData.title}
-              gameCount={embedData.gameCount}
-              onViewDetails={onViewPickEm}
-            />
-          </div>
-        );
-      }
-    } catch (e) {
-      // Not a Pick 'Em card, continue
-    }
-  }
-
-  // Handle Pick 'Em card rendering (from content JSON)
-  if (message.content) {
-    try {
-      const contentData = JSON.parse(message.content);
-      if (contentData?.type === 'pickem_card' && onViewPickEm) {
-        return (
-          <div className="px-4 py-2">
-            <PickEmCard
-              instanceId={contentData.instanceId}
-              title={contentData.title}
-              gameCount={contentData.gameCount}
-              onViewDetails={onViewPickEm}
-            />
-          </div>
-        );
-      }
-    } catch (e) {
-      // Content is not JSON; continue
-    }
+  // Handle Pick 'Em card rendering using centralized parser
+  const pickemData = parsePickEmMessage(message);
+  if (pickemData && onViewPickEm) {
+    return (
+      <div className="px-4 py-2">
+        <PickEmCard
+          instanceId={pickemData.instanceId}
+          title={pickemData.title}
+          gameCount={pickemData.gameCount}
+          onViewDetails={onViewPickEm}
+        />
+      </div>
+    );
   }
 
   return (
@@ -275,8 +248,8 @@ export const ModernMessageBubble = memo(({
                 </div>
               )}
 
-              {/* Embed Content with layout shift prevention */}
-              {message.embed_code && (
+              {/* Embed Content with layout shift prevention - only render if not Pick 'Em */}
+              {message.embed_code && !parsePickEmMessage(message) && (
                 <div 
                   className="mt-3 embed-chat rounded-xl x-embed-container" 
                   style={{ 

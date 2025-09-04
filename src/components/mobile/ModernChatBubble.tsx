@@ -10,7 +10,8 @@ import { MakePublicButton } from "@/components/MakePublicButton";
 import { cn } from "@/lib/utils";
 import { XPostEmbed } from "@/components/embeds/XPostEmbed";
 import { supabase } from "@/integrations/supabase/client";
-import { shouldShowProfile } from "@/utils/chatMessage";
+import { shouldShowProfile, parsePickEmMessage } from "@/utils/chatMessage";
+import { PickEmCard } from "@/components/pickem/PickEmCard";
 interface ModernChatBubbleProps {
   message: any;
   currentUserId?: string;
@@ -79,6 +80,21 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
       console.error("Failed to make post public:", error);
     }
   }, [message, currentUserId, teamId]);
+
+  // Handle Pick 'Em card rendering using centralized parser
+  const pickemData = parsePickEmMessage(message);
+  if (pickemData && message.onViewPickEm) {
+    return (
+      <div className="px-4 py-2">
+        <PickEmCard
+          instanceId={pickemData.instanceId}
+          title={pickemData.title}
+          gameCount={pickemData.gameCount}
+          onViewDetails={message.onViewPickEm}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -211,8 +227,8 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
                 </div>
               )}
 
-              {/* Embed Content with layout shift prevention */}
-              {message.embed_code && (
+              {/* Embed Content with layout shift prevention - only render if not Pick 'Em */}
+              {message.embed_code && !parsePickEmMessage(message) && (
                 <div
                   className="mt-3 embed-chat rounded-xl x-embed-container"
                   style={{

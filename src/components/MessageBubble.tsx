@@ -11,7 +11,7 @@ import { XPostEmbed } from '@/components/embeds/XPostEmbed';
 import { extractVideoFrame } from '@/utils/videoThumbnail';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { shouldShowProfile } from '@/utils/chatMessage';
+import { shouldShowProfile, parsePickEmMessage } from '@/utils/chatMessage';
 import { PickEmCard } from '@/components/pickem/PickEmCard';
 
 interface MessageBubbleProps {
@@ -218,46 +218,19 @@ export const MessageBubble = memo<MessageBubbleProps>(({
     );
   }, [message.content, isStreaming]);
 
-  // Handle Pick 'Em card rendering (from embed_code)
-  if (message.embed_code) {
-    try {
-      const embedData = JSON.parse(message.embed_code);
-      if (embedData.type === 'pickem_card' && onViewPickEm) {
-        return (
-          <div className="px-4 py-2">
-            <PickEmCard
-              instanceId={embedData.instanceId}
-              title={embedData.title}
-              gameCount={embedData.gameCount}
-              onViewDetails={onViewPickEm}
-            />
-          </div>
-        );
-      }
-    } catch (e) {
-      // Not a Pick 'Em card, continue
-    }
-  }
-
-  // Handle Pick 'Em card rendering (from content JSON)
-  if (message.content) {
-    try {
-      const contentData = JSON.parse(message.content);
-      if (contentData?.type === 'pickem_card' && onViewPickEm) {
-        return (
-          <div className="px-4 py-2">
-            <PickEmCard
-              instanceId={contentData.instanceId}
-              title={contentData.title}
-              gameCount={contentData.gameCount}
-              onViewDetails={onViewPickEm}
-            />
-          </div>
-        );
-      }
-    } catch (e) {
-      // Content is not JSON; continue
-    }
+  // Handle Pick 'Em card rendering using centralized parser
+  const pickemData = parsePickEmMessage(message);
+  if (pickemData && onViewPickEm) {
+    return (
+      <div className="px-4 py-2">
+        <PickEmCard
+          instanceId={pickemData.instanceId}
+          title={pickemData.title}
+          gameCount={pickemData.gameCount}
+          onViewDetails={onViewPickEm}
+        />
+      </div>
+    );
   }
 
   return (
@@ -350,8 +323,8 @@ export const MessageBubble = memo<MessageBubbleProps>(({
           </div>
         )}
 
-        {/* Embedded Content */}
-        {message.embed_code && (
+        {/* Embedded Content - only render if not Pick 'Em */}
+        {message.embed_code && !parsePickEmMessage(message) && (
           isXEmbed ? (
             <XPostEmbed embedCode={message.embed_code} />
           ) : (

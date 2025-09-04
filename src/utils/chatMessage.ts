@@ -8,6 +8,65 @@ export type BasicMessage = {
   media_url?: string | null;
   embed_code?: string | null;
   poll_data?: any;
+  content?: string | null;
+  message_type?: string | null;
+};
+
+export type PickEmData = {
+  type: 'pickem_card';
+  instanceId: string;
+  title: string;
+  gameCount: number;
+};
+
+// Centralized Pick 'Em message parsing
+export const parsePickEmMessage = (message: BasicMessage): PickEmData | null => {
+  // First check message_type for explicit Pick 'Em messages
+  if (message.message_type === 'pickem_card') {
+    try {
+      let pickemData: any = null;
+      
+      // Try embed_code first (newer format)
+      if (message.embed_code) {
+        pickemData = JSON.parse(message.embed_code);
+      }
+      // Fallback to content (legacy format)
+      else if (message.content) {
+        pickemData = JSON.parse(message.content);
+      }
+      
+      if (pickemData?.type === 'pickem_card') {
+        return {
+          type: 'pickem_card',
+          instanceId: pickemData.instanceId,
+          title: pickemData.title,
+          gameCount: pickemData.gameCount
+        };
+      }
+    } catch (e) {
+      console.warn('Failed to parse Pick Em message:', e);
+    }
+  }
+  
+  // Legacy detection: try parsing embed_code or content as Pick 'Em JSON
+  const sources = [message.embed_code, message.content].filter(Boolean);
+  for (const source of sources) {
+    try {
+      const data = JSON.parse(source);
+      if (data?.type === 'pickem_card') {
+        return {
+          type: 'pickem_card',
+          instanceId: data.instanceId,
+          title: data.title,
+          gameCount: data.gameCount
+        };
+      }
+    } catch (e) {
+      // Not JSON or not Pick 'Em, continue
+    }
+  }
+  
+  return null;
 };
 
 export const hasRichContent = (m?: Partial<BasicMessage> | null): boolean => {
@@ -15,7 +74,8 @@ export const hasRichContent = (m?: Partial<BasicMessage> | null): boolean => {
   const hasMedia = typeof m.media_url === 'string' && m.media_url.trim() !== '';
   const hasEmbed = typeof m.embed_code === 'string' && m.embed_code.trim() !== '';
   const hasPoll = !!m.poll_data;
-  return hasMedia || hasEmbed || hasPoll;
+  const hasPickEm = !!parsePickEmMessage(m as BasicMessage);
+  return hasMedia || hasEmbed || hasPoll || hasPickEm;
 };
 
 export const isConsecutiveMessage = (
