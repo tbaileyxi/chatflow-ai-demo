@@ -783,6 +783,7 @@ const { data: messagesData, error: messagesError } = await supabase
                 teamId={huddle.team_id}
                 teamLogoUrl={huddle.team_logo_url}
                 previousMessage={previousMessage}
+                onViewPickEm={handleViewPickEm}
               />
             );
           })}

@@ -19,11 +19,12 @@ interface ModernChatBubbleProps {
   teamLogoUrl?: string;
   previousMessage?: any;
   onReaction?: (messageId: string, emoji: string) => void;
+  onViewPickEm?: (instanceId: string) => void;
 }
 
 const QUICK_REACTIONS = ['👍', '😂', '🔥'];
 
-const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previousMessage, onReaction }: ModernChatBubbleProps) => {
+const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previousMessage, onReaction, onViewPickEm }: ModernChatBubbleProps) => {
   const [reactionPopoverOpen, setReactionPopoverOpen] = useState(false);
   const [hovering, setHovering] = useState(false);
 
@@ -83,14 +84,14 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
 
   // Handle Pick 'Em card rendering using centralized parser
   const pickemData = parsePickEmMessage(message);
-  if (pickemData && message.onViewPickEm) {
+  if (pickemData && onViewPickEm) {
     return (
       <div className="px-4 py-2">
         <PickEmCard
           instanceId={pickemData.instanceId}
           title={pickemData.title}
           gameCount={pickemData.gameCount}
-          onViewDetails={message.onViewPickEm}
+          onViewDetails={onViewPickEm}
         />
       </div>
     );

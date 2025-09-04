@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Trophy, Clock, Users, Target } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 
 interface PickEmCardProps {
   instanceId: string;
@@ -28,8 +29,10 @@ interface PickEmStats {
 export const PickEmCard = ({ instanceId, title, gameCount, onViewDetails }: PickEmCardProps) => {
   const [stats, setStats] = useState<PickEmStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [joining, setJoining] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (instanceId) {
@@ -93,9 +96,18 @@ export const PickEmCard = ({ instanceId, title, gameCount, onViewDetails }: Pick
   };
 
   const handleJoinPickEm = async () => {
-    if (!user || stats?.userEntry) return;
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to join Pick 'Em.",
+      });
+      navigate('/auth');
+      return;
+    }
+    if (stats?.userEntry) return;
 
     try {
+      setJoining(true);
       const { error } = await supabase
         .from('pickem_entries')
         .insert({
@@ -120,6 +132,8 @@ export const PickEmCard = ({ instanceId, title, gameCount, onViewDetails }: Pick
         description: "Failed to join Pick 'Em",
         variant: "destructive"
       });
+    } finally {
+      setJoining(false);
     }
   };
 
@@ -137,7 +151,12 @@ export const PickEmCard = ({ instanceId, title, gameCount, onViewDetails }: Pick
   }
 
   return (
-    <Card className="w-full border-primary/20">
+    <Card 
+      className="w-full border-primary/20 cursor-pointer"
+      role="button"
+      tabIndex={0}
+      onClick={() => onViewDetails(instanceId)}
+    >
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Trophy className="w-4 h-4 text-primary" />
@@ -182,7 +201,7 @@ export const PickEmCard = ({ instanceId, title, gameCount, onViewDetails }: Pick
         <div className="flex gap-2">
           <Button 
             size="sm" 
-            onClick={() => onViewDetails(instanceId)}
+            onClick={(e) => { e.stopPropagation(); onViewDetails(instanceId); }}
             className="flex-1"
           >
             View Details
@@ -192,9 +211,10 @@ export const PickEmCard = ({ instanceId, title, gameCount, onViewDetails }: Pick
             <Button 
               size="sm" 
               variant="outline"
-              onClick={handleJoinPickEm}
+              disabled={joining}
+              onClick={(e) => { e.stopPropagation(); handleJoinPickEm(); }}
             >
-              Join
+              {joining ? 'Joining…' : 'Join'}
             </Button>
           )}
         </div>
