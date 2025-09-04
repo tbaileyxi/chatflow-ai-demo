@@ -229,23 +229,23 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
                 const gameComplete = game.status === 'final';
                 
                 return (
-                  <Card key={game.id} className="w-full">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="text-sm font-medium">
-                          {game.away_team} @ {game.home_team}
+                  <Card key={game.id} className="w-full overflow-hidden">
+                    <CardContent className="p-3 min-w-0">
+                      <div className="flex items-center justify-between mb-3 min-w-0">
+                        <div className="text-xs font-medium truncate pr-2 min-w-0 flex-1">
+                          <span className="truncate">{game.away_team}</span> @ <span className="truncate">{game.home_team}</span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 flex-shrink-0">
                           {gameComplete && pick && (
                             <div className="flex items-center gap-1">
                               {pick.is_correct ? (
-                                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                <CheckCircle2 className="w-3 h-3 text-green-500" />
                               ) : (
-                                <XCircle className="w-4 h-4 text-red-500" />
+                                <XCircle className="w-3 h-3 text-red-500" />
                               )}
                             </div>
                           )}
-                          <Badge variant={locked ? "secondary" : "outline"}>
+                          <Badge variant={locked ? "secondary" : "outline"} className="text-xs">
                             {locked ? (game.status === 'final' ? 'Final' : 'Locked') : 'Open'}
                           </Badge>
                         </div>
@@ -272,22 +272,22 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
                           )}
                         </div>
                       ) : (
-                        <div className="flex gap-2">
+                        <div className="grid grid-cols-2 gap-2">
                           <Button
                             size="sm"
                             variant={pick?.picked_team === game.away_team ? "default" : "outline"}
                             onClick={() => handleMakePick(game.id, game.away_team)}
-                            className="flex-1"
+                            className="min-w-0 text-xs truncate"
                           >
-                            {game.away_team}
+                            <span className="truncate">{game.away_team}</span>
                           </Button>
                           <Button
                             size="sm"
                             variant={pick?.picked_team === game.home_team ? "default" : "outline"}
                             onClick={() => handleMakePick(game.id, game.home_team)}
-                            className="flex-1"
+                            className="min-w-0 text-xs truncate"
                           >
-                            {game.home_team}
+                            <span className="truncate">{game.home_team}</span>
                           </Button>
                         </div>
                       )}

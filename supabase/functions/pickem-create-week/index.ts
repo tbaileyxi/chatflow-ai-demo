@@ -68,17 +68,41 @@ serve(async (req) => {
       seasonYear = seasonYear - 1;
     }
 
-    // Determine current week number
+    // Get current week from ESPN API for accurate week calculation
     let currentWeek = 1;
-    if (league === 'nfl') {
-      const seasonStart = new Date(seasonYear, 8, 1); // September 1st
-      currentWeek = Math.max(1, Math.ceil((now.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000)));
-    } else if (league === 'ncaaf') {
-      const seasonStart = new Date(seasonYear, 7, 15); // August 15th
-      currentWeek = Math.max(1, Math.ceil((now.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000)));
+    let actualSeasonYear = seasonYear;
+    
+    try {
+      const espnUrl = league === 'nfl' 
+        ? `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
+        : `https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+      
+      const espnResponse = await fetch(espnUrl);
+      const espnData = await espnResponse.json();
+      
+      if (espnData?.week?.number) {
+        currentWeek = espnData.week.number;
+        console.log(`Got current week ${currentWeek} from ESPN API`);
+      }
+      
+      if (espnData?.season?.year) {
+        actualSeasonYear = espnData.season.year;
+        console.log(`Got season year ${actualSeasonYear} from ESPN API`);
+      }
+    } catch (error) {
+      console.log('Failed to get week from ESPN API, falling back to date calculation:', error);
+      // Fallback to date calculation
+      if (league === 'nfl') {
+        const seasonStart = new Date(seasonYear, 8, 1); // September 1st
+        currentWeek = Math.max(1, Math.ceil((now.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000)));
+      } else if (league === 'ncaaf') {
+        const seasonStart = new Date(seasonYear, 7, 15); // August 15th
+        currentWeek = Math.max(1, Math.ceil((now.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 1000)));
+      }
     }
 
     const targetWeek = Math.max(1, currentWeek + weekOffset);
+    seasonYear = actualSeasonYear; // Use the season year from ESPN if available
 
     console.log(`Syncing ${league} week ${targetWeek} for ${seasonYear}`);
 
