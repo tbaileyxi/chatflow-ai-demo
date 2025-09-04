@@ -382,6 +382,7 @@ useEffect(() => {
           poll_data,
           is_team_agent_message,
           origin_team_id,
+          message_type,
           origin_teams:teams!origin_team_id(name, logo_url)
         `)
         .eq("huddle_id", id)
@@ -441,6 +442,7 @@ useEffect(() => {
           poll_data,
           is_team_agent_message,
           origin_team_id,
+          message_type,
           origin_teams:teams!origin_team_id(name, logo_url)
         `)
         .eq("huddle_id", id)

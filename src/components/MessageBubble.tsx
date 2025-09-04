@@ -218,7 +218,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({
     );
   }, [message.content, isStreaming]);
 
-  // Handle Pick 'Em card rendering
+  // Handle Pick 'Em card rendering (from embed_code)
   if (message.embed_code) {
     try {
       const embedData = JSON.parse(message.embed_code);
@@ -235,7 +235,28 @@ export const MessageBubble = memo<MessageBubbleProps>(({
         );
       }
     } catch (e) {
-      // Not a Pick 'Em card, continue with normal rendering
+      // Not a Pick 'Em card, continue
+    }
+  }
+
+  // Handle Pick 'Em card rendering (from content JSON)
+  if (message.content) {
+    try {
+      const contentData = JSON.parse(message.content);
+      if (contentData?.type === 'pickem_card' && onViewPickEm) {
+        return (
+          <div className="px-4 py-2">
+            <PickEmCard
+              instanceId={contentData.instanceId}
+              title={contentData.title}
+              gameCount={contentData.gameCount}
+              onViewDetails={onViewPickEm}
+            />
+          </div>
+        );
+      }
+    } catch (e) {
+      // Content is not JSON; continue
     }
   }
 
