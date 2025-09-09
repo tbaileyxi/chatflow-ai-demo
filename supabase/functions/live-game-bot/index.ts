@@ -494,7 +494,7 @@ async function postToTeamFeeds(teams: any[], content: string, league: string, su
         const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
         for (const huddle of huddles || []) {
           // Check in-memory cache first for rapid duplicate prevention
-          const cacheKey = dedupeId ? `${huddle.id}-${dedupeId}` : `${huddle.id}-${content}`
+          const cacheKey = dedupeId ? `${huddle.id}-${dedupeId}` : `${huddle.id}-${content.substring(0, 50)}`
           const lastMessageTime = recentMessages.get(cacheKey)
           const now = Date.now()
           

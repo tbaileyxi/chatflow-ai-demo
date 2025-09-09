@@ -19,7 +19,7 @@ serve(async (req) => {
 
     console.log('Starting pick\'em scoring update...')
 
-    // Get all games from the current week that might need updates
+    // Get all games from recent weeks that might need updates
     const { data: games, error: gamesError } = await supabase
       .from('pickem_games')
       .select(`
@@ -28,7 +28,7 @@ serve(async (req) => {
       `)
       .gte('start_time', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Last 7 days
       .lte('start_time', new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString()) // Next 2 days
-      .in('status', ['scheduled', 'in_progress'])
+      .in('status', ['scheduled', 'in_progress', 'final'])
 
     if (gamesError) throw gamesError
     if (!games || games.length === 0) {
