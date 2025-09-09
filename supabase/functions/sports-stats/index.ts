@@ -200,6 +200,23 @@ async function getScoreUpdate(teamName: string): Promise<string> {
       }
     }
 
+    // Try yesterday's NFL games if no today games found
+    console.log('Checking yesterday\'s NFL games...');
+    const yesterdayET = new Date();
+    yesterdayET.setDate(yesterdayET.getDate() - 1);
+    const yesterdayStr = yesterdayET.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).replace(/-/g, '');
+    
+    const nflYesterdayResponse = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${yesterdayStr}`);
+    if (nflYesterdayResponse.ok) {
+      const nflYesterdayData = await nflYesterdayResponse.json();
+      console.log(`Found ${nflYesterdayData.events?.length || 0} NFL games yesterday`);
+      const nflYesterdayGame = findTeamGame(nflYesterdayData.events, teamName);
+      if (nflYesterdayGame) {
+        console.log('Found NFL game from yesterday');
+        return formatScoreUpdate(nflYesterdayGame, 'NFL', false, true);
+      }
+    }
+
     // Try College Football (today's games with explicit date)
     console.log('Checking College Football games...');
     const cfbResponse = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=${todayET}`);
@@ -282,10 +299,19 @@ function findTeamGame(events: any[], teamName: string): ESPNGame | null {
     for (const competition of event.competitions) {
       for (const competitor of competition.competitors) {
         const team = competitor.team;
+        
+        // Special handling for Cleveland Browns
+        const isClevelBrownsMatch = (teamName.toLowerCase() === 'browns' || 
+                                    teamName.toLowerCase() === 'cleveland') &&
+                                   (team.name.toLowerCase().includes('browns') || 
+                                    team.location.toLowerCase().includes('cleveland'));
+        
         if (
+          isClevelBrownsMatch ||
           team.name.toLowerCase().includes(teamName.toLowerCase()) ||
           team.displayName.toLowerCase().includes(teamName.toLowerCase()) ||
-          team.abbreviation.toLowerCase() === teamName.toLowerCase()
+          team.abbreviation.toLowerCase() === teamName.toLowerCase() ||
+          team.location.toLowerCase().includes(teamName.toLowerCase())
         ) {
           // Restructure to match our interface
           return {
