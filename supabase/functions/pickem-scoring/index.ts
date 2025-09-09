@@ -58,8 +58,8 @@ serve(async (req) => {
         const seasonYear = (leagueGames as any)[0].pickem_weeks.season_year
 
         const espnUrl = league === 'nfl' 
-          ? `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${weekNumber}&seasontype=2&dates=${seasonYear}`
-          : `https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?week=${weekNumber}&seasontype=2&dates=${seasonYear}`
+          ? `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${weekNumber}&seasontype=2`
+          : `https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?week=${weekNumber}&seasontype=2`
         
         const espnResponse = await fetch(espnUrl)
         const espnData = await espnResponse.json()
