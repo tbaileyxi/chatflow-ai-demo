@@ -27,7 +27,7 @@ verify_jwt = false
 
 [functions.pickem-scoring]
 verify_jwt = false
-on_schedule = "0 */2 * * *"
+on_schedule = "*/5 * * * *"
 
 [functions.pickem-backfill-week1]
 verify_jwt = false

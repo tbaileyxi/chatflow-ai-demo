@@ -57,19 +57,31 @@ serve(async (req) => {
         const weekNumber = (leagueGames as any)[0].pickem_weeks.week_number
         const seasonYear = (leagueGames as any)[0].pickem_weeks.season_year
 
+        console.log(`Processing ${league} league: Week ${weekNumber}, Season ${seasonYear}, ${(leagueGames as any[]).length} games`)
+        
         const espnUrl = league === 'nfl' 
-          ? `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${weekNumber}&seasontype=2`
-          : `https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?week=${weekNumber}&seasontype=2`
+          ? `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${weekNumber}&year=${seasonYear}&seasontype=2`
+          : `https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?week=${weekNumber}&year=${seasonYear}&seasontype=2`
+        
+        console.log(`ESPN URL: ${espnUrl}`)
         
         const espnResponse = await fetch(espnUrl)
         const espnData = await espnResponse.json()
 
-        if (!espnData.events) continue
+        if (!espnData.events) {
+          console.log(`No events found for ${league} league`)
+          continue
+        }
+        
+        console.log(`Found ${espnData.events.length} events for ${league} league`)
 
         // Update each game
         for (const game of leagueGames as any[]) {
           const espnGame = espnData.events.find((e: any) => e.id === game.espn_game_id)
-          if (!espnGame) continue
+          if (!espnGame) {
+            console.log(`ESPN game not found for ID: ${game.espn_game_id} (${game.home_team} vs ${game.away_team})`)
+            continue
+          }
 
           const competition = espnGame.competitions[0]
           if (!competition) continue
