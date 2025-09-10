@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Trophy, Clock, CheckCircle2, XCircle, Users } from "lucide-react";
+import { Trophy, Clock, CheckCircle2, XCircle, Users, RefreshCw } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 interface PickEmViewProps {
@@ -52,6 +52,28 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
   useEffect(() => {
     if (instanceId) {
       fetchPickEmData();
+      
+      // Subscribe to realtime changes on entries for this instance
+      const channel = supabase
+        .channel('pickem-entries-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'pickem_entries',
+            filter: `instance_id=eq.${instanceId}`
+          },
+          () => {
+            // Refetch leaderboard when any entry changes
+            fetchPickEmData();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [instanceId]);
 
@@ -171,6 +193,11 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
 
   const isGameLocked = (game: Game) => {
     return new Date(game.start_time) <= new Date() || game.status !== 'scheduled';
+  };
+
+  const refreshData = async () => {
+    setLoading(true);
+    await fetchPickEmData();
   };
 
   const getPickForGame = (gameId: string) => {
@@ -320,35 +347,40 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
         <TabsContent value="leaderboard" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Leaderboard
-              </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Leaderboard
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={refreshData} disabled={loading}>
+                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
             </CardHeader>
             <CardContent>
               {leaderboard.length === 0 ? (
                 <p className="text-center text-muted-foreground">No entries yet</p>
               ) : (
                 <div className="space-y-2">
-                  {leaderboard.map((entry, index) => (
+                  {leaderboard.map((entry) => (
                     <div
-                      key={entry.id}
+                      key={entry.user_id}
                       className={`flex items-center justify-between p-3 rounded-lg ${
                         entry.user_id === user?.id ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          index === 0 ? 'bg-yellow-500 text-white' :
-                          index === 1 ? 'bg-gray-400 text-white' :
-                          index === 2 ? 'bg-amber-600 text-white' :
+                          (entry.rank || 0) === 1 ? 'bg-yellow-500 text-white' :
+                          (entry.rank || 0) === 2 ? 'bg-gray-400 text-white' :
+                          (entry.rank || 0) === 3 ? 'bg-amber-600 text-white' :
                           'bg-muted text-muted-foreground'
                         }`}>
-                          {entry.rank || index + 1}
+                          {entry.rank}
                         </div>
                         <div>
                           <div className="font-medium">
-                            {entry.display_name || entry.username || 'Anonymous'}
+                            {entry.display_name === 'User' ? entry.username : entry.display_name}
                             {entry.user_id === user?.id && (
                               <span className="text-xs text-muted-foreground ml-2">(You)</span>
                             )}
