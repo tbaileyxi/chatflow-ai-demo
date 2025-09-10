@@ -20,7 +20,7 @@ verify_jwt = false
 
 [functions.pickem-sync-season]
 verify_jwt = false
-on_schedule = "0 2,14 * * 2,5"
+on_schedule = "0 2,14 * * 2,3,5"
 
 [functions.pickem-create-week]
 verify_jwt = false
@@ -28,3 +28,6 @@ verify_jwt = false
 [functions.pickem-scoring]
 verify_jwt = false
 on_schedule = "0 */2 * * *"
+
+[functions.pickem-backfill-week1]
+verify_jwt = false

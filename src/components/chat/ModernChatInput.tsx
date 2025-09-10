@@ -234,10 +234,62 @@ export const ModernChatInput = ({
         });
         onSlashComplete?.(false);
       }
+    } else if (cmd === '/pickem') {
+      try {
+        // Find active pick'em instance for this huddle
+        const { data: activeInstance } = await supabase
+          .from('pickem_instances')
+          .select('id, title, status')
+          .eq('huddle_id', huddleId)
+          .eq('status', 'open')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (activeInstance) {
+          // Post existing pick'em card
+          const systemUserId = await supabase.rpc('get_or_create_system_user');
+          
+          await supabase.from('huddle_messages').insert({
+            huddle_id: huddleId,
+            user_id: systemUserId.data,
+            content: 'Current Pick \'em challenge:',
+            message_type: 'pickem_card',
+            embed_code: `pickem_card:${activeInstance.id}`,
+            is_bot_message: true
+          });
+          
+          toast({
+            title: "Pick 'em displayed",
+            description: "Current pick 'em challenge posted!",
+          });
+        } else {
+          // Create new pick'em for current week
+          const response = await supabase.functions.invoke('pickem-create-week', {
+            body: { huddleId }
+          });
+
+          if (response.error) throw response.error;
+
+          toast({
+            title: "Pick 'em created",
+            description: "New pick 'em challenge created for this week!",
+          });
+        }
+        onSlashComplete?.(true);
+      } catch (error) {
+        console.error('Pick em command error:', error);
+        toast({
+          title: "Command failed",
+          description: "Unable to create or display pick 'em. Please try again.",
+          variant: "destructive"
+        });
+        onSlashComplete?.(false);
+      }
     } else {
       toast({
         title: "Unknown command",
-        description: "Available: /score [team], /stats [team], /score nfl, /score college. You can also use ? instead of /",
+        description: "Available: /score [team], /stats [team], /pickem, /score nfl, /score college. You can also use ? instead of /",
         variant: "destructive"
       });
       onSlashComplete?.(false);
