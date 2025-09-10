@@ -1,0 +1,1 @@
+node trigger-scoring-now.js

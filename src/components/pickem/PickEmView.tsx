@@ -380,7 +380,7 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
                         </div>
                         <div>
                           <div className="font-medium">
-                            {entry.display_name === 'User' ? entry.username : entry.display_name}
+                            {entry.display_name && entry.display_name !== 'User' ? entry.display_name : entry.username}
                             {entry.user_id === user?.id && (
                               <span className="text-xs text-muted-foreground ml-2">(You)</span>
                             )}
