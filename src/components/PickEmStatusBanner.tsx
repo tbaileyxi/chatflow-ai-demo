@@ -18,6 +18,7 @@ interface ActiveInstance {
   game_count: number;
   user_picks: number;
   deadline_approaching: boolean;
+  has_future_games?: boolean;
 }
 
 export const PickEmStatusBanner = ({ huddleId, userId, onViewDetails }: PickEmStatusBannerProps) => {
@@ -72,10 +73,10 @@ export const PickEmStatusBanner = ({ huddleId, userId, onViewDetails }: PickEmSt
 
       const userPicksCount = userEntry?.pickem_picks?.[0]?.count || 0;
       
-      // Check if deadline is approaching (within 24 hours)
+      // Check if deadline is approaching (within 24 hours) and in the future
       const now = new Date();
-      const nextDeadline = games
-        .filter(g => g.status === 'scheduled')
+      const futureGames = games.filter(g => g.status === 'scheduled' && new Date(g.start_time) > now);
+      const nextDeadline = futureGames
         .map(g => new Date(g.start_time))
         .sort((a, b) => a.getTime() - b.getTime())[0];
       
@@ -88,7 +89,8 @@ export const PickEmStatusBanner = ({ huddleId, userId, onViewDetails }: PickEmSt
         status: instance.status,
         game_count: games.length,
         user_picks: userPicksCount,
-        deadline_approaching: !!deadlineApproaching
+        deadline_approaching: !!deadlineApproaching,
+        has_future_games: futureGames.length > 0
       });
     } catch (error) {
       console.error('Error fetching active Pick\'em instance:', error);
@@ -103,7 +105,8 @@ export const PickEmStatusBanner = ({ huddleId, userId, onViewDetails }: PickEmSt
   }
 
   const isIncomplete = activeInstance.user_picks < activeInstance.game_count;
-  const showBanner = isIncomplete || activeInstance.deadline_approaching;
+  const hasFutureGames = activeInstance.has_future_games !== false;
+  const showBanner = (isIncomplete || activeInstance.deadline_approaching) && hasFutureGames;
 
   if (!showBanner) {
     return null;

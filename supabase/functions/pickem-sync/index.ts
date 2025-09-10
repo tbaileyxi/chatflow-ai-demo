@@ -47,10 +47,10 @@ serve(async (req) => {
 
     console.log(`Syncing ${league} week ${week_number} for ${season_year}`)
 
-    // Fetch from ESPN API
+    // Fetch from ESPN API (removed problematic dates parameter)
     const espnUrl = league === 'nfl' 
-      ? `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week_number}&seasontype=2&dates=${season_year}`
-      : `https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?week=${week_number}&seasontype=2&dates=${season_year}`
+      ? `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week_number}&seasontype=2`
+      : `https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?week=${week_number}&seasontype=2`
     
     const espnResponse = await fetch(espnUrl)
     const espnData = await espnResponse.json()

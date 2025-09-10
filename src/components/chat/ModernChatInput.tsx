@@ -247,16 +247,19 @@ export const ModernChatInput = ({
           .maybeSingle();
 
         if (activeInstance) {
-          // Post existing pick'em card
-          const systemUserId = await supabase.rpc('get_or_create_system_user');
-          
+          // Post existing pick'em card as current user
           await supabase.from('huddle_messages').insert({
             huddle_id: huddleId,
-            user_id: systemUserId.data,
+            user_id: userId,
             content: 'Current Pick \'em challenge:',
             message_type: 'pickem_card',
-            embed_code: `pickem_card:${activeInstance.id}`,
-            is_bot_message: true
+            embed_code: JSON.stringify({
+              type: 'pickem_card',
+              instanceId: activeInstance.id,
+              title: activeInstance.title,
+              gameCount: 0
+            }),
+            is_bot_message: false
           });
           
           toast({

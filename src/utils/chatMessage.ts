@@ -48,10 +48,11 @@ export const parsePickEmMessage = (message: BasicMessage): PickEmData | null => 
     }
   }
   
-  // Legacy detection: try parsing embed_code or content as Pick 'Em JSON
+  // Legacy detection: handle both JSON and simple formats
   const sources = [message.embed_code, message.content].filter(Boolean);
   for (const source of sources) {
     try {
+      // Try parsing as JSON first
       const data = JSON.parse(source);
       if (data?.type === 'pickem_card') {
         return {
@@ -62,7 +63,18 @@ export const parsePickEmMessage = (message: BasicMessage): PickEmData | null => 
         };
       }
     } catch (e) {
-      // Not JSON or not Pick 'Em, continue
+      // Try legacy format: "pickem_card:UUID"
+      if (source.startsWith('pickem_card:')) {
+        const instanceId = source.split(':')[1];
+        if (instanceId) {
+          return {
+            type: 'pickem_card',
+            instanceId,
+            title: 'Pick \'Em Challenge',
+            gameCount: 0
+          };
+        }
+      }
     }
   }
   
