@@ -295,6 +295,24 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
                   </Card>
                 );
               })}
+              
+              {userEntry && games.some(game => !isGameLocked(game)) && (
+                <div className="pt-4 border-t">
+                  <Button 
+                    onClick={() => {
+                      toast({
+                        title: "Picks Submitted!",
+                        description: "Your selections have been saved.",
+                      });
+                      onBack();
+                    }}
+                    className="w-full"
+                    size="lg"
+                  >
+                    Submit Picks
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </TabsContent>

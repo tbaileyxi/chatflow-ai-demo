@@ -204,7 +204,7 @@ export const PickEmCard = ({ instanceId, title, gameCount, onViewDetails }: Pick
             onClick={(e) => { e.stopPropagation(); onViewDetails(instanceId); }}
             className="flex-1"
           >
-            View Details
+            Make Selections
           </Button>
           
           {!stats?.userEntry && !stats?.hasStartedGames && (

@@ -148,7 +148,7 @@ export const PickEmStatusBanner = ({ huddleId, userId, onViewDetails }: PickEmSt
             onClick={() => onViewDetails(activeInstance.id)}
             className="bg-primary/20 hover:bg-primary/30 text-primary border-primary/20"
           >
-            {isIncomplete ? 'Complete Picks' : 'View'}
+            {isIncomplete ? 'Make Selections' : 'View'}
           </Button>
         </div>
       </div>
