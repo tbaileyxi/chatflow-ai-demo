@@ -77,6 +77,34 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
     }
   }, [instanceId]);
 
+  const restoreWeek1Data = async () => {
+    try {
+      // Get the huddle ID from the URL or current context
+      const huddleId = window.location.pathname.split('/huddle/')[1];
+      
+      const { data, error } = await supabase.functions.invoke('restore-huddle-week1', {
+        body: { huddleId }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Week 1 Restored",
+        description: "NFL Week 1 Pick 'Em has been restored with historical data",
+      });
+
+      // Refresh the data after restoration
+      await fetchPickEmData();
+    } catch (error) {
+      console.error('Error restoring Week 1:', error);
+      toast({
+        title: "Error",
+        description: "Failed to restore Week 1 data",
+        variant: "destructive"
+      });
+    }
+  };
+
   const fetchPickEmData = async () => {
     try {
       // Get instance details
@@ -89,7 +117,15 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
         .eq('id', instanceId)
         .single();
 
-      if (instanceError) throw instanceError;
+      if (instanceError) {
+        // If this is a missing Week 1 instance, try to restore it
+        if (instanceError.code === 'PGRST116') {
+          console.log('Instance not found, attempting to restore Week 1 data...');
+          await restoreWeek1Data();
+          return;
+        }
+        throw instanceError;
+      }
       setInstance(instanceData);
 
       // Get games for this instance
@@ -239,13 +275,21 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
         </TabsList>
         
         <TabsContent value="picks" className="space-y-4">
-          {!userEntry ? (
+              {!userEntry ? (
             <Card>
               <CardContent className="p-6 text-center">
-                <p className="text-muted-foreground mb-4">You haven't joined this Pick 'Em yet.</p>
-                <Button onClick={() => window.location.reload()}>
-                  Refresh to Join
-                </Button>
+                <p className="text-muted-foreground mb-4">
+                  {!instance ? "Pick 'Em data not found. This may be Week 1 data that needs to be restored." : "You haven't joined this Pick 'Em yet."}
+                </p>
+                {!instance ? (
+                  <Button onClick={restoreWeek1Data} disabled={loading}>
+                    Restore Week 1 Data
+                  </Button>
+                ) : (
+                  <Button onClick={() => window.location.reload()}>
+                    Refresh to Join
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
