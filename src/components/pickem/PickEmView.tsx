@@ -250,6 +250,14 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
             </Card>
           ) : (
             <div className="space-y-3">
+              {userEntry && userPicks.length === 0 && (
+                <Card>
+                  <CardContent className="p-4 text-sm text-muted-foreground">
+                    No picks submitted yet for this instance.
+                  </CardContent>
+                </Card>
+              )}
+
               {games.map((game) => {
                 const pick = getPickForGame(game.id);
                 const locked = isGameLocked(game);
@@ -341,20 +349,42 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
                 </div>
               )}
             </div>
-          )}
+          )
         </TabsContent>
         
         <TabsContent value="leaderboard" className="space-y-4">
           <Card>
             <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <CardTitle className="flex items-center gap-2">
                     <Users className="w-5 h-5" />
                     Leaderboard
                   </CardTitle>
-                  <Button variant="ghost" size="sm" onClick={refreshData} disabled={loading}>
-                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" onClick={refreshData} disabled={loading} aria-label="Refresh leaderboard">
+                      <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          (window as any).rescoring = true;
+                          const { error } = await supabase.functions.invoke('pickem-rescore-instance', { body: { instanceId } });
+                          if (error) throw error;
+                          toast({ title: 'Re-score started', description: 'Scores will refresh shortly.' });
+                          await refreshData();
+                        } catch (e) {
+                          console.error('Rescore error:', e);
+                          toast({ title: 'Re-score failed', description: 'Please try again or contact support.', variant: 'destructive' });
+                        } finally {
+                          (window as any).rescoring = false;
+                        }
+                      }}
+                    >
+                      Re-score now
+                    </Button>
+                  </div>
                 </div>
             </CardHeader>
             <CardContent>

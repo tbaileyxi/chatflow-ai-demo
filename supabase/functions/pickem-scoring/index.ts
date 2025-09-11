@@ -42,38 +42,38 @@ serve(async (req) => {
 
     let updatedGames = 0
 
-    // Group games by league for efficient API calls
-    const gamesByLeague = games.reduce((acc: any, game: any) => {
+    // Group games by league + season + week for precise updates
+    const groups = games.reduce((acc: any, game: any) => {
       const league = game.pickem_weeks.league
-      if (!acc[league]) acc[league] = []
-      acc[league].push(game)
+      const week = game.pickem_weeks.week_number
+      const year = game.pickem_weeks.season_year
+      const key = `${league}:${year}:W${week}`
+      if (!acc[key]) acc[key] = { league, week, year, games: [] as any[] }
+      acc[key].games.push(game)
       return acc
-    }, {})
+    }, {} as Record<string, { league: string; week: number; year: number; games: any[] }>)
 
-    // Update each league
-    for (const [league, leagueGames] of Object.entries(gamesByLeague)) {
+    // Update each group
+    for (const [key, group] of Object.entries(groups)) {
       try {
-        // Get current week for this league
-        const weekNumber = (leagueGames as any)[0].pickem_weeks.week_number
-        const seasonYear = (leagueGames as any)[0].pickem_weeks.season_year
+        const { league, week, year, games: leagueGames } = group as any
 
-        console.log(`Processing ${league} league: Week ${weekNumber}, Season ${seasonYear}, ${(leagueGames as any[]).length} games`)
-        
-        const espnUrl = league === 'nfl' 
-          ? `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${weekNumber}&year=${seasonYear}&seasontype=2`
-          : `https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?week=${weekNumber}&year=${seasonYear}&seasontype=2`
-        
+        console.log(`Processing ${key} with ${leagueGames.length} games`)
+        const espnUrl = league === 'nfl'
+          ? `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&year=${year}&seasontype=2`
+          : `https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?week=${week}&year=${year}&seasontype=2`
+
         console.log(`ESPN URL: ${espnUrl}`)
-        
+
         const espnResponse = await fetch(espnUrl)
         const espnData = await espnResponse.json()
 
         if (!espnData.events) {
-          console.log(`No events found for ${league} league`)
+          console.log(`No events found for ${key}`)
           continue
         }
-        
-        console.log(`Found ${espnData.events.length} events for ${league} league`)
+
+        console.log(`Found ${espnData.events.length} events for ${key}`)
 
         // Update each game
         for (const game of leagueGames as any[]) {
@@ -125,7 +125,7 @@ serve(async (req) => {
           }
         }
       } catch (error) {
-        console.error(`Error updating ${league} games:`, error)
+        console.error(`Error updating group ${key}:`, error)
       }
     }
 
