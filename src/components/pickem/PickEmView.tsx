@@ -360,31 +360,9 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
                     <Users className="w-5 h-5" />
                     Leaderboard
                   </CardTitle>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" onClick={refreshData} disabled={loading} aria-label="Refresh leaderboard">
-                      <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        try {
-                          (window as any).rescoring = true;
-                          const { error } = await supabase.functions.invoke('pickem-rescore-instance', { body: { instanceId } });
-                          if (error) throw error;
-                          toast({ title: 'Re-score started', description: 'Scores will refresh shortly.' });
-                          await refreshData();
-                        } catch (e) {
-                          console.error('Rescore error:', e);
-                          toast({ title: 'Re-score failed', description: 'Please try again or contact support.', variant: 'destructive' });
-                        } finally {
-                          (window as any).rescoring = false;
-                        }
-                      }}
-                    >
-                      Re-score now
-                    </Button>
-                  </div>
+                  <Button variant="ghost" size="sm" onClick={refreshData} disabled={loading} aria-label="Refresh leaderboard">
+                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  </Button>
                 </div>
             </CardHeader>
             <CardContent>
