@@ -348,9 +348,9 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
                   </Button>
                 </div>
               )}
-            </div>
-          )
-        </TabsContent>
+             </div>
+           )}
+         </TabsContent>
         
         <TabsContent value="leaderboard" className="space-y-4">
           <Card>
