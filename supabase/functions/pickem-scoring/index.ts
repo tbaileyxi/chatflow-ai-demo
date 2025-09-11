@@ -96,9 +96,20 @@ serve(async (req) => {
             status = 'postponed'
           }
 
+          // Add safeguard: never mark future games as final
+          const gameStartTime = new Date(game.start_time)
+          const now = new Date()
+          const isGameInFuture = gameStartTime > now
+          
+          // If game is scheduled in the future, force status to 'scheduled'
+          if (isGameInFuture && status === 'final') {
+            console.log(`WARNING: ESPN returned 'final' for future game ${game.espn_game_id} (${game.home_team} vs ${game.away_team}), forcing to 'scheduled'`)
+            status = 'scheduled'
+          }
+
           // Determine winner if game is final
           let winningTeam = null
-          if (status === 'final' && competition.competitors) {
+          if (status === 'final' && competition.competitors && !isGameInFuture) {
             const winner = competition.competitors.find((c: any) => c.winner === true)
             if (winner) {
               winningTeam = winner.team.displayName
