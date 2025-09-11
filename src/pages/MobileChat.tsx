@@ -16,7 +16,7 @@ import { RealtimeMessageHandler } from '@/components/optimized/RealtimeMessageHa
 import { ModernChatInput } from '@/components/chat/ModernChatInput';
 import { ImprovedMediaUpload } from '@/components/chat/ImprovedMediaUpload';
 import { StartPickEmDialog } from "@/components/pickem/StartPickEmDialog";
-import { PickEmView } from "@/components/pickem/PickEmView";
+import { PickEmDashboard } from "@/components/pickem/PickEmDashboard";
 import { PickEmCard } from "@/components/pickem/PickEmCard";
 import { PickEmStatusBanner } from "@/components/PickEmStatusBanner";
 import { HuddleVerificationDialog } from "@/components/HuddleVerificationDialog";
@@ -76,7 +76,7 @@ export const MobileChat = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [ephemeralMessages, setEphemeralMessages] = useState<Message[]>([]);
   const [showPickEmDialog, setShowPickEmDialog] = useState(false);
-  const [pickEmViewId, setPickEmViewId] = useState<string | null>(null);
+  const [showPickEmDashboard, setShowPickEmDashboard] = useState(false);
   const profileCacheRef = useRef<Map<string, User>>(new Map());
 
   // Check if current user is the owner
@@ -96,11 +96,11 @@ export const MobileChat = () => {
   };
 
   const handleViewPickEm = (instanceId: string) => {
-    setPickEmViewId(instanceId);
+    setShowPickEmDashboard(true);
   };
 
   const handleBackToChat = () => {
-    setPickEmViewId(null);
+    setShowPickEmDashboard(false);
   };
 
   const scrollToBottom = () => {
@@ -651,17 +651,13 @@ const { data: messagesData, error: messagesError } = await supabase
     );
   }
 
-  // Show Pick'Em view if selected
-  if (pickEmViewId) {
+  // Show Pick'Em dashboard if selected
+  if (showPickEmDashboard) {
     return (
-      <div className="h-[100svh] overflow-y-auto bg-background">
-        <div className="p-4 pb-24">
-          <PickEmView
-            instanceId={pickEmViewId}
-            onBack={handleBackToChat}
-          />
-        </div>
-      </div>
+      <PickEmDashboard
+        huddleId={huddleId || ''}
+        onBack={handleBackToChat}
+      />
     );
   }
 
