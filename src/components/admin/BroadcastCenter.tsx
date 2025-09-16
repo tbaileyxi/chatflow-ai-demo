@@ -54,6 +54,10 @@ export const BroadcastCenter = () => {
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
   const [tags, setTags] = useState('');
+  
+  // Thread support - multiple embeds with commentary
+  const [threadEmbeds, setThreadEmbeds] = useState<Array<{ commentary: string; embed_code: string; embed_type: 'x' | 'iframe' | 'youtube' }>>([]);
+  const [currentEmbedCommentary, setCurrentEmbedCommentary] = useState('');
 
   useEffect(() => {
     fetchTeams();
@@ -144,9 +148,38 @@ export const BroadcastCenter = () => {
     setMediaType(null);
   };
 
+  const addEmbedToThread = () => {
+    if (!embedCode.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter embed code first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const embedType = embedCode.includes('twitter.com') || embedCode.includes('x.com') ? 'x' :
+                     embedCode.includes('youtube.com') || embedCode.includes('youtu.be') ? 'youtube' : 'iframe';
+
+    setThreadEmbeds(prev => [...prev, {
+      commentary: currentEmbedCommentary,
+      embed_code: embedCode,
+      embed_type: embedType
+    }]);
+
+    // Clear form
+    setEmbedCode('');
+    setCurrentEmbedCommentary('');
+    setEmbedPreview('');
+  };
+
+  const removeEmbedFromThread = (index: number) => {
+    setThreadEmbeds(prev => prev.filter((_, i) => i !== index));
+  };
+
   const validateForm = (): string | null => {
-    if (!content.trim() && !mediaUrl && !mediaCommentary.trim() && messageType !== 'upload') {
-      return 'Please enter message content or upload media';
+    if (!content.trim() && !mediaUrl && !mediaCommentary.trim() && messageType !== 'upload' && threadEmbeds.length === 0) {
+      return 'Please enter message content, upload media, or add embeds to thread';
     }
 
     if (!sourceTeam) {
@@ -194,7 +227,7 @@ export const BroadcastCenter = () => {
       let firstError = "";
       if (huddles?.length) {
         for (const huddle of huddles) {
-          const { error: huddleMessageError } = await supabase
+          const { error } = await supabase
             .from('huddle_messages')
             .insert({
               content: postData.content,
@@ -207,13 +240,14 @@ export const BroadcastCenter = () => {
                 (postData.media_url.includes('.mp4') || postData.media_url.includes('.mov') || postData.media_url.includes('.webm') || postData.media_url.includes('.avi') ? 'video' : 'image') 
                 : 'text',
               embed_code: postData.embed_code,
+              embeds: postData.embeds,
               poll_data: postData.poll_data,
               is_team_agent_message: postData.is_team_agent_message || false
             });
 
 
-          if (huddleMessageError) {
-            console.error(`Failed to broadcast to huddle ${huddle.name}:`, huddleMessageError);
+          if (error) {
+            console.error(`Failed to broadcast to huddle ${huddle.name}:`, error);
             if (!firstError) firstError = `Failed to broadcast to huddle: ${huddle.name}`;
             hadError = true;
             continue;
@@ -288,7 +322,8 @@ export const BroadcastCenter = () => {
             is_spotlight: true,
             poll_data: pollData,
             media_url: messageType === 'upload' ? mediaUrl : null,
-            embed_code: messageType === 'embed' ? embedCode : null,
+            embed_code: messageType === 'embed' && threadEmbeds.length === 0 ? embedCode : null,
+            embeds: threadEmbeds.length > 0 ? threadEmbeds : null,
             target_audience: ['spotlight'],
             delivery_status: 'sent'
           };
@@ -331,7 +366,8 @@ export const BroadcastCenter = () => {
           is_agent_post: true,
           poll_data: pollData,
           media_url: messageType === 'upload' ? mediaUrl : null,
-          embed_code: messageType === 'embed' ? embedCode : null,
+                embed_code: messageType === 'embed' && threadEmbeds.length === 0 ? embedCode : null,
+                embeds: threadEmbeds.length > 0 ? threadEmbeds : null,
           target_audience: targetAudience,
           delivery_status: 'sent',
           is_spotlight: false
@@ -373,7 +409,8 @@ export const BroadcastCenter = () => {
             is_agent_post: true,
             poll_data: pollData,
             media_url: messageType === 'upload' ? mediaUrl : null,
-            embed_code: messageType === 'embed' ? embedCode : null,
+          embed_code: messageType === 'embed' && threadEmbeds.length === 0 ? embedCode : null,
+          embeds: threadEmbeds.length > 0 ? threadEmbeds : null,
             target_audience: ['team_feed'], // Only team feed, no spotlight
             delivery_status: 'sent',
             is_spotlight: false
@@ -407,7 +444,8 @@ export const BroadcastCenter = () => {
           is_agent_post: true,
           poll_data: pollData,
           media_url: messageType === 'upload' ? mediaUrl : null,
-          embed_code: messageType === 'embed' ? embedCode : null,
+          embed_code: messageType === 'embed' && threadEmbeds.length === 0 ? embedCode : null,
+          embeds: threadEmbeds.length > 0 ? threadEmbeds : null,
           is_team_agent_message: true,
           post_id: createdPost.id // Include the post ID for linking
         };
@@ -457,6 +495,8 @@ export const BroadcastCenter = () => {
         setAddToSpotlight(false);
         setSelectedTeams([]);
         setTags('');
+        setThreadEmbeds([]);
+        setCurrentEmbedCommentary('');
         
         // Delay hiding delivery status to let user see results
         setTimeout(() => setShowDeliveryStatus(false), 3000);
@@ -719,7 +759,7 @@ export const BroadcastCenter = () => {
           {/* Embed Code */}
           {messageType === 'embed' && (
             <div className="space-y-3">
-              <Label htmlFor="embed-code">Embed Code</Label>
+              <Label htmlFor="embed-code">Embed Code (Single or Thread)</Label>
               <Textarea
                 id="embed-code"
                 value={embedCode}
@@ -734,6 +774,60 @@ export const BroadcastCenter = () => {
                     Preview: {embedPreview}
                   </AlertDescription>
                 </Alert>
+              )}
+              
+              {/* Thread Support */}
+              <div className="space-y-3 border-t pt-4">
+                <Label htmlFor="embed-commentary">Commentary for this embed (Optional)</Label>
+                <Textarea
+                  id="embed-commentary"
+                  value={currentEmbedCommentary}
+                  onChange={(e) => setCurrentEmbedCommentary(e.target.value)}
+                  placeholder="Add commentary or context before this embed..."
+                  rows={3}
+                />
+                
+                <Button
+                  type="button"
+                  onClick={addEmbedToThread}
+                  variant="secondary"
+                  className="w-full"
+                  disabled={!embedCode.trim()}
+                >
+                  Add to Thread
+                </Button>
+              </div>
+              
+              {/* Thread Preview */}
+              {threadEmbeds.length > 0 && (
+                <div className="space-y-2 border rounded-lg p-4 bg-muted/30">
+                  <Label>Thread Preview ({threadEmbeds.length} embed{threadEmbeds.length !== 1 ? 's' : ''})</Label>
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    {threadEmbeds.map((embed, index) => (
+                      <div key={index} className="bg-background p-3 rounded border space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Badge variant="outline" className="text-xs">
+                            Embed {index + 1} - {embed.embed_type.toUpperCase()}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeEmbedFromThread(index)}
+                            className="h-6 w-6 p-0"
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        {embed.commentary && (
+                          <p className="text-sm text-muted-foreground">"{embed.commentary}"</p>
+                        )}
+                        <p className="text-xs font-mono bg-muted p-2 rounded truncate">
+                          {embed.embed_code.substring(0, 100)}...
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}

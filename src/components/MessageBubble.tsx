@@ -8,6 +8,7 @@ import { Heart, Smile, ThumbsUp, Flame, Megaphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import DOMPurify from 'dompurify';
 import { XPostEmbed } from '@/components/embeds/XPostEmbed';
+import { ThreadView } from '@/components/ThreadView';
 import { extractVideoFrame } from '@/utils/videoThumbnail';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -25,6 +26,11 @@ interface MessageBubbleProps {
     media_url?: string;
     media_type?: string;
     embed_code?: string;
+    embeds?: Array<{
+      commentary: string;
+      embed_code: string;
+      embed_type: 'x' | 'iframe' | 'youtube';
+    }>;
     reactions?: any[];
     poll_data?: any;
     source?: {
@@ -323,8 +329,15 @@ export const MessageBubble = memo<MessageBubbleProps>(({
           </div>
         )}
 
-        {/* Embedded Content - only render if not Pick 'Em */}
-        {message.embed_code && !parsePickEmMessage(message) && (
+        {/* Thread View - handles both single embeds and thread embeds */}
+        {(message.embeds && message.embeds.length > 0) ? (
+          <ThreadView
+            content=""
+            embeds={message.embeds}
+            className="mt-2"
+            maxPreviewEmbeds={1}
+          />
+        ) : message.embed_code && !parsePickEmMessage(message) ? (
           isXEmbed ? (
             <XPostEmbed embedCode={message.embed_code} />
           ) : (
@@ -334,7 +347,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({
               dangerouslySetInnerHTML={{ __html: sanitizeEmbedCode(message.embed_code) }}
             />
           )
-        )}
+        ) : null}
 
         {message.media_url && (
           <div className="mt-2">

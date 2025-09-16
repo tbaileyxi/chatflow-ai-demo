@@ -10,6 +10,7 @@ import { MediaViewer } from "@/components/MediaViewer";
 import { ReportButton } from "@/components/ReportButton";
 import { linkifyTeamNames } from "@/utils/teamLinking";
 import { XPostEmbed } from "@/components/embeds/XPostEmbed";
+import { ThreadView } from "@/components/ThreadView";
 
 // Twitter global type
 declare global {
@@ -113,6 +114,11 @@ interface PostCardProps {
     content: string;
     media_url?: string;
     embed_code?: string;
+    embeds?: Array<{
+      commentary: string;
+      embed_code: string;
+      embed_type: 'x' | 'iframe' | 'youtube';
+    }>;
     message_type?: string;
     poll_data?: any;
     created_at: string;
@@ -459,12 +465,19 @@ export const PostCard = ({ post, isSpotlight = false, disableReply = false }: Po
           dangerouslySetInnerHTML={{ __html: linkifyTeamNames(contentWithoutTags) }}
         />
         
-        {/* Embed Code Display */}
-        {post.embed_code && (
+        {/* Thread View - handles both single embeds and thread embeds */}
+        {(post.embeds && post.embeds.length > 0) ? (
+          <ThreadView
+            content=""
+            embeds={post.embeds}
+            className="mt-3"
+            maxPreviewEmbeds={1}
+          />
+        ) : post.embed_code ? (
           <div className="mt-3 rounded-lg overflow-hidden">
             <XPostEmbed embedCode={post.embed_code} />
           </div>
-        )}
+        ) : null}
 
         {/* Media Display */}
         {post.media_url && !post.embed_code && (

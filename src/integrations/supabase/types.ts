@@ -296,6 +296,7 @@ export type Database = {
           content: string
           created_at: string
           embed_code: string | null
+          embeds: Json | null
           huddle_id: string
           id: string
           is_bot_message: boolean | null
@@ -312,6 +313,7 @@ export type Database = {
           content: string
           created_at?: string
           embed_code?: string | null
+          embeds?: Json | null
           huddle_id: string
           id?: string
           is_bot_message?: boolean | null
@@ -328,6 +330,7 @@ export type Database = {
           content?: string
           created_at?: string
           embed_code?: string | null
+          embeds?: Json | null
           huddle_id?: string
           id?: string
           is_bot_message?: boolean | null
@@ -828,6 +831,7 @@ export type Database = {
           created_at: string
           delivery_status: string | null
           embed_code: string | null
+          embeds: Json | null
           huddle_id: string | null
           id: string
           is_agent_post: boolean | null
@@ -848,6 +852,7 @@ export type Database = {
           created_at?: string
           delivery_status?: string | null
           embed_code?: string | null
+          embeds?: Json | null
           huddle_id?: string | null
           id?: string
           is_agent_post?: boolean | null
@@ -868,6 +873,7 @@ export type Database = {
           created_at?: string
           delivery_status?: string | null
           embed_code?: string | null
+          embeds?: Json | null
           huddle_id?: string | null
           id?: string
           is_agent_post?: boolean | null
