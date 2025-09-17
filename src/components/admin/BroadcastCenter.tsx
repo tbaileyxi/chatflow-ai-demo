@@ -55,9 +55,8 @@ export const BroadcastCenter = () => {
   const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
   const [tags, setTags] = useState('');
   
-  // Thread support - multiple embeds with commentary
+  // Thread support - multiple embeds
   const [threadEmbeds, setThreadEmbeds] = useState<Array<{ commentary: string; embed_code: string; embed_type: 'x' | 'iframe' | 'youtube' }>>([]);
-  const [currentEmbedCommentary, setCurrentEmbedCommentary] = useState('');
 
   useEffect(() => {
     fetchTeams();
@@ -162,14 +161,13 @@ export const BroadcastCenter = () => {
                      embedCode.includes('youtube.com') || embedCode.includes('youtu.be') ? 'youtube' : 'iframe';
 
     setThreadEmbeds(prev => [...prev, {
-      commentary: currentEmbedCommentary,
+      commentary: '', // Commentary will be added inline between embeds
       embed_code: embedCode,
       embed_type: embedType
     }]);
 
     // Clear form
     setEmbedCode('');
-    setCurrentEmbedCommentary('');
     setEmbedPreview('');
   };
 
@@ -496,7 +494,6 @@ export const BroadcastCenter = () => {
         setSelectedTeams([]);
         setTags('');
         setThreadEmbeds([]);
-        setCurrentEmbedCommentary('');
         
         // Delay hiding delivery status to let user see results
         setTimeout(() => setShowDeliveryStatus(false), 3000);
@@ -778,14 +775,7 @@ export const BroadcastCenter = () => {
               
               {/* Thread Support */}
               <div className="space-y-3 border-t pt-4">
-                <Label htmlFor="embed-commentary">Commentary for this embed (Optional)</Label>
-                <Textarea
-                  id="embed-commentary"
-                  value={currentEmbedCommentary}
-                  onChange={(e) => setCurrentEmbedCommentary(e.target.value)}
-                  placeholder="Add commentary or context before this embed..."
-                  rows={3}
-                />
+                <Label htmlFor="add-embed">Add Another Embed</Label>
                 
                 <Button
                   type="button"

@@ -40,8 +40,8 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
   const renderEmbed = (embed: ThreadEmbed, index: number) => {
     return (
       <div key={index} className="mt-4 space-y-2">
-        {embed.commentary && (
-          <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg">
+        {embed.commentary && embed.commentary.trim() && (
+          <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg border-l-4 border-primary/30">
             {embed.commentary}
           </div>
         )}
