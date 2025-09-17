@@ -100,7 +100,7 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
             ) : (
               <>
                 <ChevronDown className="w-4 h-4 mr-1" />
-                See {remainingEmbeds.length} more {remainingEmbeds.length === 1 ? 'embed' : 'embeds'}
+                Read more ({remainingEmbeds.length} more {remainingEmbeds.length === 1 ? 'embed' : 'embeds'})
               </>
             )}
           </Button>

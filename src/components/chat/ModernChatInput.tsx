@@ -292,7 +292,7 @@ export const ModernChatInput = ({
     } else {
       toast({
         title: "Unknown command",
-        description: "Available: /score [team], /stats [team], /pickem, /score nfl, /score college. You can also use ? instead of /",
+        description: `Command "${cmd}" not recognized. Available: /score [team], /stats [team], /pickem, /score nfl, /score college. You can also use ? instead of /`,
         variant: "destructive"
       });
       onSlashComplete?.(false);

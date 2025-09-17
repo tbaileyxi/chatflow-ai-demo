@@ -291,7 +291,7 @@ export const HuddleOwnerPanel = ({ huddle, isOwner }: HuddleOwnerPanelProps) => 
                           
                           <div className="flex-1">
                             <div className="font-medium">
-                              {request.profiles?.display_name || request.profiles?.username || "Unknown User"}
+                              {request.profiles?.display_name || request.profiles?.username || `User ${request.user_id.slice(0, 8)}`}
                             </div>
                             <div className="text-xs text-muted-foreground mb-2">
                               {new Date(request.created_at).toLocaleDateString()}
@@ -354,7 +354,7 @@ export const HuddleOwnerPanel = ({ huddle, isOwner }: HuddleOwnerPanelProps) => 
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="font-medium">
-                                {member.profiles?.display_name || member.profiles?.username || "Unknown User"}
+                                {member.profiles?.display_name || member.profiles?.username || `User ${member.user_id.slice(0, 8)}`}
                               </span>
                               {member.user_id === huddle.owner_id && (
                                 <Badge variant="outline" className="gap-1">

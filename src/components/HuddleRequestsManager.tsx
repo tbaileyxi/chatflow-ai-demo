@@ -147,7 +147,7 @@ export const HuddleRequestsManager = ({ huddleId, isOwner }: HuddleRequestsManag
               
               <div className="flex-1">
                 <div className="font-medium">
-                  {request.profiles?.display_name || request.profiles?.username || "Unknown User"}
+                  {request.profiles?.display_name || request.profiles?.username || `User ${request.user_id.slice(0, 8)}`}
                 </div>
                 <div className="text-xs text-muted-foreground mb-2">
                   {new Date(request.created_at).toLocaleDateString()}

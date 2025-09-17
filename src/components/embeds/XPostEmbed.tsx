@@ -159,11 +159,11 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
           data-cards="visible"
           data-conversation="none"
         >
-          <a href={normalizedUrl}>Loading tweet...</a>
+          <a href={normalizedUrl}>View on X</a>
         </blockquote>
-        {isLoading && (
+        {isLoading && !isLoaded && (
           <div className="flex items-center justify-center p-6 bg-muted rounded-xl min-h-[200px]">
-            <div className="text-sm text-muted-foreground animate-pulse">Loading tweet...</div>
+            <div className="text-sm text-muted-foreground animate-pulse">Loading embed...</div>
           </div>
         )}
         {error && (

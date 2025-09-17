@@ -130,8 +130,8 @@ export const MessageBubble = memo<MessageBubbleProps>(({
     if (message.source?.posterName) return message.source.posterName;
     if (isGameBot) return 'Game Bot';
     if (isTeamAgent && teamName) return teamName;
-    return user?.display_name || user?.username || 'Unknown User';
-  }, [message.source?.posterName, isGameBot, isTeamAgent, teamName, user]);
+    return user?.display_name || user?.username || `User ${message.user_id.slice(0, 8)}`;
+  }, [message.source?.posterName, isGameBot, isTeamAgent, teamName, user, message.user_id]);
 
   const avatarUrl = useMemo(() => {
     if (message.source?.posterAvatar) return message.source.posterAvatar;

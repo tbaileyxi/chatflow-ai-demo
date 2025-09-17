@@ -110,7 +110,7 @@ export const MessageBubble = ({
                 ? 'Game Bot'
                 : message.is_team_agent_message
                 ? (message.origin_teams?.name || originTeamName || teamName || 'Team')
-                : (message.profiles?.display_name || message.profiles?.username || 'Unknown User')}
+                : (message.profiles?.display_name || message.profiles?.username || `User ${message.user_id.slice(0, 8)}`)}
             </span>
             <span className="text-xs text-muted-foreground">
               {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}

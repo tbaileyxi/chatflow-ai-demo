@@ -794,7 +794,7 @@ export const BroadcastCenter = () => {
                   className="w-full"
                   disabled={!embedCode.trim()}
                 >
-                  Add to Thread
+                  Add Another Embed
                 </Button>
               </div>
               
