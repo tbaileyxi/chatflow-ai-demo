@@ -326,41 +326,45 @@ export const PickEmDashboard = ({ huddleId, onBack }: PickEmDashboardProps) => {
               {seasonStats.length === 0 ? (
                 <p className="text-center text-muted-foreground">No season stats available yet</p>
               ) : (
-                <div className="space-y-3">
-                  {seasonStats.map((stat) => (
-                    <div
-                      key={stat.user_id}
-                      className={`flex items-center justify-between p-3 rounded-lg ${
-                        stat.user_id === user?.id ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                          stat.rank === 1 ? 'bg-yellow-500 text-white' :
-                          stat.rank === 2 ? 'bg-gray-400 text-white' :
-                          stat.rank === 3 ? 'bg-amber-600 text-white' :
-                          'bg-muted text-muted-foreground'
-                        }`}>
-                          {stat.rank}
-                        </div>
-                        <div>
-                          <div className="font-medium">
-                            {stat.display_name && stat.display_name !== 'User' ? stat.display_name : stat.username}
-                            {stat.user_id === user?.id && (
-                              <span className="text-xs text-muted-foreground ml-2">(You)</span>
-                            )}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {stat.entries_played} weeks • {Math.round(stat.win_percentage * 100)}% accuracy
-                          </div>
-                        </div>
-                      </div>
-                      <Badge variant="secondary">
-                        {stat.total_correct_picks} total correct
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
+                 <div className="space-y-3">
+                   {seasonStats.map((stat, index) => (
+                     <div
+                       key={stat.user_id || index}
+                       className={`flex items-center justify-between p-3 rounded-lg ${
+                         stat.user_id === user?.id ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'
+                       }`}
+                     >
+                       <div className="flex items-center gap-3">
+                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                           stat.rank === 1 ? 'bg-yellow-500 text-white' :
+                           stat.rank === 2 ? 'bg-gray-400 text-white' :
+                           stat.rank === 3 ? 'bg-amber-600 text-white' :
+                           'bg-muted text-muted-foreground'
+                         }`}>
+                           {stat.rank || index + 1}
+                         </div>
+                         <div>
+                           <div className="font-medium">
+                             {stat.display_name && stat.display_name !== 'User' && stat.display_name.trim() 
+                               ? stat.display_name 
+                               : stat.username && stat.username.trim() 
+                                 ? stat.username 
+                                 : `User ${(stat.user_id || '').slice(0, 8)}`}
+                             {stat.user_id === user?.id && (
+                               <span className="text-xs text-muted-foreground ml-2">(You)</span>
+                             )}
+                           </div>
+                           <div className="text-xs text-muted-foreground">
+                             {stat.entries_played || 0} weeks • {Math.round((stat.win_percentage || 0) * 100)}% accuracy
+                           </div>
+                         </div>
+                       </div>
+                       <Badge variant="secondary">
+                         {stat.total_correct_picks || 0} total correct
+                       </Badge>
+                     </div>
+                   ))}
+                 </div>
               )}
             </CardContent>
           </Card>

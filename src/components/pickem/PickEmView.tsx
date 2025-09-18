@@ -413,38 +413,42 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
               {leaderboard.length === 0 ? (
                 <p className="text-center text-muted-foreground">No entries yet</p>
               ) : (
-                <div className="space-y-2">
-                  {leaderboard.map((entry) => (
-                    <div
-                      key={entry.user_id}
-                      className={`flex items-center justify-between p-3 rounded-lg ${
-                        entry.user_id === user?.id ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          (entry.rank || 0) === 1 ? 'bg-yellow-500 text-white' :
-                          (entry.rank || 0) === 2 ? 'bg-gray-400 text-white' :
-                          (entry.rank || 0) === 3 ? 'bg-amber-600 text-white' :
-                          'bg-muted text-muted-foreground'
-                        }`}>
-                          {entry.rank}
-                        </div>
-                        <div>
-                          <div className="font-medium">
-                            {entry.display_name && entry.display_name !== 'User' ? entry.display_name : entry.username}
-                            {entry.user_id === user?.id && (
-                              <span className="text-xs text-muted-foreground ml-2">(You)</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <Badge variant="secondary">
-                        {entry.total_score} correct
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
+                 <div className="space-y-2">
+                   {leaderboard.map((entry, index) => (
+                     <div
+                       key={entry.user_id || index}
+                       className={`flex items-center justify-between p-3 rounded-lg ${
+                         entry.user_id === user?.id ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'
+                       }`}
+                     >
+                       <div className="flex items-center gap-3">
+                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                           (entry.rank || 0) === 1 ? 'bg-yellow-500 text-white' :
+                           (entry.rank || 0) === 2 ? 'bg-gray-400 text-white' :
+                           (entry.rank || 0) === 3 ? 'bg-amber-600 text-white' :
+                           'bg-muted text-muted-foreground'
+                         }`}>
+                           {entry.rank || index + 1}
+                         </div>
+                         <div>
+                           <div className="font-medium">
+                             {entry.display_name && entry.display_name !== 'User' && entry.display_name.trim() 
+                               ? entry.display_name 
+                               : entry.username && entry.username.trim() 
+                                 ? entry.username 
+                                 : `User ${(entry.user_id || '').slice(0, 8)}`}
+                             {entry.user_id === user?.id && (
+                               <span className="text-xs text-muted-foreground ml-2">(You)</span>
+                             )}
+                           </div>
+                         </div>
+                       </div>
+                       <Badge variant="secondary">
+                         {entry.total_score || 0} correct
+                       </Badge>
+                     </div>
+                   ))}
+                 </div>
               )}
             </CardContent>
           </Card>

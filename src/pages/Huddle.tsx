@@ -588,13 +588,15 @@ useEffect(() => {
 
     try {
       // Check if user already reacted with this emoji
-      const { data: existingReaction } = await supabase
+      const { data: existingReaction, error: selectError } = await supabase
         .from("huddle_message_reactions")
         .select("id")
         .eq("message_id", messageId)
         .eq("user_id", user.id)
         .eq("emoji", emoji)
-        .single();
+        .maybeSingle();
+
+      if (selectError) throw selectError;
 
       if (existingReaction) {
         // Remove reaction
@@ -604,6 +606,11 @@ useEffect(() => {
           .eq("id", existingReaction.id);
 
         if (error) throw error;
+        
+        toast({
+          title: "Reaction removed",
+          description: `Removed ${emoji} reaction`,
+        });
       } else {
         // Add reaction
         const { error } = await supabase
@@ -615,9 +622,15 @@ useEffect(() => {
           });
 
         if (error) throw error;
+        
+        toast({
+          title: "Reaction added",
+          description: `Added ${emoji} reaction`,
+        });
       }
 
-      // Refresh reactions for this message
+      // Refresh the messages to show updated reactions
+      await fetchMessages();
       fetchMessageReactions(messageId);
     } catch (error) {
       console.error("Error handling reaction:", error);
