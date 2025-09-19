@@ -45,6 +45,7 @@ export const parsePickEmMessage = (message: BasicMessage): PickEmData | null => 
       }
     } catch (e) {
       console.warn('Failed to parse Pick Em message:', e);
+      return null;
     }
   }
   

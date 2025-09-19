@@ -764,6 +764,8 @@ useEffect(() => {
         }
       } catch (e) {
         console.error('Failed to parse pickem_card embed_code:', e);
+        // Don't render anything for invalid pick'em cards
+        return null;
       }
     }
 
