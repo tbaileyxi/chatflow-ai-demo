@@ -19,6 +19,12 @@ export type PickEmData = {
   gameCount: number;
 };
 
+export type PickEmLeaderboardData = {
+  type: 'pickem_leaderboard';
+  instanceId: string;
+  title: string;
+};
+
 // Centralized Pick 'Em message parsing
 export const parsePickEmMessage = (message: BasicMessage): PickEmData | null => {
   // First check message_type for explicit Pick 'Em messages
@@ -82,13 +88,73 @@ export const parsePickEmMessage = (message: BasicMessage): PickEmData | null => 
   return null;
 };
 
+// Parse Pick 'Em leaderboard messages
+export const parsePickEmLeaderboardMessage = (message: BasicMessage): PickEmLeaderboardData | null => {
+  // Check message_type for explicit leaderboard messages
+  if (message.message_type === 'pickem_leaderboard') {
+    try {
+      let leaderboardData: any = null;
+      
+      // Try embed_code first (newer format)
+      if (message.embed_code) {
+        leaderboardData = JSON.parse(message.embed_code);
+      }
+      // Fallback to content (legacy format)
+      else if (message.content) {
+        leaderboardData = JSON.parse(message.content);
+      }
+      
+      if (leaderboardData?.type === 'pickem_leaderboard') {
+        return {
+          type: 'pickem_leaderboard',
+          instanceId: leaderboardData.instanceId,
+          title: leaderboardData.title || 'Pick \'Em Results'
+        };
+      }
+    } catch (e) {
+      console.warn('Failed to parse Pick Em leaderboard message:', e);
+    }
+  }
+  
+  // Legacy detection: handle both JSON and simple formats
+  const sources = [message.embed_code, message.content].filter(Boolean);
+  for (const source of sources) {
+    try {
+      // Try parsing as JSON first
+      const data = JSON.parse(source);
+      if (data?.type === 'pickem_leaderboard') {
+        return {
+          type: 'pickem_leaderboard',
+          instanceId: data.instanceId,
+          title: data.title || 'Pick \'Em Results'
+        };
+      }
+    } catch (e) {
+      // Try legacy format: "pickem_leaderboard:UUID"
+      if (source.startsWith('pickem_leaderboard:')) {
+        const instanceId = source.split(':')[1];
+        if (instanceId) {
+          return {
+            type: 'pickem_leaderboard',
+            instanceId,
+            title: 'Pick \'Em Results'
+          };
+        }
+      }
+    }
+  }
+  
+  return null;
+};
+
 export const hasRichContent = (m?: Partial<BasicMessage> | null): boolean => {
   if (!m) return false;
   const hasMedia = typeof m.media_url === 'string' && m.media_url.trim() !== '';
   const hasEmbed = typeof m.embed_code === 'string' && m.embed_code.trim() !== '';
   const hasPoll = !!m.poll_data;
   const hasPickEm = !!parsePickEmMessage(m as BasicMessage);
-  return hasMedia || hasEmbed || hasPoll || hasPickEm;
+  const hasPickEmLeaderboard = !!parsePickEmLeaderboardMessage(m as BasicMessage);
+  return hasMedia || hasEmbed || hasPoll || hasPickEm || hasPickEmLeaderboard;
 };
 
 export const isConsecutiveMessage = (

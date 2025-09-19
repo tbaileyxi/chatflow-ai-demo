@@ -19,6 +19,7 @@ import { ModernMessageBubble } from "@/components/chat/ModernMessageBubble";
 import { EnhancedTypingIndicator } from "@/components/chat/EnhancedTypingIndicator";
 import { isConsecutiveMessage } from "@/utils/chatMessage";
 import { PickEmCard } from "@/components/pickem/PickEmCard";
+import { PickEmLeaderboardCard } from "@/components/pickem/PickEmLeaderboardCard";
 import { PickEmView } from "@/components/pickem/PickEmView";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -765,6 +766,36 @@ useEffect(() => {
       } catch (e) {
         console.error('Failed to parse pickem_card embed_code:', e);
         // Don't render anything for invalid pick'em cards
+        return null;
+      }
+    }
+
+    // Handle Pick 'Em leaderboard messages from bot
+    if (message.message_type === 'pickem_leaderboard' || 
+        (message.embed_code && message.embed_code.startsWith('pickem_leaderboard:'))) {
+      try {
+        let instanceId = '';
+        
+        if (message.embed_code?.startsWith('pickem_leaderboard:')) {
+          instanceId = message.embed_code.split(':')[1];
+        } else if (message.embed_code) {
+          const embedData = JSON.parse(message.embed_code);
+          instanceId = embedData.instanceId;
+        }
+        
+        if (instanceId) {
+          return (
+            <div key={message.id} className="px-4 py-2">
+              <PickEmLeaderboardCard
+                instanceId={instanceId}
+                title="Pick 'Em Results"
+                onViewDetails={handleViewPickEm}
+              />
+            </div>
+          );
+        }
+      } catch (e) {
+        console.error('Failed to parse pickem_leaderboard embed_code:', e);
         return null;
       }
     }
