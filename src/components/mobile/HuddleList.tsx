@@ -114,14 +114,18 @@ export const HuddleList = () => {
         .in('huddle_id', huddleIds);
 
       // Calculate unread counts
-      const unreadCounts = unreadData?.reduce((acc, member) => {
-        const messagesAfterRead = unreadMessages?.filter(msg => 
-          msg.huddle_id === member.huddle_id && 
-          new Date(msg.created_at) > new Date(member.last_read_at || '1970-01-01')
-        ).length || 0;
-        acc[member.huddle_id] = messagesAfterRead;
-        return acc;
-      }, {} as Record<string, number>) || {};
+      const unreadCounts: Record<string, number> = {};
+      
+      if (unreadData && unreadMessages) {
+        unreadData.forEach(member => {
+          const lastReadTime = member.last_read_at ? new Date(member.last_read_at) : new Date(0);
+          const unreadCount = unreadMessages.filter(msg => 
+            msg.huddle_id === member.huddle_id && 
+            new Date(msg.created_at) > lastReadTime
+          ).length;
+          unreadCounts[member.huddle_id] = unreadCount;
+        });
+      }
 
       // Transform data to match our interface
       const transformedHuddles: Huddle[] = (huddles || []).map(huddle => {
