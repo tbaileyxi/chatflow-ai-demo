@@ -202,11 +202,11 @@ async function getScoreUpdate(teamName: string): Promise<string> {
 
     // Try yesterday's NFL games if no today games found
     console.log('Checking yesterday\'s NFL games...');
-    const yesterdayET = new Date();
-    yesterdayET.setDate(yesterdayET.getDate() - 1);
-    const yesterdayStr = yesterdayET.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).replace(/-/g, '');
+    const nflYesterdayET = new Date();
+    nflYesterdayET.setDate(nflYesterdayET.getDate() - 1);
+    const nflYesterdayStr = nflYesterdayET.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).replace(/-/g, '');
     
-    const nflYesterdayResponse = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${yesterdayStr}`);
+    const nflYesterdayResponse = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${nflYesterdayStr}`);
     if (nflYesterdayResponse.ok) {
       const nflYesterdayData = await nflYesterdayResponse.json();
       console.log(`Found ${nflYesterdayData.events?.length || 0} NFL games yesterday`);
@@ -236,11 +236,11 @@ async function getScoreUpdate(teamName: string): Promise<string> {
 
     // Try yesterday's games for college football only if no today games found
     console.log('Checking yesterday\'s College Football games...');
-    const yesterdayET = new Date();
-    yesterdayET.setDate(yesterdayET.getDate() - 1);
-    const yesterdayStr = yesterdayET.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).replace(/-/g, '');
+    const cfbYesterdayET = new Date();
+    cfbYesterdayET.setDate(cfbYesterdayET.getDate() - 1);
+    const cfbYesterdayStr = cfbYesterdayET.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).replace(/-/g, '');
     
-    const cfbYesterdayResponse = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=${yesterdayStr}`);
+    const cfbYesterdayResponse = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=${cfbYesterdayStr}`);
     if (cfbYesterdayResponse.ok) {
       const cfbYesterdayData = await cfbYesterdayResponse.json();
       console.log(`Found ${cfbYesterdayData.events?.length || 0} College Football games yesterday`);
