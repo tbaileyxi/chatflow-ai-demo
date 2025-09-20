@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, MessageSquare, Shield, Trophy, Home, ArrowLeft } from 'lucide-react';
+import { Users, MessageSquare, Shield, Trophy, Home, ArrowLeft, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
 interface DashboardStats {
   totalUsers: number;
@@ -14,6 +15,7 @@ interface DashboardStats {
 
 export const AdminDashboard = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     totalTeams: 0,
@@ -21,6 +23,7 @@ export const AdminDashboard = () => {
     totalHuddles: 0
   });
   const [loading, setLoading] = useState(true);
+  const [scoringLoading, setScoringLoading] = useState(false);
 
   useEffect(() => {
     fetchDashboardStats();
@@ -45,6 +48,38 @@ export const AdminDashboard = () => {
       console.error('Error fetching dashboard stats:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const testScoring = async () => {
+    setScoringLoading(true);
+    try {
+      console.log('Triggering scoring function...');
+      const { data, error } = await supabase.functions.invoke('pickem-scoring');
+      
+      if (error) {
+        console.error('Scoring error:', error);
+        toast({
+          title: "Scoring Failed",
+          description: `Error: ${error.message}`,
+          variant: "destructive",
+        });
+      } else {
+        console.log('Scoring result:', data);
+        toast({
+          title: "Scoring Complete",
+          description: `Updated ${data?.updated || 0} games out of ${data?.total_checked || 0} checked`,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to trigger scoring:', error);
+      toast({
+        title: "Scoring Failed",
+        description: "Failed to trigger scoring function",
+        variant: "destructive",
+      });
+    } finally {
+      setScoringLoading(false);
     }
   };
 
@@ -152,7 +187,7 @@ export const AdminDashboard = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>System Health</CardTitle>
+            <CardTitle>System Health & Tools</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -171,6 +206,20 @@ export const AdminDashboard = () => {
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Active Sessions</span>
                 <span className="text-sm text-green-500 font-medium">{stats.totalUsers}</span>
+              </div>
+              <div className="border-t border-border pt-4">
+                <Button
+                  onClick={testScoring}
+                  disabled={scoringLoading}
+                  className="w-full flex items-center gap-2"
+                  variant="outline"
+                >
+                  <Play className="h-4 w-4" />
+                  {scoringLoading ? 'Testing Scoring...' : 'Test Pick\'Em Scoring'}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Manually trigger the scoring function to update game results
+                </p>
               </div>
             </div>
           </CardContent>
