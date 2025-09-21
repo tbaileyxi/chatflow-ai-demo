@@ -163,13 +163,10 @@ export const PickEmView = ({ instanceId, onBack }: PickEmViewProps) => {
         setUserPicks(picksData || []);
       }
 
-      // Get leaderboard
-      const { data: leaderboardData, error: leaderboardError } = await supabase
-        .from('pickem_leaderboard')
-        .select('*')
-        .eq('instance_id', instanceId)
-        .order('rank', { ascending: true })
-        .limit(10);
+      // Get leaderboard using new function
+      const { data: leaderboardData, error: leaderboardError } = await supabase.rpc('get_pickem_leaderboard', {
+        target_instance_id: instanceId
+      });
 
       if (leaderboardError) throw leaderboardError;
       setLeaderboard(leaderboardData || []);

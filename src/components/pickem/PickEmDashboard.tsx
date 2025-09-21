@@ -97,17 +97,16 @@ export const PickEmDashboard = ({ huddleId, onBack }: PickEmDashboardProps) => {
               .single();
 
             if (entryData) {
-              // Get user's rank
-              const { data: rankData } = await supabase
-                .from('pickem_leaderboard')
-                .select('rank')
-                .eq('instance_id', instance.id)
-                .eq('user_id', user.id)
-                .single();
+              // Get user's rank from leaderboard function
+              const { data: leaderboardData } = await supabase.rpc('get_pickem_leaderboard', {
+                target_instance_id: instance.id
+              });
+
+              const userRank = leaderboardData?.find((entry: any) => entry.user_id === user.id)?.rank || null;
 
               userEntry = {
                 ...entryData,
-                rank: rankData?.rank
+                rank: userRank
               };
             }
           }
@@ -128,14 +127,11 @@ export const PickEmDashboard = ({ huddleId, onBack }: PickEmDashboardProps) => {
 
       setWeekInstances(enrichedInstances);
 
-      // Get season-long stats
-      const { data: seasonData, error: seasonError } = await supabase
-        .from('pickem_season_leaderboard')
-        .select('*')
-        .eq('league', 'nfl')
-        .eq('season_year', 2024)
-        .order('rank', { ascending: true })
-        .limit(10);
+      // Get season-long stats using new function
+      const { data: seasonData, error: seasonError } = await supabase.rpc('get_pickem_season_leaderboard', {
+        target_league: 'nfl',
+        target_season: 2024
+      });
 
       if (seasonError) throw seasonError;
       setSeasonStats(seasonData || []);

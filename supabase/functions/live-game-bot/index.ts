@@ -261,16 +261,21 @@ async function processGame(game: ESPNGame, league: string, teamIds: Set<string>,
         await postPregameInfo(teams, competition.date, league, supabase)
       } else if (status.type.state === 'in') {
         await postGameStart(teams, competition.date, league, supabase)
+      } else if (status.type.state === 'post') {
+        // Game already completed when first detected - post final score
+        await postGameEnd(currentState, league, supabase)
       }
     } else {
       await detectAndPostChanges(previousState, currentState, league, supabase)
     }
 
-    // Update stored state
-    await setGameState(currentState, supabase)
+    // Update stored state only if game is not completed
+    if (!status.type.completed) {
+      await setGameState(currentState, supabase)
+    }
 
-    // Clean up completed games
-    if (status.type.completed) {
+    // Clean up completed games from database
+    if (status.type.completed && previousState) {
       await supabase
         .from('game_states')
         .delete()
@@ -283,13 +288,24 @@ async function processGame(game: ESPNGame, league: string, teamIds: Set<string>,
 }
 
 async function detectAndPostChanges(previous: GameState, current: GameState, league: string, supabase: any) {
-  // Game start (pre -> in)
+  // Skip processing if game is already completed
+  if (previous.lastStatus === 'post' && current.lastStatus === 'post') {
+    return // Game is already finished, no need to process further
+  }
+
+  // Skip if transitioning from completed state back to earlier state (data inconsistency)
+  if (previous.lastStatus === 'post' && current.lastStatus !== 'post') {
+    console.log('Skipping invalid state transition from post to non-post status')
+    return
+  }
+
+  // Game start (pre -> in) - only post if not already posted
   if (previous.lastStatus === 'pre' && current.lastStatus === 'in') {
     await postGameStart(current.teams, '', league, supabase)
   }
 
-  // Score change - only post if it's an actual score change (not just different display)
-  if (previous.lastScore !== current.lastScore) {
+  // Score change - only post if it's an actual score change AND game is in progress
+  if (current.lastStatus === 'in' && previous.lastScore !== current.lastScore) {
     // Make sure it's not just a formatting difference
     const prevScores = previous.lastScore.split('-').map(s => parseInt(s.trim()))
     const currScores = current.lastScore.split('-').map(s => parseInt(s.trim()))
@@ -299,16 +315,17 @@ async function detectAndPostChanges(previous: GameState, current: GameState, lea
     }
   }
 
-  // Period change - only on actual period transitions
-  const periodIncreased = current.lastPeriod > previous.lastPeriod
-  const isHalftimeTransition = previous.lastPeriod === 2 && current.lastPeriod === 3
-  const isPeriodEnd = periodIncreased && previous.lastPeriod > 0
+  // Period change - only on actual period transitions while game is in progress
+  if (current.lastStatus === 'in') {
+    const periodIncreased = current.lastPeriod > previous.lastPeriod
+    const isPeriodEnd = periodIncreased && previous.lastPeriod > 0
 
-  if (isPeriodEnd) {
-    await postPeriodChange(previous, current, league, supabase)
+    if (isPeriodEnd) {
+      await postPeriodChange(previous, current, league, supabase)
+    }
   }
 
-  // Game status change (end of game)
+  // Game status change (end of game) - only post once when transitioning to final
   if (previous.lastStatus !== 'post' && current.lastStatus === 'post') {
     await postGameEnd(current, league, supabase)
   }
@@ -493,30 +510,32 @@ async function postToTeamFeeds(teams: any[], content: string, league: string, su
         // Post to each team huddle with enhanced de-duplication
         const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
         for (const huddle of huddles || []) {
-          // Check in-memory cache first for rapid duplicate prevention
-          const cacheKey = dedupeId ? `${huddle.id}-${dedupeId}` : `${huddle.id}-${content.substring(0, 50)}`
+          // Enhanced deduplication with content hashing
+          const contentHash = content.substring(0, 100) // Use first 100 chars as hash
+          const cacheKey = dedupeId ? `${huddle.id}-${dedupeId}` : `${huddle.id}-${contentHash}`
           const lastMessageTime = recentMessages.get(cacheKey)
           const now = Date.now()
           
-          if (lastMessageTime && (now - lastMessageTime) < 2 * 60 * 1000) { // 2 minute rapid check
+          // Increase rapid duplicate prevention to 5 minutes
+          if (lastMessageTime && (now - lastMessageTime) < 5 * 60 * 1000) {
             console.log(`Skipping duplicate game update in huddle: ${huddle.name} (in-memory cache)`)
             continue
           }
 
-          // Check database for recent duplicates with extended timeframe
+          // Check database for recent duplicates with stricter matching
           const { data: existingMsg } = await supabase
             .from('huddle_messages')
-            .select('id')
+            .select('id, created_at')
             .eq('huddle_id', huddle.id)
             .eq('is_bot_message', true)
-            .eq('message_type', 'game_update')
             .eq('content', content)
             .gte('created_at', tenMinAgo)
+            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle()
 
           if (existingMsg) {
-            console.log(`Skipping duplicate game update in huddle: ${huddle.name}`)
+            console.log(`Skipping duplicate game update in huddle: ${huddle.name} (DB check)`)
             continue
           }
 
