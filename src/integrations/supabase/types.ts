@@ -1286,49 +1286,7 @@ export type Database = {
       }
     }
     Views: {
-      pickem_leaderboard: {
-        Row: {
-          display_name: string | null
-          instance_id: string | null
-          rank: number | null
-          total_score: number | null
-          user_id: string | null
-          username: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pickem_entries_instance_id_fkey"
-            columns: ["instance_id"]
-            isOneToOne: false
-            referencedRelation: "pickem_instances"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pickem_season_leaderboard: {
-        Row: {
-          display_name: string | null
-          entries_played: number | null
-          league: Database["public"]["Enums"]["pickem_league"] | null
-          rank: number | null
-          season_year: number | null
-          total_correct_picks: number | null
-          user_id: string | null
-          username: string | null
-          win_percentage: number | null
-        }
-        Relationships: []
-      }
-      pickem_user_totals: {
-        Row: {
-          entries_played: number | null
-          league: Database["public"]["Enums"]["pickem_league"] | null
-          season_year: number | null
-          total_correct: number | null
-          user_id: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       approve_huddle_join_request: {
@@ -1354,6 +1312,41 @@ export type Database = {
       get_or_create_system_user: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_pickem_leaderboard: {
+        Args: { target_instance_id: string }
+        Returns: {
+          display_name: string
+          instance_id: string
+          rank: number
+          total_score: number
+          user_id: string
+          username: string
+        }[]
+      }
+      get_pickem_season_leaderboard: {
+        Args: { target_league?: string; target_season?: number }
+        Returns: {
+          display_name: string
+          entries_played: number
+          league: string
+          rank: number
+          season_year: number
+          total_correct_picks: number
+          user_id: string
+          username: string
+          win_percentage: number
+        }[]
+      }
+      get_pickem_user_totals: {
+        Args: { target_user_id?: string }
+        Returns: {
+          entries_played: number
+          league: string
+          season_year: number
+          total_correct: number
+          user_id: string
+        }[]
       }
       get_poll_vote_counts: {
         Args: { post_uuid: string }
