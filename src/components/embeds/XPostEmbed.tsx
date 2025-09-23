@@ -159,7 +159,6 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
           data-cards="visible"
           data-conversation="none"
         >
-          <a href={normalizedUrl} className="text-primary hover:underline">View on X</a>
         </blockquote>
         {isLoading && !isLoaded && (
           <div className="flex items-center justify-center p-6 bg-muted rounded-xl min-h-[200px]">
@@ -169,14 +168,6 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
         {error && (
           <div className="flex flex-col items-center justify-center p-6 bg-muted rounded-xl min-h-[200px] space-y-2">
             <div className="text-sm text-muted-foreground">{error}</div>
-            <a 
-              href={normalizedUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-primary hover:underline text-sm"
-            >
-              View on X/Twitter
-            </a>
           </div>
         )}
       </div>

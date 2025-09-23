@@ -419,7 +419,7 @@ export const PostCard = ({ post, isSpotlight = false, disableReply = false }: Po
                 sponsored by: {
                   post.team.sponsor_url ? (
                     <a 
-                      href={post.team.sponsor_url} 
+                      href={post.team.sponsor_url.startsWith('http') ? post.team.sponsor_url : `https://${post.team.sponsor_url}`} 
                       target="_blank" 
                       rel="noopener noreferrer" 
                       className="text-primary hover:underline"

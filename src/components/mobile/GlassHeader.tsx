@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MoreVertical } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ArrowLeft, MoreVertical, HelpCircle, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
@@ -82,13 +83,27 @@ export const GlassHeader = ({
       {/* Right side */}
       <div className="flex items-center gap-2 shrink-0">
         {rightAction || (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="p-2 hover:bg-white/10 rounded-full"
-          >
-            <MoreVertical className="h-5 w-5 text-foreground" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-2 hover:bg-white/10 rounded-full"
+              >
+                <MoreVertical className="h-5 w-5 text-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => window.open('mailto:support@sidehuddle.app', '_blank')}>
+                <Mail className="mr-2 h-4 w-4" />
+                Contact Us
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open('/faq', '_blank')}>
+                <HelpCircle className="mr-2 h-4 w-4" />
+                FAQs
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
     </header>

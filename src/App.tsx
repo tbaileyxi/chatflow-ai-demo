@@ -23,6 +23,7 @@ import { MobileHome } from "./pages/MobileHome";
 import { MobileSpotlight } from "./pages/MobileSpotlight";
 import { MobileChat } from "./pages/MobileChat";
 import { HuddleSettings } from "./pages/HuddleSettings";
+import FAQ from "./pages/FAQ";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ const AppContent = () => {
           <Route path="/teams/:teamId" element={<TeamFeed />} />
           <Route path="/huddle/:huddleId" element={<MobileChat />} />
           <Route path="/huddle/:huddleId/settings" element={<HuddleSettings />} />
+          <Route path="/faq" element={<FAQ />} />
           <Route path="/join-huddle/:huddleId" element={<JoinHuddle />} />
           <Route path="/huddle-search" element={<HuddleSearch />} />
           <Route path="/spotlight" element={<MobileSpotlight />} />

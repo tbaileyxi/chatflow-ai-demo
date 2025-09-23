@@ -559,19 +559,38 @@ async function postToTeamFeeds(teams: any[], content: string, league: string, su
           }
         }
 
-        // Also post to main team feed for visibility (de-duplicated within 10 minutes)
-        const tenMinAgoFeed = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+        // Also post to main team feed for visibility (de-duplicated within 24 hours for final scores)
+        const isDuplicateHours = content.includes('🏆 FINAL:') ? 24 : 1 // 24 hours for final scores, 1 hour for others
+        const dedupeCutoff = new Date(Date.now() - isDuplicateHours * 60 * 60 * 1000).toISOString()
         const { data: existingPost } = await supabase
           .from('posts')
           .select('id')
           .eq('team_id', dbTeam.id)
           .eq('is_team_agent_message', true)
           .eq('content', content)
-          .gte('created_at', tenMinAgoFeed)
+          .gte('created_at', dedupeCutoff)
           .limit(1)
           .maybeSingle()
 
         if (!existingPost) {
+          // Additional check: don't post final scores if the game was already marked as final over 4 hours ago
+          if (content.includes('🏆 FINAL:')) {
+            const gameStateAge = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString() // 4 hours ago
+            const { data: oldGameState } = await supabase
+              .from('game_states')
+              .select('last_status, updated_at')
+              .eq('teams', JSON.stringify(dbTeam.name))
+              .eq('last_status', 'post')
+              .lt('updated_at', gameStateAge)
+              .limit(1)
+              .maybeSingle()
+            
+            if (oldGameState) {
+              console.log(`Skipping old final score post for ${dbTeam.name} - game was already final over 4 hours ago`)
+              continue
+            }
+          }
+
           const { error: postError } = await supabase
             .from('posts')
             .insert({
