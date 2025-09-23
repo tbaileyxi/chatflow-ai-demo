@@ -21,7 +21,7 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
   content, 
   embeds = [], 
   className = '',
-  maxPreviewEmbeds = 1 
+  maxPreviewEmbeds = 2 
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
@@ -86,21 +86,21 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
             renderEmbed(embed, index + maxPreviewEmbeds)
           )}
           
-          <Button
+            <Button
             variant="ghost"
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="mt-2 text-primary hover:text-primary/80 text-sm font-medium"
+            className="mt-3 text-primary hover:text-primary/80 text-sm font-medium flex items-center gap-1 px-0"
           >
             {isExpanded ? (
               <>
-                <ChevronUp className="w-4 h-4 mr-1" />
-                See less
+                <ChevronUp className="w-4 h-4" />
+                Show less
               </>
             ) : (
               <>
-                <ChevronDown className="w-4 h-4 mr-1" />
-                Read more ({remainingEmbeds.length} more {remainingEmbeds.length === 1 ? 'embed' : 'embeds'})
+                <ChevronDown className="w-4 h-4" />
+                Show {remainingEmbeds.length} more {remainingEmbeds.length === 1 ? 'post' : 'posts'}
               </>
             )}
           </Button>

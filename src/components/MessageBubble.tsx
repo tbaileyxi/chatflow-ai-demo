@@ -115,6 +115,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({
   const [showReactions, setShowReactions] = useState(false);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [videoPoster, setVideoPoster] = useState<string | null>(null);
+  const [hovering, setHovering] = useState(false);
   const { toast } = useToast();
   
   const isOwnMessage = currentUserId === message.user_id;
@@ -282,7 +283,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({
       )}
       
       <div className={cn(
-        "flex-1 min-w-0 max-w-[85%]",
+        "flex-1 min-w-0 max-w-[85%] relative group",
         shouldShowAvatar ? "" : "ml-11",
         isOwnMessage && shouldShowAvatar ? "mr-0" : "",
         isOwnMessage && !shouldShowAvatar ? "mr-11" : ""
@@ -312,20 +313,41 @@ export const MessageBubble = memo<MessageBubbleProps>(({
         )}
         
         {message.content && (
-          <div className={cn(
-            "rounded-xl px-3 py-2 max-w-fit",
-            isOwnMessage 
-              ? "bg-primary text-primary-foreground ml-auto" 
-              : "bg-muted text-foreground",
-            shouldShowAvatar && !isConsecutive 
-              ? "rounded-xl" 
-              : isOwnMessage 
-                ? "rounded-l-xl rounded-tr-md rounded-br-xl"
-                : "rounded-r-xl rounded-tl-md rounded-bl-xl"
-          )}>
-            <div className="text-base font-normal leading-snug">
-              {renderedContent}
+          <div className="relative">
+            <div className={cn(
+              "rounded-xl px-3 py-2 max-w-fit",
+              isOwnMessage 
+                ? "bg-primary text-primary-foreground ml-auto" 
+                : "bg-muted text-foreground",
+              shouldShowAvatar && !isConsecutive 
+                ? "rounded-xl" 
+                : isOwnMessage 
+                  ? "rounded-l-xl rounded-tr-md rounded-br-xl"
+                  : "rounded-r-xl rounded-tl-md rounded-bl-xl"
+            )}>
+              <div className="text-base font-normal leading-snug">
+                {renderedContent}
+              </div>
             </div>
+            
+            {/* Reaction button (shows on hover) */}
+            {onAddReaction && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "absolute -top-2 h-6 w-6 p-0 rounded-full bg-background border border-border shadow-sm",
+                  "opacity-0 group-hover:opacity-100 transition-opacity duration-200",
+                  isOwnMessage ? "-left-8" : "-right-8"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowReactions(!showReactions);
+                }}
+              >
+                <span className="text-xs">😊</span>
+              </Button>
+            )}
           </div>
         )}
 

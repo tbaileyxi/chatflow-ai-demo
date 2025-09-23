@@ -55,7 +55,7 @@ export const BroadcastCenter = () => {
   const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
   const [tags, setTags] = useState('');
   
-  // Thread support - multiple embeds
+  // Thread support - multiple embeds (like X threads)
   const [threadEmbeds, setThreadEmbeds] = useState<Array<{ commentary: string; embed_code: string; embed_type: 'x' | 'iframe' | 'youtube' }>>([]);
 
   useEffect(() => {
@@ -161,7 +161,7 @@ export const BroadcastCenter = () => {
                      embedCode.includes('youtube.com') || embedCode.includes('youtu.be') ? 'youtube' : 'iframe';
 
     setThreadEmbeds(prev => [...prev, {
-      commentary: '', // Commentary will be added inline between embeds
+      commentary: mediaCommentary.trim(), // Use media commentary for thread commentary
       embed_code: embedCode,
       embed_type: embedType
     }]);
@@ -169,6 +169,7 @@ export const BroadcastCenter = () => {
     // Clear form
     setEmbedCode('');
     setEmbedPreview('');
+    setMediaCommentary(''); // Clear commentary too
   };
 
   const removeEmbedFromThread = (index: number) => {
@@ -773,19 +774,28 @@ export const BroadcastCenter = () => {
                 </Alert>
               )}
               
-              {/* Thread Support */}
+              {/* Thread Support - X Style */}
               <div className="space-y-3 border-t pt-4">
-                <Label htmlFor="add-embed">Add Another Embed</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Thread Mode</Label>
+                  <Badge variant="outline" className="text-xs">
+                    X-Style Threading
+                  </Badge>
+                </div>
                 
                 <Button
                   type="button"
                   onClick={addEmbedToThread}
-                  variant="secondary"
+                  variant="secondary" 
                   className="w-full"
                   disabled={!embedCode.trim()}
                 >
-                  Add Another Embed
+                  + Add to Thread ({threadEmbeds.length + (embedCode.trim() ? 1 : 0)})
                 </Button>
+                
+                <p className="text-xs text-muted-foreground">
+                  Add multiple embeds to create a thread. They'll display with "See more" option like X.
+                </p>
               </div>
               
               {/* Thread Preview */}
