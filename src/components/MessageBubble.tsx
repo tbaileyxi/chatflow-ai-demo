@@ -337,7 +337,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({
             className="mt-2"
             maxPreviewEmbeds={1}
           />
-        ) : message.embed_code && !parsePickEmMessage(message) && !(message.embeds && message.embeds.length > 0) ? (
+        ) : message.embed_code && !parsePickEmMessage(message) ? (
           isXEmbed ? (
             <XPostEmbed embedCode={message.embed_code} />
           ) : (

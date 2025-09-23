@@ -159,7 +159,7 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
           data-cards="visible"
           data-conversation="none"
         >
-          <a href={normalizedUrl}>View on X</a>
+          <a href={normalizedUrl} className="text-primary hover:underline">View on X</a>
         </blockquote>
         {isLoading && !isLoaded && (
           <div className="flex items-center justify-center p-6 bg-muted rounded-xl min-h-[200px]">
