@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,12 +9,10 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { MediaUpload } from '@/components/MediaUpload';
-import { MediaViewer } from '@/components/MediaViewer';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Send, Clock, Upload, Link, MessageSquare, BarChart3, CheckCircle, AlertCircle, Loader2, X, Calendar } from 'lucide-react';
+import { Send, Clock, Link, CheckCircle, AlertCircle, Loader2, X, Calendar } from 'lucide-react';
 import { ScheduleDialog } from '@/components/ScheduleDialog';
 import { PostManagement } from '@/components/PostManagement';
 import { ScheduledBroadcastProcessor } from './ScheduledBroadcastProcessor';
@@ -39,38 +36,21 @@ export const BroadcastCenter = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [sourceTeam, setSourceTeam] = useState('');
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
-  const [messageType, setMessageType] = useState('text');
-  const [content, setContent] = useState('');
   const [addToSpotlight, setAddToSpotlight] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [pollOptions, setPollOptions] = useState(['', '']);
-  const [embedCode, setEmbedCode] = useState('');
-  const [mediaUrl, setMediaUrl] = useState('');
-  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
-  const [mediaCommentary, setMediaCommentary] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus[]>([]);
   const [showDeliveryStatus, setShowDeliveryStatus] = useState(false);
-  const [embedPreview, setEmbedPreview] = useState('');
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
-  const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
   const [tags, setTags] = useState('');
   
-  // Simple embed list - like X/Twitter multiple embeds
+  // Simple embed system - like X/Twitter
   const [embedList, setEmbedList] = useState<Array<{ commentary: string; embed_code: string; embed_type: 'x' | 'iframe' | 'youtube' }>>([]);
+  const [currentEmbedCode, setCurrentEmbedCode] = useState('');
   const [currentEmbedCommentary, setCurrentEmbedCommentary] = useState('');
 
   useEffect(() => {
     fetchTeams();
   }, []);
-
-  // Generate embed preview when embed code changes
-  useEffect(() => {
-    if (embedCode.trim()) {
-      generateEmbedPreview(embedCode);
-    } else {
-      setEmbedPreview('');
-    }
-  }, [embedCode]);
 
   const fetchTeams = async () => {
     try {
@@ -92,64 +72,8 @@ export const BroadcastCenter = () => {
     }
   };
 
-  const generateEmbedPreview = (code: string) => {
-    // Extract common embed patterns
-    if (code.includes('twitter.com') || code.includes('x.com')) {
-      const urlMatch = code.match(/https?:\/\/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/);
-      if (urlMatch) {
-        setEmbedPreview(`Twitter post: ${urlMatch[0]}`);
-      }
-    } else if (code.includes('youtube.com') || code.includes('youtu.be')) {
-      const urlMatch = code.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
-      if (urlMatch) {
-        setEmbedPreview(`YouTube video: ${urlMatch[0]}`);
-      }
-    } else if (code.includes('instagram.com')) {
-      const urlMatch = code.match(/https?:\/\/(?:www\.)?instagram\.com\/p\/[^\/]+/);
-      if (urlMatch) {
-        setEmbedPreview(`Instagram post: ${urlMatch[0]}`);
-      }
-    } else if (code.includes('<iframe')) {
-      setEmbedPreview('Custom embed code detected');
-    } else {
-      setEmbedPreview('');
-    }
-  };
-
-  const handleMediaWithCommentary = (url: string, type: 'image' | 'video', commentary?: string) => {
-    setMediaUrl(url);
-    setMediaType(type);
-    if (commentary) {
-      setMediaCommentary(commentary);
-    }
-  };
-
-  const addPollOption = () => {
-    setPollOptions(prev => [...prev, '']);
-  };
-
-  const updatePollOption = (index: number, value: string) => {
-    setPollOptions(prev => prev.map((option, i) => i === index ? value : option));
-  };
-
-  const removePollOption = (index: number) => {
-    if (pollOptions.length > 2) {
-      setPollOptions(prev => prev.filter((_, i) => i !== index));
-    }
-  };
-
-  const handleMediaSelected = (url: string, type: 'image' | 'video') => {
-    setMediaUrl(url);
-    setMediaType(type);
-  };
-
-  const clearMedia = () => {
-    setMediaUrl('');
-    setMediaType(null);
-  };
-
   const addEmbed = () => {
-    if (!embedCode.trim()) {
+    if (!currentEmbedCode.trim()) {
       toast({
         title: "Error",
         description: "Please enter embed code first",
@@ -158,18 +82,17 @@ export const BroadcastCenter = () => {
       return;
     }
 
-    const embedType = embedCode.includes('twitter.com') || embedCode.includes('x.com') ? 'x' :
-                     embedCode.includes('youtube.com') || embedCode.includes('youtu.be') ? 'youtube' : 'iframe';
+    const embedType = currentEmbedCode.includes('twitter.com') || currentEmbedCode.includes('x.com') ? 'x' :
+                     currentEmbedCode.includes('youtube.com') || currentEmbedCode.includes('youtu.be') ? 'youtube' : 'iframe';
 
     setEmbedList(prev => [...prev, {
       commentary: currentEmbedCommentary.trim(),
-      embed_code: embedCode,
+      embed_code: currentEmbedCode,
       embed_type: embedType
     }]);
 
     // Clear form
-    setEmbedCode('');
-    setEmbedPreview('');
+    setCurrentEmbedCode('');
     setCurrentEmbedCommentary('');
   };
 
@@ -178,8 +101,8 @@ export const BroadcastCenter = () => {
   };
 
   const validateForm = (): string | null => {
-    if (!content.trim() && !mediaUrl && !mediaCommentary.trim() && messageType !== 'upload' && embedList.length === 0) {
-      return 'Please enter message content, upload media, or add embeds';
+    if (embedList.length === 0) {
+      return 'Please add at least one embed';
     }
 
     if (!sourceTeam) {
@@ -192,17 +115,6 @@ export const BroadcastCenter = () => {
 
     if (!user?.id) {
       return 'You must be logged in to send messages';
-    }
-
-    if (messageType === 'poll') {
-      const validOptions = pollOptions.filter(option => option.trim());
-      if (validOptions.length < 2) {
-        return 'Poll must have at least 2 options';
-      }
-    }
-
-    if (messageType === 'upload' && !mediaUrl) {
-      return 'Please upload a file';
     }
 
     return null;
@@ -230,7 +142,7 @@ export const BroadcastCenter = () => {
               huddle_id: huddle.id,
               user_id: postData.author_id,
               origin_team_id: postData.origin_team_id,
-              origin_post_id: postData.post_id, // Link to the original post for cascade deletion
+              origin_post_id: postData.post_id,
               media_url: postData.media_url,
               media_type: postData.media_url ? 
                 (postData.media_url.includes('.mp4') || postData.media_url.includes('.mov') || postData.media_url.includes('.webm') || postData.media_url.includes('.avi') ? 'video' : 'image') 
@@ -240,7 +152,6 @@ export const BroadcastCenter = () => {
               poll_data: postData.poll_data,
               is_team_agent_message: postData.is_team_agent_message || false
             });
-
 
           if (error) {
             console.error(`Failed to broadcast to huddle ${huddle.name}:`, error);
@@ -276,25 +187,8 @@ export const BroadcastCenter = () => {
     setShowDeliveryStatus(true);
 
     try {
-      let pollData = null;
-      if (messageType === 'poll') {
-        const validOptions = pollOptions.filter(option => option.trim());
-        const pollId = crypto.randomUUID();
-        pollData = {
-          id: pollId,
-          question: content,
-          options: validOptions.map((option, index) => ({ 
-            id: index, 
-            text: option, 
-            votes: 0 
-          }))
-        };
-      }
-
-      // Simplified broadcast system: Every message goes to Team Feed + All Team Huddles
-      // Optional: Add to Spotlight Feed
-      
-      const finalContent = mediaCommentary.trim() || content || (messageType === 'upload' ? '' : '');
+      // Simple broadcast system: Just send embeds
+      const finalContent = '';
       
       // New broadcast system: Single post from source team that gets distributed
       const deliveryResults: DeliveryStatus[] = [];
@@ -312,14 +206,14 @@ export const BroadcastCenter = () => {
             content: finalContent,
             team_id: sourceTeam,
             origin_team_id: sourceTeam,
-            author_id: systemBotId, // Use system bot for broadcast posts
-            message_type: messageType,
+            author_id: systemBotId,
+            message_type: 'embed',
             is_agent_post: true,
             is_spotlight: true,
-            poll_data: pollData,
-            media_url: messageType === 'upload' ? mediaUrl : null,
-            embed_code: messageType === 'embed' && embedList.length === 0 ? embedCode : null,
-            embeds: embedList.length > 0 ? embedList : null,
+            poll_data: null,
+            media_url: null,
+            embed_code: null,
+            embeds: embedList,
             target_audience: ['spotlight'],
             delivery_status: 'sent'
           };
@@ -355,15 +249,15 @@ export const BroadcastCenter = () => {
         
         const postData = {
           content: finalContent,
-          team_id: sourceTeam, // The post belongs to the source team
-          origin_team_id: sourceTeam, // Track the original source team
-          author_id: systemBotId, // Use system bot for broadcast posts
-          message_type: messageType,
+          team_id: sourceTeam,
+          origin_team_id: sourceTeam,
+          author_id: systemBotId,
+          message_type: 'embed',
           is_agent_post: true,
-          poll_data: pollData,
-          media_url: messageType === 'upload' ? mediaUrl : null,
-          embed_code: messageType === 'embed' && embedList.length === 0 ? embedCode : null,
-          embeds: embedList.length > 0 ? embedList : null,
+          poll_data: null,
+          media_url: null,
+          embed_code: null,
+          embeds: embedList,
           target_audience: targetAudience,
           delivery_status: 'sent',
           is_spotlight: false
@@ -398,16 +292,16 @@ export const BroadcastCenter = () => {
         for (const destTeamId of selectedTeams) {
           const feedPostData = {
             content: tags.trim() ? `${finalContent} ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}` : finalContent,
-            team_id: destTeamId, // Post appears in destination team's feed
-            origin_team_id: sourceTeam, // But track the source team for attribution
-            author_id: systemBotId, // Use system bot for broadcast posts
-            message_type: messageType,
+            team_id: destTeamId,
+            origin_team_id: sourceTeam,
+            author_id: systemBotId,
+            message_type: 'embed',
             is_agent_post: true,
-            poll_data: pollData,
-            media_url: messageType === 'upload' ? mediaUrl : null,
-            embed_code: messageType === 'embed' && embedList.length === 0 ? embedCode : null,
-            embeds: embedList.length > 0 ? embedList : null,
-            target_audience: ['team_feed'], // Only team feed, no spotlight
+            poll_data: null,
+            media_url: null,
+            embed_code: null,
+            embeds: embedList,
+            target_audience: ['team_feed'],
             delivery_status: 'sent',
             is_spotlight: false
           };
@@ -427,23 +321,22 @@ export const BroadcastCenter = () => {
         }
 
         // Broadcast to all destination teams' huddles (including source team)
-        const allTargetTeams = Array.from(new Set([sourceTeam, ...selectedTeams])); // Remove duplicates
+        const allTargetTeams = Array.from(new Set([sourceTeam, ...selectedTeams]));
         const huddleContent = tags.trim() ? `${finalContent} ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}` : finalContent;
         
-        // Ensure embed_code is properly included for X video embeds
         const huddlePostData = {
           content: huddleContent,
-          team_id: sourceTeam, // Keep source team context
-          origin_team_id: sourceTeam, // Track the original source team
-          author_id: systemBotId, // Use system bot for broadcast posts
-          message_type: messageType,
+          team_id: sourceTeam,
+          origin_team_id: sourceTeam,
+          author_id: systemBotId,
+          message_type: 'embed',
           is_agent_post: true,
-          poll_data: pollData,
-          media_url: messageType === 'upload' ? mediaUrl : null,
-          embed_code: messageType === 'embed' && embedList.length === 0 ? embedCode : null,
-          embeds: embedList.length > 0 ? embedList : null,
+          poll_data: null,
+          media_url: null,
+          embed_code: null,
+          embeds: embedList,
           is_team_agent_message: true,
-          post_id: createdPost.id // Include the post ID for linking
+          post_id: createdPost.id
         };
         
         console.log('Broadcasting to huddles with data:', huddlePostData);
@@ -469,7 +362,6 @@ export const BroadcastCenter = () => {
         });
       }
 
-
       setDeliveryStatus(deliveryResults);
 
       const successCount = deliveryResults.filter(r => r.status === 'delivered').length;
@@ -479,33 +371,20 @@ export const BroadcastCenter = () => {
         toast({
           title: "Broadcast Complete",
           description: `Delivered to ${successCount} channel${successCount > 1 ? 's' : ''}${failureCount > 0 ? ` (${failureCount} failed)` : ''}`,
-          variant: successCount === deliveryResults.length ? "default" : "destructive"
-        });
-
-        // Clear form on successful broadcast
-        setContent('');
-        setMediaUrl('');
-        setMediaType(null);
-        setMediaCommentary('');
-        setEmbedCode('');
-        setEmbedPreview('');
-        setEmbedList([]);
-        setCurrentEmbedCommentary('');
-        setPollOptions(['', '']);
-        setTags('');
-        setSelectedTeams([]);
-      } else {
-        toast({
-          title: "Broadcast Failed",
-          description: "Failed to deliver to any channels",
-          variant: "destructive"
         });
       }
+
+      // Clear form on success
+      setCurrentEmbedCode('');
+      setCurrentEmbedCommentary('');
+      setEmbedList([]);
+      setTags('');
+
     } catch (error: any) {
-      console.error('Broadcast error:', error);
+      console.error('Error sending broadcast:', error);
       toast({
-        title: "Broadcast Error",
-        description: error.message || "An unexpected error occurred",
+        title: "Error",
+        description: "Failed to send broadcast",
         variant: "destructive"
       });
     } finally {
@@ -513,386 +392,201 @@ export const BroadcastCenter = () => {
     }
   };
 
-  const handleScheduleBroadcast = async (scheduledTime: Date) => {
+  const handleScheduleBroadcast = async (scheduledDate: Date) => {
     const validationError = validateForm();
     if (validationError) {
       toast({
-        title: "Validation Error", 
+        title: "Validation Error",
         description: validationError,
         variant: "destructive"
       });
       return;
     }
 
-    setLoading(true);
-
-    try {
-      let pollData = null;
-      if (messageType === 'poll') {
-        const validOptions = pollOptions.filter(option => option.trim());
-        const pollId = crypto.randomUUID();
-        pollData = {
-          id: pollId,
-          question: content,
-          options: validOptions.map((option, index) => ({ 
-            id: index, 
-            text: option, 
-            votes: 0 
-          }))
-        };
-      }
-
-      const finalContent = mediaCommentary.trim() || content || (messageType === 'upload' ? '' : '');
-
-      // Create scheduled post
-      const postData = {
-        content: finalContent,
-        team_id: sourceTeam,
-        origin_team_id: sourceTeam,
-        author_id: user.id,
-        message_type: messageType,
-        is_agent_post: true,
-        poll_data: pollData,
-        media_url: messageType === 'upload' ? mediaUrl : null,
-        embed_code: messageType === 'embed' && embedList.length === 0 ? embedCode : null,
-        embeds: embedList.length > 0 ? embedList : null,
-        target_audience: addToSpotlight ? ['team_feed', 'spotlight'] : ['team_feed'],
-        delivery_status: 'scheduled',
-        scheduled_at: scheduledTime.toISOString(),
-        scheduled_teams: selectedTeams,
-        is_spotlight: addToSpotlight
-      };
-
-      // Add tags if provided
-      if (tags.trim()) {
-        postData.content += ` ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}`;
-      }
-
-      const { error } = await supabase
-        .from('posts')
-        .insert(postData);
-
-      if (error) throw error;
-
-      setScheduledAt(scheduledTime);
-      setScheduleDialogOpen(false);
-
-      toast({
-        title: "Broadcast Scheduled",
-        description: `Message scheduled for ${scheduledTime.toLocaleString()}`,
-      });
-
-      // Clear form
-      setContent('');
-      setMediaUrl('');
-      setMediaType(null);
-      setMediaCommentary('');
-      setEmbedCode('');
-      setEmbedPreview('');
-      setEmbedList([]);
-      setCurrentEmbedCommentary('');
-      setPollOptions(['', '']);
-      setTags('');
-      setSelectedTeams([]);
-    } catch (error: any) {
-      console.error('Schedule error:', error);
-      toast({
-        title: "Schedule Error",
-        description: error.message || "Failed to schedule broadcast",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+    toast({
+      title: "Coming Soon",
+      description: "Scheduling feature will be available soon!",
+    });
+    setScheduleDialogOpen(false);
   };
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="w-5 h-5" />
-            Create Message
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Basic Message Settings */}
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="source-team">Source Team</Label>
-                <Select value={sourceTeam} onValueChange={setSourceTeam}>
-                  <SelectTrigger id="source-team">
-                    <SelectValue placeholder="Select source team" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teams.map((team) => (
-                      <SelectItem key={team.id} value={team.id}>
-                        {team.city} {team.name} ({team.league})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="destination-teams">Destination Teams</Label>
-                <Select value="" onValueChange={(value) => {
-                  if (value && !selectedTeams.includes(value)) {
-                    setSelectedTeams(prev => [...prev, value]);
-                  }
-                }}>
-                  <SelectTrigger id="destination-teams">
-                    <SelectValue placeholder="Add destination teams" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teams
-                      .filter(team => !selectedTeams.includes(team.id))
-                      .map((team) => (
-                        <SelectItem key={team.id} value={team.id}>
-                          {team.city} {team.name} ({team.league})
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                {selectedTeams.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {selectedTeams.map((teamId) => {
-                      const team = teams.find(t => t.id === teamId);
-                      return (
-                        <Badge key={teamId} variant="secondary" className="text-xs">
-                          {team ? `${team.city} ${team.name}` : teamId}
-                          <X 
-                            className="w-3 h-3 ml-1 cursor-pointer" 
-                            onClick={() => setSelectedTeams(prev => prev.filter(id => id !== teamId))}
-                          />
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="message-type">Message Type</Label>
-              <Select value={messageType} onValueChange={setMessageType}>
-                <SelectTrigger id="message-type">
-                  <SelectValue />
+      <ScheduledBroadcastProcessor />
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Broadcast Form */}
+        <div className="space-y-6">
+          {/* Source Team Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Source Team</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Select value={sourceTeam} onValueChange={setSourceTeam}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select source team" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="text">
-                    <div className="flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4" />
-                      Text Message
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="poll">
-                    <div className="flex items-center gap-2">
-                      <BarChart3 className="w-4 h-4" />
-                      Poll
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="upload">
-                    <div className="flex items-center gap-2">
-                      <Upload className="w-4 h-4" />
-                      Media Upload
-                    </div>
-                  </SelectItem>
+                  {teams.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.city} {team.name} ({team.league})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <Separator />
+          {/* Destination Teams */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Destination Teams</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {teams.map((team) => (
+                  <div key={team.id} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id={team.id}
+                      checked={selectedTeams.includes(team.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedTeams(prev => [...prev, team.id]);
+                        } else {
+                          setSelectedTeams(prev => prev.filter(id => id !== team.id));
+                        }
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                    <Label htmlFor={team.id} className="text-sm">
+                      {team.city} {team.name} ({team.league})
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Message Content */}
-          <div className="space-y-2">
-            <Label htmlFor="content">Message Content (optional)</Label>
-            <Textarea
-              id="content"
-              placeholder="Enter your message content..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="min-h-[100px]"
-            />
-          </div>
-
-          {/* Poll Options */}
-          {messageType === 'poll' && (
-            <div className="space-y-4">
-              <Label>Poll Options</Label>
-              {pollOptions.map((option, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    placeholder={`Option ${index + 1}`}
-                    value={option}
-                    onChange={(e) => updatePollOption(index, e.target.value)}
-                  />
-                  {pollOptions.length > 2 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => removePollOption(index)}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={addPollOption}
-                className="w-full"
-              >
-                Add Option
-              </Button>
-            </div>
-          )}
-
-          {/* Media Upload */}
-          {messageType === 'upload' && (
-            <div className="space-y-4">
-              <Label>Upload Media</Label>
-              <MediaUpload 
-                onMediaSelected={handleMediaSelected}
-                bucket="broadcast-media"
-                showPreview={true}
-              />
-              {mediaUrl && (
-                <div className="space-y-2">
-                  <MediaViewer 
-                    mediaUrl={mediaUrl} 
-                    mediaType={mediaType || 'image'}
-                    className="max-h-64"
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={clearMedia}
-                    className="w-full"
-                  >
-                    Clear Media
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Simple Embed Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Link className="w-4 h-4" />
-              <Label>Add Embeds</Label>
-            </div>
-            
-            <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+          {/* Simple Embed Interface */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Link className="w-5 h-5" />
+                Broadcast Embeds
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="embed-code">Embed Code or URL</Label>
+                <Label htmlFor="embed-code">Paste embed code or URL</Label>
                 <Textarea
                   id="embed-code"
-                  placeholder="Paste X/Twitter URL, YouTube URL, or embed code..."
-                  value={embedCode}
-                  onChange={(e) => setEmbedCode(e.target.value)}
+                  placeholder="Paste X post URL, YouTube URL, or embed code..."
+                  value={currentEmbedCode}
+                  onChange={(e) => setCurrentEmbedCode(e.target.value)}
                   className="min-h-[80px]"
                 />
-                {embedPreview && (
-                  <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
-                    Preview: {embedPreview}
-                  </div>
-                )}
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="embed-commentary">Commentary (optional)</Label>
-                <Input
+                <Label htmlFor="embed-commentary">Add text/commentary (optional)</Label>
+                <Textarea
                   id="embed-commentary"
-                  placeholder="Add commentary for this embed..."
+                  placeholder="Add your text or commentary for this embed..."
                   value={currentEmbedCommentary}
                   onChange={(e) => setCurrentEmbedCommentary(e.target.value)}
+                  className="min-h-[60px]"
                 />
               </div>
-              
-              <Button
-                type="button"
+
+              <Button 
+                type="button" 
+                variant="outline" 
                 onClick={addEmbed}
-                disabled={!embedCode.trim()}
                 className="w-full"
+                disabled={!currentEmbedCode.trim()}
               >
-                Add This Embed
+                Add Another Embed
               </Button>
-            </div>
 
-            {/* Show added embeds */}
-            {embedList.length > 0 && (
-              <div className="space-y-2">
-                <Label>Added Embeds ({embedList.length})</Label>
+              {/* Preview of what will be posted */}
+              {embedList.length > 0 && (
                 <div className="space-y-2">
-                  {embedList.map((embed, index) => (
-                    <div key={index} className="flex items-start gap-2 p-3 border rounded-lg bg-background">
-                      <div className="flex-1 space-y-1">
-                        <div className="text-sm font-medium">
-                          {embed.embed_type === 'x' ? 'X/Twitter Post' : 
-                           embed.embed_type === 'youtube' ? 'YouTube Video' : 'Custom Embed'}
-                        </div>
-                        {embed.commentary && (
-                          <div className="text-sm text-muted-foreground">
-                            "{embed.commentary}"
+                  <Label>What will be posted:</Label>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {embedList.map((embed, index) => (
+                      <div key={index} className="flex items-start justify-between p-3 border rounded-lg bg-muted/30">
+                        <div className="flex-1">
+                          {embed.commentary && (
+                            <div className="text-sm mb-2 font-medium">
+                              {embed.commentary}
+                            </div>
+                          )}
+                          <div className="text-xs text-muted-foreground">
+                            {embed.embed_type === 'x' ? '📱 X Post' : 
+                             embed.embed_type === 'youtube' ? '🎥 YouTube Video' : '🔗 Custom Embed'}
                           </div>
-                        )}
-                        <div className="text-xs text-muted-foreground truncate">
-                          {embed.embed_code.substring(0, 100)}...
+                          <div className="text-xs text-muted-foreground mt-1 truncate">
+                            {embed.embed_code.substring(0, 80)}...
+                          </div>
                         </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeEmbed(index)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeEmbed(index)}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Optional Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Additional Settings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="spotlight"
+                  checked={addToSpotlight}
+                  onCheckedChange={setAddToSpotlight}
+                />
+                <Label htmlFor="spotlight">Add to Spotlight Feed</Label>
               </div>
-            )}
-          </div>
 
-          {/* Tags */}
-          <div className="space-y-2">
-            <Label htmlFor="tags">Tags (comma-separated)</Label>
-            <Input
-              id="tags"
-              placeholder="Bears, NFL, GameDay"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="tags">Tags (comma-separated)</Label>
+                <input
+                  id="tags"
+                  type="text"
+                  placeholder="tag1, tag2, tag3"
+                  value={tags}
+                  onChange={(e) => setTags(e.target.value)}
+                  className="w-full px-3 py-2 border border-input rounded-md"
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Spotlight Toggle */}
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="spotlight"
-              checked={addToSpotlight}
-              onCheckedChange={setAddToSpotlight}
-            />
-            <Label htmlFor="spotlight">Add to Spotlight Feed</Label>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2">
-            <Button
-              onClick={handleSendMessage}
-              disabled={loading}
+          {/* Send Buttons */}
+          <div className="flex gap-3">
+            <Button 
+              onClick={handleSendMessage} 
+              disabled={loading || embedList.length === 0}
               className="flex-1"
             >
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Broadcasting...
+                  Sending...
                 </>
               ) : (
                 <>
@@ -902,81 +596,69 @@ export const BroadcastCenter = () => {
               )}
             </Button>
             
-            <Button
-              variant="outline"
+            <Button 
+              variant="outline" 
               onClick={() => setScheduleDialogOpen(true)}
-              disabled={loading}
+              disabled={loading || embedList.length === 0}
             >
               <Clock className="w-4 h-4 mr-2" />
               Schedule
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Delivery Status */}
-      {showDeliveryStatus && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5" />
-              Delivery Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {deliveryStatus.map((status, index) => (
-                <div key={index} className="flex items-center justify-between p-3 rounded-lg border">
-                  <span className="font-medium">{status.channel}</span>
-                  <div className="flex items-center gap-2">
-                    {status.status === 'delivered' && (
-                      <Badge variant="default" className="bg-green-500 text-white">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Delivered
-                      </Badge>
-                    )}
-                    {status.status === 'failed' && (
-                      <Badge variant="destructive">
-                        <AlertCircle className="w-3 h-3 mr-1" />
-                        Failed
-                      </Badge>
-                    )}
-                    {status.status === 'pending' && (
-                      <Badge variant="secondary">
-                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                        Pending
-                      </Badge>
-                    )}
-                  </div>
+        {/* Status and Management */}
+        <div className="space-y-6">
+          {/* Delivery Status */}
+          {showDeliveryStatus && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Send className="w-5 h-5" />
+                  Delivery Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {deliveryStatus.map((status, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 border rounded">
+                      <span className="text-sm">{status.channel}</span>
+                      <div className="flex items-center gap-2">
+                        {status.status === 'delivered' && (
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                        )}
+                        {status.status === 'failed' && (
+                          <AlertCircle className="w-4 h-4 text-red-600" />
+                        )}
+                        {status.status === 'pending' && (
+                          <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                        )}
+                        <Badge 
+                          variant={status.status === 'delivered' ? 'default' : 
+                                  status.status === 'failed' ? 'destructive' : 'secondary'}
+                        >
+                          {status.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Scheduled At Display */}
-      {scheduledAt && (
-        <Alert>
-          <Calendar className="h-4 w-4" />
-          <AlertDescription>
-            Message scheduled for: {scheduledAt.toLocaleString()}
-          </AlertDescription>
-        </Alert>
-      )}
+          {/* Post Management */}
+          <PostManagement />
+        </div>
+      </div>
 
       {/* Schedule Dialog */}
       <ScheduleDialog
         open={scheduleDialogOpen}
         onOpenChange={setScheduleDialogOpen}
         onSchedule={handleScheduleBroadcast}
+        loading={loading}
       />
-
-      {/* Scheduled Broadcast Processor */}
-      <ScheduledBroadcastProcessor />
-
-      {/* Post Management */}
-      <PostManagement />
     </div>
   );
 };
