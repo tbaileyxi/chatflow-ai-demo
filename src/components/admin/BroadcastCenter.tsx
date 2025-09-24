@@ -201,10 +201,6 @@ export const BroadcastCenter = () => {
       }
     }
 
-    if (messageType === 'embed' && !embedCode.trim()) {
-      return 'Please enter embed code';
-    }
-
     if (messageType === 'upload' && !mediaUrl) {
       return 'Please upload a file';
     }
@@ -366,8 +362,8 @@ export const BroadcastCenter = () => {
           is_agent_post: true,
           poll_data: pollData,
           media_url: messageType === 'upload' ? mediaUrl : null,
-                embed_code: messageType === 'embed' && embedList.length === 0 ? embedCode : null,
-                embeds: embedList.length > 0 ? embedList : null,
+          embed_code: messageType === 'embed' && embedList.length === 0 ? embedCode : null,
+          embeds: embedList.length > 0 ? embedList : null,
           target_audience: targetAudience,
           delivery_status: 'sent',
           is_spotlight: false
@@ -409,8 +405,8 @@ export const BroadcastCenter = () => {
             is_agent_post: true,
             poll_data: pollData,
             media_url: messageType === 'upload' ? mediaUrl : null,
-           embed_code: messageType === 'embed' && embedList.length === 0 ? embedCode : null,
-           embeds: embedList.length > 0 ? embedList : null,
+            embed_code: messageType === 'embed' && embedList.length === 0 ? embedCode : null,
+            embeds: embedList.length > 0 ? embedList : null,
             target_audience: ['team_feed'], // Only team feed, no spotlight
             delivery_status: 'sent',
             is_spotlight: false
@@ -482,24 +478,22 @@ export const BroadcastCenter = () => {
       if (successCount > 0) {
         toast({
           title: "Broadcast Complete",
-          description: `Successfully delivered to ${successCount} channel${successCount > 1 ? 's' : ''}${failureCount > 0 ? `, ${failureCount} failed` : ''}`,
+          description: `Delivered to ${successCount} channel${successCount > 1 ? 's' : ''}${failureCount > 0 ? ` (${failureCount} failed)` : ''}`,
+          variant: successCount === deliveryResults.length ? "default" : "destructive"
         });
 
-        // Reset form on success
+        // Clear form on successful broadcast
         setContent('');
-        setPollOptions(['', '']);
-        setEmbedCode('');
         setMediaUrl('');
         setMediaType(null);
         setMediaCommentary('');
-        setAddToSpotlight(false);
-        setSelectedTeams([]);
+        setEmbedCode('');
+        setEmbedPreview('');
+        setEmbedList([]);
+        setCurrentEmbedCommentary('');
+        setPollOptions(['', '']);
         setTags('');
-      setEmbedList([]);
-      setCurrentEmbedCommentary('');
-        
-        // Delay hiding delivery status to let user see results
-        setTimeout(() => setShowDeliveryStatus(false), 3000);
+        setSelectedTeams([]);
       } else {
         toast({
           title: "Broadcast Failed",
@@ -507,12 +501,11 @@ export const BroadcastCenter = () => {
           variant: "destructive"
         });
       }
-
     } catch (error: any) {
-      console.error('Error sending message:', error);
+      console.error('Broadcast error:', error);
       toast({
-        title: "Error",
-        description: error.message || 'Failed to send message',
+        title: "Broadcast Error",
+        description: error.message || "An unexpected error occurred",
         variant: "destructive"
       });
     } finally {
@@ -520,11 +513,11 @@ export const BroadcastCenter = () => {
     }
   };
 
-  const handleScheduleBroadcast = async (scheduledAt: Date) => {
+  const handleScheduleBroadcast = async (scheduledTime: Date) => {
     const validationError = validateForm();
     if (validationError) {
       toast({
-        title: "Validation Error",
+        title: "Validation Error", 
         description: validationError,
         variant: "destructive"
       });
@@ -532,11 +525,14 @@ export const BroadcastCenter = () => {
     }
 
     setLoading(true);
+
     try {
       let pollData = null;
       if (messageType === 'poll') {
         const validOptions = pollOptions.filter(option => option.trim());
+        const pollId = crypto.randomUUID();
         pollData = {
+          id: pollId,
           question: content,
           options: validOptions.map((option, index) => ({ 
             id: index, 
@@ -547,27 +543,30 @@ export const BroadcastCenter = () => {
       }
 
       const finalContent = mediaCommentary.trim() || content || (messageType === 'upload' ? '' : '');
-      const contentWithTags = tags.trim() ? `${finalContent} ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}` : finalContent;
-      const targetAudience = addToSpotlight ? ['team_feed', 'spotlight'] : ['team_feed'];
 
-      // Schedule a single post from the source team with destination teams metadata
+      // Create scheduled post
       const postData = {
-        content: contentWithTags,
-        team_id: sourceTeam, // Post belongs to source team
-        origin_team_id: sourceTeam, // Track the original source team
+        content: finalContent,
+        team_id: sourceTeam,
+        origin_team_id: sourceTeam,
         author_id: user.id,
         message_type: messageType,
-        is_spotlight: addToSpotlight,
         is_agent_post: true,
         poll_data: pollData,
         media_url: messageType === 'upload' ? mediaUrl : null,
-        embed_code: messageType === 'embed' ? embedCode : null,
-        scheduled_at: scheduledAt.toISOString(),
+        embed_code: messageType === 'embed' && embedList.length === 0 ? embedCode : null,
+        embeds: embedList.length > 0 ? embedList : null,
+        target_audience: addToSpotlight ? ['team_feed', 'spotlight'] : ['team_feed'],
         delivery_status: 'scheduled',
-        target_audience: targetAudience,
-        // Store destination teams as metadata for scheduled broadcast processor
-        destination_teams: selectedTeams
+        scheduled_at: scheduledTime.toISOString(),
+        scheduled_teams: selectedTeams,
+        is_spotlight: addToSpotlight
       };
+
+      // Add tags if provided
+      if (tags.trim()) {
+        postData.content += ` ${tags.split(',').map(tag => `#${tag.trim()}`).join(' ')}`;
+      }
 
       const { error } = await supabase
         .from('posts')
@@ -575,30 +574,31 @@ export const BroadcastCenter = () => {
 
       if (error) throw error;
 
+      setScheduledAt(scheduledTime);
+      setScheduleDialogOpen(false);
 
       toast({
         title: "Broadcast Scheduled",
-        description: `Message scheduled for ${selectedTeams.length} team${selectedTeams.length > 1 ? 's' : ''} at ${scheduledAt.toLocaleString()}`,
+        description: `Message scheduled for ${scheduledTime.toLocaleString()}`,
       });
 
-      // Reset form
+      // Clear form
       setContent('');
-      setPollOptions(['', '']);
-      setEmbedCode('');
       setMediaUrl('');
       setMediaType(null);
       setMediaCommentary('');
-      setAddToSpotlight(false);
-      setSelectedTeams([]);
-      setTags('');
+      setEmbedCode('');
+      setEmbedPreview('');
       setEmbedList([]);
       setCurrentEmbedCommentary('');
-      
+      setPollOptions(['', '']);
+      setTags('');
+      setSelectedTeams([]);
     } catch (error: any) {
-      console.error('Error scheduling message:', error);
+      console.error('Schedule error:', error);
       toast({
-        title: "Error",
-        description: error.message || 'Failed to schedule message',
+        title: "Schedule Error",
+        description: error.message || "Failed to schedule broadcast",
         variant: "destructive"
       });
     } finally {
@@ -611,396 +611,372 @@ export const BroadcastCenter = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Send className="w-5 h-5" />
-            Broadcast Center
+            <MessageSquare className="w-5 h-5" />
+            Create Message
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Source Team Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="source-team-select">Source Team Agent</Label>
-            <Select value={sourceTeam} onValueChange={setSourceTeam}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose agent to broadcast from" />
-              </SelectTrigger>
-              <SelectContent>
-                {teams.map((team) => (
-                  <SelectItem key={team.id} value={team.id}>
-                    {team.city} {team.name} Agent ({team.league})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Destination Teams Selection */}
-          <div className="space-y-2">
-            <Label>Destination Teams</Label>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-40 overflow-y-auto border rounded-md p-3">
-              {teams.map((team) => (
-                <div key={team.id} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id={`team-${team.id}`}
-                    checked={selectedTeams.includes(team.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedTeams(prev => [...prev, team.id]);
-                      } else {
-                        setSelectedTeams(prev => prev.filter(id => id !== team.id));
-                      }
-                    }}
-                    className="rounded border-input"
-                  />
-                  <Label htmlFor={`team-${team.id}`} className="text-sm">
-                    {team.city} {team.name}
-                  </Label>
-                </div>
-              ))}
+          {/* Basic Message Settings */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="source-team">Source Team</Label>
+                <Select value={sourceTeam} onValueChange={setSourceTeam}>
+                  <SelectTrigger id="source-team">
+                    <SelectValue placeholder="Select source team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.city} {team.name} ({team.league})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="destination-teams">Destination Teams</Label>
+                <Select value="" onValueChange={(value) => {
+                  if (value && !selectedTeams.includes(value)) {
+                    setSelectedTeams(prev => [...prev, value]);
+                  }
+                }}>
+                  <SelectTrigger id="destination-teams">
+                    <SelectValue placeholder="Add destination teams" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams
+                      .filter(team => !selectedTeams.includes(team.id))
+                      .map((team) => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.city} {team.name} ({team.league})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {selectedTeams.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {selectedTeams.map((teamId) => {
+                      const team = teams.find(t => t.id === teamId);
+                      return (
+                        <Badge key={teamId} variant="secondary" className="text-xs">
+                          {team ? `${team.city} ${team.name}` : teamId}
+                          <X 
+                            className="w-3 h-3 ml-1 cursor-pointer" 
+                            onClick={() => setSelectedTeams(prev => prev.filter(id => id !== teamId))}
+                          />
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-            {selectedTeams.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                Broadcasting to {selectedTeams.length} team{selectedTeams.length > 1 ? 's' : ''}
-              </p>
-            )}
-          </div>
 
-          {/* Message Type */}
-          <div className="space-y-2">
-            <Label>Message Type</Label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Button
-                variant={messageType === 'text' ? 'default' : 'outline'}
-                onClick={() => setMessageType('text')}
-                className="flex items-center gap-2"
-              >
-                <MessageSquare className="w-4 h-4" />
-                Text
-              </Button>
-              <Button
-                variant={messageType === 'poll' ? 'default' : 'outline'}
-                onClick={() => setMessageType('poll')}
-                className="flex items-center gap-2"
-              >
-                <BarChart3 className="w-4 h-4" />
-                Poll
-              </Button>
-              <Button
-                variant={messageType === 'upload' ? 'default' : 'outline'}
-                onClick={() => setMessageType('upload')}
-                className="flex items-center gap-2"
-              >
-                <Upload className="w-4 h-4" />
-                Upload
-              </Button>
-              <Button
-                variant={messageType === 'embed' ? 'default' : 'outline'}
-                onClick={() => setMessageType('embed')}
-                className="flex items-center gap-2"
-              >
-                <Link className="w-4 h-4" />
-                Embed
-              </Button>
-            </div>
-          </div>
-
-          {/* Content Input */}
-          {messageType !== 'upload' && (
             <div className="space-y-2">
-              <Label htmlFor="content">
-                {messageType === 'poll' ? 'Poll Question' : 'Message Content'}
-              </Label>
-              <Textarea
-                id="content"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder={
-                  messageType === 'poll' ? 'What would you like to ask?' : 
-                  messageType === 'embed' ? 'Optional caption for your embed...' :
-                  'Enter your message... (Use line breaks for formatting)'
-                }
-                rows={6}
-                className="resize-vertical"
-              />
-              <p className="text-xs text-muted-foreground">
-                Tip: Use line breaks (Enter key) to format your message with multiple paragraphs
-              </p>
+              <Label htmlFor="message-type">Message Type</Label>
+              <Select value={messageType} onValueChange={setMessageType}>
+                <SelectTrigger id="message-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="text">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4" />
+                      Text Message
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="poll">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4" />
+                      Poll
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="upload">
+                    <div className="flex items-center gap-2">
+                      <Upload className="w-4 h-4" />
+                      Media Upload
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          )}
+          </div>
+
+          <Separator />
+
+          {/* Message Content */}
+          <div className="space-y-2">
+            <Label htmlFor="content">Message Content (optional)</Label>
+            <Textarea
+              id="content"
+              placeholder="Enter your message content..."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="min-h-[100px]"
+            />
+          </div>
 
           {/* Poll Options */}
           {messageType === 'poll' && (
-            <div className="space-y-2">
+            <div className="space-y-4">
               <Label>Poll Options</Label>
+              {pollOptions.map((option, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    placeholder={`Option ${index + 1}`}
+                    value={option}
+                    onChange={(e) => updatePollOption(index, e.target.value)}
+                  />
+                  {pollOptions.length > 2 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => removePollOption(index)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addPollOption}
+                className="w-full"
+              >
+                Add Option
+              </Button>
+            </div>
+          )}
+
+          {/* Media Upload */}
+          {messageType === 'upload' && (
+            <div className="space-y-4">
+              <Label>Upload Media</Label>
+              <MediaUpload 
+                onFileSelected={handleMediaSelected}
+                allowCommentary={true}
+                onCommentaryUpdate={setMediaCommentary}
+              />
+              {mediaUrl && (
+                <div className="space-y-2">
+                  <MediaViewer 
+                    url={mediaUrl} 
+                    type={mediaType || 'image'}
+                    className="max-h-64"
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={clearMedia}
+                    className="w-full"
+                  >
+                    Clear Media
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Simple Embed Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Link className="w-4 h-4" />
+              <Label>Add Embeds</Label>
+            </div>
+            
+            <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
               <div className="space-y-2">
-                {pollOptions.map((option, index) => (
-                  <div key={index} className="flex gap-2">
-                    <Input
-                      value={option}
-                      onChange={(e) => updatePollOption(index, e.target.value)}
-                      placeholder={`Option ${index + 1}`}
-                    />
-                    {pollOptions.length > 2 && (
+                <Label htmlFor="embed-code">Embed Code or URL</Label>
+                <Textarea
+                  id="embed-code"
+                  placeholder="Paste X/Twitter URL, YouTube URL, or embed code..."
+                  value={embedCode}
+                  onChange={(e) => setEmbedCode(e.target.value)}
+                  className="min-h-[80px]"
+                />
+                {embedPreview && (
+                  <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
+                    Preview: {embedPreview}
+                  </div>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="embed-commentary">Commentary (optional)</Label>
+                <Input
+                  id="embed-commentary"
+                  placeholder="Add commentary for this embed..."
+                  value={currentEmbedCommentary}
+                  onChange={(e) => setCurrentEmbedCommentary(e.target.value)}
+                />
+              </div>
+              
+              <Button
+                type="button"
+                onClick={addEmbed}
+                disabled={!embedCode.trim()}
+                className="w-full"
+              >
+                Add This Embed
+              </Button>
+            </div>
+
+            {/* Show added embeds */}
+            {embedList.length > 0 && (
+              <div className="space-y-2">
+                <Label>Added Embeds ({embedList.length})</Label>
+                <div className="space-y-2">
+                  {embedList.map((embed, index) => (
+                    <div key={index} className="flex items-start gap-2 p-3 border rounded-lg bg-background">
+                      <div className="flex-1 space-y-1">
+                        <div className="text-sm font-medium">
+                          {embed.embed_type === 'x' ? 'X/Twitter Post' : 
+                           embed.embed_type === 'youtube' ? 'YouTube Video' : 'Custom Embed'}
+                        </div>
+                        {embed.commentary && (
+                          <div className="text-sm text-muted-foreground">
+                            "{embed.commentary}"
+                          </div>
+                        )}
+                        <div className="text-xs text-muted-foreground truncate">
+                          {embed.embed_code.substring(0, 100)}...
+                        </div>
+                      </div>
                       <Button
-                        variant="outline"
-                        onClick={() => removePollOption(index)}
+                        type="button"
+                        variant="ghost"
                         size="sm"
+                        onClick={() => removeEmbed(index)}
                       >
                         <X className="w-4 h-4" />
                       </Button>
-                    )}
-                  </div>
-                ))}
-                <Button variant="outline" onClick={addPollOption} size="sm">
-                  Add Option
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Embed Code */}
-          {messageType === 'embed' && (
-            <div className="space-y-3">
-              <Label htmlFor="embed-code">Embed Code (Single or Thread)</Label>
-              <Textarea
-                id="embed-code"
-                value={embedCode}
-                onChange={(e) => setEmbedCode(e.target.value)}
-                placeholder="Paste Twitter embed code, YouTube embed, Instagram embed, or custom HTML..."
-                rows={6}
-              />
-              {embedPreview && (
-                <Alert>
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Preview: {embedPreview}
-                  </AlertDescription>
-                </Alert>
-              )}
-              
-              {/* Multiple Embeds Support */}
-              <div className="space-y-3 border-t pt-4">
-                <div className="flex items-center justify-between">
-                  <Label>Multiple Embeds</Label>
-                  <Badge variant="outline" className="text-xs">
-                    Like X Posts
-                  </Badge>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="embed-commentary">Commentary (optional)</Label>
-                  <Textarea
-                    id="embed-commentary"
-                    value={currentEmbedCommentary}
-                    onChange={(e) => setCurrentEmbedCommentary(e.target.value)}
-                    placeholder="Add context or commentary for this embed..."
-                    rows={2}
-                  />
-                </div>
-                
-                <Button
-                  type="button"
-                  onClick={addEmbed}
-                  variant="secondary" 
-                  className="w-full"
-                  disabled={!embedCode.trim()}
-                >
-                  + Add Embed ({embedList.length + (embedCode.trim() ? 1 : 0)})
-                </Button>
-                
-                <p className="text-xs text-muted-foreground">
-                  Add multiple embeds to your post. They'll display with "See more" button like X.
-                </p>
-              </div>
-              
-              {/* Embed List Preview */}
-              {embedList.length > 0 && (
-                <div className="space-y-2 border rounded-lg p-4 bg-muted/30">
-                  <Label>Added Embeds ({embedList.length} embed{embedList.length !== 1 ? 's' : ''})</Label>
-                  <div className="space-y-3 max-h-60 overflow-y-auto">
-                    {embedList.map((embed, index) => (
-                      <div key={index} className="bg-background p-3 rounded border space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Badge variant="outline" className="text-xs">
-                            Embed {index + 1} - {embed.embed_type.toUpperCase()}
-                          </Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeEmbed(index)}
-                            className="h-6 w-6 p-0"
-                          >
-                            <X className="w-3 h-3" />
-                          </Button>
-                        </div>
-                        {embed.commentary && (
-                          <p className="text-sm text-muted-foreground">"{embed.commentary}"</p>
-                        )}
-                        <p className="text-xs font-mono bg-muted p-2 rounded truncate">
-                          {embed.embed_code.substring(0, 100)}...
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Upload Section */}
-          {messageType === 'upload' && (
-            <div className="space-y-3">
-              <Label>Media Upload</Label>
-              {mediaUrl ? (
-                <div className="space-y-3">
-                  <MediaViewer
-                    mediaUrl={mediaUrl}
-                    mediaType={mediaType!}
-                    className="max-w-md"
-                    showLightbox={false}
-                  />
-                  <div className="flex gap-2">
-                    <Badge variant="secondary">
-                      {mediaType === 'image' ? 'Image' : 'Video'} uploaded
-                    </Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={clearMedia}
-                    >
-                      <X className="w-4 h-4 mr-1" />
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <MediaUpload
-                  onMediaSelected={handleMediaWithCommentary}
-                  bucket="broadcast-media"
-                  showPreview={false}
-                />
-              )}
-            </div>
-          )}
-
-          {/* Upload Commentary for Media */}
-          {messageType === 'upload' && (
-            <div className="space-y-2">
-              <Label htmlFor="media-commentary">Message (Optional)</Label>
-              <Textarea
-                id="media-commentary"
-                value={mediaCommentary}
-                onChange={(e) => setMediaCommentary(e.target.value)}
-                placeholder="Add a message to go with your upload..."
-                rows={3}
-              />
-            </div>
-          )}
-
-          {/* Tags */}
-          <div className="space-y-2">
-            <Label htmlFor="tags">Tags (Optional)</Label>
-            <Input
-              id="tags"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="sports, breaking, news (comma separated)"
-            />
-            <p className="text-xs text-muted-foreground">
-              Tags will be automatically formatted with # symbols
-            </p>
-          </div>
-
-          <Separator />
-
-          {/* Simplified Broadcast Options */}
-          <div className="space-y-4">
-            <div>
-              <Label className="text-base font-medium">Broadcast Settings</Label>
-              <p className="text-sm text-muted-foreground mt-1">
-                Every message automatically goes to Team Feed and All Team Huddles
-              </p>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="spotlight"
-                checked={addToSpotlight}
-                onCheckedChange={setAddToSpotlight}
-              />
-              <Label htmlFor="spotlight" className="font-medium">Add to Spotlight Feed</Label>
-              <span className="text-xs text-muted-foreground">(featured across all teams)</span>
-            </div>
-          </div>
-
-
-          {/* Delivery Status */}
-          {showDeliveryStatus && deliveryStatus.length > 0 && (
-            <Alert>
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>
-                <div className="space-y-2">
-                  <div className="font-medium">Delivery Status:</div>
-                  {deliveryStatus.map((status, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      {status.status === 'delivered' ? (
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                      )}
-                      <span className="text-sm">
-                        {status.channel}: {status.status}
-                        {status.error && ` - ${status.error}`}
-                      </span>
                     </div>
                   ))}
                 </div>
-              </AlertDescription>
-            </Alert>
-          )}
+              </div>
+            )}
+          </div>
 
-          <Separator />
+          {/* Tags */}
+          <div className="space-y-2">
+            <Label htmlFor="tags">Tags (comma-separated)</Label>
+            <Input
+              id="tags"
+              placeholder="Bears, NFL, GameDay"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+            />
+          </div>
+
+          {/* Spotlight Toggle */}
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="spotlight"
+              checked={addToSpotlight}
+              onCheckedChange={setAddToSpotlight}
+            />
+            <Label htmlFor="spotlight">Add to Spotlight Feed</Label>
+          </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3">
-            <Button 
-              onClick={handleSendMessage} 
+          <div className="flex gap-2">
+            <Button
+              onClick={handleSendMessage}
               disabled={loading}
-              className="flex items-center gap-2"
+              className="flex-1"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Broadcasting...
                 </>
               ) : (
                 <>
-                  <Send className="w-4 h-4" />
-                  Broadcast Now
+                  <Send className="w-4 h-4 mr-2" />
+                  Send Now
                 </>
               )}
             </Button>
-            <Button variant="outline" disabled={loading} className="flex items-center gap-2" onClick={() => setScheduleDialogOpen(true)}>
-              <Calendar className="w-4 h-4" />
+            
+            <Button
+              variant="outline"
+              onClick={() => setScheduleDialogOpen(true)}
+              disabled={loading}
+            >
+              <Clock className="w-4 h-4 mr-2" />
               Schedule
             </Button>
           </div>
         </CardContent>
       </Card>
-      
-      {/* Scheduled Broadcast Processor */}
-      <ScheduledBroadcastProcessor />
-      
-      {/* Post Management Section */}
-      <PostManagement />
-      
+
+      {/* Delivery Status */}
+      {showDeliveryStatus && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5" />
+              Delivery Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {deliveryStatus.map((status, index) => (
+                <div key={index} className="flex items-center justify-between p-3 rounded-lg border">
+                  <span className="font-medium">{status.channel}</span>
+                  <div className="flex items-center gap-2">
+                    {status.status === 'delivered' && (
+                      <Badge variant="default" className="bg-green-500 text-white">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Delivered
+                      </Badge>
+                    )}
+                    {status.status === 'failed' && (
+                      <Badge variant="destructive">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        Failed
+                      </Badge>
+                    )}
+                    {status.status === 'pending' && (
+                      <Badge variant="secondary">
+                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        Pending
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Scheduled At Display */}
+      {scheduledAt && (
+        <Alert>
+          <Calendar className="h-4 w-4" />
+          <AlertDescription>
+            Message scheduled for: {scheduledAt.toLocaleString()}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Schedule Dialog */}
       <ScheduleDialog
         open={scheduleDialogOpen}
         onOpenChange={setScheduleDialogOpen}
         onSchedule={handleScheduleBroadcast}
-        loading={loading}
       />
+
+      {/* Scheduled Broadcast Processor */}
+      <ScheduledBroadcastProcessor />
+
+      {/* Post Management */}
+      <PostManagement />
     </div>
   );
 };
