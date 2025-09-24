@@ -55,8 +55,9 @@ export const BroadcastCenter = () => {
   const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
   const [tags, setTags] = useState('');
   
-  // Thread support - multiple embeds (like X threads)
-  const [threadEmbeds, setThreadEmbeds] = useState<Array<{ commentary: string; embed_code: string; embed_type: 'x' | 'iframe' | 'youtube' }>>([]);
+  // Simple embed list - like X/Twitter multiple embeds
+  const [embedList, setEmbedList] = useState<Array<{ commentary: string; embed_code: string; embed_type: 'x' | 'iframe' | 'youtube' }>>([]);
+  const [currentEmbedCommentary, setCurrentEmbedCommentary] = useState('');
 
   useEffect(() => {
     fetchTeams();
@@ -147,7 +148,7 @@ export const BroadcastCenter = () => {
     setMediaType(null);
   };
 
-  const addEmbedToThread = () => {
+  const addEmbed = () => {
     if (!embedCode.trim()) {
       toast({
         title: "Error",
@@ -160,8 +161,8 @@ export const BroadcastCenter = () => {
     const embedType = embedCode.includes('twitter.com') || embedCode.includes('x.com') ? 'x' :
                      embedCode.includes('youtube.com') || embedCode.includes('youtu.be') ? 'youtube' : 'iframe';
 
-    setThreadEmbeds(prev => [...prev, {
-      commentary: mediaCommentary.trim(), // Use media commentary for thread commentary
+    setEmbedList(prev => [...prev, {
+      commentary: currentEmbedCommentary.trim(),
       embed_code: embedCode,
       embed_type: embedType
     }]);
@@ -169,16 +170,16 @@ export const BroadcastCenter = () => {
     // Clear form
     setEmbedCode('');
     setEmbedPreview('');
-    setMediaCommentary(''); // Clear commentary too
+    setCurrentEmbedCommentary('');
   };
 
-  const removeEmbedFromThread = (index: number) => {
-    setThreadEmbeds(prev => prev.filter((_, i) => i !== index));
+  const removeEmbed = (index: number) => {
+    setEmbedList(prev => prev.filter((_, i) => i !== index));
   };
 
   const validateForm = (): string | null => {
-    if (!content.trim() && !mediaUrl && !mediaCommentary.trim() && messageType !== 'upload' && threadEmbeds.length === 0) {
-      return 'Please enter message content, upload media, or add embeds to thread';
+    if (!content.trim() && !mediaUrl && !mediaCommentary.trim() && messageType !== 'upload' && embedList.length === 0) {
+      return 'Please enter message content, upload media, or add embeds';
     }
 
     if (!sourceTeam) {
@@ -321,8 +322,8 @@ export const BroadcastCenter = () => {
             is_spotlight: true,
             poll_data: pollData,
             media_url: messageType === 'upload' ? mediaUrl : null,
-            embed_code: messageType === 'embed' && threadEmbeds.length === 0 ? embedCode : null,
-            embeds: threadEmbeds.length > 0 ? threadEmbeds : null,
+            embed_code: messageType === 'embed' && embedList.length === 0 ? embedCode : null,
+            embeds: embedList.length > 0 ? embedList : null,
             target_audience: ['spotlight'],
             delivery_status: 'sent'
           };
@@ -365,8 +366,8 @@ export const BroadcastCenter = () => {
           is_agent_post: true,
           poll_data: pollData,
           media_url: messageType === 'upload' ? mediaUrl : null,
-                embed_code: messageType === 'embed' && threadEmbeds.length === 0 ? embedCode : null,
-                embeds: threadEmbeds.length > 0 ? threadEmbeds : null,
+                embed_code: messageType === 'embed' && embedList.length === 0 ? embedCode : null,
+                embeds: embedList.length > 0 ? embedList : null,
           target_audience: targetAudience,
           delivery_status: 'sent',
           is_spotlight: false
@@ -408,8 +409,8 @@ export const BroadcastCenter = () => {
             is_agent_post: true,
             poll_data: pollData,
             media_url: messageType === 'upload' ? mediaUrl : null,
-          embed_code: messageType === 'embed' && threadEmbeds.length === 0 ? embedCode : null,
-          embeds: threadEmbeds.length > 0 ? threadEmbeds : null,
+           embed_code: messageType === 'embed' && embedList.length === 0 ? embedCode : null,
+           embeds: embedList.length > 0 ? embedList : null,
             target_audience: ['team_feed'], // Only team feed, no spotlight
             delivery_status: 'sent',
             is_spotlight: false
@@ -443,8 +444,8 @@ export const BroadcastCenter = () => {
           is_agent_post: true,
           poll_data: pollData,
           media_url: messageType === 'upload' ? mediaUrl : null,
-          embed_code: messageType === 'embed' && threadEmbeds.length === 0 ? embedCode : null,
-          embeds: threadEmbeds.length > 0 ? threadEmbeds : null,
+          embed_code: messageType === 'embed' && embedList.length === 0 ? embedCode : null,
+          embeds: embedList.length > 0 ? embedList : null,
           is_team_agent_message: true,
           post_id: createdPost.id // Include the post ID for linking
         };
@@ -494,7 +495,8 @@ export const BroadcastCenter = () => {
         setAddToSpotlight(false);
         setSelectedTeams([]);
         setTags('');
-        setThreadEmbeds([]);
+      setEmbedList([]);
+      setCurrentEmbedCommentary('');
         
         // Delay hiding delivery status to let user see results
         setTimeout(() => setShowDeliveryStatus(false), 3000);
@@ -589,6 +591,8 @@ export const BroadcastCenter = () => {
       setAddToSpotlight(false);
       setSelectedTeams([]);
       setTags('');
+      setEmbedList([]);
+      setCurrentEmbedCommentary('');
       
     } catch (error: any) {
       console.error('Error scheduling message:', error);
@@ -774,36 +778,47 @@ export const BroadcastCenter = () => {
                 </Alert>
               )}
               
-              {/* Thread Support - X Style */}
+              {/* Multiple Embeds Support */}
               <div className="space-y-3 border-t pt-4">
                 <div className="flex items-center justify-between">
-                  <Label>Thread Mode</Label>
+                  <Label>Multiple Embeds</Label>
                   <Badge variant="outline" className="text-xs">
-                    X-Style Threading
+                    Like X Posts
                   </Badge>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="embed-commentary">Commentary (optional)</Label>
+                  <Textarea
+                    id="embed-commentary"
+                    value={currentEmbedCommentary}
+                    onChange={(e) => setCurrentEmbedCommentary(e.target.value)}
+                    placeholder="Add context or commentary for this embed..."
+                    rows={2}
+                  />
                 </div>
                 
                 <Button
                   type="button"
-                  onClick={addEmbedToThread}
+                  onClick={addEmbed}
                   variant="secondary" 
                   className="w-full"
                   disabled={!embedCode.trim()}
                 >
-                  + Add to Thread ({threadEmbeds.length + (embedCode.trim() ? 1 : 0)})
+                  + Add Embed ({embedList.length + (embedCode.trim() ? 1 : 0)})
                 </Button>
                 
                 <p className="text-xs text-muted-foreground">
-                  Add multiple embeds to create a thread. They'll display with "See more" option like X.
+                  Add multiple embeds to your post. They'll display with "See more" button like X.
                 </p>
               </div>
               
-              {/* Thread Preview */}
-              {threadEmbeds.length > 0 && (
+              {/* Embed List Preview */}
+              {embedList.length > 0 && (
                 <div className="space-y-2 border rounded-lg p-4 bg-muted/30">
-                  <Label>Thread Preview ({threadEmbeds.length} embed{threadEmbeds.length !== 1 ? 's' : ''})</Label>
+                  <Label>Added Embeds ({embedList.length} embed{embedList.length !== 1 ? 's' : ''})</Label>
                   <div className="space-y-3 max-h-60 overflow-y-auto">
-                    {threadEmbeds.map((embed, index) => (
+                    {embedList.map((embed, index) => (
                       <div key={index} className="bg-background p-3 rounded border space-y-2">
                         <div className="flex items-center justify-between">
                           <Badge variant="outline" className="text-xs">
@@ -812,7 +827,7 @@ export const BroadcastCenter = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeEmbedFromThread(index)}
+                            onClick={() => removeEmbed(index)}
                             className="h-6 w-6 p-0"
                           >
                             <X className="w-3 h-3" />
