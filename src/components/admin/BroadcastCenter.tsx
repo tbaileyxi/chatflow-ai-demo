@@ -757,15 +757,15 @@ export const BroadcastCenter = () => {
             <div className="space-y-4">
               <Label>Upload Media</Label>
               <MediaUpload 
-                onFileSelected={handleMediaSelected}
-                allowCommentary={true}
-                onCommentaryUpdate={setMediaCommentary}
+                onMediaSelected={handleMediaSelected}
+                bucket="broadcast-media"
+                showPreview={true}
               />
               {mediaUrl && (
                 <div className="space-y-2">
                   <MediaViewer 
-                    url={mediaUrl} 
-                    type={mediaType || 'image'}
+                    mediaUrl={mediaUrl} 
+                    mediaType={mediaType || 'image'}
                     className="max-h-64"
                   />
                   <Button 
