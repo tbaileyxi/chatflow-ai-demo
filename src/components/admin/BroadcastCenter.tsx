@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Send, Clock, Link, CheckCircle, AlertCircle, Loader2, X, Calendar } from 'lucide-react';
+import { Send, Clock, Link, CheckCircle, AlertCircle, Loader2, X, Calendar, Plus } from 'lucide-react';
 import { ScheduleDialog } from '@/components/ScheduleDialog';
 import { PostManagement } from '@/components/PostManagement';
 import { ScheduledBroadcastProcessor } from './ScheduledBroadcastProcessor';
@@ -42,6 +42,13 @@ export const BroadcastCenter = () => {
   const [showDeliveryStatus, setShowDeliveryStatus] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [tags, setTags] = useState('');
+  
+  // Message type and content states
+  const [messageType, setMessageType] = useState<'text' | 'media' | 'poll' | 'embed'>('text');
+  const [textContent, setTextContent] = useState('');
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
   
   // Simple embed system - like X/Twitter
   const [embedList, setEmbedList] = useState<Array<{ commentary: string; embed_code: string; embed_type: 'x' | 'iframe' | 'youtube' }>>([]);
@@ -100,9 +107,33 @@ export const BroadcastCenter = () => {
     setEmbedList(prev => prev.filter((_, i) => i !== index));
   };
 
+  const addPollOption = () => {
+    setPollOptions([...pollOptions, '']);
+  };
+
+  const updatePollOption = (index: number, value: string) => {
+    const newOptions = [...pollOptions];
+    newOptions[index] = value;
+    setPollOptions(newOptions);
+  };
+
+  const removePollOption = (index: number) => {
+    if (pollOptions.length > 2) {
+      setPollOptions(pollOptions.filter((_, i) => i !== index));
+    }
+  };
+
   const validateForm = (): string | null => {
-    if (embedList.length === 0) {
+    if (messageType === 'embed' && embedList.length === 0) {
       return 'Please add at least one embed';
+    }
+
+    if (messageType === 'text' && !textContent.trim()) {
+      return 'Please enter message content';
+    }
+
+    if (messageType === 'poll' && (!pollQuestion.trim() || pollOptions.filter(opt => opt.trim()).length < 2)) {
+      return 'Please enter a poll question and at least 2 options';
     }
 
     if (!sourceTeam) {
@@ -187,10 +218,31 @@ export const BroadcastCenter = () => {
     setShowDeliveryStatus(true);
 
     try {
-      // Simple broadcast system: Just send embeds
-      const finalContent = '';
+      // Create content based on message type
+      let finalContent = '';
+      let pollData = null;
+      let mediaUrl = null;
+      let threadEmbeds = null;
+
+      if (messageType === 'text') {
+        finalContent = textContent;
+      } else if (messageType === 'poll') {
+        finalContent = pollQuestion;
+        pollData = {
+          question: pollQuestion,
+          options: pollOptions.filter(opt => opt.trim()).map((option, index) => ({
+            id: index,
+            text: option.trim()
+          }))
+        };
+      } else if (messageType === 'embed') {
+        finalContent = '';
+        threadEmbeds = embedList;
+      } else if (messageType === 'media' && mediaFile) {
+        finalContent = `Media from ${teams.find(t => t.id === sourceTeam)?.city} ${teams.find(t => t.id === sourceTeam)?.name}`;
+        // TODO: Upload media file
+      }
       
-      // New broadcast system: Single post from source team that gets distributed
       const deliveryResults: DeliveryStatus[] = [];
       const sourceTeamInfo = teams.find(t => t.id === sourceTeam);
       const sourceTeamName = sourceTeamInfo ? `${sourceTeamInfo.city} ${sourceTeamInfo.name}` : 'Source Team';
@@ -200,23 +252,23 @@ export const BroadcastCenter = () => {
         const { data: systemBot } = await supabase.rpc('get_or_create_system_user');
         const systemBotId = systemBot || user.id;
 
-        // Create the main spotlight post if enabled (only for source team)
-        if (addToSpotlight) {
-          const spotlightData = {
-            content: finalContent,
-            team_id: sourceTeam,
-            origin_team_id: sourceTeam,
-            author_id: systemBotId,
-            message_type: 'embed',
-            is_agent_post: true,
-            is_spotlight: true,
-            poll_data: null,
-            media_url: null,
-            embed_code: null,
-            embeds: embedList,
-            target_audience: ['spotlight'],
-            delivery_status: 'sent'
-          };
+          // Create the main spotlight post if enabled (only for source team)
+          if (addToSpotlight) {
+            const spotlightData = {
+              content: finalContent,
+              team_id: sourceTeam,
+              origin_team_id: sourceTeam,
+              author_id: systemBotId,
+              message_type: messageType === 'embed' ? 'embed' : 'text',
+              is_agent_post: true,
+              is_spotlight: true,
+              poll_data: pollData,
+              media_url: mediaUrl,
+              embed_code: null,
+              embeds: threadEmbeds,
+              target_audience: ['spotlight'],
+              delivery_status: 'sent'
+            };
 
           // Add tags if provided
           if (tags.trim()) {
@@ -252,12 +304,12 @@ export const BroadcastCenter = () => {
           team_id: sourceTeam,
           origin_team_id: sourceTeam,
           author_id: systemBotId,
-          message_type: 'embed',
+          message_type: messageType === 'embed' ? 'embed' : 'text',
           is_agent_post: true,
-          poll_data: null,
-          media_url: null,
+          poll_data: pollData,
+          media_url: mediaUrl,
           embed_code: null,
-          embeds: embedList,
+          embeds: threadEmbeds,
           target_audience: targetAudience,
           delivery_status: 'sent',
           is_spotlight: false
@@ -295,12 +347,12 @@ export const BroadcastCenter = () => {
             team_id: destTeamId,
             origin_team_id: sourceTeam,
             author_id: systemBotId,
-            message_type: 'embed',
+            message_type: messageType === 'embed' ? 'embed' : 'text',
             is_agent_post: true,
-            poll_data: null,
-            media_url: null,
+            poll_data: pollData,
+            media_url: mediaUrl,
             embed_code: null,
-            embeds: embedList,
+            embeds: threadEmbeds,
             target_audience: ['team_feed'],
             delivery_status: 'sent',
             is_spotlight: false
@@ -329,12 +381,12 @@ export const BroadcastCenter = () => {
           team_id: sourceTeam,
           origin_team_id: sourceTeam,
           author_id: systemBotId,
-          message_type: 'embed',
+          message_type: messageType === 'embed' ? 'embed' : 'text',
           is_agent_post: true,
-          poll_data: null,
-          media_url: null,
+          poll_data: pollData,
+          media_url: mediaUrl,
           embed_code: null,
-          embeds: embedList,
+          embeds: threadEmbeds,
           is_team_agent_message: true,
           post_id: createdPost.id
         };
@@ -375,9 +427,13 @@ export const BroadcastCenter = () => {
       }
 
       // Clear form on success
+      setTextContent('');
       setCurrentEmbedCode('');
       setCurrentEmbedCommentary('');
       setEmbedList([]);
+      setPollQuestion('');
+      setPollOptions(['', '']);
+      setMediaFile(null);
       setTags('');
 
     } catch (error: any) {
@@ -469,51 +525,147 @@ export const BroadcastCenter = () => {
             </CardContent>
           </Card>
 
-          {/* Simple Embed Interface */}
+          {/* Message Type and Content */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Link className="w-5 h-5" />
-                Broadcast Embeds
+                <Send className="w-5 h-5" />
+                Broadcast Message
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="embed-code">Paste embed code or URL</Label>
-                <Textarea
-                  id="embed-code"
-                  placeholder="Paste X post URL, YouTube URL, or embed code..."
-                  value={currentEmbedCode}
-                  onChange={(e) => setCurrentEmbedCode(e.target.value)}
-                  className="min-h-[80px]"
-                />
+                <Label htmlFor="message-type">Message Type</Label>
+                <Select value={messageType} onValueChange={(value: 'text' | 'media' | 'poll' | 'embed') => setMessageType(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Text Message</SelectItem>
+                    <SelectItem value="media">Media Upload</SelectItem>
+                    <SelectItem value="poll">Poll</SelectItem>
+                    <SelectItem value="embed">Embed Thread</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="embed-commentary">Add text/commentary (optional)</Label>
-                <Textarea
-                  id="embed-commentary"
-                  placeholder="Add your text or commentary for this embed..."
-                  value={currentEmbedCommentary}
-                  onChange={(e) => setCurrentEmbedCommentary(e.target.value)}
-                  className="min-h-[60px]"
-                />
-              </div>
+              {messageType === 'text' && (
+                <div className="space-y-2">
+                  <Label htmlFor="text-content">Message Content</Label>
+                  <Textarea
+                    id="text-content"
+                    placeholder="Enter your message..."
+                    value={textContent}
+                    onChange={(e) => setTextContent(e.target.value)}
+                    className="min-h-[100px]"
+                  />
+                </div>
+              )}
 
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={addEmbed}
-                className="w-full"
-                disabled={!currentEmbedCode.trim()}
-              >
-                Add Another Embed
-              </Button>
+              {messageType === 'media' && (
+                <div className="space-y-2">
+                  <Label htmlFor="media-file">Media File</Label>
+                  <input
+                    id="media-file"
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={(e) => setMediaFile(e.target.files?.[0] || null)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                  {mediaFile && (
+                    <p className="text-sm text-muted-foreground">Selected: {mediaFile.name}</p>
+                  )}
+                </div>
+              )}
+
+              {messageType === 'poll' && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="poll-question">Poll Question</Label>
+                    <Textarea
+                      id="poll-question"
+                      placeholder="Enter your poll question..."
+                      value={pollQuestion}
+                      onChange={(e) => setPollQuestion(e.target.value)}
+                      className="min-h-[80px]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Poll Options</Label>
+                    {pollOptions.map((option, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={option}
+                          onChange={(e) => updatePollOption(index, e.target.value)}
+                          placeholder={`Option ${index + 1}`}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        />
+                        {pollOptions.length > 2 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removePollOption(index)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={addPollOption}
+                      className="w-full"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Option
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {messageType === 'embed' && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="embed-code">Paste embed code or URL</Label>
+                    <Textarea
+                      id="embed-code"
+                      placeholder="Paste X post URL, YouTube URL, or embed code..."
+                      value={currentEmbedCode}
+                      onChange={(e) => setCurrentEmbedCode(e.target.value)}
+                      className="min-h-[80px]"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="embed-commentary">Add text/commentary (optional)</Label>
+                    <Textarea
+                      id="embed-commentary"
+                      placeholder="Add your text or commentary for this embed..."
+                      value={currentEmbedCommentary}
+                      onChange={(e) => setCurrentEmbedCommentary(e.target.value)}
+                      className="min-h-[60px]"
+                    />
+                  </div>
+
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={addEmbed}
+                    className="w-full"
+                    disabled={!currentEmbedCode.trim()}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {embedList.length === 0 ? 'Add This Embed' : 'Add Another Embed'}
+                  </Button>
+                </>
+              )}
 
               {/* Preview of what will be posted */}
-              {embedList.length > 0 && (
+              {messageType === 'embed' && embedList.length > 0 && (
                 <div className="space-y-2">
-                  <Label>What will be posted:</Label>
+                  <Label>Embeds to be posted:</Label>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
                     {embedList.map((embed, index) => (
                       <div key={index} className="flex items-start justify-between p-3 border rounded-lg bg-muted/30">
@@ -537,7 +689,7 @@ export const BroadcastCenter = () => {
                           size="sm"
                           onClick={() => removeEmbed(index)}
                         >
-                          <X className="w-4 h-4" />
+                          <X className="h-4 w-4" />
                         </Button>
                       </div>
                     ))}
@@ -580,7 +732,7 @@ export const BroadcastCenter = () => {
           <div className="flex gap-3">
             <Button 
               onClick={handleSendMessage} 
-              disabled={loading || embedList.length === 0}
+              disabled={loading || (messageType === 'embed' && embedList.length === 0) || (messageType === 'text' && !textContent.trim()) || (messageType === 'poll' && (!pollQuestion.trim() || pollOptions.filter(opt => opt.trim()).length < 2))}
               className="flex-1"
             >
               {loading ? (
@@ -599,7 +751,7 @@ export const BroadcastCenter = () => {
             <Button 
               variant="outline" 
               onClick={() => setScheduleDialogOpen(true)}
-              disabled={loading || embedList.length === 0}
+              disabled={loading || (messageType === 'embed' && embedList.length === 0) || (messageType === 'text' && !textContent.trim()) || (messageType === 'poll' && (!pollQuestion.trim() || pollOptions.filter(opt => opt.trim()).length < 2))}
             >
               <Clock className="w-4 h-4 mr-2" />
               Schedule

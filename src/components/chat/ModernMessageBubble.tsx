@@ -230,10 +230,9 @@ export const ModernMessageBubble = memo(({
 
               {/* Text Content */}
               {showContent && (
-                <div 
-                  className="whitespace-pre-wrap break-words leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: contentWithoutTags }}
-                />
+                <div className="whitespace-pre-wrap break-words leading-relaxed">
+                  {contentWithoutTags}
+                </div>
               )}
 
               {/* Media Content with layout shift prevention */}
