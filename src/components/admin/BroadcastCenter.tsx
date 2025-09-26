@@ -53,10 +53,8 @@ export const BroadcastCenter = () => {
   const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
   const [embedIntroduction, setEmbedIntroduction] = useState('');
   
-  // Simple embed system - like X/Twitter
-  const [embedList, setEmbedList] = useState<Array<{ commentary: string; embed_code: string; embed_type: 'x' | 'iframe' | 'youtube' }>>([]);
-  const [currentEmbedCode, setCurrentEmbedCode] = useState('');
-  const [currentEmbedCommentary, setCurrentEmbedCommentary] = useState('');
+  // Simplified embed system - just paste embed codes directly
+  const [embedCodes, setEmbedCodes] = useState('');
 
   useEffect(() => {
     fetchTeams();
@@ -82,32 +80,22 @@ export const BroadcastCenter = () => {
     }
   };
 
-  const addEmbed = () => {
-    if (!currentEmbedCode.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter embed code first",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const embedType = currentEmbedCode.includes('twitter.com') || currentEmbedCode.includes('x.com') ? 'x' :
-                     currentEmbedCode.includes('youtube.com') || currentEmbedCode.includes('youtu.be') ? 'youtube' : 'iframe';
-
-    setEmbedList(prev => [...prev, {
-      commentary: currentEmbedCommentary.trim(),
-      embed_code: currentEmbedCode,
-      embed_type: embedType
-    }]);
-
-    // Clear form
-    setCurrentEmbedCode('');
-    setCurrentEmbedCommentary('');
-  };
-
-  const removeEmbed = (index: number) => {
-    setEmbedList(prev => prev.filter((_, i) => i !== index));
+  const parseEmbedCodes = (codes: string) => {
+    if (!codes.trim()) return [];
+    
+    // Split by lines and filter out empty lines
+    const lines = codes.split('\n').filter(line => line.trim());
+    
+    return lines.map(line => {
+      const embedType = line.includes('twitter.com') || line.includes('x.com') ? 'x' :
+                       line.includes('youtube.com') || line.includes('youtu.be') ? 'youtube' : 'iframe';
+      
+      return {
+        commentary: '',
+        embed_code: line.trim(),
+        embed_type: embedType
+      };
+    });
   };
 
   const addPollOption = () => {
@@ -151,8 +139,8 @@ export const BroadcastCenter = () => {
     }
 
     if (messageType === 'embed') {
-      if (embedList.length === 0) {
-        return 'Please add at least one embed';
+      if (!embedCodes.trim()) {
+        return 'Please enter embed codes';
       }
       if (!embedIntroduction.trim()) {
         return 'Please enter an introduction for your thread';
@@ -280,7 +268,7 @@ export const BroadcastCenter = () => {
         };
       } else if (messageType === 'embed') {
         finalContent = embedIntroduction;
-        threadEmbeds = embedList;
+        threadEmbeds = parseEmbedCodes(embedCodes);
       }
       
       const deliveryResults: DeliveryStatus[] = [];
@@ -470,9 +458,7 @@ export const BroadcastCenter = () => {
       setTextContent('');
       setMediaCaption('');
       setEmbedIntroduction('');
-      setCurrentEmbedCode('');
-      setCurrentEmbedCommentary('');
-      setEmbedList([]);
+      setEmbedCodes('');
       setPollQuestion('');
       setPollOptions(['', '']);
       setMediaFile(null);
@@ -693,53 +679,29 @@ export const BroadcastCenter = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="embed-code">Paste embed code or URL</Label>
+                    <Label htmlFor="embed-codes">Paste Embed Codes or URLs</Label>
                     <Textarea
-                      id="embed-code"
-                      placeholder="Paste X post URL, YouTube URL, or embed code..."
-                      value={currentEmbedCode}
-                      onChange={(e) => setCurrentEmbedCode(e.target.value)}
-                      className="min-h-[80px]"
+                      id="embed-codes"
+                      placeholder="Paste X post URLs, YouTube URLs, or embed codes (one per line)..."
+                      value={embedCodes}
+                      onChange={(e) => setEmbedCodes(e.target.value)}
+                      className="min-h-[120px] font-mono text-sm"
                     />
+                    <div className="text-xs text-muted-foreground">
+                      Each line will become a separate embed in your thread. Supports X/Twitter posts, YouTube videos, and other embeddable content.
+                    </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="embed-commentary">Add text/commentary (optional)</Label>
-                    <Textarea
-                      id="embed-commentary"
-                      placeholder="Add your text or commentary for this embed..."
-                      value={currentEmbedCommentary}
-                      onChange={(e) => setCurrentEmbedCommentary(e.target.value)}
-                      className="min-h-[60px]"
-                    />
-                  </div>
-
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={addEmbed}
-                    className="w-full"
-                    disabled={!currentEmbedCode.trim()}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    {embedList.length === 0 ? 'Add This Embed' : 'Add Another Embed'}
-                  </Button>
                 </div>
               )}
 
               {/* Preview of what will be posted */}
-              {messageType === 'embed' && embedList.length > 0 && (
+              {messageType === 'embed' && embedCodes.trim() && (
                 <div className="space-y-2">
-                  <Label>Embeds to be posted:</Label>
+                  <Label>Embed Preview:</Label>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {embedList.map((embed, index) => (
+                    {parseEmbedCodes(embedCodes).map((embed, index) => (
                       <div key={index} className="flex items-start justify-between p-3 border rounded-lg bg-muted/30">
                         <div className="flex-1">
-                          {embed.commentary && (
-                            <div className="text-sm mb-2 font-medium">
-                              {embed.commentary}
-                            </div>
-                          )}
                           <div className="text-xs text-muted-foreground">
                             {embed.embed_type === 'x' ? '📱 X Post' : 
                              embed.embed_type === 'youtube' ? '🎥 YouTube Video' : '🔗 Custom Embed'}
@@ -748,14 +710,6 @@ export const BroadcastCenter = () => {
                             {embed.embed_code.substring(0, 80)}...
                           </div>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeEmbed(index)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
                       </div>
                     ))}
                   </div>
@@ -801,7 +755,7 @@ export const BroadcastCenter = () => {
                 (messageType === 'text' && !textContent.trim()) || 
                 (messageType === 'media' && (!mediaFile || !mediaCaption.trim())) ||
                 (messageType === 'poll' && (!pollQuestion.trim() || pollOptions.filter(opt => opt.trim()).length < 2)) ||
-                (messageType === 'embed' && (embedList.length === 0 || !embedIntroduction.trim()))}
+                (messageType === 'embed' && (!embedCodes.trim() || !embedIntroduction.trim()))}
               className="flex-1"
             >
               {loading ? (
@@ -824,7 +778,7 @@ export const BroadcastCenter = () => {
                 (messageType === 'text' && !textContent.trim()) || 
                 (messageType === 'media' && (!mediaFile || !mediaCaption.trim())) ||
                 (messageType === 'poll' && (!pollQuestion.trim() || pollOptions.filter(opt => opt.trim()).length < 2)) ||
-                (messageType === 'embed' && (embedList.length === 0 || !embedIntroduction.trim()))}
+                (messageType === 'embed' && (!embedCodes.trim() || !embedIntroduction.trim()))}
             >
               <Clock className="w-4 h-4 mr-2" />
               Schedule
