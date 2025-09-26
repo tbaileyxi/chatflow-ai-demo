@@ -46,12 +46,12 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
           </div>
         )}
         <div className="rounded-lg overflow-hidden">
-          {embed.embed_type === 'x' || embed.embed_code.includes('twitter.com') || embed.embed_code.includes('x.com') ? (
+          {(embed.embed_type === 'x' || embed.embed_code.includes('twitter.com') || embed.embed_code.includes('x.com')) ? (
             <XPostEmbed embedCode={embed.embed_code} />
-          ) : embed.embed_type === 'youtube' || embed.embed_code.includes('youtube.com') || embed.embed_code.includes('youtu.be') ? (
+          ) : (embed.embed_type === 'youtube' || embed.embed_code.includes('youtube.com') || embed.embed_code.includes('youtu.be')) ? (
             <div className="aspect-video">
               <iframe
-                src={embed.embed_code.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                src={embed.embed_code.includes('watch?v=') ? embed.embed_code.replace('watch?v=', 'embed/') : embed.embed_code.includes('youtu.be/') ? embed.embed_code.replace('youtu.be/', 'youtube.com/embed/') : embed.embed_code}
                 className="w-full h-full"
                 frameBorder="0"
                 allowFullScreen

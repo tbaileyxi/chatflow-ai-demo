@@ -16,6 +16,7 @@ import { Send, Clock, Link, CheckCircle, AlertCircle, Loader2, X, Calendar, Plus
 import { ScheduleDialog } from '@/components/ScheduleDialog';
 import { PostManagement } from '@/components/PostManagement';
 import { ScheduledBroadcastProcessor } from './ScheduledBroadcastProcessor';
+import { FileUpload } from '@/components/FileUpload';
 
 interface Team {
   id: string;
@@ -47,8 +48,10 @@ export const BroadcastCenter = () => {
   const [messageType, setMessageType] = useState<'text' | 'media' | 'poll' | 'embed'>('text');
   const [textContent, setTextContent] = useState('');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaCaption, setMediaCaption] = useState('');
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [embedIntroduction, setEmbedIntroduction] = useState('');
   
   // Simple embed system - like X/Twitter
   const [embedList, setEmbedList] = useState<Array<{ commentary: string; embed_code: string; embed_type: 'x' | 'iframe' | 'youtube' }>>([]);
@@ -124,16 +127,36 @@ export const BroadcastCenter = () => {
   };
 
   const validateForm = (): string | null => {
-    if (messageType === 'embed' && embedList.length === 0) {
-      return 'Please add at least one embed';
-    }
-
     if (messageType === 'text' && !textContent.trim()) {
       return 'Please enter message content';
     }
 
-    if (messageType === 'poll' && (!pollQuestion.trim() || pollOptions.filter(opt => opt.trim()).length < 2)) {
-      return 'Please enter a poll question and at least 2 options';
+    if (messageType === 'media') {
+      if (!mediaFile) {
+        return 'Please select a media file';
+      }
+      if (!mediaCaption.trim()) {
+        return 'Please enter a caption for your media';
+      }
+    }
+
+    if (messageType === 'poll') {
+      if (!pollQuestion.trim()) {
+        return 'Please enter a poll question';
+      }
+      const validOptions = pollOptions.filter(opt => opt.trim());
+      if (validOptions.length < 2) {
+        return 'Please provide at least 2 poll options';
+      }
+    }
+
+    if (messageType === 'embed') {
+      if (embedList.length === 0) {
+        return 'Please add at least one embed';
+      }
+      if (!embedIntroduction.trim()) {
+        return 'Please enter an introduction for your thread';
+      }
     }
 
     if (!sourceTeam) {
@@ -226,6 +249,26 @@ export const BroadcastCenter = () => {
 
       if (messageType === 'text') {
         finalContent = textContent;
+      } else if (messageType === 'media' && mediaFile) {
+        // Upload media file to Supabase storage
+        const fileExt = mediaFile.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `broadcast/${fileName}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('broadcast-media')
+          .upload(filePath, mediaFile);
+
+        if (uploadError) {
+          throw new Error(`Media upload failed: ${uploadError.message}`);
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('broadcast-media')
+          .getPublicUrl(filePath);
+
+        mediaUrl = publicUrl;
+        finalContent = mediaCaption;
       } else if (messageType === 'poll') {
         finalContent = pollQuestion;
         pollData = {
@@ -236,11 +279,8 @@ export const BroadcastCenter = () => {
           }))
         };
       } else if (messageType === 'embed') {
-        finalContent = '';
+        finalContent = embedIntroduction;
         threadEmbeds = embedList;
-      } else if (messageType === 'media' && mediaFile) {
-        finalContent = `Media from ${teams.find(t => t.id === sourceTeam)?.city} ${teams.find(t => t.id === sourceTeam)?.name}`;
-        // TODO: Upload media file
       }
       
       const deliveryResults: DeliveryStatus[] = [];
@@ -428,6 +468,8 @@ export const BroadcastCenter = () => {
 
       // Clear form on success
       setTextContent('');
+      setMediaCaption('');
+      setEmbedIntroduction('');
       setCurrentEmbedCode('');
       setCurrentEmbedCommentary('');
       setEmbedList([]);
@@ -563,18 +605,30 @@ export const BroadcastCenter = () => {
               )}
 
               {messageType === 'media' && (
-                <div className="space-y-2">
-                  <Label htmlFor="media-file">Media File</Label>
-                  <input
-                    id="media-file"
-                    type="file"
-                    accept="image/*,video/*"
-                    onChange={(e) => setMediaFile(e.target.files?.[0] || null)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                  {mediaFile && (
-                    <p className="text-sm text-muted-foreground">Selected: {mediaFile.name}</p>
-                  )}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="media-file">Media File</Label>
+                    <input
+                      id="media-file"
+                      type="file"
+                      accept="image/*,video/*"
+                      onChange={(e) => setMediaFile(e.target.files?.[0] || null)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                    {mediaFile && (
+                      <p className="text-sm text-muted-foreground">Selected: {mediaFile.name}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="media-caption">Media Caption</Label>
+                    <Textarea
+                      id="media-caption"
+                      placeholder="Enter caption for your media..."
+                      value={mediaCaption}
+                      onChange={(e) => setMediaCaption(e.target.value)}
+                      className="min-h-[100px]"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -626,7 +680,18 @@ export const BroadcastCenter = () => {
               )}
 
               {messageType === 'embed' && (
-                <>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="thread-intro">Thread Introduction</Label>
+                    <Textarea
+                      id="thread-intro"
+                      placeholder="Introduce your thread with context..."
+                      value={embedIntroduction}
+                      onChange={(e) => setEmbedIntroduction(e.target.value)}
+                      className="min-h-[80px]"
+                    />
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="embed-code">Paste embed code or URL</Label>
                     <Textarea
@@ -659,7 +724,7 @@ export const BroadcastCenter = () => {
                     <Plus className="w-4 h-4 mr-2" />
                     {embedList.length === 0 ? 'Add This Embed' : 'Add Another Embed'}
                   </Button>
-                </>
+                </div>
               )}
 
               {/* Preview of what will be posted */}
@@ -732,7 +797,11 @@ export const BroadcastCenter = () => {
           <div className="flex gap-3">
             <Button 
               onClick={handleSendMessage} 
-              disabled={loading || (messageType === 'embed' && embedList.length === 0) || (messageType === 'text' && !textContent.trim()) || (messageType === 'poll' && (!pollQuestion.trim() || pollOptions.filter(opt => opt.trim()).length < 2))}
+              disabled={loading || 
+                (messageType === 'text' && !textContent.trim()) || 
+                (messageType === 'media' && (!mediaFile || !mediaCaption.trim())) ||
+                (messageType === 'poll' && (!pollQuestion.trim() || pollOptions.filter(opt => opt.trim()).length < 2)) ||
+                (messageType === 'embed' && (embedList.length === 0 || !embedIntroduction.trim()))}
               className="flex-1"
             >
               {loading ? (
@@ -751,7 +820,11 @@ export const BroadcastCenter = () => {
             <Button 
               variant="outline" 
               onClick={() => setScheduleDialogOpen(true)}
-              disabled={loading || (messageType === 'embed' && embedList.length === 0) || (messageType === 'text' && !textContent.trim()) || (messageType === 'poll' && (!pollQuestion.trim() || pollOptions.filter(opt => opt.trim()).length < 2))}
+              disabled={loading || 
+                (messageType === 'text' && !textContent.trim()) || 
+                (messageType === 'media' && (!mediaFile || !mediaCaption.trim())) ||
+                (messageType === 'poll' && (!pollQuestion.trim() || pollOptions.filter(opt => opt.trim()).length < 2)) ||
+                (messageType === 'embed' && (embedList.length === 0 || !embedIntroduction.trim()))}
             >
               <Clock className="w-4 h-4 mr-2" />
               Schedule
