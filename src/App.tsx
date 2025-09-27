@@ -11,6 +11,8 @@ import Index from "./pages/Index";
 import { Landing } from "./pages/Landing";
 import { Admin } from "./pages/Admin";
 import { Auth } from "./pages/Auth";
+import { BillsHuddleLayout } from "./components/BillsHuddleLayout";
+import { BillsChatDemo } from "./components/BillsChatDemo";
 import { MobileProfile } from "./pages/MobileProfile";
 import { TeamDirectory } from "./pages/TeamDirectory";
 import { TeamFeed } from "./pages/TeamFeed";
@@ -37,6 +39,11 @@ const AppContent = () => {
       <div className="flex-1 overflow-hidden">
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/bills-demo" element={
+            <BillsHuddleLayout>
+              <BillsChatDemo />
+            </BillsHuddleLayout>
+          } />
           <Route path="/onboard" element={<Index />} />
           <Route path="/app" element={<MobileHome />} />
           <Route path="/admin" element={<Admin />} />

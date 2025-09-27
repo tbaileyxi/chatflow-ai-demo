@@ -151,39 +151,39 @@ All colors MUST be HSL.
   }
 
   .dark {
-    /* Dark Slate Grey Base with Mobile PWA optimization */
-    --background: 217 33% 17%;
+    /* Bills Colors - Black/Dark Gray base */
+    --background: 0 0% 8%;
     --foreground: 0 0% 100%;
 
-    --card: 217 33% 17%;
+    --card: 0 0% 8%;
     --card-foreground: 0 0% 100%;
 
-    --popover: 217 33% 19%;
+    --popover: 0 0% 12%;
     --popover-foreground: 0 0% 100%;
 
-    /* Bright Yellow Primary - Main accent */
+    /* Bills Yellow Primary - SH Logo accent */
     --primary: 45 100% 51%;
     --primary-foreground: 0 0% 0%;
 
-    /* Dark Slate Secondary */
-    --secondary: 217 33% 22%;
+    /* Bills Royal Blue for Bot accents */
+    --secondary: 217 100% 28%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 217 33% 22%;
-    --muted-foreground: 0 0% 70%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
 
-    /* Baby Blue Subtle */
-    --accent: 203 89% 53%;
-    --accent-foreground: 0 0% 0%;
+    /* Bills Red for User bubbles */
+    --accent: 349 87% 39%;
+    --accent-foreground: 0 0% 100%;
 
     /* Glassmorphism colors */
     --glass-bg: 217 33% 17% / 0.8;
     --glass-border: 0 0% 100% / 0.1;
     --glass-blur: blur(20px);
 
-    /* Bot message styling */
-    --bot-bubble: 203 89% 53% / 0.1;
-    --bot-border: 203 89% 53% / 0.2;
+    /* Bills Bot message styling - Royal Blue */
+    --bot-bubble: 217 100% 28% / 0.15;
+    --bot-border: 217 100% 28% / 0.3;
 
     /* Success and Destructive */
     --success: 120 100% 40%;
