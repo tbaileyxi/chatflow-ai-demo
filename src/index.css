@@ -111,6 +111,7 @@
 All colors MUST be HSL.
 */
 
+/* Enhanced CSS for team adaptive theming */
 @layer base {
   :root {
     /* Light mode fallback */
@@ -128,14 +129,14 @@ All colors MUST be HSL.
     --muted-foreground: 215.4 16.3% 46.9%;
     --accent: 210 40% 96%;
     --accent-foreground: 222.2 84% 4.9%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
 
-  /* PWA safe area support */
-  --safe-area-inset-top: env(safe-area-inset-top);
-  --safe-area-inset-right: env(safe-area-inset-right);
-  --safe-area-inset-bottom: env(safe-area-inset-bottom);
-  --safe-area-inset-left: env(safe-area-inset-left);
+    /* PWA safe area support */
+    --safe-area-inset-top: env(safe-area-inset-top);
+    --safe-area-inset-right: env(safe-area-inset-right);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom);
+    --safe-area-inset-left: env(safe-area-inset-left);
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
@@ -148,10 +149,15 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 10.6% 64.9%;
+
+    /* Universal team theming variables */
+    --team-primary: var(--primary);
+    --team-secondary: var(--secondary);
+    --team-accent: var(--accent);
   }
 
   .dark {
-    /* Bills Colors - Black/Dark Gray base */
+    /* Dark theme with enhanced universal team support */
     --background: 0 0% 8%;
     --foreground: 0 0% 100%;
 
@@ -161,29 +167,29 @@ All colors MUST be HSL.
     --popover: 0 0% 12%;
     --popover-foreground: 0 0% 100%;
 
-    /* Bills Yellow Primary - SH Logo accent */
-    --primary: 45 100% 51%;
+    /* Dynamic team primary (overridden by useTeamTheme) */
+    --primary: var(--team-primary, 45 100% 51%);
     --primary-foreground: 0 0% 0%;
 
-    /* Bills Royal Blue for Bot accents */
-    --secondary: 217 100% 28%;
+    /* Dynamic team secondary (overridden by useTeamTheme) */
+    --secondary: var(--team-secondary, 217 100% 28%);
     --secondary-foreground: 0 0% 100%;
 
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 60%;
 
-    /* Bills Red for User bubbles */
-    --accent: 349 87% 39%;
+    /* Dynamic team accent (overridden by useTeamTheme) */
+    --accent: var(--team-accent, 349 87% 39%);
     --accent-foreground: 0 0% 100%;
 
-    /* Glassmorphism colors */
+    /* Enhanced glassmorphism colors */
     --glass-bg: 217 33% 17% / 0.8;
     --glass-border: 0 0% 100% / 0.1;
     --glass-blur: blur(20px);
 
-    /* Bills Bot message styling - Royal Blue */
-    --bot-bubble: 217 100% 28% / 0.15;
-    --bot-border: 217 100% 28% / 0.3;
+    /* Dynamic bot message styling */
+    --bot-bubble: var(--team-primary, 217 100% 28%) / 0.15;
+    --bot-border: var(--team-primary, 217 100% 28%) / 0.3;
 
     /* Success and Destructive */
     --success: 120 100% 40%;
@@ -194,12 +200,12 @@ All colors MUST be HSL.
 
     --border: 0 0% 30%;
     --input: 0 0% 30%;
-    --ring: 45 100% 51%;
+    --ring: var(--team-accent, 45 100% 51%);
 
-    /* Modern UI elements */
-    --huddle-primary: 270 100% 70%;
-    --huddle-secondary: 260 100% 80%;
-    --spotlight: 45 100% 51%;
+    /* Modern UI elements with team theming */
+    --huddle-primary: var(--team-primary, 270 100% 70%);
+    --huddle-secondary: var(--team-secondary, 260 100% 80%);
+    --spotlight: var(--team-accent, 45 100% 51%);
     --spotlight-foreground: 0 0% 0%;
     --like-button: 24 95% 53%;
     --like-button-foreground: 0 0% 100%;
@@ -207,21 +213,26 @@ All colors MUST be HSL.
     --fire-button-foreground: 0 0% 100%;
     
     /* Verified huddle colors */
-    --verified-primary: 142 76% 36%; /* Gold/green for verified status */
-    --verified-background: 142 76% 15%; /* Dark verified background */
-    --verified-border: 142 76% 30%; /* Verified border color */
+    --verified-primary: 142 76% 36%;
+    --verified-background: 142 76% 15%;
+    --verified-border: 142 76% 30%;
 
     --radius: 12px;
 
-    /* Sidebar with dark theme */
+    /* Sidebar with dynamic theming */
     --sidebar-background: 0 0% 20%;
     --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 45 100% 51%;
+    --sidebar-primary: var(--team-accent, 45 100% 51%);
     --sidebar-primary-foreground: 0 0% 0%;
     --sidebar-accent: 0 0% 25%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 0 0% 30%;
-    --sidebar-ring: 45 100% 51%;
+    --sidebar-ring: var(--team-accent, 45 100% 51%);
+
+    /* Universal team theming variables */
+    --team-primary: 217 100% 28%; /* Default: Royal Blue */
+    --team-secondary: 349 87% 39%; /* Default: Red */
+    --team-accent: 45 100% 51%; /* Default: Yellow */
   }
 }
 

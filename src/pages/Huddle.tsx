@@ -22,6 +22,7 @@ import { PickEmCard } from "@/components/pickem/PickEmCard";
 import { PickEmLeaderboardCard } from "@/components/pickem/PickEmLeaderboardCard";
 import { PickEmView } from "@/components/pickem/PickEmView";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { UniversalHuddleLayout } from "@/components/adaptive/UniversalHuddleLayout";
 
 import { formatDistanceToNow } from "date-fns";
 
@@ -845,128 +846,133 @@ useEffect(() => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-muted-foreground">Loading huddle...</div>
-      </div>
+      <UniversalHuddleLayout teamName="Loading...">
+        <div className="flex items-center justify-center h-full">
+          <div className="text-muted-foreground">Loading huddle...</div>
+        </div>
+      </UniversalHuddleLayout>
     );
   }
 
   if (!huddle) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <h3 className="text-xl font-semibold mb-2">Huddle not found</h3>
-          <p className="text-muted-foreground">This huddle may not exist or you don't have access to it.</p>
+      <UniversalHuddleLayout teamName="Not Found">
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <h3 className="text-xl font-semibold mb-2">Huddle not found</h3>
+            <p className="text-muted-foreground">This huddle may not exist or you don't have access to it.</p>
+          </div>
         </div>
-      </div>
+      </UniversalHuddleLayout>
     );
   }
 
-
   return (
-    <div className="flex flex-col h-full">
-      {/* Compact Chat Header */}
-      <div className="p-3 border-b bg-card sticky top-0 z-10" style={{ height: '56px' }}>
-        <div className="flex items-center justify-between h-full">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <Avatar className="h-8 w-8 shrink-0">
-              <AvatarImage src={huddle.team.logo_url} alt={huddle.team.name} />
-              <AvatarFallback className="text-xs">
-                {huddle.team.name.substring(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h2 className="font-semibold text-sm truncate">{huddle.name}</h2>
-                {huddle.is_verified && <VerifiedBadge size="sm" />}
+    <UniversalHuddleLayout huddle={huddle} teamName={huddle.team?.name}>
+      <div className="flex flex-col h-full">
+        {/* Compact Chat Header */}
+        <div className="p-3 border-b bg-card sticky top-0 z-10" style={{ height: '56px' }}>
+          <div className="flex items-center justify-between h-full">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <Avatar className="h-8 w-8 shrink-0">
+                <AvatarImage src={huddle.team.logo_url} alt={huddle.team.name} />
+                <AvatarFallback className="text-xs">
+                  {huddle.team.name.substring(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-semibold text-sm truncate">{huddle.name}</h2>
+                  {huddle.is_verified && <VerifiedBadge size="sm" />}
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  {huddle.team.name} Side Huddle
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground truncate">
-                {huddle.team.name} Side Huddle
-              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {user?.id === huddle.owner_id && !huddle.is_verified && (
+                <HuddleVerificationDialog huddleId={huddle.id} isVerified={huddle.is_verified} />
+              )}
+              <InviteButton 
+                huddleId={huddle.id} 
+                ownerDisplayName={huddle.owner?.display_name || huddle.owner?.username || 'Someone'}
+                teamName={huddle.team.name}
+                className="h-7 text-xs px-2" 
+              />
+              <HuddleManagement huddleId={huddle.id} ownerId={huddle.owner_id} huddle={huddle} />
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {user?.id === huddle.owner_id && !huddle.is_verified && (
-              <HuddleVerificationDialog huddleId={huddle.id} isVerified={huddle.is_verified} />
-            )}
-            <InviteButton 
-              huddleId={huddle.id} 
-              ownerDisplayName={huddle.owner?.display_name || huddle.owner?.username || 'Someone'}
-              teamName={huddle.team.name}
-              className="h-7 text-xs px-2" 
-            />
-            <HuddleManagement huddleId={huddle.id} ownerId={huddle.owner_id} huddle={huddle} />
+          <div className="mt-2 sm:mt-3">
+            <CollapsibleMemberList huddleId={huddle.id} ownerId={huddle.owner_id} />
           </div>
         </div>
-        <div className="mt-2 sm:mt-3">
-          <CollapsibleMemberList huddleId={huddle.id} ownerId={huddle.owner_id} />
-        </div>
-      </div>
 
-      <div className="flex-1 w-full flex flex-col min-h-0 chat-container">
-        {/* Messages Area */}
-        <ChatList
-          ref={chatListRef}
-          messages={messages}
-          loadOlderMessages={loadOlderMessages}
-          renderMessage={renderMessageItem}
-          hasMore={hasMore}
-          isLoadingMore={loadingMore}
-        />
+        <div className="flex-1 w-full flex flex-col min-h-0 chat-container">
+          {/* Messages Area */}
+          <ChatList
+            ref={chatListRef}
+            messages={messages}
+            loadOlderMessages={loadOlderMessages}
+            renderMessage={renderMessageItem}
+            hasMore={hasMore}
+            isLoadingMore={loadingMore}
+          />
 
-        {/* Enhanced Typing Indicator with animation */}
-        <div className="px-6 py-2">
-          <EnhancedTypingIndicator 
-            typingUsers={typingUsers.map(name => ({ 
-              id: name, 
-              name, 
-              avatar: undefined 
-            }))} 
+          {/* Enhanced Typing Indicator with animation */}
+          <div className="px-6 py-2">
+            <EnhancedTypingIndicator 
+              typingUsers={typingUsers.map(name => ({ 
+                id: name, 
+                name, 
+                avatar: undefined 
+              }))} 
+            />
+          </div>
+
+          {/* Modern Message Input */}
+          <ModernChatInput
+            onSendMessage={sendMessage}
+            onSendMedia={sendMediaMessage}
+            placeholder="Type your message..."
+            disabled={loading}
+            huddleId={id}
+            userId={user?.id}
+            onTyping={(isTyping) => {
+              if (isTyping) {
+                // Throttle typing broadcasts to avoid flooding
+                const now = Date.now();
+                if (now - (lastTypingSentRef.current || 0) > 1200 && user?.id) {
+                  lastTypingSentRef.current = now;
+                  const name = displayName || user.email?.split('@')[0] || 'User';
+                  typingChannelRef.current?.send({
+                    type: 'broadcast',
+                    event: 'typing',
+                    payload: { userId: user.id, name: name }
+                  });
+                }
+              }
+            }}
           />
         </div>
 
-        {/* Modern Message Input */}
-        <ModernChatInput
-          onSendMessage={sendMessage}
-          onSendMedia={sendMediaMessage}
-          placeholder="Type your message..."
-          disabled={loading}
-          huddleId={id}
-          userId={user?.id}
-          onTyping={(isTyping) => {
-            if (isTyping) {
-              // Throttle typing broadcasts to avoid flooding
-              const now = Date.now();
-              if (now - (lastTypingSentRef.current || 0) > 1200 && user?.id) {
-                lastTypingSentRef.current = now;
-                const name = displayName || user.email?.split('@')[0] || 'User';
-                typingChannelRef.current?.send({
-                  type: 'broadcast',
-                  event: 'typing',
-                  payload: { userId: user.id, name: name }
-                });
-              }
-            }
-          }}
-        />
+        {/* Pick 'Em View Dialog */}
+        {pickEmViewId && (
+          <Dialog open={!!pickEmViewId} onOpenChange={() => setPickEmViewId(null)}>
+            <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+              <DialogHeader className="flex-shrink-0">
+                <DialogTitle>Pick 'Em Details</DialogTitle>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto">
+                <PickEmView 
+                  instanceId={pickEmViewId} 
+                  onBack={() => setPickEmViewId(null)} 
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
-
-      {/* Pick 'Em View Dialog */}
-      {pickEmViewId && (
-        <Dialog open={!!pickEmViewId} onOpenChange={() => setPickEmViewId(null)}>
-          <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
-            <DialogHeader className="flex-shrink-0">
-              <DialogTitle>Pick 'Em Details</DialogTitle>
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto">
-              <PickEmView 
-                instanceId={pickEmViewId} 
-                onBack={() => setPickEmViewId(null)} 
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-    </div>
+    </UniversalHuddleLayout>
   );
 };
