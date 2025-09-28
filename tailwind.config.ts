@@ -41,6 +41,9 @@ export default {
 			},
 			fontFamily: {
 				sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'sans-serif'],
+				arcade: ['Orbitron', 'monospace'],
+				chat: ['Exo 2', 'Inter', 'sans-serif'],
+				pixel: ['Press Start 2P', 'monospace'],
 			},
 			colors: {
 				border: 'hsl(var(--border))',
@@ -105,7 +108,14 @@ export default {
 				
 				// Bot colors
 				'bot-bubble': 'hsla(var(--bot-bubble))',
-				'bot-border': 'hsla(var(--bot-border))'
+				'bot-border': 'hsla(var(--bot-border))',
+				
+				// Retro Arcade Colors
+				'team-primary': 'hsl(var(--team-primary))',
+				'team-secondary': 'hsl(var(--team-secondary))',
+				'team-accent': 'hsl(var(--team-accent))',
+				'neon-glow': 'hsl(var(--neon-glow))',
+				'scanline': 'hsla(var(--scanline))',
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -166,6 +176,26 @@ export default {
 					'40%, 43%': { transform: 'translate3d(0, -4px, 0)' },
 					'70%': { transform: 'translate3d(0, -2px, 0)' },
 					'90%': { transform: 'translate3d(0, -1px, 0)' }
+				},
+				'neon-pulse': {
+					'0%, 100%': { 
+						textShadow: '0 0 5px currentColor, 0 0 10px currentColor, 0 0 15px currentColor',
+						opacity: '1'
+					},
+					'50%': { 
+						textShadow: '0 0 2px currentColor, 0 0 5px currentColor, 0 0 8px currentColor',
+						opacity: '0.8'
+					}
+				},
+				'crt-flicker': {
+					'0%, 100%': { opacity: '1' },
+					'98%': { opacity: '1' },
+					'99%': { opacity: '0.98' },
+					'99.5%': { opacity: '1' }
+				},
+				'retro-tilt': {
+					'0%': { transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg)' },
+					'100%': { transform: 'perspective(1000px) rotateX(2deg) rotateY(-1deg)' }
 				}
 			},
 			animation: {
@@ -183,7 +213,10 @@ export default {
 				'slide-up': 'slide-up 0.2s ease-out',
 				'message-bounce': 'message-bounce 0.6s ease-out',
 				'enter': 'fade-in 0.3s ease-out, scale-in 0.2s ease-out',
-				'exit': 'fade-out 0.3s ease-out, scale-out 0.2s ease-out'
+				'exit': 'fade-out 0.3s ease-out, scale-out 0.2s ease-out',
+				'neon-pulse': 'neon-pulse 2s ease-in-out infinite',
+				'crt-flicker': 'crt-flicker 0.15s linear infinite',
+				'retro-tilt': 'retro-tilt 0.3s ease-out forwards'
 			}
 		}
 	},

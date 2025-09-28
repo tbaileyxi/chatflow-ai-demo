@@ -4,6 +4,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronRight, Users } from 'lucide-react';
+import { usePresence } from '@/hooks/usePresence';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Member {
   user_id: string;
@@ -24,6 +26,8 @@ export const CollapsibleMemberList = ({ huddleId, ownerId }: CollapsibleMemberLi
   const [members, setMembers] = useState<Member[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const { onlineUsers, onlineCount } = usePresence(`huddle:${huddleId}`, user?.id);
 
   useEffect(() => {
     fetchMembers();
@@ -59,11 +63,11 @@ export const CollapsibleMemberList = ({ huddleId, ownerId }: CollapsibleMemberLi
       const profileResults = await Promise.all(profilePromises);
       const profiles = profileResults.map(result => result.data?.[0]).filter(Boolean);
 
-      // Use consistent online status logic across components 
+      // Use real presence data
       const membersWithStatus = allUserIds.map(userId => ({
         user_id: userId,
         profiles: profiles?.find(p => p.user_id === userId) || null,
-        online: userId === huddleData.owner_id ? true : Math.random() > 0.3 // Owner always online, others 70% chance
+        online: onlineUsers.some(u => u.user_id === userId) || userId === huddleData.owner_id
       }));
 
       console.log(`Huddle ${huddleId} - Fetched ${membersWithStatus.length} members:`, 

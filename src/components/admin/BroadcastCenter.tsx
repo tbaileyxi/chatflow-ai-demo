@@ -87,12 +87,27 @@ export const BroadcastCenter = () => {
     const lines = codes.split('\n').filter(line => line.trim());
     
     return lines.map(line => {
-      const embedType = line.includes('twitter.com') || line.includes('x.com') ? 'x' :
-                       line.includes('youtube.com') || line.includes('youtu.be') ? 'youtube' : 'iframe';
+      const trimmed = line.trim();
+      let embedType: string;
+      let embedCode: string;
+      
+      // Detect embed type and normalize
+      if (trimmed.includes('twitter.com') || trimmed.includes('x.com')) {
+        embedType = 'x';
+        // Extract tweet URL if it's just a URL
+        const tweetMatch = trimmed.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/\w+\/status\/\d+/);
+        embedCode = tweetMatch ? tweetMatch[0] : trimmed;
+      } else if (trimmed.includes('youtube.com') || trimmed.includes('youtu.be')) {
+        embedType = 'youtube';
+        embedCode = trimmed;
+      } else {
+        embedType = 'iframe';
+        embedCode = trimmed;
+      }
       
       return {
         commentary: '',
-        embed_code: line.trim(),
+        embed_code: embedCode,
         embed_type: embedType
       };
     });
