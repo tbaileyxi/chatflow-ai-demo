@@ -11,6 +11,15 @@ interface RetroTheme {
 }
 
 const RETRO_TEAM_THEMES: Record<string, RetroTheme> = {
+  'buffaloes': {
+    primary: '0 0% 15%', // Deep Black
+    secondary: '45 100% 50%', // Pure Gold
+    accent: '0 0% 85%', // Light Silver
+    neonGlow: '45 100% 60%', // Bright Gold Glow
+    name: 'Colorado Buffs',
+    mascot: '🦬',
+    pattern: 'mountain-peaks'
+  },
   'bills': {
     primary: '217 100% 55%', // Electric Royal Blue
     secondary: '349 87% 50%', // Fiery Red
@@ -76,7 +85,8 @@ export const useRetroTheme = (teamName?: string) => {
     const detectTeam = (name: string): RetroTheme => {
       const normalized = name.toLowerCase();
       
-      if (normalized.includes('bill') || normalized.includes('buffalo')) return RETRO_TEAM_THEMES.bills;
+      if (normalized.includes('buffalo') && (normalized.includes('bill') || normalized.includes('bills'))) return RETRO_TEAM_THEMES.bills;
+      if (normalized.includes('buffalo') || normalized.includes('colorado') || normalized.includes('buff')) return RETRO_TEAM_THEMES.buffaloes;
       if (normalized.includes('steel') || normalized.includes('pittsburgh')) return RETRO_TEAM_THEMES.steelers;
       if (normalized.includes('pack') || normalized.includes('green bay')) return RETRO_TEAM_THEMES.packers;
       if (normalized.includes('cowboy') || normalized.includes('dallas')) return RETRO_TEAM_THEMES.cowboys;

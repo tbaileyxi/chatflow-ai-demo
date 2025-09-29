@@ -761,12 +761,25 @@ All colors MUST be HSL.
 }
 
 /* Contrast Flipping for Readability */
+/* Enhanced contrast classes for retro theme */
 .contrast-text {
-  color: color-mix(in srgb, hsl(var(--foreground)), white 0%);
+  color: hsl(var(--foreground));
+}
+
+.contrast-text-on-primary {
+  color: hsl(var(--primary-foreground));
+}
+
+.contrast-text-on-secondary {
+  color: hsl(var(--secondary-foreground));
 }
 
 .contrast-text-dark {
   color: color-mix(in srgb, hsl(var(--foreground)), black 50%);
+}
+
+.contrast-text-light {
+  color: color-mix(in srgb, hsl(var(--foreground)), white 80%);
 }
 
 /* CRT Screen Effect */

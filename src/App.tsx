@@ -26,6 +26,7 @@ import { MobileSpotlight } from "./pages/MobileSpotlight";
 import { MobileChat } from "./pages/MobileChat";
 import { HuddleSettings } from "./pages/HuddleSettings";
 import FAQ from "./pages/FAQ";
+import { RetroDemo } from "./pages/RetroDemo";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ const AppContent = () => {
               <BillsChatDemo />
             </BillsHuddleLayout>
           } />
+          <Route path="/retro-demo" element={<RetroDemo />} />
           <Route path="/onboard" element={<Index />} />
           <Route path="/app" element={<MobileHome />} />
           <Route path="/admin" element={<Admin />} />

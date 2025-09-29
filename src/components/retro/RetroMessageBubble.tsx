@@ -7,7 +7,6 @@ import { formatDistanceToNow } from 'date-fns';
 import { Megaphone, Star, Copy, Heart, ThumbsUp, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
 interface RetroMessageBubbleProps {
   message: {
@@ -46,9 +45,10 @@ const RetroReactionButtons = memo<{
   visible: boolean;
 }>(({ messageId, onReact, visible }) => {
   const reactions = [
-    { emoji: '👍', color: 'hsl(var(--team-primary))' },
-    { emoji: '🔥', color: 'hsl(var(--team-secondary))' },
-    { emoji: '⚡', color: 'hsl(var(--team-accent))' }
+    { emoji: '🔥', label: 'Fire' },
+    { emoji: '⚡', label: 'Electric' },
+    { emoji: '💪', label: 'Strong' },
+    { emoji: '🦬', label: 'Buffalo' }
   ];
 
   return (
@@ -59,22 +59,18 @@ const RetroReactionButtons = memo<{
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.8, y: 10 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className="flex gap-1 mt-2"
+          className="flex gap-1 mt-1"
         >
-          {reactions.map(({ emoji, color }) => (
+          {reactions.map(({ emoji, label }) => (
             <Button
               key={emoji}
               variant="ghost"
               size="sm"
-              className="retro-reaction h-7 w-7 p-0"
-              style={{ 
-                '--reaction-color': color,
-                borderColor: color,
-                backgroundColor: `${color.replace(')', ' / 0.1)')}` 
-              } as React.CSSProperties}
+              className="h-6 w-6 p-0 bg-team-primary/10 border border-team-primary/30 hover:bg-team-primary/20 hover:scale-110 transition-all duration-200"
               onClick={() => onReact(emoji)}
+              title={label}
             >
-              <span className="text-sm">{emoji}</span>
+              <span className="text-xs">{emoji}</span>
             </Button>
           ))}
         </motion.div>
@@ -97,6 +93,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
 }) => {
   const [showReactions, setShowReactions] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  const [activeReactions, setActiveReactions] = useState<string[]>([]);
   const { toast } = useToast();
 
   const isOwnMessage = currentUserId === message.user_id;
@@ -110,6 +107,13 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
     if (isBot) return 'Game Bot';
     return user?.display_name || user?.username || `User ${message.user_id.slice(0, 8)}`;
   }, [isBot, user, message.user_id]);
+
+  // Auto-adjust text color based on background
+  const getContrastTextColor = (isOwnMessage: boolean, isBot: boolean) => {
+    if (isBot) return 'text-foreground'; // Bot messages use gradient, keep default
+    if (isOwnMessage) return 'text-white'; // Own messages on dark background
+    return 'text-foreground'; // Other messages on light background
+  };
 
   const handleCopy = useCallback(async () => {
     try {
@@ -148,18 +152,29 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   }, [message.id, onHighlight, toast]);
 
   const handleReaction = useCallback((emoji: string) => {
-    // Handle team-colored reactions
-    console.log(`Reacting with ${emoji} to message ${message.id}`);
+    setActiveReactions(prev => 
+      prev.includes(emoji) 
+        ? prev.filter(r => r !== emoji)
+        : [...prev, emoji]
+    );
     setShowReactions(false);
-  }, [message.id]);
+    toast({
+      title: "Reacted!",
+      description: `Added ${emoji} reaction`,
+    });
+  }, [toast]);
+
+  const handleLongPress = useCallback(() => {
+    setShowReactions(true);
+  }, []);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
       className={cn(
-        "group relative px-4 py-2 hover:bg-muted/20 transition-all duration-200",
+        "group relative py-1 px-2 hover:bg-muted/10 transition-all duration-200",
         className
       )}
       onMouseEnter={() => setShowActions(true)}
@@ -167,35 +182,36 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
         setShowActions(false);
         setShowReactions(false);
       }}
+      onTouchStart={handleLongPress}
     >
       {/* Action Buttons */}
       <AnimatePresence>
         {showActions && (
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.2 }}
-            className="absolute right-2 top-2 flex gap-1 z-10"
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-2 top-1 flex gap-1 z-10"
           >
             <Button
               variant="ghost"
               size="sm"
               onClick={handleCopy}
-              className="h-6 w-6 p-0 bg-background/80 border border-border hover:bg-muted"
+              className="h-5 w-5 p-0 bg-background/80 border border-border hover:bg-muted"
               title="Copy Message"
             >
-              <Copy className="w-3 h-3" />
+              <Copy className="w-2.5 h-2.5" />
             </Button>
             
             <Button
               variant="ghost"
               size="sm"
               onClick={handleCallout}
-              className="h-6 w-6 p-0 bg-background/80 border border-border hover:bg-muted"
+              className="h-5 w-5 p-0 bg-background/80 border border-border hover:bg-muted"
               title="Call Out to Highlights"
             >
-              <Star className="w-3 h-3" />
+              <Star className="w-2.5 h-2.5" />
             </Button>
 
             {isAdmin && (
@@ -204,20 +220,20 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                   variant="ghost"
                   size="sm"
                   onClick={handleMegaphone}
-                  className="retro-megaphone h-6 w-6 p-0"
+                  className="retro-megaphone h-5 w-5 p-0"
                   title="Broadcast to Spotlight"
                 >
-                  <Megaphone className="w-3 h-3" />
+                  <Megaphone className="w-2.5 h-2.5" />
                 </Button>
                 
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleHighlight}
-                  className="h-6 w-6 p-0 bg-team-secondary/20 border border-team-secondary/40 hover:bg-team-secondary/30"
+                  className="h-5 w-5 p-0 bg-team-secondary/20 border border-team-secondary/40 hover:bg-team-secondary/30"
                   title="Force Highlight"
                 >
-                  <Flame className="w-3 h-3 text-team-secondary" />
+                  <Flame className="w-2.5 h-2.5 text-team-secondary" />
                 </Button>
               </>
             )}
@@ -225,60 +241,57 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
         )}
       </AnimatePresence>
 
-      {/* Message Content */}
-      <div className={cn(
-        "flex gap-3",
-        isOwnMessage ? "flex-row-reverse" : "flex-row"
-      )}>
+      {/* Message Content - Left-aligned like real messaging apps */}
+      <div className="flex gap-2 items-start">
         {/* Avatar */}
-        <Avatar className="h-8 w-8 shrink-0">
+        <Avatar className="h-6 w-6 shrink-0 mt-0.5">
           <AvatarImage src={user?.avatar_url} alt={displayName} />
-          <AvatarFallback className="text-xs font-pixel">
+          <AvatarFallback className="text-xs font-pixel bg-team-primary/20 text-team-primary">
             {displayName.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
 
-        {/* Message Bubble */}
-        <div className="flex-1 max-w-[70%]">
-          {/* Header */}
-          <div className={cn(
-            "flex items-center gap-2 mb-1",
-            isOwnMessage ? "justify-end" : "justify-start"
-          )}>
-            <span className="font-chat font-medium text-sm opacity-80 truncate">
+        {/* Message Content */}
+        <div className="flex-1 min-w-0">
+          {/* Header with name and time */}
+          <div className="flex items-baseline gap-2 mb-0.5">
+            <span className="font-chat font-medium text-xs text-foreground/90 truncate">
               {displayName}
             </span>
             {isBot && (
-              <Badge variant="secondary" className="text-xs h-4 font-pixel">
+              <Badge variant="secondary" className="text-xs h-3.5 px-1 font-pixel">
                 BOT
               </Badge>
             )}
-            <span className="text-xs text-muted-foreground font-arcade">
+            <span className="text-xs text-muted-foreground font-arcade ml-auto shrink-0">
               {formattedTime}
             </span>
           </div>
 
-          {/* Content */}
+          {/* Message Bubble - Real chat app style */}
           <div className={cn(
-            "relative rounded-xl px-4 py-3 transition-all duration-200",
-            isOwnMessage 
-              ? "retro-bubble own ml-auto" 
-              : isBot
-              ? "bg-gradient-to-r from-team-primary/10 to-team-accent/10 border border-team-primary/20"
-              : "retro-bubble",
-            "hover:scale-[1.02] hover:shadow-lg"
+            "relative inline-block max-w-[80%] px-3 py-1.5 rounded-2xl text-sm leading-relaxed transition-all duration-200",
+            isBot 
+              ? "bg-gradient-to-r from-team-primary/20 to-team-secondary/20 border border-team-primary/30" 
+              : isOwnMessage
+              ? "bg-team-primary/90 text-white ml-auto"
+              : "bg-muted/50 text-foreground",
+            "hover:shadow-md"
           )}>
-            <div className="font-chat text-sm leading-relaxed whitespace-pre-wrap break-words contrast-text">
+            <div className={cn(
+              "font-chat whitespace-pre-wrap break-words",
+              getContrastTextColor(isOwnMessage, isBot)
+            )}>
               {message.content}
             </div>
 
-            {/* Embed Content */}
+            {/* Inline Embeds */}
             {(message.embeds && message.embeds.length > 0) || message.embed_code ? (
-              <div className="mt-3">
-                <div className="retro-embed overflow-hidden">
+              <div className="mt-2 -mx-1">
+                <div className="retro-embed overflow-hidden rounded-lg border border-team-primary/30 bg-background/50">
                   {message.embed_code && (
                     <div 
-                      className="w-full"
+                      className="w-full p-2"
                       dangerouslySetInnerHTML={{ __html: message.embed_code }}
                     />
                   )}
@@ -288,19 +301,19 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
 
             {/* Media */}
             {message.media_url && (
-              <div className="mt-3">
+              <div className="mt-2 -mx-1">
                 {message.media_type === 'image' ? (
                   <img
                     src={message.media_url}
                     alt="Shared media"
-                    className="max-w-full rounded-lg shadow-sm retro-embed"
+                    className="max-w-full rounded-lg shadow-sm"
                     loading="lazy"
                   />
                 ) : (
                   <video
                     src={message.media_url}
                     controls
-                    className="max-w-full rounded-lg shadow-sm retro-embed"
+                    className="max-w-full rounded-lg shadow-sm"
                     preload="metadata"
                   />
                 )}
@@ -312,15 +325,28 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
               variant="ghost"
               size="sm"
               className={cn(
-                "absolute -bottom-2 h-6 w-6 p-0 rounded-full bg-background border border-border shadow-sm transition-all duration-200",
-                "opacity-0 group-hover:opacity-100",
-                isOwnMessage ? "-left-8" : "-right-8"
+                "absolute -bottom-1 -right-1 h-4 w-4 p-0 rounded-full bg-background border border-border shadow-sm transition-all duration-200",
+                "opacity-0 group-hover:opacity-100 hover:scale-110"
               )}
               onClick={() => setShowReactions(!showReactions)}
             >
-              <span className="text-xs">⚡</span>
+              <span className="text-xs">+</span>
             </Button>
           </div>
+
+          {/* Active Reactions - Display inline */}
+          {activeReactions.length > 0 && (
+            <div className="flex gap-1 mt-1">
+              {activeReactions.map((emoji, index) => (
+                <span 
+                  key={index}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-team-primary/20 border border-team-primary/40 rounded-full"
+                >
+                  {emoji} <span className="text-xs font-pixel">1</span>
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Reactions */}
           <RetroReactionButtons
