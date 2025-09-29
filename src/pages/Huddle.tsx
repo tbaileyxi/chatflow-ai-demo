@@ -14,15 +14,15 @@ import { HuddleManagement } from "@/components/HuddleManagement";
 import { ChatList, ChatListRef } from "@/components/ChatList";
 import { MessageBubble } from "@/components/MessageBubble";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
-import { ModernChatInput } from "@/components/chat/ModernChatInput";
-import { ModernMessageBubble } from "@/components/chat/ModernMessageBubble";
+import { RetroChatInput } from "@/components/retro/RetroChatInput";
+import { RetroVirtualizedChat } from "@/components/retro/RetroVirtualizedChat";
 import { EnhancedTypingIndicator } from "@/components/chat/EnhancedTypingIndicator";
 import { isConsecutiveMessage } from "@/utils/chatMessage";
 import { PickEmCard } from "@/components/pickem/PickEmCard";
 import { PickEmLeaderboardCard } from "@/components/pickem/PickEmLeaderboardCard";
 import { PickEmView } from "@/components/pickem/PickEmView";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { UniversalHuddleLayout } from "@/components/adaptive/UniversalHuddleLayout";
+import { RetroHuddleLayout } from "@/components/retro/RetroHuddleLayout";
 
 import { formatDistanceToNow } from "date-fns";
 
@@ -850,7 +850,7 @@ useEffect(() => {
         <div className="flex items-center justify-center h-full">
           <div className="text-muted-foreground">Loading huddle...</div>
         </div>
-      </UniversalHuddleLayout>
+      </RetroHuddleLayout>
     );
   }
 
@@ -863,12 +863,18 @@ useEffect(() => {
             <p className="text-muted-foreground">This huddle may not exist or you don't have access to it.</p>
           </div>
         </div>
-      </UniversalHuddleLayout>
+    </RetroHuddleLayout>
     );
   }
 
   return (
-    <UniversalHuddleLayout huddle={huddle} teamName={huddle.team?.name}>
+    <RetroHuddleLayout
+      huddleId={id!}
+      teamName={huddle?.team?.name}
+      huddle={huddle}
+      messages={messages}
+      currentUserId={user?.id}
+    >
       <div className="flex flex-col h-full">
         {/* Compact Chat Header */}
         <div className="p-3 border-b bg-card sticky top-0 z-10" style={{ height: '56px' }}>
@@ -973,6 +979,6 @@ useEffect(() => {
           </Dialog>
         )}
       </div>
-    </UniversalHuddleLayout>
+    </RetroHuddleLayout>
   );
 };

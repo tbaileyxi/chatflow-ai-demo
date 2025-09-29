@@ -235,6 +235,15 @@ All colors MUST be HSL.
     --team-accent: 45 100% 51%;       /* Dynamic team accent color */
     --neon-glow: 0 100% 50%;          /* Dynamic neon glow color */
     --scanline: 0 0% 100% / 0.1;      /* CRT scanline effect */
+    --contrast-text: var(--foreground); /* Auto-adjusting contrast text */
+
+    /* Retro arcade styling */
+    --retro-grid: linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+    --retro-scanlines: linear-gradient(transparent 0%, rgba(0,0,0,0.05) 50%, transparent 100%);
+    --retro-glow: 0 0 10px hsl(var(--neon-glow) / 0.3),
+                  0 0 20px hsl(var(--neon-glow) / 0.2),
+                  inset 0 0 10px hsl(var(--neon-glow) / 0.1);
   }
 }
 

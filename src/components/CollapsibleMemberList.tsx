@@ -4,6 +4,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronRight, Users } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { formatDistanceToNow } from 'date-fns';
 import { usePresence } from '@/hooks/usePresence';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -15,6 +19,7 @@ interface Member {
     avatar_url?: string;
   } | null;
   online: boolean;
+  joined_at: string;
 }
 
 interface CollapsibleMemberListProps {
@@ -27,7 +32,7 @@ export const CollapsibleMemberList = ({ huddleId, ownerId }: CollapsibleMemberLi
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-  const { onlineUsers, onlineCount } = usePresence(`huddle:${huddleId}`, user?.id);
+  const { onlineMembers } = usePresence(huddleId);
 
   useEffect(() => {
     fetchMembers();
@@ -67,7 +72,8 @@ export const CollapsibleMemberList = ({ huddleId, ownerId }: CollapsibleMemberLi
       const membersWithStatus = allUserIds.map(userId => ({
         user_id: userId,
         profiles: profiles?.find(p => p.user_id === userId) || null,
-        online: onlineUsers.some(u => u.user_id === userId) || userId === huddleData.owner_id
+        online: onlineMembers.some(u => u.user_id === userId) || userId === huddleData.owner_id,
+        joined_at: new Date().toISOString() // Add this for compatibility
       }));
 
       console.log(`Huddle ${huddleId} - Fetched ${membersWithStatus.length} members:`, 
@@ -89,83 +95,73 @@ export const CollapsibleMemberList = ({ huddleId, ownerId }: CollapsibleMemberLi
 
   if (loading) return null;
 
-  const onlineMembers = members.filter(m => m.online);
-  const offlineMembers = members.filter(m => !m.online);
+  const onlineCount = members.filter(m => m.online).length;
+  const huddle = { owner_id: ownerId }; // Add this for compatibility
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <CollapsibleTrigger asChild>
-        <Button variant="ghost" size="sm" className="w-full justify-between p-2">
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            <span className="text-sm font-medium">
-              Members ({members.length})
-            </span>
-            {onlineMembers.length > 0 && (
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                <span className="text-xs text-muted-foreground">{onlineMembers.length}</span>
-              </div>
-            )}
-          </div>
-          {isOpen ? (
-            <ChevronDown className="w-4 h-4" />
-          ) : (
-            <ChevronRight className="w-4 h-4" />
-          )}
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-8 gap-2 bg-team-primary/20 border border-team-primary/40 hover:bg-team-primary/30 text-team-primary font-pixel"
+          disabled={loading}
+        >
+          <Users className="h-4 w-4" />
+          <span className="text-sm font-medium">
+            {loading ? '...' : `${onlineCount} online`}
+          </span>
+          <ChevronDown className={cn(
+            "h-3 w-3 transition-transform duration-200",
+            isOpen && "rotate-180"
+          )} />
         </Button>
       </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-2 p-2">
-        {onlineMembers.length > 0 && (
-          <div>
-            <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              Online ({onlineMembers.length})
+
+      <CollapsibleContent className="absolute top-full right-0 z-50 mt-1">
+        <Card className="w-72 max-h-96 overflow-y-auto bg-background/95 backdrop-blur-sm border-team-primary/30 shadow-lg">
+          <div className="p-4">
+            <h3 className="font-orbitron font-semibold text-sm text-team-primary mb-3">
+              Huddle Members ({members.length})
+            </h3>
+            <div className="space-y-2">
+              {members.map((member) => {
+                const isOnline = member.online;
+                return (
+                  <div key={member.user_id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-team-primary/10 transition-colors">
+                    <div className="relative">
+                      <Avatar className="h-8 w-8 border border-team-primary/30">
+                        <AvatarImage src={member.profiles?.avatar_url} />
+                        <AvatarFallback className="text-xs bg-team-primary/20 text-team-primary">
+                          {(member.profiles?.display_name?.[0] || 
+                            member.profiles?.username?.[0] || 
+                            'U').toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      {isOnline && (
+                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-background rounded-full animate-pulse" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate font-exo2">
+                        {member.profiles?.display_name || member.profiles?.username || 'Anonymous'}
+                        {isOnline && <span className="ml-2 text-xs text-green-500">●</span>}
+                      </p>
+                      <p className="text-xs text-muted-foreground font-pixel">
+                        Joined {formatDistanceToNow(new Date(member.joined_at), { addSuffix: true })}
+                      </p>
+                    </div>
+                    {member.user_id === huddle?.owner_id && (
+                      <Badge variant="secondary" className="text-xs bg-team-secondary/20 text-team-secondary border-team-secondary/40">
+                        Owner
+                      </Badge>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            {onlineMembers.map((member) => (
-              <div key={member.user_id} className="flex items-center gap-2 p-1 rounded hover:bg-accent/50">
-                <div className="relative">
-                  <Avatar className="w-6 h-6">
-                    <AvatarImage src={member.profiles?.avatar_url} />
-                    <AvatarFallback className="text-xs">
-                      {(member.profiles?.display_name || member.profiles?.username)?.substring(0, 2).toUpperCase() || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-background"></div>
-                </div>
-                <span className="text-sm">
-                  {member.profiles?.display_name || member.profiles?.username || 'Anonymous'}
-                  {member.user_id === ownerId && (
-                    <span className="text-xs italic text-muted-foreground ml-1">(owner)</span>
-                  )}
-                </span>
-              </div>
-            ))}
           </div>
-        )}
-        {offlineMembers.length > 0 && (
-          <div>
-            <div className="text-xs font-medium text-muted-foreground mb-2">
-              Offline ({offlineMembers.length})
-            </div>
-            {offlineMembers.map((member) => (
-              <div key={member.user_id} className="flex items-center gap-2 p-1 rounded hover:bg-accent/50">
-                <Avatar className="w-6 h-6">
-                  <AvatarImage src={member.profiles?.avatar_url} />
-                  <AvatarFallback className="text-xs">
-                    {(member.profiles?.display_name || member.profiles?.username)?.substring(0, 2).toUpperCase() || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-sm text-muted-foreground">
-                  {member.profiles?.display_name || member.profiles?.username || 'Anonymous'}
-                  {member.user_id === ownerId && (
-                    <span className="text-xs italic text-muted-foreground ml-1">(owner)</span>
-                  )}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+        </Card>
       </CollapsibleContent>
     </Collapsible>
   );

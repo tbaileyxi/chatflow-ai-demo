@@ -48,7 +48,9 @@ const RetroReactionButtons = memo<{
     { emoji: '🔥', label: 'Fire' },
     { emoji: '⚡', label: 'Electric' },
     { emoji: '💪', label: 'Strong' },
-    { emoji: '🦬', label: 'Buffalo' }
+    { emoji: '🦬', label: 'Buffalo' },
+    { emoji: '⭐', label: 'Star' },
+    { emoji: '💯', label: 'Hundred' }
   ];
 
   return (
@@ -241,7 +243,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
         )}
       </AnimatePresence>
 
-      {/* Message Content - Left-aligned like real messaging apps */}
+        {/* Message Content - Left-aligned like real messaging apps */}
       <div className="flex gap-2 items-start">
         {/* Avatar */}
         <Avatar className="h-6 w-6 shrink-0 mt-0.5">
@@ -255,7 +257,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
         <div className="flex-1 min-w-0">
           {/* Header with name and time */}
           <div className="flex items-baseline gap-2 mb-0.5">
-            <span className="font-chat font-medium text-xs text-foreground/90 truncate">
+            <span className="font-exo2 font-medium text-xs text-foreground/90 truncate">
               {displayName}
             </span>
             {isBot && (
@@ -263,25 +265,22 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                 BOT
               </Badge>
             )}
-            <span className="text-xs text-muted-foreground font-arcade ml-auto shrink-0">
+            <span className="text-xs text-muted-foreground font-pixel ml-auto shrink-0">
               {formattedTime}
             </span>
           </div>
 
-          {/* Message Bubble - Real chat app style */}
+          {/* Message Bubble - Real chat app style with proper contrast */}
           <div className={cn(
-            "relative inline-block max-w-[80%] px-3 py-1.5 rounded-2xl text-sm leading-relaxed transition-all duration-200",
+            "relative inline-block max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-relaxed transition-all duration-200",
             isBot 
-              ? "bg-gradient-to-r from-team-primary/20 to-team-secondary/20 border border-team-primary/30" 
+              ? "bg-gradient-to-r from-team-primary/15 to-team-secondary/15 border border-team-primary/30 text-contrast-auto-adjust" 
               : isOwnMessage
-              ? "bg-team-primary/90 text-white ml-auto"
-              : "bg-muted/50 text-foreground",
-            "hover:shadow-md"
+              ? "bg-team-primary text-contrast-auto-adjust"
+              : "bg-muted/60 text-contrast-auto-adjust",
+            "hover:shadow-lg hover:scale-[1.01] retro-message-glow"
           )}>
-            <div className={cn(
-              "font-chat whitespace-pre-wrap break-words",
-              getContrastTextColor(isOwnMessage, isBot)
-            )}>
+            <div className="font-exo2 whitespace-pre-wrap break-words">
               {message.content}
             </div>
 
@@ -320,30 +319,33 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
               </div>
             )}
 
-            {/* Reaction Button */}
+            {/* Highlight Button - replacing duplicate "+" */}
             <Button
               variant="ghost"
               size="sm"
               className={cn(
-                "absolute -bottom-1 -right-1 h-4 w-4 p-0 rounded-full bg-background border border-border shadow-sm transition-all duration-200",
-                "opacity-0 group-hover:opacity-100 hover:scale-110"
+                "absolute -bottom-1 -right-1 h-5 w-5 p-0 rounded-full bg-team-secondary/20 border border-team-secondary/40 shadow-sm transition-all duration-200",
+                "opacity-0 group-hover:opacity-100 hover:scale-110 retro-button-glow"
               )}
-              onClick={() => setShowReactions(!showReactions)}
+              onClick={() => handleHighlight()}
+              title="Highlight Message"
             >
-              <span className="text-xs">+</span>
+              <span className="text-xs">⭐</span>
             </Button>
           </div>
 
-          {/* Active Reactions - Display inline */}
+          {/* Active Reactions - Display inline with team colors */}
           {activeReactions.length > 0 && (
-            <div className="flex gap-1 mt-1">
+            <div className="flex gap-1 mt-2">
               {activeReactions.map((emoji, index) => (
-                <span 
+                <motion.span 
                   key={index}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-team-primary/20 border border-team-primary/40 rounded-full"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-team-primary/30 border border-team-primary/50 rounded-full retro-button-glow"
                 >
-                  {emoji} <span className="text-xs font-pixel">1</span>
-                </span>
+                  {emoji} <span className="text-xs font-pixel text-team-primary font-bold">1</span>
+                </motion.span>
               ))}
             </div>
           )}
