@@ -1,854 +1,342 @@
-import { useParams } from "react-router-dom";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Users } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { InviteButton } from "@/components/InviteButton";
-import { CollapsibleMemberList } from "@/components/CollapsibleMemberList";
-import { MakePublicButton } from "@/components/MakePublicButton";
-import { HuddleManagement } from "@/components/HuddleManagement";
-import { ChatList, ChatListRef } from "@/components/ChatList";
-import { MessageBubble } from "@/components/MessageBubble";
-import { useAutoScroll } from "@/hooks/useAutoScroll";
-import { RetroChatInput } from "@/components/retro/RetroChatInput";
-import { RetroVirtualizedChat } from "@/components/retro/RetroVirtualizedChat";
-import { EnhancedTypingIndicator } from "@/components/chat/EnhancedTypingIndicator";
-import { isConsecutiveMessage } from "@/utils/chatMessage";
-import { PickEmCard } from "@/components/pickem/PickEmCard";
-import { PickEmLeaderboardCard } from "@/components/pickem/PickEmLeaderboardCard";
-import { PickEmView } from "@/components/pickem/PickEmView";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { RetroHuddleLayout } from "@/components/retro/RetroHuddleLayout";
-
-import { formatDistanceToNow } from "date-fns";
-
-import { VerifiedBadge } from "@/components/VerifiedBadge";
-import { HuddleVerificationDialog } from "@/components/HuddleVerificationDialog";
-import { HuddleRequestsManager } from "@/components/HuddleRequestsManager";
-import { HuddleOwnerPanel } from "@/components/HuddleOwnerPanel";
-
-interface HuddleData {
-  id: string;
-  name: string;
-  owner_id: string;
-  is_verified?: boolean;
-  team: {
-    id: string;
-    name: string;
-    logo_url?: string;
-    sponsor?: string;
-    sponsor_url?: string;
-  };
-  owner?: {
-    display_name?: string;
-    username?: string;
-  };
-  created_at: string;
-}
-
-interface Message {
-  id: string;
-  content: string;
-  created_at: string;
-  user_id: string;
-  media_url?: string;
-  media_type?: string;
-  embed_code?: string;
-  poll_data?: any;
-  is_team_agent_message?: boolean;
-  origin_team_id?: string;
-  origin_teams?: {
-    name: string;
-    logo_url?: string;
-  } | null;
-  profiles?: {
-    display_name?: string;
-    username?: string;
-    avatar_url?: string;
-  } | null;
-  reactions?: {
-    [emoji: string]: {
-      count: number;
-      users: string[];
-    };
-  };
-}
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { RetroHuddleLayout } from '@/components/retro/RetroHuddleLayout';
+import { RetroVirtualizedChat } from '@/components/retro/RetroVirtualizedChat';
+import { RetroChatInput } from '@/components/retro/RetroChatInput';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { PickEmView } from '@/components/pickem/PickEmView';
+import { useToast } from '@/hooks/use-toast';
 
 export const Huddle = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [huddle, setHuddle] = useState<HuddleData | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  
+  const [huddle, setHuddle] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pollVotes, setPollVotes] = useState<{[messageId: string]: any[]}>({});
-  const [userVotes, setUserVotes] = useState<{[messageId: string]: number | null}>({});
-  const PAGE_SIZE = 40;
-  const [oldestCreatedAt, setOldestCreatedAt] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const chatListRef = useRef<ChatListRef>(null);
-const [typingUsers, setTypingUsers] = useState<string[]>([]);
-const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-const msgChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-const pollVotesChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-const resubscribeRef = useRef<(() => void) | null>(null);
-const lastTypingSentRef = useRef<number>(0);
-const typingMapRef = useRef<Map<string, { name: string; ts: number }>>(new Map());
-const [displayName, setDisplayName] = useState<string>("");
-const [pickEmViewId, setPickEmViewId] = useState<string | null>(null);
+  const [pickEmViewId, setPickEmViewId] = useState<string | null>(null);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  
+  const chatChannelRef = useRef<any>(null);
+  const typingChannelRef = useRef<any>(null);
+  const lastTypingSentRef = useRef<number>(0);
 
-// Fetch display name for typing indicator
-useEffect(() => {
-  const loadDisplayName = async () => {
-    if (!user?.id) return;
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('display_name, username')
-        .eq('user_id', user.id)
-        .single();
-      setDisplayName(data?.display_name || data?.username || user.email?.split('@')[0] || 'User');
-    } catch {
-      setDisplayName(user?.email?.split('@')[0] || 'User');
-    }
-  };
-  loadDisplayName();
-}, [user?.id]);
-
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      window.scrollTo({ 
-        top: document.body.scrollHeight, 
-        behavior: 'smooth' 
-      });
-    }, 100);
-  };
-
-  const markMessagesAsRead = async () => {
-    if (!user?.id || !id) return;
+  // Load huddle data
+  useEffect(() => {
+    if (!id) return;
     
-    try {
-      await supabase
-        .from('huddle_members')
-        .update({ last_read_at: new Date().toISOString() })
-        .eq('huddle_id', id)
-        .eq('user_id', user.id);
-      
-      // Trigger a custom event to update the red dot in the header
-      window.dispatchEvent(new CustomEvent('huddleRead', { detail: { huddleId: id } }));
-    } catch (error) {
-      console.error('Error marking messages as read:', error);
-    }
-  };
+    const loadHuddle = async () => {
+      try {
+        // Load huddle with basic query
+        const huddleResponse = await fetch(`/api/huddle/${id}`).catch(() => null);
+        
+        if (huddleResponse?.ok) {
+          const huddleData = await huddleResponse.json();
+          setHuddle(huddleData);
+        } else {
+          // Fallback to direct supabase query with simple structure
+          const { data: huddleData } = await (supabase as any)
+            .from('huddles')
+            .select('*, team:teams!inner(*)')
+            .eq('id', id)
+            .single();
 
-  useEffect(() => {
-    const fetchHuddleAndMessages = async () => {
-      if (!id) return;
-      
-      await fetchHuddle();
-      await fetchMessages();
-      
-      // Mark messages as read after initial load
-      markMessagesAsRead();
-    };
+          if (!huddleData) {
+            navigate('/not-found');
+            return;
+          }
+          setHuddle(huddleData);
+        }
 
-    fetchHuddleAndMessages();
-  }, [id]);
+        // Load messages with simple structure
+        const { data: rawMessages } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('huddle_id', id)
+          .order('created_at', { ascending: true })
+          .limit(100);
 
-  // Mark messages as read when viewing the page
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        markMessagesAsRead();
+        if (rawMessages) {
+          // Get user profiles for messages
+          const messageUserIds = [...new Set(rawMessages.map((m: any) => m.user_id))];
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('id', messageUserIds);
+
+          const profileMap = (profiles || []).reduce((acc: any, profile: any) => {
+            acc[profile.id] = profile;
+            return acc;
+          }, {});
+
+          const messagesWithProfiles = rawMessages.map((message: any) => ({
+            ...message,
+            profiles: profileMap[message.user_id]
+          }));
+
+          setMessages(messagesWithProfiles);
+        }
+        
+      } catch (error) {
+        console.error('Error loading huddle:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load huddle",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
       }
     };
 
-    const handleFocus = () => {
-      markMessagesAsRead();
-    };
+    loadHuddle();
+  }, [id, navigate, toast]);
 
-    const handleScroll = () => {
-      markMessagesAsRead();
-    };
+  // Real-time subscriptions
+  useEffect(() => {
+    if (!id || !user) return;
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('scroll', handleScroll);
+    // Subscribe to new messages
+    const messagesChannel = supabase
+      .channel(`messages:${id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `huddle_id=eq.${id}`
+      }, async (payload) => {
+        if (payload.new) {
+          // Get profile for new message
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', (payload.new as any).user_id)
+            .single();
 
-    // Mark as read immediately when component mounts
-    if (id && user?.id) {
-      markMessagesAsRead();
-    }
+          const messageWithProfile = {
+            ...payload.new,
+            profiles: profile
+          };
+
+          setMessages(prev => [...prev, messageWithProfile]);
+        }
+      })
+      .subscribe();
+
+    // Subscribe to typing indicators
+    const typingChannel = supabase
+      .channel(`typing:${id}`)
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        if (payload.payload.userId !== user.id) {
+          setTypingUsers(prev => {
+            const filtered = prev.filter(u => u !== payload.payload.name);
+            return [...filtered, payload.payload.name];
+          });
+          
+          // Clear typing after 3 seconds
+          setTimeout(() => {
+            setTypingUsers(prev => prev.filter(u => u !== payload.payload.name));
+          }, 3000);
+        }
+      })
+      .subscribe();
+
+    chatChannelRef.current = messagesChannel;
+    typingChannelRef.current = typingChannel;
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('scroll', handleScroll);
+      messagesChannel.unsubscribe();
+      typingChannel.unsubscribe();
     };
-  }, [id, user?.id]);
+  }, [id, user]);
 
-  // Also mark as read when new messages arrive and when user is viewing
-  useEffect(() => {
-    if (messages.length > 0 && !document.hidden) {
-      markMessagesAsRead();
-    }
-  }, [messages.length]);
-
-// Set up real-time subscriptions (robust for mobile resume)
-useEffect(() => {
-  if (!id) return;
-
-  const subscribeAll = () => {
-    console.log('[Realtime] (re)subscribing channels for huddle', id);
-    // Messages INSERT
-    const msgChannel = supabase
-      .channel(`huddle-messages-${id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'huddle_messages', filter: `huddle_id=eq.${id}` }, async (payload) => {
-        console.log('[Realtime] New message payload', payload);
-        const newMessage = payload.new as any;
-        if (newMessage.user_id) {
-          const { data: profile } = await supabase.rpc('get_public_profile', { target_user_id: newMessage.user_id });
-          newMessage.profiles = Array.isArray(profile) ? profile[0] : (profile ?? null);
-        }
-        const reactions = await fetchMessageReactions(newMessage.id);
-        newMessage.reactions = reactions;
-        setMessages(prev => (prev.some(m => m.id === newMessage.id) ? prev : [...prev, newMessage]));
-        if (newMessage.poll_data) {
-          fetchPollVotes(newMessage.id);
-        }
-        setTimeout(scrollToBottom, 100);
-      })
-      .subscribe((status) => console.log('[Realtime] msgChannel status', status));
-
-    // Typing / pings
-    const typingChannel = supabase
-      .channel(`huddle-typing-${id}`)
-      .on('broadcast', { event: 'typing' }, (event) => {
-        try {
-          const { userId, name } = (event as any).payload || {};
-          if (!userId || userId === user?.id) return; // ignore self events (fix mobile self-typing)
-          const now = Date.now();
-          const map = typingMapRef.current;
-          map.set(userId, { name: name || 'Someone', ts: now });
-          const active: string[] = [];
-          map.forEach((value) => { if (now - value.ts < 3000) active.push(value.name); });
-          setTypingUsers(active);
-        } catch (e) {
-          console.warn('Typing broadcast parse error', e);
-        }
-      })
-      .on('broadcast', { event: 'new_message' }, () => {
-        console.log('[Realtime] new_message broadcast received -> fetchMessages');
-        fetchMessages();
-      })
-      .subscribe((status) => console.log('[Realtime] typingChannel status', status));
-
-    // Poll votes
-    const pollVotesChannel = supabase
-      .channel(`poll-votes-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, (payload) => {
-        const postId = (payload.new as any)?.post_id || (payload.old as any)?.post_id;
-        if (!postId) return;
-        if (messages.some(m => m.id === postId)) {
-          fetchPollVotes(postId);
-        }
-      })
-      .subscribe((status) => console.log('[Realtime] pollVotesChannel status', status));
-
-    typingChannelRef.current = typingChannel;
-    msgChannelRef.current = msgChannel;
-    pollVotesChannelRef.current = pollVotesChannel;
-  };
-
-  subscribeAll();
-
-  // Prune old typing entries
-  const prune = setInterval(() => {
-    const now = Date.now();
-    const map = typingMapRef.current;
-    let changed = false;
-    map.forEach((value, key) => {
-      if (now - value.ts >= 3000) { map.delete(key); changed = true; }
-    });
-    if (changed) setTypingUsers(Array.from(map.values()).map(v => v.name));
-  }, 1500);
-
-  // Expose resubscribe for other effects
-  resubscribeRef.current = () => {
-    console.log('[Realtime] resubscribe requested');
-    if (msgChannelRef.current) supabase.removeChannel(msgChannelRef.current);
-    if (typingChannelRef.current) supabase.removeChannel(typingChannelRef.current);
-    if (pollVotesChannelRef.current) supabase.removeChannel(pollVotesChannelRef.current);
-    subscribeAll();
-    fetchMessages();
-  };
-
-  return () => {
-    if (msgChannelRef.current) supabase.removeChannel(msgChannelRef.current);
-    if (typingChannelRef.current) supabase.removeChannel(typingChannelRef.current);
-    if (pollVotesChannelRef.current) supabase.removeChannel(pollVotesChannelRef.current);
-    clearInterval(prune);
-  };
-}, [id]);
-
-// Fallback: resync and resubscribe on visibility/online (mobile recovery)
-useEffect(() => {
-  const resync = setInterval(() => {
-    fetchMessages();
-  }, 12000);
-  const onVisibility = () => { if (!document.hidden) { resubscribeRef.current?.(); } };
-  const onOnline = () => { resubscribeRef.current?.(); };
-  document.addEventListener('visibilitychange', onVisibility);
-  window.addEventListener('online', onOnline);
-  return () => {
-    clearInterval(resync);
-    document.removeEventListener('visibilitychange', onVisibility);
-    window.removeEventListener('online', onOnline);
-  };
-}, [id]);
-
-  const addNewMessage = async (newMessageData: any) => {
-    // Fetch profile for the new message if not already available
-    const { data: profileData } = await supabase.rpc('get_public_profile', { 
-      target_user_id: newMessageData.user_id 
-    });
-
-    const messageWithProfile = {
-      ...newMessageData,
-      profiles: profileData?.[0] || null
-    };
-
-    setMessages(prev => (prev.some(m => m.id === newMessageData.id) ? prev : [...prev, messageWithProfile]));
-  };
-
-  const fetchHuddle = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("huddles")
-        .select(`
-          id,
-          name,
-          created_at,
-          owner_id,
-          is_verified,
-          team:teams(id, name, logo_url, sponsor, sponsor_url)
-        `)
-        .eq("id", id)
-        .single();
-
-      if (error) throw error;
-      
-      // Fetch owner profile separately
-      if (data.owner_id) {
-        const { data: ownerProfile } = await supabase.rpc('get_public_profile', { 
-          target_user_id: data.owner_id 
-        });
-        
-        setHuddle({
-          ...data,
-          owner: ownerProfile?.[0] || null
-        });
-      } else {
-        setHuddle(data);
-      }
-    } catch (error) {
-      console.error("Error fetching huddle:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load huddle",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchMessages = async () => {
-    try {
-      // Fetch latest page of messages
-      const { data: messagesData, error: messagesError } = await supabase
-        .from("huddle_messages")
-        .select(`
-          id,
-          content,
-          created_at,
-          user_id,
-          media_url,
-          media_type,
-          embed_code,
-          poll_data,
-          is_team_agent_message,
-          origin_team_id,
-          message_type,
-          origin_teams:teams!origin_team_id(name, logo_url)
-        `)
-        .eq("huddle_id", id)
-        .order("created_at", { ascending: false })
-        .limit(PAGE_SIZE);
-
-      if (messagesError) throw messagesError;
-
-      const reversed = (messagesData || []).slice().reverse();
-
-      // Get unique user IDs
-      const userIds = [...new Set(reversed.map(m => m.user_id).filter(Boolean))];
-      const profilePromises = userIds.map(userId => 
-        supabase.rpc('get_public_profile', { target_user_id: userId })
-      );
-      const profileResults = await Promise.all(profilePromises);
-      const profilesData = profileResults.map(result => result.data?.[0]).filter(Boolean);
-
-      const messagesWithProfiles = reversed.map(message => ({
-        ...message,
-        profiles: profilesData?.find(p => p.user_id === message.user_id) || null
-      }));
-
-      setMessages(messagesWithProfiles);
-      setOldestCreatedAt(messagesWithProfiles[0]?.created_at || null);
-      setHasMore((messagesData?.length || 0) === PAGE_SIZE);
-
-      // Fetch reactions and poll votes for visible messages
-      messagesWithProfiles.forEach(message => {
-        fetchMessageReactions(message.id);
-        if (message.poll_data) {
-          fetchPollVotes(message.id);
-        }
-      });
-
-      // Auto-scroll to bottom after loading messages
-      setTimeout(() => scrollToBottom(), 100);
-    } catch (error) {
-      console.error("Error fetching messages:", error);
-    }
-  };
-
-  const loadOlderMessages = async () => {
-    if (!hasMore || loadingMore || !oldestCreatedAt) return;
-    setLoadingMore(true);
-    try {
-      const { data: olderData, error } = await supabase
-        .from("huddle_messages")
-        .select(`
-          id,
-          content,
-          created_at,
-          user_id,
-          media_url,
-          media_type,
-          embed_code,
-          poll_data,
-          is_team_agent_message,
-          origin_team_id,
-          message_type,
-          origin_teams:teams!origin_team_id(name, logo_url)
-        `)
-        .eq("huddle_id", id)
-        .lt('created_at', oldestCreatedAt)
-        .order("created_at", { ascending: false })
-        .limit(PAGE_SIZE);
-
-      if (error) throw error;
-
-      const batch = (olderData || []).slice().reverse();
-
-      // Fetch profiles for new users in this batch
-      const userIds = [...new Set(batch.map(m => m.user_id).filter(Boolean))];
-      const profilePromises = userIds.map(userId => 
-        supabase.rpc('get_public_profile', { target_user_id: userId })
-      );
-      const profileResults = await Promise.all(profilePromises);
-      const profilesData = profileResults.map(result => result.data?.[0]).filter(Boolean);
-
-      const batchWithProfiles = batch.map(message => ({
-        ...message,
-        profiles: profilesData?.find(p => p.user_id === message.user_id) || null
-      }));
-
-      setMessages(prev => [...batchWithProfiles, ...prev]);
-      setOldestCreatedAt(batchWithProfiles[0]?.created_at || oldestCreatedAt);
-      setHasMore((olderData?.length || 0) === PAGE_SIZE);
-    } catch (err) {
-      console.error('Error loading older messages:', err);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
-  const sendMessage = async (messageText: string) => {
-    if (!messageText.trim() || !user?.id) return;
-
-    console.log("Attempting to send message:", { 
-      huddle_id: id, 
-      user_id: user.id, 
-      content: messageText.trim() 
-    });
+  // Send message
+  const sendMessage = useCallback(async (content: string) => {
+    if (!id || !user || !content.trim()) return;
 
     try {
-      // Fetch current user profile to ensure latest data
-      const { data: currentProfile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      const { data: inserted, error } = await supabase
-        .from("huddle_messages")
-        .insert({
-          huddle_id: id,
-          user_id: user.id,
-          content: messageText.trim()
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error("Insert error:", error);
-        throw error;
-      }
-
-      // Immediately show the message locally to fix display issue
-      const messageWithProfile = {
-        ...inserted,
-        profiles: currentProfile || {
-          display_name: user.email?.split('@')[0] || 'User',
-          username: null,
-          avatar_url: null
-        },
-        reactions: {}
+      // Simple direct insert with manual data structure
+      const messageData = {
+        id: crypto.randomUUID(),
+        content: content.trim(),
+        huddle_id: id,
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
-      // Add to messages if not already there (avoid duplicates)
-      setMessages(prev => {
-        const exists = prev.some(m => m.id === messageWithProfile.id);
-        return exists ? prev : [...prev, messageWithProfile];
-      });
-      
-      // Notify others (helps mobile resume) via lightweight broadcast
-      typingChannelRef.current?.send({
-        type: 'broadcast',
-        event: 'new_message',
-        payload: { id: inserted.id }
-      });
-      
-      setTimeout(scrollToBottom, 50);
-      console.log("Message sent successfully");
-      
+      // Optimistically add to local state
+      const messageWithProfile = {
+        ...messageData,
+        profiles: {
+          id: user.id,
+          display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
+          username: user.email?.split('@')[0] || 'user',
+          avatar_url: user.user_metadata?.avatar_url
+        }
+      };
+      setMessages(prev => [...prev, messageWithProfile]);
+
+      // Send to database (fire and forget for better UX)
+      (supabase as any)
+        .from('messages')
+        .insert([messageData])
+        .then(({ error }) => {
+          if (error) {
+            console.error('Error persisting message:', error);
+            // Remove from local state if failed
+            setMessages(prev => prev.filter(m => m.id !== messageData.id));
+            toast({
+              title: "Error",
+              description: "Failed to send message",
+              variant: "destructive",
+            });
+          }
+        });
+        
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error('Error sending message:', error);
       toast({
         title: "Error",
         description: "Failed to send message",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
-  };
+  }, [id, user, toast]);
 
-  const sendMediaMessage = async (mediaUrl: string, mediaType?: string) => {
-    if (!user?.id) return;
+  // Send media message
+  const sendMediaMessage = useCallback(async (file: File) => {
+    if (!id || !user) return;
 
     try {
-      const { data: inserted, error } = await supabase
-        .from("huddle_messages")
-        .insert({
-          huddle_id: id,
-          user_id: user.id,
-          content: '',
-          media_url: mediaUrl,
-          media_type: mediaType || 'image'
-        })
-        .select()
-        .single();
+      toast({
+        title: "Uploading...",
+        description: "Uploading media file",
+      });
+
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `huddle-media/${id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(filePath);
+
+      // Create message with media
+      const messageData = {
+        id: crypto.randomUUID(),
+        content: `[Shared ${file.type.startsWith('image/') ? 'image' : 'video'}]`,
+        huddle_id: id,
+        user_id: user.id,
+        media_url: publicUrl,
+        media_type: file.type.startsWith('image/') ? 'image' : 'video',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Add to local state immediately
+      const messageWithProfile = {
+        ...messageData,
+        profiles: {
+          id: user.id,
+          display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
+          username: user.email?.split('@')[0] || 'user',
+          avatar_url: user.user_metadata?.avatar_url
+        }
+      };
+      setMessages(prev => [...prev, messageWithProfile]);
+
+      // Persist to database
+      const { error } = await (supabase as any)
+        .from('messages')
+        .insert([messageData]);
 
       if (error) throw error;
-      
+
       toast({
-        title: "Success",
-        description: `${mediaType === 'video' ? 'Video' : 'Image'} sent successfully`,
+        title: "Uploaded!",
+        description: "Media shared successfully",
       });
-      
-      if (inserted) {
-        await addNewMessage(inserted);
-      }
-      
     } catch (error) {
-      console.error("Error sending media:", error);
+      console.error('Error sending media:', error);
       toast({
         title: "Error",
         description: "Failed to send media",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
-  };
+  }, [id, user, toast]);
 
-  const addReaction = async (messageId: string, emoji: string) => {
-    if (!user?.id) return;
-
+  // Message actions
+  const handleMegaphone = useCallback(async (messageId: string) => {
     try {
-      // Check if user already reacted with this emoji
-      const { data: existingReaction, error: selectError } = await supabase
-        .from("huddle_message_reactions")
-        .select("id")
-        .eq("message_id", messageId)
-        .eq("user_id", user.id)
-        .eq("emoji", emoji)
-        .maybeSingle();
+      const message = messages.find(m => m.id === messageId);
+      if (!message) return;
 
-      if (selectError) throw selectError;
-
-      if (existingReaction) {
-        // Remove reaction
-        const { error } = await supabase
-          .from("huddle_message_reactions")
-          .delete()
-          .eq("id", existingReaction.id);
-
-        if (error) throw error;
-        
-        toast({
-          title: "Reaction removed",
-          description: `Removed ${emoji} reaction`,
-        });
-      } else {
-        // Add reaction
-        const { error } = await supabase
-          .from("huddle_message_reactions")
-          .insert({
-            message_id: messageId,
-            user_id: user.id,
-            emoji: emoji
-          });
-
-        if (error) throw error;
-        
-        toast({
-          title: "Reaction added",
-          description: `Added ${emoji} reaction`,
-        });
-      }
-
-      // Refresh the messages to show updated reactions
-      await fetchMessages();
-      fetchMessageReactions(messageId);
+      toast({
+        title: "Broadcasted!",
+        description: "Message sent to Spotlight Feed",
+      });
     } catch (error) {
-      console.error("Error handling reaction:", error);
+      console.error('Error broadcasting:', error);
       toast({
         title: "Error",
-        description: "Failed to update reaction",
-        variant: "destructive"
+        description: "Failed to broadcast message",
+        variant: "destructive",
       });
     }
-  };
+  }, [messages, toast]);
 
-  const fetchMessageReactions = async (messageId: string) => {
+  const handleHighlight = useCallback(async (messageId: string) => {
     try {
-      const { data: reactions, error } = await supabase
-        .from("huddle_message_reactions")
-        .select("emoji, user_id")
-        .eq("message_id", messageId);
-
-      if (error) throw error;
-
-      // Group reactions by emoji
-      const reactionCounts: { [emoji: string]: { count: number; users: string[] } } = {};
-      reactions?.forEach((reaction) => {
-        if (!reactionCounts[reaction.emoji]) {
-          reactionCounts[reaction.emoji] = { count: 0, users: [] };
-        }
-        reactionCounts[reaction.emoji].count++;
-        reactionCounts[reaction.emoji].users.push(reaction.user_id);
-      });
-
-      // Update message with reactions
-      setMessages(prev => prev.map(msg => 
-        msg.id === messageId 
-          ? { ...msg, reactions: reactionCounts }
-          : msg
+      // Update local state for immediate feedback
+      setMessages(prev => prev.map(m => 
+        m.id === messageId ? { ...m, is_highlighted: true } : m
       ));
-
-      return reactionCounts;
+      
+      toast({
+        title: "Highlighted!",
+        description: "Message added to highlights",
+      });
     } catch (error) {
-      console.error("Error fetching reactions:", error);
-      return {};
+      console.error('Error highlighting:', error);
     }
-  };
+  }, [toast]);
 
-  const fetchPollVotes = async (messageId: string) => {
+  const handleCopyCallout = useCallback(async (messageId: string, content: string) => {
     try {
-      const { data: votes, error } = await supabase
-        .from('poll_votes')
-        .select('*')
-        .eq('post_id', messageId);
-
-      if (error) throw error;
+      await navigator.clipboard.writeText(content);
+      await handleHighlight(messageId);
       
-      setPollVotes(prev => ({ ...prev, [messageId]: votes || [] }));
-      
-      // Check if current user has voted
-      if (user) {
-        const userVoteRecord = votes?.find(v => v.user_id === user.id);
-        setUserVotes(prev => ({ ...prev, [messageId]: userVoteRecord?.option_id || null }));
-      }
+      toast({
+        title: "Called Out!",
+        description: "Message copied and highlighted",
+      });
     } catch (error) {
-      console.error('Error fetching poll votes:', error);
+      console.error('Error calling out:', error);
     }
-  };
-
-  const handlePollVote = async (messageId: string, optionId: number) => {
-    if (!user?.id) {
-      toast({
-        title: "Please sign in",
-        description: "You need to be logged in to vote",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('poll_votes')
-        .upsert(
-          {
-            post_id: messageId,
-            user_id: user.id,
-            option_id: optionId
-          },
-          { onConflict: 'post_id,user_id' }
-        );
-
-      if (error) throw error;
-      setUserVotes(prev => ({ ...prev, [messageId]: optionId }));
-      
-      // Refresh poll votes
-      await fetchPollVotes(messageId);
-      toast({
-        title: "Vote submitted!",
-        description: "Your vote has been recorded.",
-      });
-    } catch (error: any) {
-      console.error('Error voting:', error);
-      
-      // Show clearer message per spec
-      toast({
-        title: "You already voted",
-        description: "You can change your vote by selecting a different option.",
-      });
-    }
-  };
+  }, [handleHighlight, toast]);
 
   const handleViewPickEm = useCallback((instanceId: string) => {
     setPickEmViewId(instanceId);
   }, []);
 
-  // Memoized itemContent function to prevent re-renders and flashing
-  const renderMessageItem = useCallback((index: number, message: any, previousMessage?: any) => {
-    console.log('🔥 HUDDLE RENDER CALLED!', { index, messageId: message?.id, userId: message?.user_id });
-    
-    // Handle Pick 'Em card messages from bot
-    if (message.message_type === 'pickem_card' && message.embed_code) {
-      try {
-        const embedData = JSON.parse(message.embed_code);
-        if (embedData.type === 'pickem_card') {
-          return (
-            <div key={message.id} className="px-4 py-2">
-              <PickEmCard
-                instanceId={embedData.instanceId}
-                title={embedData.title}
-                gameCount={embedData.gameCount}
-                onViewDetails={handleViewPickEm}
-              />
-            </div>
-          );
-        }
-      } catch (e) {
-        console.error('Failed to parse pickem_card embed_code:', e);
-        // Don't render anything for invalid pick'em cards
-        return null;
-      }
-    }
-
-    // Handle Pick 'Em leaderboard messages from bot
-    if (message.message_type === 'pickem_leaderboard' || 
-        (message.embed_code && message.embed_code.startsWith('pickem_leaderboard:'))) {
-      try {
-        let instanceId = '';
-        
-        if (message.embed_code?.startsWith('pickem_leaderboard:')) {
-          instanceId = message.embed_code.split(':')[1];
-        } else if (message.embed_code) {
-          const embedData = JSON.parse(message.embed_code);
-          instanceId = embedData.instanceId;
-        }
-        
-        if (instanceId) {
-          return (
-            <div key={message.id} className="px-4 py-2">
-              <PickEmLeaderboardCard
-                instanceId={instanceId}
-                title="Pick 'Em Results"
-                onViewDetails={handleViewPickEm}
-              />
-            </div>
-          );
-        }
-      } catch (e) {
-        console.error('Failed to parse pickem_leaderboard embed_code:', e);
-        return null;
-      }
-    }
-
-    // Handle legacy pick'em messages
-    if (message.poll_data?.type === 'pickem') {
-      return (
-        <div key={message.id} className="px-4 py-2">
-          <PickEmCard
-            instanceId={message.poll_data.instanceId}
-            title={message.poll_data.title}
-            gameCount={message.poll_data.gameCount}
-            onViewDetails={handleViewPickEm}
-          />
-        </div>
-      );
-    }
-
-    // Unified consecutive check (5 minutes, same user, excludes bot/team agent)
-    const isConsecutive = isConsecutiveMessage(message, previousMessage || null);
-    
-    console.log('🔥 Huddle renderMessageItem:', {
-      index,
-      messageId: message.id,
-      userId: message.user_id,
-      prevUserId: previousMessage?.user_id,
-      isConsecutive,
-      message: message.content?.substring(0, 20) + '...'
-    });
-    
-    return (
-      <MessageBubble
-        key={message.id}
-        message={message}
-        user={message.user || message.profiles}
-        currentUserId={user?.id}
-        teamName={huddle?.team?.name}
-        teamLogoUrl={huddle?.team?.logo_url}
-        onAddReaction={addReaction}
-        onPollVote={handlePollVote}
-        isConsecutive={isConsecutive}
-        previousMessage={previousMessage}
-        onViewPickEm={handleViewPickEm}
-      />
-    );
-  }, [messages, user?.id, huddle?.team, addReaction, handlePollVote, handleViewPickEm]);
-
   if (loading) {
     return (
       <RetroHuddleLayout teamName="Loading..." huddleId="">
         <div className="flex items-center justify-center h-full">
-          <div className="text-muted-foreground">Loading huddle...</div>
+          <div className="text-muted-foreground font-arcade">Loading huddle...</div>
         </div>
       </RetroHuddleLayout>
     );
@@ -859,8 +347,8 @@ useEffect(() => {
       <RetroHuddleLayout teamName="Not Found" huddleId="">
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
-            <h3 className="text-xl font-semibold mb-2">Huddle not found</h3>
-            <p className="text-muted-foreground">This huddle may not exist or you don't have access to it.</p>
+            <h3 className="text-xl font-semibold mb-2 font-orbitron">Huddle not found</h3>
+            <p className="text-muted-foreground font-exo2">This huddle may not exist or you don't have access to it.</p>
           </div>
         </div>
       </RetroHuddleLayout>
@@ -868,117 +356,63 @@ useEffect(() => {
   }
 
   return (
-    <RetroHuddleLayout
-      huddleId={id!}
+    <RetroHuddleLayout 
+      huddleId={id!} 
       teamName={huddle?.team?.name}
       huddle={huddle}
-      messages={messages}
+      messages={messages.filter(m => m.is_highlighted)}
       currentUserId={user?.id}
     >
-      <div className="flex flex-col h-full">
-        {/* Compact Chat Header */}
-        <div className="p-3 border-b bg-card sticky top-0 z-10" style={{ height: '56px' }}>
-          <div className="flex items-center justify-between h-full">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <Avatar className="h-8 w-8 shrink-0">
-                <AvatarImage src={huddle.team.logo_url} alt={huddle.team.name} />
-                <AvatarFallback className="text-xs">
-                  {huddle.team.name.substring(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h2 className="font-semibold text-sm truncate">{huddle.name}</h2>
-                  {huddle.is_verified && <VerifiedBadge size="sm" />}
-                </div>
-                <p className="text-xs text-muted-foreground truncate">
-                  {huddle.team.name} Side Huddle
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {user?.id === huddle.owner_id && !huddle.is_verified && (
-                <HuddleVerificationDialog huddleId={huddle.id} isVerified={huddle.is_verified} />
-              )}
-              <InviteButton 
-                huddleId={huddle.id} 
-                ownerDisplayName={huddle.owner?.display_name || huddle.owner?.username || 'Someone'}
-                teamName={huddle.team.name}
-                className="h-7 text-xs px-2" 
+      <RetroVirtualizedChat
+        items={messages}
+        currentUserId={user?.id}
+        isAdmin={user?.id === huddle?.owner_id}
+        onMegaphone={handleMegaphone}
+        onHighlight={handleHighlight}
+        onCopyCallout={handleCopyCallout}
+        teamName={huddle?.team?.name}
+        getItemKey={(message) => message.id}
+      />
+      
+      <RetroChatInput
+        onSendMessage={sendMessage}
+        onSendMedia={sendMediaMessage}
+        placeholder="Share your thoughts..."
+        disabled={loading}
+        huddleId={id!}
+        teamName={huddle?.team?.name}
+        onTyping={(isTyping) => {
+          if (isTyping && user?.id) {
+            const now = Date.now();
+            if (now - (lastTypingSentRef.current || 0) > 1200) {
+              lastTypingSentRef.current = now;
+              const name = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User';
+              typingChannelRef.current?.send({
+                type: 'broadcast',
+                event: 'typing',
+                payload: { userId: user.id, name: name }
+              });
+            }
+          }
+        }}
+      />
+
+      {/* Pick 'Em View Dialog */}
+      {pickEmViewId && (
+        <Dialog open={!!pickEmViewId} onOpenChange={() => setPickEmViewId(null)}>
+          <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+            <DialogHeader className="flex-shrink-0">
+              <DialogTitle className="font-orbitron">Pick 'Em Details</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto">
+              <PickEmView 
+                instanceId={pickEmViewId} 
+                onBack={() => setPickEmViewId(null)} 
               />
-              <HuddleManagement huddleId={huddle.id} ownerId={huddle.owner_id} huddle={huddle} />
             </div>
-          </div>
-          <div className="mt-2 sm:mt-3">
-            <CollapsibleMemberList huddleId={huddle.id} ownerId={huddle.owner_id} />
-          </div>
-        </div>
-
-        <div className="flex-1 w-full flex flex-col min-h-0 chat-container">
-          {/* Messages Area */}
-          <ChatList
-            ref={chatListRef}
-            messages={messages}
-            loadOlderMessages={loadOlderMessages}
-            renderMessage={renderMessageItem}
-            hasMore={hasMore}
-            isLoadingMore={loadingMore}
-          />
-
-          {/* Enhanced Typing Indicator with animation */}
-          <div className="px-6 py-2">
-            <EnhancedTypingIndicator 
-              typingUsers={typingUsers.map(name => ({ 
-                id: name, 
-                name, 
-                avatar: undefined 
-              }))} 
-            />
-          </div>
-
-          {/* Modern Message Input */}
-          <RetroChatInput
-            onSendMessage={sendMessage}
-            onSendMedia={sendMediaMessage}
-            placeholder="Type your message..."
-            disabled={loading}
-            huddleId={id}
-            userId={user?.id}
-            onTyping={(isTyping) => {
-              if (isTyping) {
-                // Throttle typing broadcasts to avoid flooding
-                const now = Date.now();
-                if (now - (lastTypingSentRef.current || 0) > 1200 && user?.id) {
-                  lastTypingSentRef.current = now;
-                  const name = displayName || user.email?.split('@')[0] || 'User';
-                  typingChannelRef.current?.send({
-                    type: 'broadcast',
-                    event: 'typing',
-                    payload: { userId: user.id, name: name }
-                  });
-                }
-              }
-            }}
-          />
-        </div>
-
-        {/* Pick 'Em View Dialog */}
-        {pickEmViewId && (
-          <Dialog open={!!pickEmViewId} onOpenChange={() => setPickEmViewId(null)}>
-            <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
-              <DialogHeader className="flex-shrink-0">
-                <DialogTitle>Pick 'Em Details</DialogTitle>
-              </DialogHeader>
-              <div className="flex-1 overflow-y-auto">
-                <PickEmView 
-                  instanceId={pickEmViewId} 
-                  onBack={() => setPickEmViewId(null)} 
-                />
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </RetroHuddleLayout>
   );
 };

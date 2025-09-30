@@ -10,7 +10,7 @@ import { motion } from 'framer-motion';
 
 interface RetroChatInputProps {
   onSendMessage: (content: string) => Promise<void>;
-  onSendMedia: (url: string, type: 'image' | 'video') => Promise<void>;
+  onSendMedia?: (file: File) => Promise<void>;
   onTyping?: (isTyping: boolean) => void;
   placeholder?: string;
   disabled?: boolean;
@@ -136,7 +136,7 @@ export const RetroChatInput = ({
         .getPublicUrl(data.path);
 
       const type = file.type.startsWith('video/') ? 'video' : 'image';
-      await onSendMedia(publicUrl, type);
+      await onSendMedia(file);
       
       toast({
         title: "Upload successful",
