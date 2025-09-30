@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, Users, Highlight, X } from 'lucide-react';
+import { Menu, Users, Highlighter, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRetroTheme } from '@/hooks/useRetroTheme';
 import { RetroHighlightsSidebar } from './RetroHighlightsSidebar';
@@ -91,7 +91,7 @@ export const RetroHuddleLayout: React.FC<RetroHuddleLayoutProps> = ({
                 className="hidden md:flex h-8 w-8 p-0 border border-team-primary/40 hover:bg-team-primary/20"
                 title="Toggle Highlights"
               >
-                <Highlight className="w-4 h-4" />
+                <Highlighter className="w-4 h-4" />
               </Button>
 
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>

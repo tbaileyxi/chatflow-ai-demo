@@ -846,7 +846,7 @@ useEffect(() => {
 
   if (loading) {
     return (
-      <UniversalHuddleLayout teamName="Loading...">
+      <RetroHuddleLayout teamName="Loading..." huddleId="">
         <div className="flex items-center justify-center h-full">
           <div className="text-muted-foreground">Loading huddle...</div>
         </div>
@@ -856,14 +856,14 @@ useEffect(() => {
 
   if (!huddle) {
     return (
-      <UniversalHuddleLayout teamName="Not Found">
+      <RetroHuddleLayout teamName="Not Found" huddleId="">
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <h3 className="text-xl font-semibold mb-2">Huddle not found</h3>
             <p className="text-muted-foreground">This huddle may not exist or you don't have access to it.</p>
           </div>
         </div>
-    </RetroHuddleLayout>
+      </RetroHuddleLayout>
     );
   }
 
@@ -937,7 +937,7 @@ useEffect(() => {
           </div>
 
           {/* Modern Message Input */}
-          <ModernChatInput
+          <RetroChatInput
             onSendMessage={sendMessage}
             onSendMedia={sendMediaMessage}
             placeholder="Type your message..."

@@ -74,6 +74,7 @@ export const usePresence = (channelName: string, userId?: string) => {
 
   return {
     onlineUsers,
+    onlineMembers: onlineUsers,
     updateActivity,
     onlineCount: onlineUsers.length
   };

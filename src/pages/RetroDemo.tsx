@@ -146,17 +146,21 @@ export const RetroDemo = () => {
       </div>
 
       {/* Highlights Sidebar */}
-      <RetroHighlightsSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        highlights={highlights.map((h, index) => ({
-          id: h.id,
-          title: h.content.slice(0, 30) + '...',
-          type: 'video' as const,
-          timestamp: `${index + 1}min ago`,
-          engagement: Math.floor(Math.random() * 100) + 50
-        }))}
-      />
+      {sidebarOpen && (
+        <div className="fixed right-0 top-0 bottom-0 w-80 z-30">
+          <RetroHighlightsSidebar
+            onClose={() => setSidebarOpen(false)}
+            highlights={highlights.map((h, index) => ({
+              id: h.id,
+              title: h.content.slice(0, 30) + '...',
+              type: 'video' as const,
+              timestamp: `${index + 1}min ago`,
+              engagement: Math.floor(Math.random() * 100) + 50
+            }))}
+            teamName="Colorado Buffaloes"
+          />
+        </div>
+      )}
 
       {/* Mobile Floating Action Button */}
       <Button
