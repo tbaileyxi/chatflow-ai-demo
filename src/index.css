@@ -2,6 +2,56 @@
 @tailwind components;
 @tailwind utilities;
 
+/* CRITICAL MOBILE-FIRST UTILITIES */
+@layer utilities {
+  /* Dynamic viewport height for mobile devices */
+  .min-h-screen-dynamic {
+    min-height: 100vh;
+    min-height: 100dvh; /* Dynamic viewport height for iOS */
+  }
+  
+  .h-screen-dynamic {
+    height: 100vh;
+    height: 100dvh;
+  }
+  
+  /* Safe area handling for notch devices */
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-inset-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .safe-area-inset-right {
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  /* Touch-friendly tap targets */
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Smooth scrolling with momentum on iOS */
+  .touch-pan-y {
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Prevent text selection on touch hold */
+  .touch-no-select {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+}
+
 /* iOS-specific fixes for chat scrolling */
 @supports (-webkit-touch-callout: none) {
   .chat-container {
