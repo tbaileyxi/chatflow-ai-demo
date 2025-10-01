@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
 import { Navigate } from 'react-router-dom';
-import { FeedTabs } from "@/components/FeedTabs";
-import { HuddleBar } from "@/components/HuddleBar";
 import { useAuth } from '@/hooks/useAuth';
 import { MobileOnboarding } from "@/components/MobileOnboarding";
 import { ProfileSetup } from "@/components/ProfileSetup";
@@ -18,7 +16,6 @@ const Index = () => {
       if (!user) return;
 
       try {
-        // Check if user has completed profile setup
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('display_name, avatar_url, onboarding_completed')
@@ -30,7 +27,6 @@ const Index = () => {
           return;
         }
 
-        // If no profile exists or no display name, show profile setup
         if (!profile || !profile.display_name) {
           setShowProfileSetup(true);
           setShowOnboarding(false);
@@ -40,7 +36,6 @@ const Index = () => {
 
         setProfileComplete(true);
 
-        // Only show onboarding for users who haven't completed it yet AND have a complete profile
         if (profile.onboarding_completed === false || profile.onboarding_completed === null) {
           setShowOnboarding(true);
         } else {
@@ -57,12 +52,10 @@ const Index = () => {
   const handleProfileSetupComplete = () => {
     setShowProfileSetup(false);
     setProfileComplete(true);
-    // Show onboarding for new users after profile setup
     setShowOnboarding(true);
   };
 
   const handleOnboardingComplete = async () => {
-    // Mark onboarding as completed in database
     await supabase
       .from('profiles')
       .update({ onboarding_completed: true })
@@ -73,8 +66,8 @@ const Index = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg text-muted-foreground">Loading...</div>
+      <div className="flex items-center justify-center min-h-screen bg-background crt-effect">
+        <div className="text-lg text-muted-foreground font-arcade">Loading...</div>
       </div>
     );
   }
@@ -84,15 +77,33 @@ const Index = () => {
   }
 
   if (showProfileSetup) {
-    return <ProfileSetup onComplete={handleProfileSetupComplete} />;
+    return (
+      <div className="min-h-screen bg-background crt-effect">
+        <div className="fixed inset-0 pointer-events-none opacity-10">
+          <div className="absolute inset-0 retro-grid"></div>
+          <div className="absolute inset-0 retro-scanlines"></div>
+        </div>
+        <div className="relative">
+          <ProfileSetup onComplete={handleProfileSetupComplete} />
+        </div>
+      </div>
+    );
   }
 
-  // Show onboarding if user hasn't seen it before
   if (showOnboarding && profileComplete) {
-    return <MobileOnboarding onComplete={handleOnboardingComplete} />;
+    return (
+      <div className="min-h-screen bg-background crt-effect">
+        <div className="fixed inset-0 pointer-events-none opacity-10">
+          <div className="absolute inset-0 retro-grid"></div>
+          <div className="absolute inset-0 retro-scanlines"></div>
+        </div>
+        <div className="relative">
+          <MobileOnboarding onComplete={handleOnboardingComplete} />
+        </div>
+      </div>
+    );
   }
 
-  // Redirect to mobile-first home
   return <Navigate to="/app" replace />;
 };
 

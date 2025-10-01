@@ -38,105 +38,62 @@ export const Huddle = () => {
     
     const loadHuddle = async () => {
       try {
-        console.log('Loading huddle:', id);
-        
-        // Load huddle directly from Supabase
         const { data: huddleData, error: huddleError } = await supabase
           .from('huddles')
           .select(`
             *,
-            teams (
-              id,
-              name,
-              city,
-              logo_url,
-              conference,
-              league
-            )
+            teams (id, name, city, logo_url, conference, league)
           `)
           .eq('id', id)
           .single();
 
-        console.log('Huddle query result:', { huddleData, huddleError });
-
         if (huddleError || !huddleData) {
-          console.error('Huddle not found:', huddleError);
           navigate('/not-found');
           return;
         }
 
-        // Flatten team data for easier access
-        const formattedHuddle = {
-          ...huddleData,
-          team: huddleData.teams
-        };
-        setHuddle(formattedHuddle);
-        console.log('Huddle loaded:', formattedHuddle);
+        setHuddle({ ...huddleData, team: huddleData.teams });
 
         // Load messages
-        const { data: rawMessages, error: messagesError } = await supabase
+        const { data: rawMessages } = await supabase
           .from('huddle_messages')
           .select('*')
           .eq('huddle_id', id)
           .order('created_at', { ascending: true })
           .limit(100);
 
-        console.log('Messages query result:', { count: rawMessages?.length, messagesError });
-
         if (rawMessages && rawMessages.length > 0) {
-          // Get user profiles for messages
           const messageUserIds = [...new Set(rawMessages.map((m: any) => m.user_id))];
           const { data: profiles } = await supabase
             .from('profiles')
-            .select('*')
+            .select('user_id, display_name, username, avatar_url')
             .in('user_id', messageUserIds);
 
-          const profileMap = (profiles || []).reduce((acc: any, profile: any) => {
-            acc[profile.user_id] = profile;
-            return acc;
-          }, {});
-
-          const messagesWithProfiles = rawMessages.map((message: any) => ({
-            ...message,
-            profiles: profileMap[message.user_id]
+          const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+          const messagesWithProfiles = rawMessages.map((m: any) => ({
+            ...m,
+            profile: profilesMap.get(m.user_id)
           }));
 
           setMessages(messagesWithProfiles);
-        } else {
-          setMessages([]);
         }
 
-        // Load huddle members
-        const { data: membersData, error: membersError } = await supabase
+        // Load members
+        const { data: membersData } = await supabase
           .from('huddle_members')
-          .select(`
-            user_id,
-            profiles (
-              user_id,
-              display_name,
-              username,
-              avatar_url
-            )
-          `)
+          .select(`user_id, profiles (user_id, display_name, username, avatar_url)`)
           .eq('huddle_id', id)
           .limit(20);
 
-        console.log('Members query result:', { count: membersData?.length, membersError });
-
         if (membersData) {
-          const validMembers = membersData
-            .map(m => m.profiles)
-            .filter(Boolean);
-          setMembers(validMembers);
-        } else {
-          setMembers([]);
+          setMembers(membersData.map(m => m.profiles).filter(Boolean));
         }
         
       } catch (error) {
         console.error('Error loading huddle:', error);
         toast({
           title: "Error",
-          description: "Failed to load huddle. Please try again.",
+          description: "Failed to load huddle",
           variant: "destructive",
         });
       } finally {

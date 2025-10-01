@@ -11,7 +11,6 @@ import Index from "./pages/Index";
 import { Landing } from "./pages/Landing";
 import { Admin } from "./pages/Admin";
 import { Auth } from "./pages/Auth";
-import { BillsHuddleLayout } from "./components/BillsHuddleLayout";
 import { BillsChatDemo } from "./components/BillsChatDemo";
 import { MobileProfile } from "./pages/MobileProfile";
 import { TeamDirectory } from "./pages/TeamDirectory";
@@ -34,17 +33,19 @@ const AppContent = () => {
   // Initialize global join request notifications
   useJoinRequestNotifications();
 
-  // Use mobile-first layout for all routes now
+  // Use mobile-first layout for all routes now with retro theme
   return (
-    <div className="min-h-screen w-full bg-mobile-background">
-      <div className="flex-1 overflow-hidden">
+    <div className="min-h-screen w-full bg-background crt-effect">
+      {/* Global retro background effects */}
+      <div className="fixed inset-0 pointer-events-none opacity-10">
+        <div className="absolute inset-0 retro-grid"></div>
+        <div className="absolute inset-0 retro-scanlines"></div>
+      </div>
+      
+      <div className="relative flex-1 overflow-hidden">
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/bills-demo" element={
-            <BillsHuddleLayout>
-              <BillsChatDemo />
-            </BillsHuddleLayout>
-          } />
+          <Route path="/bills-demo" element={<BillsChatDemo />} />
           <Route path="/retro-demo" element={<RetroDemo />} />
           <Route path="/onboard" element={<Index />} />
           <Route path="/app" element={<MobileHome />} />
@@ -53,7 +54,7 @@ const AppContent = () => {
           <Route path="/profile" element={<MobileProfile />} />
           <Route path="/teams" element={<TeamDirectory />} />
           <Route path="/teams/:teamId" element={<TeamFeed />} />
-          <Route path="/huddle/:huddleId" element={<MobileChat />} />
+          <Route path="/huddle/:huddleId" element={<Huddle />} />
           <Route path="/huddle/:huddleId/settings" element={<HuddleSettings />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/join-huddle/:huddleId" element={<JoinHuddle />} />
