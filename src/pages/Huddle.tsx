@@ -46,9 +46,17 @@ export const Huddle = () => {
 
         if (huddleError) {
           console.error('Huddle query error:', huddleError);
+          setLoading(false);
+          toast({
+            title: "Error",
+            description: "Failed to load huddle",
+            variant: "destructive",
+          });
+          return;
         }
 
         if (!huddle) {
+          setLoading(false);
           navigate('/not-found');
           return;
         }

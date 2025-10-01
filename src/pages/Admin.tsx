@@ -29,20 +29,26 @@ export const Admin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="border-b border-border">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold text-foreground">Admin Panel</h1>
-          <p className="text-muted-foreground">Manage your sports platform</p>
+    <div className="min-h-screen bg-background crt-effect">
+      {/* Retro background effects */}
+      <div className="fixed inset-0 pointer-events-none opacity-10">
+        <div className="absolute inset-0 retro-grid"></div>
+        <div className="absolute inset-0 retro-scanlines"></div>
+      </div>
+
+      <div className="relative border-b border-border bg-card/50 backdrop-blur-sm">
+        <div className="container mx-auto px-4 py-6">
+          <h1 className="text-3xl font-bold text-foreground font-arcade">ADMIN CONTROL CENTER</h1>
+          <p className="text-muted-foreground font-mono">System Management Interface</p>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6 relative">
         {!isAdmin ? (
           <FirstAdminSetup />
         ) : (
           <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="grid grid-cols-8 w-full max-w-6xl">
+            <TabsList className="grid grid-cols-8 w-full max-w-6xl bg-card/80 backdrop-blur-sm border border-primary/20">
               <TabsTrigger value="dashboard" className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
                 Dashboard

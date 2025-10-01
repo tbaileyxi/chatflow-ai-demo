@@ -223,14 +223,21 @@ export const TeamDirectory = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Team Directory</h1>
-          <p className="text-muted-foreground">Discover and follow your favorite NFL and NCAA teams</p>
-        </div>
+    <div className="min-h-screen bg-background crt-effect">
+      {/* Retro background effects */}
+      <div className="fixed inset-0 pointer-events-none opacity-10">
+        <div className="absolute inset-0 retro-grid"></div>
+        <div className="absolute inset-0 retro-scanlines"></div>
+      </div>
 
-        {/* Search and Filter */}
+      <div className="container mx-auto px-4 py-6 relative">
+        <div className="space-y-6">
+          <div className="bg-card/50 backdrop-blur-sm border border-primary/20 rounded-lg p-6">
+            <h1 className="text-3xl font-bold text-foreground font-arcade">TEAM DIRECTORY</h1>
+            <p className="text-muted-foreground font-mono">Discover and follow your favorite NFL and NCAA teams</p>
+          </div>
+
+          {/* Search and Filter */}
         <div className="flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
@@ -252,7 +259,7 @@ export const TeamDirectory = () => {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <Card>
+          <Card className="bg-card/80 backdrop-blur-sm border-primary/20">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <Trophy className="w-8 h-8 text-primary" />
@@ -263,7 +270,7 @@ export const TeamDirectory = () => {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-card/80 backdrop-blur-sm border-primary/20">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <Users className="w-8 h-8 text-blue-500" />
@@ -274,7 +281,7 @@ export const TeamDirectory = () => {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-card/80 backdrop-blur-sm border-primary/20">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <Users className="w-8 h-8 text-green-500" />
@@ -285,7 +292,7 @@ export const TeamDirectory = () => {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-card/80 backdrop-blur-sm border-primary/20">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <Heart className="w-8 h-8 text-red-500" />
@@ -296,7 +303,7 @@ export const TeamDirectory = () => {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-card/80 backdrop-blur-sm border-primary/20">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <Clock className="w-8 h-8 text-orange-500" />
@@ -506,6 +513,7 @@ export const TeamDirectory = () => {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 };
