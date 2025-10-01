@@ -147,18 +147,38 @@ export const Huddle = () => {
         filter: `huddle_id=eq.${huddleId}`
       }, async (payload) => {
         if (payload.new) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('user_id', (payload.new as any).user_id)
-            .single();
-
-          const messageWithProfile = {
-            ...payload.new,
-            profiles: profile
-          };
-
-          setMessages(prev => [...prev, messageWithProfile]);
+          const newMessage = payload.new as any;
+          
+          // Prevent duplicates - check if message already exists
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMessage.id)) {
+              return prev;
+            }
+            
+            // Fetch profile for the new message
+            supabase
+              .from('profiles')
+              .select('*')
+              .eq('user_id', newMessage.user_id)
+              .single()
+              .then(({ data: profile }) => {
+                const messageWithProfile = {
+                  ...newMessage,
+                  profile: profile || {
+                    user_id: newMessage.user_id,
+                    display_name: 'User',
+                    username: 'user'
+                  }
+                };
+                
+                setMessages(prev => {
+                  if (prev.some(m => m.id === newMessage.id)) return prev;
+                  return [...prev, messageWithProfile];
+                });
+              });
+            
+            return prev;
+          });
           
           // Auto-scroll to new messages
           setTimeout(() => scrollToBottom('smooth'), 100);
@@ -186,7 +206,7 @@ export const Huddle = () => {
 
       const messageWithProfile = {
         ...messageData,
-        profiles: {
+        profile: {
           user_id: user.id,
           display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
           username: user.email?.split('@')[0] || 'user',
@@ -194,6 +214,9 @@ export const Huddle = () => {
         }
       };
       setMessages(prev => [...prev, messageWithProfile]);
+      
+      // Auto-scroll after sending
+      setTimeout(() => scrollToBottom('smooth'), 100);
 
       supabase
         .from('huddle_messages')
@@ -256,7 +279,7 @@ export const Huddle = () => {
 
       const messageWithProfile = {
         ...messageData,
-        profiles: {
+        profile: {
           user_id: user.id,
           display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
           username: user.email?.split('@')[0] || 'user',
@@ -264,6 +287,9 @@ export const Huddle = () => {
         }
       };
       setMessages(prev => [...prev, messageWithProfile]);
+      
+      // Auto-scroll after sending media
+      setTimeout(() => scrollToBottom('smooth'), 100);
 
       const { error } = await supabase
         .from('huddle_messages')
@@ -310,19 +336,20 @@ export const Huddle = () => {
 
   return (
     <div className="min-h-screen-dynamic w-full bg-gradient-to-br from-background via-background to-team-primary/5 flex flex-col">
+      {/* Floating back button - always visible */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => navigate('/app')}
+        className="fixed top-4 left-4 z-50 h-12 w-12 rounded-full bg-background/95 backdrop-blur-sm border border-team-primary/30 hover:bg-team-primary/20 shadow-lg touch-manipulation"
+        aria-label="Go back"
+      >
+        <ArrowLeft className="h-5 w-5" />
+      </Button>
+
       {/* Mobile-first header - sticky at top */}
       <div className="retro-header sticky top-0 z-20 px-3 sm:px-4 py-2 sm:py-3 border-b border-team-primary/30 bg-background/95 backdrop-blur-sm safe-area-inset-top">
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Back button on mobile */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/app')}
-            className="h-8 w-8 p-0 sm:hidden rounded-full"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          
+        <div className="flex items-center gap-2 sm:gap-3 ml-14">
           {/* Team logo - smaller on mobile */}
           {teamLogo && (
             <img 
@@ -354,15 +381,21 @@ export const Huddle = () => {
               <UserPlus className="h-4 w-4 sm:h-5 sm:w-5 text-team-primary" />
             </Button>
             
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setPickEmDialog({ open: true })}
-              className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-full hover:bg-team-primary/20"
-              aria-label="Blitz Board"
-            >
-              <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-team-primary" />
-            </Button>
+            <div className="relative group">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPickEmDialog({ open: true })}
+                className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-full hover:bg-team-primary/20"
+                aria-label="Blitz Board - Heat Check"
+              >
+                <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-team-primary" />
+              </Button>
+              <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-background/95 backdrop-blur-sm border border-team-primary/30 rounded-lg text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg">
+                <div className="font-semibold mb-1">Heat Check 🔥</div>
+                <div className="text-muted-foreground">Pick games, compete with your huddle!</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -381,15 +414,25 @@ export const Huddle = () => {
             }}
           >
             <div className="max-w-4xl mx-auto space-y-2 sm:space-y-3">
-              {messages.map((message) => (
-                <RetroMessageBubble
-                  key={message.id}
-                  message={message}
-                  user={message.profile}
-                  currentUserId={user?.id}
-                  isAdmin={false}
-                />
-              ))}
+              {messages.map((message, index) => {
+                const prevMessage = index > 0 ? messages[index - 1] : null;
+                const isGrouped = prevMessage && 
+                  prevMessage.user_id === message.user_id && 
+                  !prevMessage.is_bot_message && 
+                  !message.is_bot_message &&
+                  (new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime()) < 60000;
+                
+                return (
+                  <RetroMessageBubble
+                    key={message.id}
+                    message={message}
+                    user={message.profile}
+                    currentUserId={user?.id}
+                    isAdmin={false}
+                    isGrouped={isGrouped}
+                  />
+                );
+              })}
             </div>
           </div>
           

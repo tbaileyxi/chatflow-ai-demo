@@ -33,6 +33,7 @@ interface RetroMessageBubbleProps {
   } | null;
   currentUserId?: string;
   isAdmin?: boolean;
+  isGrouped?: boolean;
   onMegaphone?: (messageId: string) => void;
   onHighlight?: (messageId: string) => void;
   onCopyCallout?: (messageId: string, content: string) => void;
@@ -47,6 +48,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   user,
   currentUserId,
   isAdmin = false,
+  isGrouped = false,
   onMegaphone,
   onHighlight,
   onCopyCallout,
@@ -132,13 +134,13 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
               <div className="w-2 h-2 rounded-full bg-black animate-pulse" />
               <span className="font-bold text-xs tracking-wider uppercase text-black">Live Update</span>
             </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground/60">
+            <div className="flex items-center gap-1 text-sm text-gray-600">
               {formattedTime}
             </div>
           </div>
           
-          {/* Fixed: Solid color text instead of unreadable gradient */}
-          <div className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-team-primary/20 to-team-secondary/20 border border-team-primary/30">
+          {/* Fixed: Solid background instead of gradient for better readability */}
+          <div className="px-3 py-1.5 rounded-lg bg-background border border-team-primary/30">
             <p className="text-sm font-medium text-foreground">
               {message.content}
             </p>
@@ -184,25 +186,30 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
       onMouseLeave={() => setShowActions(false)}
       onTouchStart={() => setShowActions(true)}
     >
-      {/* Avatar - smaller on mobile */}
-      <Avatar className="h-7 w-7 sm:h-8 sm:w-8 ring-2 ring-team-primary/30 shrink-0">
-        <AvatarImage src={user?.avatar_url} />
-        <AvatarFallback className="bg-team-primary/20 text-team-primary text-xs">
-          {displayName.slice(0, 2).toUpperCase()}
-        </AvatarFallback>
-      </Avatar>
+      {/* Avatar - hidden if grouped */}
+      {!isGrouped && (
+        <Avatar className="h-7 w-7 sm:h-8 sm:w-8 ring-2 ring-team-primary/30 shrink-0">
+          <AvatarImage src={user?.avatar_url} />
+          <AvatarFallback className="bg-team-primary/20 text-team-primary text-xs">
+            {displayName.slice(0, 2).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+      )}
+      {isGrouped && <div className="h-7 w-7 sm:h-8 sm:w-8 shrink-0" />}
 
       {/* Content - full width on mobile */}
       <div className="flex-1 min-w-0">
-        {/* Header - responsive */}
-        <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-          <span className="font-semibold text-team-primary text-xs sm:text-sm truncate">
-            {displayName}
-          </span>
-          <span className="text-xs text-muted-foreground/60 shrink-0">
-            {formattedTime}
-          </span>
-        </div>
+        {/* Header - hidden if grouped */}
+        {!isGrouped && (
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+            <span className="font-semibold text-team-primary text-xs sm:text-sm truncate">
+              {displayName}
+            </span>
+            <span className="text-xs text-muted-foreground/60 shrink-0">
+              {formattedTime}
+            </span>
+          </div>
+        )}
 
         {/* Message content - mobile optimized padding */}
         <div className="retro-bubble p-2 sm:p-3 rounded-lg border border-team-primary/30 bg-gradient-to-br from-background/80 to-team-primary/5 backdrop-blur-sm">

@@ -38,6 +38,7 @@ export const BroadcastCenter = () => {
   const [sourceTeam, setSourceTeam] = useState('');
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [addToSpotlight, setAddToSpotlight] = useState(false);
+  const [addToHighlights, setAddToHighlights] = useState(false);
   const [loading, setLoading] = useState(false);
   const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus[]>([]);
   const [showDeliveryStatus, setShowDeliveryStatus] = useState(false);
@@ -746,6 +747,15 @@ export const BroadcastCenter = () => {
                   onCheckedChange={setAddToSpotlight}
                 />
                 <Label htmlFor="spotlight">Add to Spotlight Feed</Label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="highlights"
+                  checked={addToHighlights}
+                  onCheckedChange={setAddToHighlights}
+                />
+                <Label htmlFor="highlights">Add to Highlights Board</Label>
               </div>
 
               <div className="space-y-2">

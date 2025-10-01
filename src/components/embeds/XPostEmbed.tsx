@@ -10,8 +10,12 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const loadedRef = useRef(false);
 
   useEffect(() => {
+    // Prevent double loading
+    if (loadedRef.current) return;
+    
     // Create abort controller for cleanup
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
@@ -33,6 +37,10 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
         if (existingScript) {
           // Wait for existing script to load
           const checkLoaded = () => {
+            if (signal.aborted) {
+              reject(new Error('Aborted'));
+              return;
+            }
             if ((window as any).twttr?.widgets) {
               resolve();
             } else {
@@ -46,14 +54,13 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
         const script = document.createElement('script');
         script.src = 'https://platform.twitter.com/widgets.js';
         script.async = true;
+        script.charset = 'utf-8';
         script.onload = () => {
           if (!signal.aborted) resolve();
         };
         script.onerror = () => {
           if (!signal.aborted) {
-            setError('Failed to load Twitter widgets');
-            setIsLoading(false);
-            resolve();
+            reject(new Error('Failed to load Twitter widgets script'));
           }
         };
         document.head.appendChild(script);
@@ -64,52 +71,59 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
       try {
         if (signal.aborted) return;
         
+        setIsLoading(true);
+        setError(null);
+        
         await loadTwitterWidgets();
         
         if (signal.aborted) return;
         
         if (containerRef.current && (window as any).twttr?.widgets) {
-          // Extract tweet ID and use createTweet for better inline control
-          const tweetUrlMatch = embedCode.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/);
+          // Extract tweet ID from various URL formats
+          const tweetUrlMatch = embedCode.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/(?:@)?(\w+)\/status\/(\d+)/);
           
           if (tweetUrlMatch) {
-            const tweetId = tweetUrlMatch[1];
+            const tweetId = tweetUrlMatch[2];
             
             try {
               if (signal.aborted) return;
               
+              // Clear container before rendering
+              containerRef.current.innerHTML = '';
+              
               await (window as any).twttr.widgets.createTweet(tweetId, containerRef.current, {
-                theme: 'auto',
+                theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
                 width: '100%',
                 cards: 'visible',
                 conversation: 'none',
-                align: 'left',
+                align: 'center',
                 dnt: true
               });
               
               if (!signal.aborted) {
+                loadedRef.current = true;
                 setIsLoading(false);
                 setIsLoaded(true);
               }
             } catch (createError) {
               if (!signal.aborted) {
-                console.warn('createTweet failed, falling back to load:', createError);
-                setError('Failed to load embed');
+                console.error('createTweet failed:', createError);
+                setError('Failed to load tweet. It may be unavailable or deleted.');
                 setIsLoading(false);
               }
             }
           } else if (!signal.aborted) {
-            setError('Invalid tweet URL');
+            setError('Invalid tweet URL format');
             setIsLoading(false);
           }
         } else if (!signal.aborted) {
-          setError('Twitter widgets not available');
+          setError('Twitter widgets unavailable');
           setIsLoading(false);
         }
       } catch (error) {
         if (!signal.aborted) {
-          console.error('Error loading Twitter widgets:', error);
-          setError('Failed to load embed');
+          console.error('Error loading Twitter embed:', error);
+          setError('Failed to load tweet');
           setIsLoading(false);
         }
       }
@@ -122,52 +136,46 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-      
-      // Let React handle DOM cleanup naturally, don't manipulate innerHTML
-      if (containerRef.current) {
-        // Remove any event listeners added by Twitter widgets
-        const container = containerRef.current;
-        const twitterElements = container.querySelectorAll('[data-twitter-event-id]');
-        twitterElements.forEach(el => {
-          const clone = el.cloneNode(true);
-          el.parentNode?.replaceChild(clone, el);
-        });
-      }
     };
   }, [embedCode]);
 
   // Check if embedCode is a Twitter/X URL and normalize it
-  const tweetUrlMatch = embedCode.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/);
+  const tweetUrlMatch = embedCode.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/(?:@)?(\w+)\/status\/(\d+)/);
   
   if (tweetUrlMatch) {
-    const tweetId = tweetUrlMatch[1];
-    const normalizedUrl = `https://twitter.com/user/status/${tweetId}`;
+    const tweetId = tweetUrlMatch[2];
+    const username = tweetUrlMatch[1];
+    const normalizedUrl = `https://twitter.com/${username}/status/${tweetId}`;
     
     return (
       <div 
         ref={containerRef}
-        className="rounded-xl overflow-hidden shadow w-full my-1 relative"
+        className="rounded-xl overflow-hidden w-full my-2 relative"
         style={{ 
           pointerEvents: 'auto',
-          contain: 'layout style'
+          contain: 'layout style',
+          minHeight: isLoading ? '200px' : 'auto'
         }}
       >
-        <blockquote 
-          className="twitter-tweet" 
-          data-theme="auto" 
-          data-width="100%" 
-          data-cards="visible"
-          data-conversation="none"
-        >
-        </blockquote>
-        {isLoading && !isLoaded && (
-          <div className="flex items-center justify-center p-6 bg-muted rounded-xl min-h-[200px]">
-            <div className="text-sm text-muted-foreground animate-pulse">Loading embed...</div>
+        {isLoading && !isLoaded && !error && (
+          <div className="flex items-center justify-center p-8 bg-muted/50 rounded-xl min-h-[200px]">
+            <div className="flex flex-col items-center space-y-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <div className="text-sm text-muted-foreground">Loading tweet...</div>
+            </div>
           </div>
         )}
         {error && (
-          <div className="flex flex-col items-center justify-center p-6 bg-muted rounded-xl min-h-[200px] space-y-2">
-            <div className="text-sm text-muted-foreground">{error}</div>
+          <div className="flex flex-col items-center justify-center p-6 bg-muted/50 rounded-xl min-h-[150px] space-y-3">
+            <div className="text-sm font-medium text-muted-foreground">{error}</div>
+            <a 
+              href={normalizedUrl} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-xs text-primary hover:underline"
+            >
+              View on X/Twitter →
+            </a>
           </div>
         )}
       </div>
