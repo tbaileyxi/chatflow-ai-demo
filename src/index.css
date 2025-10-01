@@ -716,27 +716,29 @@ All colors MUST be HSL.
 
 /* Retro Admin Controls */
 .retro-megaphone {
-  background: linear-gradient(45deg, 
-    hsl(var(--team-accent)), 
-    hsl(var(--team-accent) / 0.8)
+  background: linear-gradient(135deg, 
+    hsl(45 100% 51%), 
+    hsl(38 92% 50%)
   );
-  border: none;
-  color: hsl(var(--background));
-  font-family: 'Orbitron', monospace;
-  font-weight: 600;
+  border: 2px solid hsl(38 92% 40%);
+  color: hsl(0 0% 0%);
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   box-shadow: 
-    0 0 20px hsl(var(--team-accent) / 0.4),
-    inset 0 1px 0 hsl(var(--team-accent) / 0.3);
+    0 0 20px hsla(45, 100%, 51%, 0.5),
+    0 4px 12px hsla(0, 0%, 0%, 0.3),
+    inset 0 1px 0 hsla(45, 100%, 70%, 0.4);
   transition: all 0.2s ease;
 }
 
 .retro-megaphone:hover {
-  transform: scale(1.05);
+  transform: translateY(-1px);
   box-shadow: 
-    0 0 30px hsl(var(--team-accent) / 0.6),
-    inset 0 1px 0 hsl(var(--team-accent) / 0.5);
+    0 0 30px hsla(45, 100%, 51%, 0.7),
+    0 6px 16px hsla(0, 0%, 0%, 0.4),
+    inset 0 1px 0 hsla(45, 100%, 70%, 0.5);
 }
 
 /* Pixel Perfect Reactions */
