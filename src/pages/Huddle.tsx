@@ -54,7 +54,7 @@ export const Huddle = () => {
 
         // Load messages with simple structure
         const { data: rawMessages } = await supabase
-          .from('messages')
+          .from('huddle_messages')
           .select('*')
           .eq('huddle_id', id)
           .order('created_at', { ascending: true })
@@ -66,10 +66,10 @@ export const Huddle = () => {
           const { data: profiles } = await supabase
             .from('profiles')
             .select('*')
-            .in('id', messageUserIds);
+            .in('user_id', messageUserIds);
 
           const profileMap = (profiles || []).reduce((acc: any, profile: any) => {
-            acc[profile.id] = profile;
+            acc[profile.user_id] = profile;
             return acc;
           }, {});
 
@@ -106,7 +106,7 @@ export const Huddle = () => {
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'messages',
+        table: 'huddle_messages',
         filter: `huddle_id=eq.${id}`
       }, async (payload) => {
         if (payload.new) {
@@ -114,7 +114,7 @@ export const Huddle = () => {
           const { data: profile } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', (payload.new as any).user_id)
+            .eq('user_id', (payload.new as any).user_id)
             .single();
 
           const messageWithProfile = {
@@ -173,7 +173,7 @@ export const Huddle = () => {
       const messageWithProfile = {
         ...messageData,
         profiles: {
-          id: user.id,
+          user_id: user.id,
           display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
           username: user.email?.split('@')[0] || 'user',
           avatar_url: user.user_metadata?.avatar_url
@@ -182,8 +182,8 @@ export const Huddle = () => {
       setMessages(prev => [...prev, messageWithProfile]);
 
       // Send to database (fire and forget for better UX)
-      (supabase as any)
-        .from('messages')
+      supabase
+        .from('huddle_messages')
         .insert([messageData])
         .then(({ error }) => {
           if (error) {
@@ -249,7 +249,7 @@ export const Huddle = () => {
       const messageWithProfile = {
         ...messageData,
         profiles: {
-          id: user.id,
+          user_id: user.id,
           display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
           username: user.email?.split('@')[0] || 'user',
           avatar_url: user.user_metadata?.avatar_url
@@ -258,8 +258,8 @@ export const Huddle = () => {
       setMessages(prev => [...prev, messageWithProfile]);
 
       // Persist to database
-      const { error } = await (supabase as any)
-        .from('messages')
+      const { error } = await supabase
+        .from('huddle_messages')
         .insert([messageData]);
 
       if (error) throw error;

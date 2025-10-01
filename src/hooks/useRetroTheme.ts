@@ -86,7 +86,7 @@ export const useRetroTheme = (teamName?: string) => {
       const normalized = name.toLowerCase();
       
       if (normalized.includes('buffalo') && (normalized.includes('bill') || normalized.includes('bills'))) return RETRO_TEAM_THEMES.bills;
-      if (normalized.includes('buffalo') || normalized.includes('colorado') || normalized.includes('buff')) return RETRO_TEAM_THEMES.buffaloes;
+      if (normalized.includes('colorado') || normalized.includes('buff')) return RETRO_TEAM_THEMES.buffaloes;
       if (normalized.includes('steel') || normalized.includes('pittsburgh')) return RETRO_TEAM_THEMES.steelers;
       if (normalized.includes('pack') || normalized.includes('green bay')) return RETRO_TEAM_THEMES.packers;
       if (normalized.includes('cowboy') || normalized.includes('dallas')) return RETRO_TEAM_THEMES.cowboys;
