@@ -38,21 +38,51 @@ export const Huddle = () => {
     
     const loadHuddle = async () => {
       try {
+        console.log('[Huddle] Loading huddle:', id);
+        
+        // Fetch huddle data first
         const { data: huddleData, error: huddleError } = await supabase
           .from('huddles')
-          .select(`
-            *,
-            teams (id, name, city, logo_url, conference, league)
-          `)
+          .select('*')
           .eq('id', id)
-          .single();
+          .maybeSingle();
 
-        if (huddleError || !huddleData) {
-          navigate('/not-found');
+        console.log('[Huddle] Huddle data:', huddleData, huddleError);
+
+        if (huddleError) {
+          console.error('[Huddle] Error fetching huddle:', huddleError);
+          toast({
+            title: "Error",
+            description: "Failed to load huddle: " + huddleError.message,
+            variant: "destructive",
+          });
+          setLoading(false);
           return;
         }
 
-        setHuddle({ ...huddleData, team: huddleData.teams });
+        if (!huddleData) {
+          console.log('[Huddle] Huddle not found');
+          setLoading(false);
+          return;
+        }
+
+        // Fetch team data separately if team_id exists
+        let teamData = null;
+        if (huddleData.team_id) {
+          const { data: team, error: teamError } = await supabase
+            .from('teams')
+            .select('id, name, city, logo_url, conference, league')
+            .eq('id', huddleData.team_id)
+            .maybeSingle();
+          
+          console.log('[Huddle] Team data:', team, teamError);
+          
+          if (!teamError && team) {
+            teamData = team;
+          }
+        }
+
+        setHuddle({ ...huddleData, team: teamData });
 
         // Load messages
         const { data: rawMessages } = await supabase
