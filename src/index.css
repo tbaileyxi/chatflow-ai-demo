@@ -207,39 +207,39 @@ All colors MUST be HSL.
   }
 
   .dark {
-    /* Dark theme with enhanced universal team support */
-    --background: 0 0% 8%;
-    --foreground: 0 0% 100%;
+    /* Dark theme with neon gold/teal/orange retro palette */
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
 
-    --card: 0 0% 8%;
-    --card-foreground: 0 0% 100%;
+    --card: 0 0% 4%;
+    --card-foreground: 0 0% 98%;
 
     --popover: 0 0% 12%;
-    --popover-foreground: 0 0% 100%;
+    --popover-foreground: 0 0% 98%;
 
-    /* Dynamic team primary (overridden by useTeamTheme) */
-    --primary: var(--team-primary, 45 100% 51%);
-    --primary-foreground: 0 0% 0%;
+    /* Neon gold primary */
+    --primary: 51 100% 50%;
+    --primary-foreground: 0 0% 4%;
 
-    /* Dynamic team secondary (overridden by useTeamTheme) */
-    --secondary: var(--team-secondary, 217 100% 28%);
-    --secondary-foreground: 0 0% 100%;
+    /* Teal secondary */
+    --secondary: 191 100% 50%;
+    --secondary-foreground: 0 0% 4%;
 
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 60%;
 
-    /* Dynamic team accent (overridden by useTeamTheme) */
-    --accent: var(--team-accent, 349 87% 39%);
-    --accent-foreground: 0 0% 100%;
+    /* Orange accent */
+    --accent: 30 100% 50%;
+    --accent-foreground: 0 0% 4%;
 
     /* Enhanced glassmorphism colors */
-    --glass-bg: 217 33% 17% / 0.8;
-    --glass-border: 0 0% 100% / 0.1;
+    --glass-bg: 0 0% 4% / 0.8;
+    --glass-border: 51 100% 50% / 0.2;
     --glass-blur: blur(20px);
 
-    /* Dynamic bot message styling */
-    --bot-bubble: var(--team-primary, 217 100% 28%) / 0.15;
-    --bot-border: var(--team-primary, 217 100% 28%) / 0.3;
+    /* Dynamic bot message styling with primary gold */
+    --bot-bubble: 51 100% 50% / 0.15;
+    --bot-border: 51 100% 50% / 0.3;
 
     /* Success and Destructive */
     --success: 120 100% 40%;
@@ -248,19 +248,19 @@ All colors MUST be HSL.
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 30%;
-    --input: 0 0% 30%;
-    --ring: var(--team-accent, 45 100% 51%);
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 51 100% 50%;
 
-    /* Modern UI elements with team theming */
-    --huddle-primary: var(--team-primary, 270 100% 70%);
-    --huddle-secondary: var(--team-secondary, 260 100% 80%);
-    --spotlight: var(--team-accent, 45 100% 51%);
-    --spotlight-foreground: 0 0% 0%;
-    --like-button: 24 95% 53%;
-    --like-button-foreground: 0 0% 100%;
-    --fire-button: 0 84% 60%;
-    --fire-button-foreground: 0 0% 100%;
+    /* Modern UI elements with neon gold/teal/orange theming */
+    --huddle-primary: 51 100% 50%;
+    --huddle-secondary: 191 100% 50%;
+    --spotlight: 51 100% 50%;
+    --spotlight-foreground: 0 0% 4%;
+    --like-button: 191 100% 50%;
+    --like-button-foreground: 0 0% 4%;
+    --fire-button: 30 100% 50%;
+    --fire-button-foreground: 0 0% 4%;
     
     /* Verified huddle colors */
     --verified-primary: 142 76% 36%;
@@ -269,27 +269,27 @@ All colors MUST be HSL.
 
     --radius: 12px;
 
-    /* Sidebar with dynamic theming */
-    --sidebar-background: 0 0% 20%;
-    --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: var(--team-accent, 45 100% 51%);
-    --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 0 0% 25%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 0 0% 30%;
-    --sidebar-ring: var(--team-accent, 45 100% 51%);
+    /* Sidebar with neon theming */
+    --sidebar-background: 0 0% 8%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 51 100% 50%;
+    --sidebar-primary-foreground: 0 0% 4%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 51 100% 50%;
 
-    /* Retro Arcade Team Theming */
-    --team-primary: 217 100% 28%;     /* Dynamic team primary color */
-    --team-secondary: 349 87% 39%;    /* Dynamic team secondary color */
-    --team-accent: 45 100% 51%;       /* Dynamic team accent color */
-    --neon-glow: 0 100% 50%;          /* Dynamic neon glow color */
-    --scanline: 0 0% 100% / 0.1;      /* CRT scanline effect */
+    /* Retro Arcade Neon Gold/Teal/Orange Theme */
+    --team-primary: 51 100% 50%;     /* Neon gold primary */
+    --team-secondary: 191 100% 50%;  /* Teal secondary */
+    --team-accent: 30 100% 50%;      /* Orange accent */
+    --neon-glow: 51 100% 50%;        /* Gold neon glow */
+    --scanline: 0 0% 100% / 0.1;     /* CRT scanline effect */
     --contrast-text: var(--foreground); /* Auto-adjusting contrast text */
 
     /* Retro arcade styling */
-    --retro-grid: linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-                  linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+    --retro-grid: linear-gradient(rgba(255, 215, 0, 0.1) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(255, 215, 0, 0.1) 1px, transparent 1px);
     --retro-scanlines: linear-gradient(transparent 0%, rgba(0,0,0,0.05) 50%, transparent 100%);
     --retro-glow: 0 0 10px hsl(var(--neon-glow) / 0.3),
                   0 0 20px hsl(var(--neon-glow) / 0.2),

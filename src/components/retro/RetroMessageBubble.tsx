@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback, useMemo } from 'react';
+import React, { memo, useState, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -58,6 +58,8 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   const [broadcastPopoverOpen, setBroadcastPopoverOpen] = useState(false);
   const [includeHighlight, setIncludeHighlight] = useState(false);
   const [reactions, setReactions] = useState<{ emoji: string; count: number }[]>([]);
+  const [showReactions, setShowReactions] = useState(false);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   const isBot = message.is_bot_message || message.is_team_agent_message;
@@ -174,17 +176,31 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   }
 
   // Regular user messages - mobile-first design
+  const handleLongPressStart = () => {
+    longPressTimer.current = setTimeout(() => {
+      setShowReactions(true);
+    }, 500);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
   return (
     <motion.div
       className={cn(
-        "group flex gap-2 sm:gap-3 hover:bg-team-primary/5 p-2 sm:p-3 rounded-lg transition-colors",
+        "group flex gap-2 sm:gap-3 hover:bg-team-primary/5 p-1 sm:p-2 rounded-lg transition-colors",
         "relative touch-manipulation"
       )}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
-      onTouchStart={() => setShowActions(true)}
+      onTouchStart={handleLongPressStart}
+      onTouchEnd={handleLongPressEnd}
     >
       {/* Avatar - hidden if grouped */}
       {!isGrouped && (
@@ -212,7 +228,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
         )}
 
         {/* Message content - mobile optimized padding */}
-        <div className="retro-bubble p-2 sm:p-3 rounded-lg border border-team-primary/30 bg-gradient-to-br from-background/80 to-team-primary/5 backdrop-blur-sm">
+        <div className="retro-bubble p-2 rounded-lg border border-team-primary/30 bg-gradient-to-br from-background/80 to-team-primary/5 backdrop-blur-sm relative">
           <p className="text-xs sm:text-sm text-foreground whitespace-pre-wrap break-words">
             {message.content}
           </p>
@@ -279,6 +295,8 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
               exit={{ opacity: 0, y: -10 }}
             >
               {/* Simple static reactions - mobile-first */}
+            {/* Simple static reactions - desktop only */}
+            <div className="hidden sm:flex items-center gap-1">
               {SIMPLE_REACTIONS.map((emoji) => (
                 <Button
                   key={emoji}
@@ -290,6 +308,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                   {emoji}
                 </Button>
               ))}
+            </div>
 
               {/* Copy */}
               <Button

@@ -14,6 +14,7 @@ import { JumpToLatest } from '@/components/JumpToLatest';
 import { UserPlus, Trophy, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 
 export const Huddle = () => {
   const { huddleId } = useParams<{ huddleId: string }>();
@@ -31,6 +32,9 @@ export const Huddle = () => {
   
   // Auto-scroll functionality
   const { showJumpToLatest, scrollRef, handleAtBottomStateChange, jumpToLatest, scrollToBottom } = useAutoScroll();
+
+  // Check if current user is owner
+  const isOwner = user?.id === huddle?.owner_id;
 
   // Load huddle data with comprehensive error handling
   useEffect(() => {
@@ -413,7 +417,7 @@ export const Huddle = () => {
               handleAtBottomStateChange(isAtBottom);
             }}
           >
-            <div className="max-w-4xl mx-auto space-y-2 sm:space-y-3">
+            <div className="max-w-4xl mx-auto space-y-1">
               {messages.map((message, index) => {
                 const prevMessage = index > 0 ? messages[index - 1] : null;
                 const isGrouped = prevMessage && 
@@ -439,26 +443,26 @@ export const Huddle = () => {
           {/* Jump to latest button */}
           <JumpToLatest visible={showJumpToLatest} onClick={jumpToLatest} />
 
-          {/* Chat input - sticky at bottom on mobile */}
-          <RetroChatInput
-            onSendMessage={sendMessage}
-            onSendMedia={sendMediaMessage}
-            placeholder="Share your thoughts..."
-            disabled={loading}
-            huddleId={huddleId!}
-            teamName={teamName}
-            onTyping={(isTyping) => {
-              if (isTyping && user?.id) {
-                supabase.channel(`typing:${huddleId}`).send({
-                  type: 'broadcast',
-                  event: 'typing',
-                  payload: { userId: user.id, isTyping: true }
-                });
-              }
-            }}
-            onPickEm={() => setPickEmDialog({ open: true })}
-            showPickEm={true}
-          />
+          {/* Chat input - sticky at bottom on mobile with bottom nav padding */}
+          <div className="pb-14">
+            <RetroChatInput
+              onSendMessage={sendMessage}
+              onSendMedia={sendMediaMessage}
+              placeholder="Share your thoughts..."
+              disabled={loading}
+              huddleId={huddleId!}
+              teamName={teamName}
+              onTyping={(isTyping) => {
+                if (isTyping && user?.id) {
+                  supabase.channel(`typing:${huddleId}`).send({
+                    type: 'broadcast',
+                    event: 'typing',
+                    payload: { userId: user.id, isTyping: true }
+                  });
+                }
+              }}
+            />
+          </div>
         </div>
 
         {/* Collapsible highlights sidebar - slide over on mobile */}
@@ -476,14 +480,11 @@ export const Huddle = () => {
         </div>
       </div>
 
-      {/* Mobile FAB for highlights - touch-friendly */}
-      <button
-        onClick={() => setShowHighlights(!showHighlights)}
-        className="sm:hidden fixed bottom-20 right-3 z-40 h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-team-primary text-white shadow-lg retro-button-glow hover:scale-105 transition-transform active:scale-95 touch-manipulation"
-        aria-label="Toggle highlights"
-      >
-        <Trophy className="h-5 w-5 sm:h-6 sm:w-6 mx-auto" />
-      </button>
+      {/* Mobile Bottom Navigation with Pick Em */}
+      <MobileBottomNav 
+        onPickEmClick={() => setPickEmDialog({ open: true })}
+        showPickEm={true}
+      />
 
       {/* Pick 'Em Dialog */}
       {pickEmDialog.instanceId && (
