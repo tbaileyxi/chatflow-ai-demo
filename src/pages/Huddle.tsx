@@ -2,11 +2,15 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { RetroHuddleLayout } from '@/components/retro/RetroHuddleLayout';
+import { useRetroTheme } from '@/hooks/useRetroTheme';
 import { RetroMessageBubble } from '@/components/retro/RetroMessageBubble';
+import { RetroHighlightsSidebar } from '@/components/retro/RetroHighlightsSidebar';
 import { RetroChatInput } from '@/components/retro/RetroChatInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PickEmView } from '@/components/pickem/PickEmView';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Star } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export const Huddle = () => {
@@ -17,8 +21,11 @@ export const Huddle = () => {
   
   const [huddle, setHuddle] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [pickEmViewId, setPickEmViewId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [highlights, setHighlights] = useState<Array<{id: string, content: string}>>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   
   const chatChannelRef = useRef<any>(null);
@@ -79,6 +86,17 @@ export const Huddle = () => {
           }));
 
           setMessages(messagesWithProfiles);
+        }
+
+        // Load huddle members
+        const { data: membersData } = await supabase
+          .from('huddle_members')
+          .select('user_id, profiles(*)')
+          .eq('huddle_id', id)
+          .limit(20);
+
+        if (membersData) {
+          setMembers(membersData.map(m => m.profiles).filter(Boolean));
         }
         
       } catch (error) {
@@ -300,6 +318,12 @@ export const Huddle = () => {
 
   const handleHighlight = useCallback(async (messageId: string) => {
     try {
+      const message = messages.find(m => m.id === messageId);
+      if (message) {
+        setHighlights(prev => [...prev, { id: messageId, content: message.content }]);
+        setSidebarOpen(true);
+      }
+      
       // Update local state for immediate feedback
       setMessages(prev => prev.map(m => 
         m.id === messageId ? { ...m, is_highlighted: true } : m
@@ -312,7 +336,7 @@ export const Huddle = () => {
     } catch (error) {
       console.error('Error highlighting:', error);
     }
-  }, [toast]);
+  }, [messages, toast]);
 
   const handleCopyCallout = useCallback(async (messageId: string, content: string) => {
     try {
@@ -332,38 +356,83 @@ export const Huddle = () => {
     setPickEmViewId(instanceId);
   }, []);
 
+  const retroTheme = useRetroTheme(huddle?.team?.name);
+
   if (loading) {
     return (
-      <RetroHuddleLayout teamName="Loading..." huddleId="">
-        <div className="flex items-center justify-center h-full">
-          <div className="text-muted-foreground font-arcade">Loading huddle...</div>
-        </div>
-      </RetroHuddleLayout>
+      <div className="min-h-screen bg-background crt-effect flex items-center justify-center">
+        <div className="text-muted-foreground font-arcade">Loading huddle...</div>
+      </div>
     );
   }
 
   if (!huddle) {
     return (
-      <RetroHuddleLayout teamName="Not Found" huddleId="">
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <h3 className="text-xl font-semibold mb-2 font-orbitron">Huddle not found</h3>
-            <p className="text-muted-foreground font-exo2">This huddle may not exist or you don't have access to it.</p>
-          </div>
+      <div className="min-h-screen bg-background crt-effect flex items-center justify-center">
+        <div className="text-center">
+          <h3 className="text-xl font-semibold mb-2 font-orbitron">Huddle not found</h3>
+          <p className="text-muted-foreground font-exo2">This huddle may not exist or you don't have access to it.</p>
         </div>
-      </RetroHuddleLayout>
+      </div>
     );
   }
 
+  const teamName = huddle?.team?.name || huddle?.name || 'Team';
+  const onlineCount = members.length;
+
   return (
-    <RetroHuddleLayout 
-      huddleId={id!} 
-      teamName={huddle?.team?.name}
-      huddle={{ ...huddle, name: huddle?.name || huddle?.team?.name }}
-      messages={messages}
-      currentUserId={user?.id}
-    >
-      <div className="flex flex-col h-full">
+    <div className="min-h-screen bg-background crt-effect flex">
+      {/* Left Sidebar - Tight Avatars */}
+      <div className="hidden md:flex flex-col w-16 bg-muted/20 border-r border-team-primary/30 p-2 gap-2">
+        <div className="text-center mb-4">
+          <div className="text-xs font-pixel text-team-secondary">{retroTheme.mascot}</div>
+        </div>
+        
+        {/* Online Members - Tight */}
+        <div className="space-y-1">
+          {members.slice(0, 10).map((member) => (
+            <div key={member.user_id} className="relative">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={member.avatar_url} alt={member.display_name} />
+                <AvatarFallback className="text-xs font-pixel bg-team-primary/20 text-team-primary border border-team-primary/40">
+                  {(member.display_name || member.username || 'U').charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="mt-auto text-center">
+          <div className="text-xs font-arcade text-muted-foreground">{onlineCount} online</div>
+        </div>
+      </div>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="bg-background/95 backdrop-blur border-b border-team-primary/30 p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="retro-header text-lg neon-text">
+                {teamName} Game Chat
+              </h1>
+              <p className="font-arcade text-xs text-muted-foreground">
+                Live game discussion • {onlineCount} members online
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden"
+            >
+              <Star className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Chat Messages - Scrollable Container */}
         <div className="flex-1 overflow-y-auto p-2">
           <div className="max-w-4xl mx-auto space-y-1">
             {messages.map((message) => (
@@ -384,7 +453,8 @@ export const Huddle = () => {
             ))}
           </div>
         </div>
-        
+
+        {/* Chat Input */}
         <div className="border-t border-team-primary/30 p-3 bg-background/95 backdrop-blur">
           <RetroChatInput
             onSendMessage={sendMessage}
@@ -392,7 +462,7 @@ export const Huddle = () => {
             placeholder="Share your thoughts..."
             disabled={loading}
             huddleId={id!}
-            teamName={huddle?.team?.name}
+            teamName={teamName}
             onTyping={(isTyping) => {
               if (isTyping && user?.id) {
                 const now = Date.now();
@@ -411,6 +481,31 @@ export const Huddle = () => {
         </div>
       </div>
 
+      {/* Highlights Sidebar */}
+      {sidebarOpen && (
+        <div className="fixed right-0 top-0 bottom-0 w-80 z-30">
+          <RetroHighlightsSidebar
+            onClose={() => setSidebarOpen(false)}
+            highlights={highlights.map((h, index) => ({
+              id: h.id,
+              title: h.content.slice(0, 30) + '...',
+              type: 'video' as const,
+              timestamp: `${index + 1}min ago`,
+              engagement: Math.floor(Math.random() * 100) + 50
+            }))}
+            teamName={teamName}
+          />
+        </div>
+      )}
+
+      {/* Mobile Floating Action Button */}
+      <Button
+        onClick={() => setSidebarOpen(true)}
+        className="md:hidden fixed bottom-6 right-6 h-12 w-12 rounded-full retro-megaphone shadow-lg z-20"
+      >
+        <Star className="w-5 h-5" />
+      </Button>
+
       {/* Pick 'Em View Dialog */}
       {pickEmViewId && (
         <Dialog open={!!pickEmViewId} onOpenChange={() => setPickEmViewId(null)}>
@@ -427,6 +522,6 @@ export const Huddle = () => {
           </DialogContent>
         </Dialog>
       )}
-    </RetroHuddleLayout>
+    </div>
   );
 };
