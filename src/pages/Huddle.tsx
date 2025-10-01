@@ -108,35 +108,44 @@ export const Huddle = () => {
 
         if (messagesError) {
           console.error('⚠️ Messages query error:', messagesError);
+          setMessages([]); // Set empty array on error
         } else {
           console.log('✅ Messages loaded:', rawMessages?.length || 0);
           
-          if (rawMessages && rawMessages.length > 0) {
-            const messageUserIds = [...new Set(rawMessages.map((m: any) => m.user_id))];
-            console.log('📍 Step 3b: Fetching message author profiles...');
-            
-            const { data: profiles, error: profilesError } = await supabase
-              .from('profiles')
-              .select('user_id, display_name, username, avatar_url')
-              .in('user_id', messageUserIds);
+          try {
+            if (rawMessages && rawMessages.length > 0) {
+              const messageUserIds = [...new Set(rawMessages.map((m: any) => m.user_id))];
+              console.log('📍 Step 3b: Fetching message author profiles...');
+              
+              const { data: profiles, error: profilesError } = await supabase
+                .from('profiles')
+                .select('user_id, display_name, username, avatar_url')
+                .in('user_id', messageUserIds);
 
-            if (profilesError) {
-              console.error('⚠️ Message profiles error:', profilesError);
-            } else {
-              console.log('✅ Message profiles loaded:', profiles?.length || 0);
-            }
-
-            const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-            const messagesWithProfiles = rawMessages.map((m: any) => ({
-              ...m,
-              profile: profilesMap.get(m.user_id) || {
-                user_id: m.user_id,
-                display_name: 'User',
-                username: 'user'
+              if (profilesError) {
+                console.error('⚠️ Message profiles error:', profilesError);
+              } else {
+                console.log('✅ Message profiles loaded:', profiles?.length || 0);
               }
-            }));
 
-            setMessages(messagesWithProfiles);
+              const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+              const messagesWithProfiles = rawMessages.map((m: any) => ({
+                ...m,
+                profile: profilesMap.get(m.user_id) || {
+                  user_id: m.user_id,
+                  display_name: 'User',
+                  username: 'user'
+                }
+              }));
+
+              setMessages(messagesWithProfiles);
+            } else {
+              setMessages([]);
+            }
+          } catch (profileError) {
+            console.error('❌ Error processing message profiles:', profileError);
+            // Still set messages even if profile processing fails
+            setMessages(rawMessages || []);
           }
         }
 
@@ -150,29 +159,39 @@ export const Huddle = () => {
 
         if (membersError) {
           console.error('⚠️ Members query error:', membersError);
+          setMembers([]); // Set empty array on error
         } else {
           console.log('✅ Members loaded:', membersData?.length || 0);
           
-          if (membersData && membersData.length > 0) {
-            const memberIds = membersData.map(m => m.user_id);
-            console.log('📍 Step 4b: Fetching member profiles...');
-            
-            const { data: profilesData, error: profilesError } = await supabase
-              .from('profiles')
-              .select('user_id, display_name, username, avatar_url')
-              .in('user_id', memberIds);
+          try {
+            if (membersData && membersData.length > 0) {
+              const memberIds = membersData.map(m => m.user_id);
+              console.log('📍 Step 4b: Fetching member profiles...');
+              
+              const { data: profilesData, error: profilesError } = await supabase
+                .from('profiles')
+                .select('user_id, display_name, username, avatar_url')
+                .in('user_id', memberIds);
 
-            if (profilesError) {
-              console.error('⚠️ Member profiles error:', profilesError);
+              if (profilesError) {
+                console.error('⚠️ Member profiles error:', profilesError);
+                setMembers([]);
+              } else {
+                console.log('✅ Member profiles loaded:', profilesData?.length || 0);
+                setMembers(profilesData || []);
+              }
             } else {
-              console.log('✅ Member profiles loaded:', profilesData?.length || 0);
-              setMembers(profilesData || []);
+              setMembers([]);
             }
+          } catch (profileError) {
+            console.error('❌ Error processing member profiles:', profileError);
+            setMembers([]);
           }
         }
         
         console.log('✅ All huddle data loaded successfully');
         clearTimeout(timeoutId);
+        setLoading(false); // CRITICAL: Set loading false here after all data is processed
         
       } catch (error) {
         console.error('❌ Critical error loading huddle:', error);
