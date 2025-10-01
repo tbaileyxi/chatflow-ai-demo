@@ -14,7 +14,7 @@ import { Star } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export const Huddle = () => {
-  const { id } = useParams<{ id: string }>();
+  const { huddleId } = useParams<{ huddleId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -34,10 +34,10 @@ export const Huddle = () => {
 
   // Load huddle data with comprehensive error handling
   useEffect(() => {
-    if (!id) return;
+    if (!huddleId) return;
     
     const loadHuddle = async () => {
-      console.log('🔄 Starting huddle load for ID:', id);
+      console.log('🔄 Starting huddle load for ID:', huddleId);
       
       // Set timeout to prevent infinite loading
       const timeoutId = setTimeout(() => {
@@ -56,7 +56,7 @@ export const Huddle = () => {
         const { data: huddle, error: huddleError } = await supabase
           .from('huddles')
           .select('*')
-          .eq('id', id)
+          .eq('id', huddleId)
           .maybeSingle();
 
         if (huddleError) {
@@ -102,7 +102,7 @@ export const Huddle = () => {
         const { data: rawMessages, error: messagesError } = await supabase
           .from('huddle_messages')
           .select('*')
-          .eq('huddle_id', id)
+          .eq('huddle_id', huddleId)
           .order('created_at', { ascending: true })
           .limit(100);
 
@@ -154,7 +154,7 @@ export const Huddle = () => {
         const { data: membersData, error: membersError } = await supabase
           .from('huddle_members')
           .select('user_id')
-          .eq('huddle_id', id)
+          .eq('huddle_id', huddleId)
           .limit(20);
 
         if (membersError) {
@@ -208,20 +208,20 @@ export const Huddle = () => {
     };
 
     loadHuddle();
-  }, [id, navigate, toast]);
+  }, [huddleId, navigate, toast]);
 
   // Real-time subscriptions
   useEffect(() => {
-    if (!id || !user) return;
+    if (!huddleId || !user) return;
 
     // Subscribe to new messages
     const messagesChannel = supabase
-      .channel(`messages:${id}`)
+      .channel(`messages:${huddleId}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'huddle_messages',
-        filter: `huddle_id=eq.${id}`
+        filter: `huddle_id=eq.${huddleId}`
       }, async (payload) => {
         if (payload.new) {
           // Get profile for new message
@@ -243,7 +243,7 @@ export const Huddle = () => {
 
     // Subscribe to typing indicators
     const typingChannel = supabase
-      .channel(`typing:${id}`)
+      .channel(`typing:${huddleId}`)
       .on('broadcast', { event: 'typing' }, (payload) => {
         if (payload.payload.userId !== user.id) {
           setTypingUsers(prev => {
@@ -266,18 +266,18 @@ export const Huddle = () => {
       messagesChannel.unsubscribe();
       typingChannel.unsubscribe();
     };
-  }, [id, user]);
+  }, [huddleId, user]);
 
   // Send message
   const sendMessage = useCallback(async (content: string) => {
-    if (!id || !user || !content.trim()) return;
+    if (!huddleId || !user || !content.trim()) return;
 
     try {
       // Simple direct insert with manual data structure
       const messageData = {
         id: crypto.randomUUID(),
         content: content.trim(),
-        huddle_id: id,
+        huddle_id: huddleId,
         user_id: user.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -320,11 +320,11 @@ export const Huddle = () => {
         variant: "destructive",
       });
     }
-  }, [id, user, toast]);
+  }, [huddleId, user, toast]);
 
   // Send media message
   const sendMediaMessage = useCallback(async (file: File) => {
-    if (!id || !user) return;
+    if (!huddleId || !user) return;
 
     try {
       toast({
@@ -335,7 +335,7 @@ export const Huddle = () => {
       // Upload to Supabase Storage
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `huddle-media/${id}/${fileName}`;
+      const filePath = `huddle-media/${huddleId}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('media')
@@ -351,7 +351,7 @@ export const Huddle = () => {
       const messageData = {
         id: crypto.randomUUID(),
         content: `[Shared ${file.type.startsWith('image/') ? 'image' : 'video'}]`,
-        huddle_id: id,
+        huddle_id: huddleId,
         user_id: user.id,
         media_url: publicUrl,
         media_type: file.type.startsWith('image/') ? 'image' : 'video',
@@ -390,7 +390,7 @@ export const Huddle = () => {
         variant: "destructive",
       });
     }
-  }, [id, user, toast]);
+  }, [huddleId, user, toast]);
 
   // Message actions
   const handleMegaphone = useCallback(async (messageId: string) => {
@@ -557,7 +557,7 @@ export const Huddle = () => {
             onSendMedia={sendMediaMessage}
             placeholder="Share your thoughts..."
             disabled={loading}
-            huddleId={id!}
+            huddleId={huddleId!}
             teamName={teamName}
             onTyping={(isTyping) => {
               if (isTyping && user?.id) {
