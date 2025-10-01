@@ -93,15 +93,24 @@ export const Huddle = () => {
           setMessages(messagesWithProfiles);
         }
 
-        // Load members
-        const { data: membersData } = await supabase
+        // Load members - simplified query
+        const { data: membersData, error: membersError } = await supabase
           .from('huddle_members')
-          .select(`user_id, profiles (user_id, display_name, username, avatar_url)`)
+          .select('user_id')
           .eq('huddle_id', id)
           .limit(20);
 
-        if (membersData) {
-          setMembers(membersData.map(m => m.profiles).filter(Boolean));
+        if (membersError) {
+          console.error('Error loading members:', membersError);
+        } else if (membersData && membersData.length > 0) {
+          // Fetch profiles separately
+          const memberIds = membersData.map(m => m.user_id);
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('user_id, display_name, username, avatar_url')
+            .in('user_id', memberIds);
+
+          setMembers(profilesData || []);
         }
         
       } catch (error) {

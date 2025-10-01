@@ -144,12 +144,17 @@ export const HuddleSearch = () => {
   );
 
   return (
-    <MobileLayout>
-      <GlassHeader 
-        title="Discover Verified Huddles"
-        onBack={() => window.history.back()}
-      />
-      <div className="flex-1 overflow-auto">
+    <div className="min-h-screen bg-background crt-effect">
+      <div className="fixed inset-0 pointer-events-none opacity-10">
+        <div className="absolute inset-0 retro-grid"></div>
+        <div className="absolute inset-0 retro-scanlines"></div>
+      </div>
+      <div className="relative">
+        <GlassHeader 
+          title="Discover Verified Huddles"
+          onBack={() => window.history.back()}
+        />
+        <div className="flex-1 overflow-auto font-arcade">
         <div className="container mx-auto p-4 max-w-4xl">
           <div className="mb-4">
             <p className="text-muted-foreground text-sm">
@@ -193,6 +198,7 @@ export const HuddleSearch = () => {
         </div>
       </div>
       <BottomNav />
-    </MobileLayout>
+      </div>
+    </div>
   );
 };

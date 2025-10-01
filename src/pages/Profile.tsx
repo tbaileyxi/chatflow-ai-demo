@@ -164,15 +164,15 @@ export const Profile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">Loading profile...</div>
+      <div className="min-h-screen bg-background crt-effect flex items-center justify-center">
+        <div className="text-muted-foreground font-arcade">Loading profile...</div>
       </div>
     );
   }
 
   if (!profile) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-background crt-effect flex items-center justify-center">
         <Alert className="max-w-md">
           <AlertDescription>Profile not found.</AlertDescription>
         </Alert>
@@ -181,7 +181,12 @@ export const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4">
+    <div className="min-h-screen bg-background crt-effect p-4">
+      <div className="fixed inset-0 pointer-events-none opacity-10">
+        <div className="absolute inset-0 retro-grid"></div>
+        <div className="absolute inset-0 retro-scanlines"></div>
+      </div>
+      <div className="relative">
       <div className="max-w-2xl mx-auto space-y-6">
         <Card>
           <CardHeader>
@@ -292,6 +297,7 @@ export const Profile = () => {
             </Button>
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );
