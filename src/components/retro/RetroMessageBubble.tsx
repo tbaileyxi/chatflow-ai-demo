@@ -2,11 +2,9 @@ import React, { memo, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
 import { formatDistanceToNow } from 'date-fns';
-import { Megaphone, Copy, Smile } from 'lucide-react';
+import { Megaphone, Copy, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -41,8 +39,8 @@ interface RetroMessageBubbleProps {
   className?: string;
 }
 
-// Emoji reactions for inline display
-const TEAM_EMOJIS = ['🔥', '⚡', '💪', '🎯', '🏈', '👏', '💯', '🚀'];
+// Simplified reactions - only 3 static emojis for mobile-first
+const SIMPLE_REACTIONS = ['🔥', '👍', '😂'];
 
 export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   message,
@@ -55,9 +53,9 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   className
 }) => {
   const [showActions, setShowActions] = useState(false);
-  const [activeReactions, setActiveReactions] = useState<string[]>([]);
-  const [broadcastOpen, setBroadcastOpen] = useState(false);
-  const [alsoHighlight, setAlsoHighlight] = useState(false);
+  const [broadcastPopoverOpen, setBroadcastPopoverOpen] = useState(false);
+  const [includeHighlight, setIncludeHighlight] = useState(false);
+  const [reactions, setReactions] = useState<{ emoji: string; count: number }[]>([]);
   const { toast } = useToast();
 
   const isBot = message.is_bot_message || message.is_team_agent_message;
@@ -93,52 +91,57 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
 
   const handleBroadcast = useCallback(() => {
     onMegaphone?.(message.id);
-    if (alsoHighlight) {
+    if (includeHighlight) {
       onHighlight?.(message.id);
     }
     toast({
       title: "Broadcasted!",
-      description: alsoHighlight 
+      description: includeHighlight 
         ? "Message sent to Spotlight and saved to Highlights"
         : "Message sent to Spotlight Feed",
     });
-    setBroadcastOpen(false);
-    setAlsoHighlight(false);
-  }, [message.id, alsoHighlight, onMegaphone, onHighlight, toast]);
+    setBroadcastPopoverOpen(false);
+    setIncludeHighlight(false);
+  }, [message.id, includeHighlight, onMegaphone, onHighlight, toast]);
 
   const handleReaction = useCallback((emoji: string) => {
-    setActiveReactions(prev => 
-      prev.includes(emoji) 
-        ? prev.filter(r => r !== emoji)
-        : [...prev, emoji]
-    );
+    setReactions(prev => {
+      const existing = prev.find(r => r.emoji === emoji);
+      if (existing) {
+        return prev.map(r => r.emoji === emoji ? { ...r, count: r.count + 1 } : r);
+      }
+      return [...prev, { emoji, count: 1 }];
+    });
     toast({
       title: "Reacted!",
       description: `Added ${emoji} reaction`,
     });
   }, [toast]);
 
-  // Bot messages = full-width embeds
+  // Bot messages = full-width updates with solid text
   if (isBot) {
     return (
       <div className="w-full px-2 py-1">
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          whileHover={{ scale: 1.005, rotateX: 0.5 }}
-          transition={{ duration: 0.2 }}
-          className="retro-megaphone p-4 rounded-lg border-2 border-yellow-600/60 bg-gradient-to-r from-yellow-400 to-amber-500 text-black shadow-[0_0_20px_rgba(251,191,36,0.4)]"
+          className="retro-megaphone p-3 sm:p-4 rounded-lg border-2 border-yellow-600/60 bg-gradient-to-r from-yellow-400 to-amber-500 shadow-lg"
         >
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-black animate-pulse" />
-            <span className="font-arcade text-[10px] tracking-wider uppercase">Live Update</span>
-            <span className="font-pixel text-xs opacity-70 ml-auto">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-black animate-pulse" />
+              <span className="font-bold text-xs tracking-wider uppercase text-black">Live Update</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground/60">
               {formattedTime}
-            </span>
+            </div>
           </div>
           
-          <div className="font-orbitron text-sm font-bold leading-relaxed">
-            {message.content}
+          {/* Fixed: Solid color text instead of unreadable gradient */}
+          <div className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-team-primary/20 to-team-secondary/20 border border-team-primary/30">
+            <p className="text-sm font-medium text-foreground">
+              {message.content}
+            </p>
           </div>
           
           {message.embed_code && (
@@ -148,224 +151,209 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             />
           )}
 
-          {/* Bot message actions */}
-          <div className="flex items-center gap-2 mt-3 pt-2 border-t border-black/20">
-            <button
+          {/* Bot message actions - simplified */}
+          <div className="flex items-center gap-2 mt-3">
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleCopy}
-              className="p-1.5 hover:bg-black/10 rounded transition-colors"
-              title="Copy"
+              className="h-7 px-2 text-xs hover:bg-team-primary/20 text-team-primary rounded-lg"
             >
-              <Copy className="w-3.5 h-3.5" />
-            </button>
-            <button
+              <Copy className="h-3 w-3 mr-1" />
+              Copy
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleCallout}
-              className="p-1.5 hover:bg-black/10 rounded transition-colors"
-              title="Save to Highlights"
+              className="h-7 px-2 text-xs hover:bg-team-primary/20 text-team-primary rounded-lg"
             >
-              <Copy className="w-3.5 h-3.5" />
-            </button>
+              <Trophy className="h-3 w-3 mr-1" />
+              Save
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 text-lg hover:bg-team-primary/20 rounded-lg"
+              onClick={handleCallout}
+            >
+              🔥
+            </Button>
           </div>
         </motion.div>
       </div>
     );
   }
 
-  // Regular user messages - left-aligned, tight spacing
+  // Regular user messages - mobile-first design
   return (
     <motion.div
-      initial={{ opacity: 0, y: 5 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15, ease: "easeOut" }}
       className={cn(
-        "group relative py-0.5 px-2 hover:bg-team-primary/5 transition-all duration-200 rounded",
-        className
+        "group flex gap-2 sm:gap-3 hover:bg-team-primary/5 p-2 sm:p-3 rounded-lg transition-colors",
+        "relative touch-manipulation"
       )}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
+      onTouchStart={() => setShowActions(true)}
     >
-      {/* Message Content - Left-aligned */}
-      <div className="flex gap-2 items-start">
-        {/* Avatar */}
-        <Avatar className="h-7 w-7 shrink-0 mt-0.5 border border-team-primary/30">
-          <AvatarImage src={user?.avatar_url} alt={displayName} />
-          <AvatarFallback className="text-xs font-pixel bg-team-primary/20 text-team-primary">
-            {displayName.charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+      {/* Avatar - smaller on mobile */}
+      <Avatar className="h-7 w-7 sm:h-8 sm:w-8 ring-2 ring-team-primary/30 shrink-0">
+        <AvatarImage src={user?.avatar_url} />
+        <AvatarFallback className="bg-team-primary/20 text-team-primary text-xs">
+          {displayName.slice(0, 2).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
 
-        {/* Message Content */}
-        <div className="flex-1 min-w-0">
-          {/* Header with name and time */}
-          <div className="flex items-baseline gap-2 mb-0.5">
-            <span className="font-chat font-semibold text-xs text-team-primary truncate">
-              {displayName}
-            </span>
-            <span className="text-[10px] text-muted-foreground font-pixel ml-auto shrink-0">
-              {formattedTime}
-            </span>
-          </div>
+      {/* Content - full width on mobile */}
+      <div className="flex-1 min-w-0">
+        {/* Header - responsive */}
+        <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+          <span className="font-semibold text-team-primary text-xs sm:text-sm truncate">
+            {displayName}
+          </span>
+          <span className="text-xs text-muted-foreground/60 shrink-0">
+            {formattedTime}
+          </span>
+        </div>
 
-          {/* Message Bubble */}
-          <div className={cn(
-            "relative inline-block max-w-[85%] px-3 py-1.5 rounded-xl text-sm leading-relaxed transition-all duration-200",
-            "bg-muted/60 text-foreground border border-border/50",
-            "hover:bg-muted/70 hover:shadow-md"
-          )}>
-            <div className="font-chat whitespace-pre-wrap break-words">
-              {message.content}
-            </div>
+        {/* Message content - mobile optimized padding */}
+        <div className="retro-bubble p-2 sm:p-3 rounded-lg border border-team-primary/30 bg-gradient-to-br from-background/80 to-team-primary/5 backdrop-blur-sm">
+          <p className="text-xs sm:text-sm text-foreground whitespace-pre-wrap break-words">
+            {message.content}
+          </p>
 
-            {/* Inline Embeds */}
-            {(message.embeds && message.embeds.length > 0) || message.embed_code ? (
-              <div className="mt-2 -mx-1">
-                <div className="retro-embed overflow-hidden rounded-lg border border-team-primary/30 bg-background/50">
-                  {message.embed_code && (
-                    <div 
-                      className="w-full p-2"
-                      dangerouslySetInnerHTML={{ __html: message.embed_code }}
-                    />
-                  )}
-                </div>
-              </div>
-            ) : null}
-
-            {/* Media */}
-            {message.media_url && (
-              <div className="mt-2 -mx-1">
-                {message.media_type === 'image' ? (
-                  <img
-                    src={message.media_url}
-                    alt="Shared media"
-                    className="max-w-full rounded-lg shadow-sm"
-                    loading="lazy"
-                  />
-                ) : (
-                  <video
-                    src={message.media_url}
-                    controls
-                    className="max-w-full rounded-lg shadow-sm"
-                    preload="metadata"
-                  />
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Active Reactions - Inline with burst animation */}
-          {activeReactions.length > 0 && (
-            <div className="flex gap-1 mt-1">
-              {activeReactions.map((emoji, index) => (
-                <motion.span 
-                  key={index}
-                  initial={{ scale: 0, rotate: -180 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 15 }}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-team-primary/20 border border-team-primary/40 rounded-full shadow-sm"
-                >
-                  {emoji} <span className="text-xs font-pixel text-team-primary font-bold">1</span>
-                </motion.span>
-              ))}
+          {/* Media - responsive sizing */}
+          {message.media_url && (
+            <div className="mt-2 rounded-lg overflow-hidden border border-team-primary/20">
+              {message.media_type === 'image' ? (
+                <img 
+                  src={message.media_url} 
+                  alt="Shared media" 
+                  className="w-full h-auto max-h-60 sm:max-h-96 object-contain bg-black/20"
+                />
+              ) : (
+                <video 
+                  src={message.media_url} 
+                  controls 
+                  className="w-full h-auto max-h-60 sm:max-h-96 bg-black/20"
+                />
+              )}
             </div>
           )}
 
-          {/* Action Buttons - Show on hover */}
-          <AnimatePresence>
-            {showActions && (
+          {/* Embeds */}
+          {message.embed_code && (
+            <div className="mt-2">
+              <div 
+                className="retro-embed"
+                dangerouslySetInnerHTML={{ __html: message.embed_code }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Reactions - mobile-friendly touch targets */}
+        {reactions.length > 0 && (
+          <motion.div 
+            className="flex gap-1.5 mt-2 flex-wrap"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+          >
+            {reactions.map((reaction, idx) => (
               <motion.div
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -5 }}
-                transition={{ duration: 0.15 }}
-                className="flex items-center gap-1 mt-1"
+                key={idx}
+                className="px-2.5 py-1 rounded-full bg-team-primary/20 border border-team-primary/30 text-xs flex items-center gap-1 min-h-[28px] touch-manipulation"
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: idx * 0.05, type: "spring" }}
               >
-                {/* Emoji Reaction Picker */}
-                <Popover>
+                <span className="text-base">{reaction.emoji}</span>
+                <span className="text-team-primary font-medium">{reaction.count}</span>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+
+        {/* Action buttons - simplified mobile-friendly */}
+        <AnimatePresence>
+          {showActions && (
+            <motion.div
+              className="flex items-center gap-1 sm:gap-1.5 mt-2 flex-wrap"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              {/* Simple static reactions - mobile-first */}
+              {SIMPLE_REACTIONS.map((emoji) => (
+                <Button
+                  key={emoji}
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 sm:h-9 sm:w-9 p-0 text-lg sm:text-xl hover:bg-team-primary/20 hover:scale-110 transition-all rounded-full touch-manipulation"
+                  onClick={() => handleReaction(emoji)}
+                >
+                  {emoji}
+                </Button>
+              ))}
+
+              {/* Copy */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCopy}
+                className="h-8 px-2 sm:px-3 text-xs hover:bg-team-primary/20 text-muted-foreground rounded-full touch-manipulation"
+              >
+                <Copy className="h-3 w-3 sm:mr-1" />
+                <span className="hidden sm:inline">Copy</span>
+              </Button>
+
+              {/* Admin broadcast - mobile optimized */}
+              {isAdmin && (
+                <Popover open={broadcastPopoverOpen} onOpenChange={setBroadcastPopoverOpen}>
                   <PopoverTrigger asChild>
-                    <button
-                      className="p-1 hover:bg-team-primary/20 rounded transition-colors"
-                      title="React"
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 sm:px-3 text-xs hover:bg-destructive/20 text-destructive rounded-full touch-manipulation"
                     >
-                      <Smile className="w-3 h-3 text-team-primary" />
-                    </button>
+                      <Megaphone className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">Broadcast</span>
+                    </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-2 bg-background/95 backdrop-blur border-team-primary/30">
-                    <div className="flex gap-1">
-                      {TEAM_EMOJIS.map((emoji) => (
-                        <motion.button
-                          key={emoji}
-                          onClick={() => handleReaction(emoji)}
-                          whileHover={{ scale: 1.2 }}
-                          whileTap={{ scale: 0.9 }}
-                          className="text-lg p-1 hover:bg-team-primary/10 rounded transition-colors"
-                        >
-                          {emoji}
-                        </motion.button>
-                      ))}
+                  <PopoverContent className="w-64 p-3 bg-background/95 backdrop-blur-sm border-team-primary/30" align="end">
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="includeHighlight"
+                          checked={includeHighlight}
+                          onChange={(e) => setIncludeHighlight(e.target.checked)}
+                          className="h-4 w-4 touch-manipulation"
+                        />
+                        <label htmlFor="includeHighlight" className="text-sm">
+                          Also add to highlights
+                        </label>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          handleBroadcast();
+                          setBroadcastPopoverOpen(false);
+                        }}
+                        className="w-full bg-destructive hover:bg-destructive/90 touch-manipulation min-h-[44px]"
+                        size="sm"
+                      >
+                        <Megaphone className="h-3 w-3 mr-2" />
+                        Confirm Broadcast
+                      </Button>
                     </div>
                   </PopoverContent>
                 </Popover>
-
-                {/* Copy Button */}
-                <button
-                  onClick={handleCopy}
-                  className="p-1 hover:bg-team-primary/20 rounded transition-colors"
-                  title="Copy"
-                >
-                  <Copy className="w-3 h-3 text-team-primary" />
-                </button>
-
-                {/* Call Out (Save to Highlights) */}
-                <button
-                  onClick={handleCallout}
-                  className="p-1 hover:bg-team-primary/20 rounded transition-colors font-arcade text-[10px]"
-                  title="Save to Highlights"
-                >
-                  ⭐
-                </button>
-
-                {/* Admin Broadcast with Highlight Toggle */}
-                {isAdmin && (
-                  <Popover open={broadcastOpen} onOpenChange={setBroadcastOpen}>
-                    <PopoverTrigger asChild>
-                      <button
-                        className="p-1 hover:bg-team-primary/20 rounded transition-colors"
-                        title="Broadcast to Spotlight"
-                      >
-                        <Megaphone className="w-3 h-3 text-team-primary" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-64 bg-background/95 backdrop-blur border-team-primary/30 p-4">
-                      <div className="space-y-3">
-                        <h4 className="font-orbitron text-sm text-team-primary font-bold">Broadcast Message</h4>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="highlight-toggle"
-                            checked={alsoHighlight}
-                            onCheckedChange={(checked) => setAlsoHighlight(checked as boolean)}
-                          />
-                          <label
-                            htmlFor="highlight-toggle"
-                            className="text-sm font-chat cursor-pointer"
-                          >
-                            Also save to Highlights
-                          </label>
-                        </div>
-                        <Button
-                          onClick={handleBroadcast}
-                          className="w-full retro-megaphone"
-                          size="sm"
-                        >
-                          <Megaphone className="w-3 h-3 mr-2" />
-                          Broadcast
-                        </Button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );

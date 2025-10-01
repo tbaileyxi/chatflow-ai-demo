@@ -17,15 +17,15 @@ export const JumpToLatest: React.FC<JumpToLatestProps> = ({ visible, onClick }) 
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="fixed bottom-20 right-4 z-50"
+          className="fixed bottom-24 sm:bottom-20 right-3 sm:right-4 z-50"
         >
           <Button
             onClick={onClick}
-            className="bg-primary text-white rounded-full shadow-lg px-4 py-2 hover:bg-primary/90 transition-colors"
+            className="bg-primary text-white rounded-full shadow-lg px-3 sm:px-4 py-2 hover:bg-primary/90 transition-colors touch-manipulation min-h-[44px]"
             size="sm"
           >
-            <ChevronDown className="h-4 w-4 mr-1" />
-            Jump to latest
+            <ChevronDown className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Jump to latest</span>
           </Button>
         </motion.div>
       )}

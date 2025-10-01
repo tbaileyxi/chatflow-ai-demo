@@ -44,10 +44,10 @@ const AppContent = () => {
       
       <div className="relative flex-1 overflow-hidden">
         <Routes>
-          <Route path="/" element={<Landing />} />
+          <Route path="/" element={<MobileHome />} />
           <Route path="/bills-demo" element={<BillsChatDemo />} />
           <Route path="/retro-demo" element={<RetroDemo />} />
-          <Route path="/onboard" element={<Index />} />
+          <Route path="/onboard" element={<MobileHome />} />
           <Route path="/app" element={<MobileHome />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/auth" element={<Auth />} />
