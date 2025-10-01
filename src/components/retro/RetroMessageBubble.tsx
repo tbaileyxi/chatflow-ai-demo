@@ -162,23 +162,9 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
               <Copy className="h-3 w-3 mr-1" />
               Copy
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCallout}
-              className="h-7 px-2 text-xs hover:bg-team-primary/20 text-team-primary rounded-lg"
-            >
-              <Trophy className="h-3 w-3 mr-1" />
-              Save
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0 text-lg hover:bg-team-primary/20 rounded-lg"
-              onClick={handleCallout}
-            >
+            <span className="text-lg ml-1">
               🔥
-            </Button>
+            </span>
           </div>
         </motion.div>
       </div>
