@@ -19,7 +19,7 @@ import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 export const Huddle = () => {
   const { huddleId } = useParams<{ huddleId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   
   const [huddle, setHuddle] = useState<any>(null);
@@ -408,8 +408,15 @@ export const Huddle = () => {
       <div className="flex-1 flex flex-col sm:flex-row relative overflow-hidden">
         {/* Messages container - full width on mobile */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Messages - mobile optimized scrolling */}
+          {/* Messages - mobile optimized scrolling with proper ref connection */}
           <div 
+            ref={(el) => {
+              if (el && scrollRef.current) {
+                scrollRef.current.scrollToBottom = (behavior = 'smooth') => {
+                  el.scrollTo({ top: el.scrollHeight, behavior });
+                };
+              }
+            }}
             className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-4 py-3 sm:py-4 retro-chat-column touch-pan-y"
             onScroll={(e) => {
               const target = e.target as HTMLDivElement;
@@ -432,7 +439,7 @@ export const Huddle = () => {
                     message={message}
                     user={message.profile}
                     currentUserId={user?.id}
-                    isAdmin={false}
+                    isAdmin={isAdmin}
                     isGrouped={isGrouped}
                   />
                 );
@@ -443,26 +450,25 @@ export const Huddle = () => {
           {/* Jump to latest button */}
           <JumpToLatest visible={showJumpToLatest} onClick={jumpToLatest} />
 
-          {/* Chat input - sticky at bottom on mobile with bottom nav padding */}
-          <div className="pb-14">
-            <RetroChatInput
-              onSendMessage={sendMessage}
-              onSendMedia={sendMediaMessage}
-              placeholder="Share your thoughts..."
-              disabled={loading}
-              huddleId={huddleId!}
-              teamName={teamName}
-              onTyping={(isTyping) => {
-                if (isTyping && user?.id) {
-                  supabase.channel(`typing:${huddleId}`).send({
-                    type: 'broadcast',
-                    event: 'typing',
-                    payload: { userId: user.id, isTyping: true }
-                  });
-                }
-              }}
-            />
-          </div>
+          {/* Chat input - sticky at bottom */}
+          <RetroChatInput
+            onSendMessage={sendMessage}
+            onSendMedia={sendMediaMessage}
+            placeholder="Share your thoughts..."
+            disabled={loading}
+            huddleId={huddleId!}
+            teamName={teamName}
+            isAdmin={isAdmin}
+            onTyping={(isTyping) => {
+              if (isTyping && user?.id) {
+                supabase.channel(`typing:${huddleId}`).send({
+                  type: 'broadcast',
+                  event: 'typing',
+                  payload: { userId: user.id, isTyping: true }
+                });
+              }
+            }}
+          />
         </div>
 
         {/* Collapsible highlights sidebar - slide over on mobile */}
@@ -480,11 +486,16 @@ export const Huddle = () => {
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation with Pick Em */}
-      <MobileBottomNav 
-        onPickEmClick={() => setPickEmDialog({ open: true })}
-        showPickEm={true}
-      />
+      {/* Floating Highlights Button - always accessible */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setShowHighlights(!showHighlights)}
+        className="fixed bottom-20 right-4 z-40 h-14 w-14 rounded-full bg-team-primary/90 hover:bg-team-primary backdrop-blur-sm shadow-lg touch-manipulation"
+        aria-label="View highlights"
+      >
+        <Trophy className="h-6 w-6 text-white" />
+      </Button>
 
       {/* Pick 'Em Dialog */}
       {pickEmDialog.instanceId && (

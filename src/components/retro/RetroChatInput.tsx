@@ -21,6 +21,7 @@ interface RetroChatInputProps {
   onPickEm?: () => void;
   showPickEm?: boolean;
   teamName?: string;
+  isAdmin?: boolean;
 }
 
 const TEAM_EMOJIS = [
@@ -40,7 +41,8 @@ export const RetroChatInput = ({
   onSlashComplete,
   onPickEm,
   showPickEm = false,
-  teamName
+  teamName,
+  isAdmin = false
 }: RetroChatInputProps) => {
   const [message, setMessage] = useState('');
   const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
@@ -317,8 +319,79 @@ export const RetroChatInput = ({
                 <Plus className="w-5 h-5 text-team-primary" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-48 p-2 bg-background/95 backdrop-blur-sm border-team-primary/30" side="top">
-              <div className="grid gap-1">
+            <PopoverContent className="w-56 p-2 bg-background/95 backdrop-blur-sm border-team-primary/30" side="top">
+              <div className="space-y-1">
+                <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
+                  Quick Actions
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    handleEmojiSelect('🔥');
+                    setMediaOptionsOpen(false);
+                  }}
+                  className="justify-start h-10 w-full font-exo2 text-base"
+                  disabled={disabled || sending}
+                >
+                  🔥 Fire
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    toast({ title: "Heat Check!", description: "Quick Pick 'Em coming soon!" });
+                    setMediaOptionsOpen(false);
+                  }}
+                  className="justify-start h-10 w-full font-exo2 text-base"
+                  disabled={disabled || sending}
+                >
+                  ⚡ Heat Check
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    handleEmojiSelect('👍');
+                    setMediaOptionsOpen(false);
+                  }}
+                  className="justify-start h-10 w-full font-exo2 text-base"
+                  disabled={disabled || sending}
+                >
+                  👍 Thumbs Up
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(message);
+                      toast({ title: "Copied!", description: "Message copied to clipboard" });
+                    } catch (err) {
+                      toast({ title: "Error", description: "Failed to copy", variant: "destructive" });
+                    }
+                    setMediaOptionsOpen(false);
+                  }}
+                  className="justify-start h-10 w-full font-exo2"
+                  disabled={disabled || sending || !message.trim()}
+                >
+                  📋 Copy Message
+                </Button>
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      toast({ title: "Sent to Spotlight!", description: "Message broadcasted" });
+                      setMediaOptionsOpen(false);
+                    }}
+                    className="justify-start h-10 w-full font-exo2 text-destructive"
+                    disabled={disabled || sending || !message.trim()}
+                  >
+                    📣 Send to Spotlight
+                  </Button>
+                )}
+                <div className="h-px bg-border my-1" />
                 <Button
                   variant="ghost"
                   size="sm"
@@ -326,7 +399,7 @@ export const RetroChatInput = ({
                     cameraInputRef.current?.click();
                     setMediaOptionsOpen(false);
                   }}
-                  className="justify-start h-8 font-exo2"
+                  className="justify-start h-10 w-full font-exo2"
                   disabled={disabled || sending || uploading}
                 >
                   <Camera className="h-4 w-4 mr-2" />
@@ -339,27 +412,12 @@ export const RetroChatInput = ({
                     photoInputRef.current?.click();
                     setMediaOptionsOpen(false);
                   }}
-                  className="justify-start h-8 font-exo2"
+                  className="justify-start h-10 w-full font-exo2"
                   disabled={disabled || sending || uploading}
                 >
                   <Image className="h-4 w-4 mr-2" />
                   Choose Photo
                 </Button>
-                {showPickEm && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="justify-start h-8 text-team-primary font-exo2"
-                    disabled={disabled || sending}
-                    onClick={() => {
-                      onPickEm?.();
-                      setMediaOptionsOpen(false);
-                    }}
-                  >
-                    <Trophy className="h-4 w-4 mr-2" />
-                    Start Pick 'Em
-                  </Button>
-                )}
               </div>
             </PopoverContent>
           </Popover>

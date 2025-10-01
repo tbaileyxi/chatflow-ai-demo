@@ -35,7 +35,9 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
         // Check if script already exists
         const existingScript = document.querySelector('script[src="https://platform.twitter.com/widgets.js"]');
         if (existingScript) {
-          // Wait for existing script to load
+          // Wait for existing script to load with timeout
+          let attempts = 0;
+          const maxAttempts = 50;
           const checkLoaded = () => {
             if (signal.aborted) {
               reject(new Error('Aborted'));
@@ -43,8 +45,11 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
             }
             if ((window as any).twttr?.widgets) {
               resolve();
-            } else {
+            } else if (attempts < maxAttempts) {
+              attempts++;
               setTimeout(checkLoaded, 100);
+            } else {
+              reject(new Error('Timeout waiting for Twitter widgets'));
             }
           };
           checkLoaded();
@@ -56,7 +61,10 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
         script.async = true;
         script.charset = 'utf-8';
         script.onload = () => {
-          if (!signal.aborted) resolve();
+          if (!signal.aborted) {
+            // Wait a bit for widgets to initialize
+            setTimeout(() => resolve(), 100);
+          }
         };
         script.onerror = () => {
           if (!signal.aborted) {
@@ -182,7 +190,55 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
     );
   }
 
-  // Handle oEmbed HTML - aggressively clean to prevent double rendering
+  // Handle blockquote format from Twitter
+  const blockquoteMatch = embedCode.match(/<blockquote[^>]*class="twitter-tweet"[^>]*>(.*?)<\/blockquote>/is);
+  
+  if (blockquoteMatch) {
+    // Use the same flow as direct URL - extract tweet ID from blockquote
+    const tweetUrlInBlockquote = embedCode.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/(?:@)?(\w+)\/status\/(\d+)/);
+    
+    if (tweetUrlInBlockquote) {
+      const tweetId = tweetUrlInBlockquote[2];
+      const username = tweetUrlInBlockquote[1];
+      const normalizedUrl = `https://twitter.com/${username}/status/${tweetId}`;
+      
+      return (
+        <div 
+          ref={containerRef}
+          className="rounded-xl overflow-hidden w-full my-2 relative"
+          style={{ 
+            pointerEvents: 'auto',
+            contain: 'layout style',
+            minHeight: isLoading ? '200px' : 'auto'
+          }}
+        >
+          {isLoading && !isLoaded && !error && (
+            <div className="flex items-center justify-center p-8 bg-muted/50 rounded-xl min-h-[200px]">
+              <div className="flex flex-col items-center space-y-2">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="text-sm text-muted-foreground">Loading tweet...</div>
+              </div>
+            </div>
+          )}
+          {error && (
+            <div className="flex flex-col items-center justify-center p-6 bg-muted/50 rounded-xl min-h-[150px] space-y-3">
+              <div className="text-sm font-medium text-muted-foreground">{error}</div>
+              <a 
+                href={normalizedUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline"
+              >
+                View on X/Twitter →
+              </a>
+            </div>
+          )}
+        </div>
+      );
+    }
+  }
+  
+  // Fallback: Handle oEmbed HTML - aggressively clean to prevent double rendering
   const sanitizedHtml = embedCode
     .replace(/<script[^>]*src="https:\/\/platform\.twitter\.com\/widgets\.js"[^>]*><\/script>/gi, '')
     .replace(/<script[^>]*>.*?<\/script>/gi, '') // Remove any other scripts
