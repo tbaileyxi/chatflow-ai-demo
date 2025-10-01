@@ -116,11 +116,10 @@ export const RetroHuddleLayout: React.FC<RetroHuddleLayoutProps> = ({
               </Sheet>
 
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-team-secondary rounded-full animate-pulse" />
-                <span className="font-orbitron font-bold text-team-primary">
-                  {huddle?.name || 'Loading...'}
+                <span className="font-orbitron font-bold text-lg neon-text">
+                  {theme.name} Game Chat
                 </span>
-                <span className="text-xs text-muted-foreground font-pixel">
+                <span className="text-lg">
                   {theme.mascot}
                 </span>
               </div>

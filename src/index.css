@@ -791,10 +791,71 @@ All colors MUST be HSL.
   color: color-mix(in srgb, hsl(var(--foreground)), white 80%);
 }
 
+/* Retro Grid Background */
+.retro-grid {
+  background-image: var(--retro-grid);
+  background-size: 40px 40px;
+  animation: retro-grid-move 20s linear infinite;
+}
+
+@keyframes retro-grid-move {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 40px 40px;
+  }
+}
+
+/* Retro Scanlines */
+.retro-scanlines {
+  background-image: var(--retro-scanlines);
+  background-size: 100% 3px;
+  animation: retro-scan 8s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes retro-scan {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 100%;
+  }
+}
+
+/* Neon Pulse Animation */
+@keyframes neon-pulse {
+  0%, 100% {
+    text-shadow: 
+      0 0 5px hsl(var(--team-primary) / 0.5),
+      0 0 10px hsl(var(--team-primary) / 0.3),
+      0 0 20px hsl(var(--team-primary) / 0.2);
+  }
+  50% {
+    text-shadow: 
+      0 0 10px hsl(var(--team-primary) / 0.8),
+      0 0 20px hsl(var(--team-primary) / 0.5),
+      0 0 30px hsl(var(--team-primary) / 0.3);
+  }
+}
+
 /* CRT Screen Effect */
 .crt-effect {
   position: relative;
   animation: crt-flicker 0.15s linear infinite;
+}
+
+@keyframes crt-flicker {
+  0% {
+    opacity: 0.98;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.98;
+  }
 }
 
 .crt-effect::after {
@@ -811,4 +872,28 @@ All colors MUST be HSL.
   background-size: 100% 2px;
   pointer-events: none;
   animation: crt-flicker 0.15s linear infinite;
+}
+
+/* Retro Button Glow */
+.retro-button-glow {
+  box-shadow: var(--retro-glow);
+  transition: all 0.2s ease;
+}
+
+.retro-button-glow:hover {
+  box-shadow: 
+    0 0 15px hsl(var(--neon-glow) / 0.5),
+    0 0 30px hsl(var(--neon-glow) / 0.3),
+    inset 0 0 15px hsl(var(--neon-glow) / 0.2);
+}
+
+/* Retro Message Glow */
+.retro-message-glow {
+  transition: all 0.3s ease;
+}
+
+.retro-message-glow:hover {
+  box-shadow: 
+    0 4px 15px hsl(var(--team-primary) / 0.2),
+    0 0 10px hsl(var(--team-primary) / 0.1);
 }

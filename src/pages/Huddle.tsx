@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { RetroHuddleLayout } from '@/components/retro/RetroHuddleLayout';
-import { RetroVirtualizedChat } from '@/components/retro/RetroVirtualizedChat';
+import { RetroMessageBubble } from '@/components/retro/RetroMessageBubble';
 import { RetroChatInput } from '@/components/retro/RetroChatInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PickEmView } from '@/components/pickem/PickEmView';
@@ -359,43 +359,57 @@ export const Huddle = () => {
     <RetroHuddleLayout 
       huddleId={id!} 
       teamName={huddle?.team?.name}
-      huddle={huddle}
-      messages={messages.filter(m => m.is_highlighted)}
+      huddle={{ ...huddle, name: huddle?.name || huddle?.team?.name }}
+      messages={messages}
       currentUserId={user?.id}
     >
-      <RetroVirtualizedChat
-        items={messages}
-        currentUserId={user?.id}
-        isAdmin={user?.id === huddle?.owner_id}
-        onMegaphone={handleMegaphone}
-        onHighlight={handleHighlight}
-        onCopyCallout={handleCopyCallout}
-        teamName={huddle?.team?.name}
-        getItemKey={(message) => message.id}
-      />
-      
-      <RetroChatInput
-        onSendMessage={sendMessage}
-        onSendMedia={sendMediaMessage}
-        placeholder="Share your thoughts..."
-        disabled={loading}
-        huddleId={id!}
-        teamName={huddle?.team?.name}
-        onTyping={(isTyping) => {
-          if (isTyping && user?.id) {
-            const now = Date.now();
-            if (now - (lastTypingSentRef.current || 0) > 1200) {
-              lastTypingSentRef.current = now;
-              const name = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User';
-              typingChannelRef.current?.send({
-                type: 'broadcast',
-                event: 'typing',
-                payload: { userId: user.id, name: name }
-              });
-            }
-          }
-        }}
-      />
+      <div className="flex flex-col h-full">
+        <div className="flex-1 overflow-y-auto p-2">
+          <div className="max-w-4xl mx-auto space-y-1">
+            {messages.map((message) => (
+              <RetroMessageBubble
+                key={message.id}
+                message={message}
+                user={message.profiles || {
+                  id: message.user_id,
+                  display_name: 'User',
+                  username: 'user'
+                }}
+                currentUserId={user?.id}
+                isAdmin={user?.id === huddle?.owner_id}
+                onMegaphone={handleMegaphone}
+                onHighlight={handleHighlight}
+                onCopyCallout={handleCopyCallout}
+              />
+            ))}
+          </div>
+        </div>
+        
+        <div className="border-t border-team-primary/30 p-3 bg-background/95 backdrop-blur">
+          <RetroChatInput
+            onSendMessage={sendMessage}
+            onSendMedia={sendMediaMessage}
+            placeholder="Share your thoughts..."
+            disabled={loading}
+            huddleId={id!}
+            teamName={huddle?.team?.name}
+            onTyping={(isTyping) => {
+              if (isTyping && user?.id) {
+                const now = Date.now();
+                if (now - (lastTypingSentRef.current || 0) > 1200) {
+                  lastTypingSentRef.current = now;
+                  const name = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User';
+                  typingChannelRef.current?.send({
+                    type: 'broadcast',
+                    event: 'typing',
+                    payload: { userId: user.id, name: name }
+                  });
+                }
+              }
+            }}
+          />
+        </div>
+      </div>
 
       {/* Pick 'Em View Dialog */}
       {pickEmViewId && (

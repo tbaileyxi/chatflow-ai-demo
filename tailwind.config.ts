@@ -42,7 +42,9 @@ export default {
 			fontFamily: {
 				sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'sans-serif'],
 				arcade: ['Orbitron', 'monospace'],
+				orbitron: ['Orbitron', 'monospace'],
 				chat: ['Exo 2', 'Inter', 'sans-serif'],
+				exo2: ['Exo 2', 'Inter', 'sans-serif'],
 				pixel: ['Press Start 2P', 'monospace'],
 			},
 			colors: {

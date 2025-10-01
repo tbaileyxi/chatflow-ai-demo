@@ -243,12 +243,12 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
         )}
       </AnimatePresence>
 
-        {/* Message Content - Left-aligned like real messaging apps */}
+      {/* Message Content - Left-aligned like real messaging apps */}
       <div className="flex gap-2 items-start">
         {/* Avatar */}
-        <Avatar className="h-6 w-6 shrink-0 mt-0.5">
+        <Avatar className="h-8 w-8 shrink-0 mt-0.5 border border-team-primary/40">
           <AvatarImage src={user?.avatar_url} alt={displayName} />
-          <AvatarFallback className="text-xs font-pixel bg-team-primary/20 text-team-primary">
+          <AvatarFallback className="text-xs font-pixel bg-team-primary/20 text-team-primary border border-team-primary/30">
             {displayName.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
@@ -274,11 +274,11 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
           <div className={cn(
             "relative inline-block max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-relaxed transition-all duration-200",
             isBot 
-              ? "bg-gradient-to-r from-team-primary/15 to-team-secondary/15 border border-team-primary/30 text-contrast-auto-adjust" 
+              ? "bg-gradient-to-r from-yellow-400/80 to-amber-500/80 border-2 border-yellow-500/50 text-black font-bold shadow-lg shadow-yellow-500/30" 
               : isOwnMessage
-              ? "bg-team-primary text-contrast-auto-adjust"
-              : "bg-muted/60 text-contrast-auto-adjust",
-            "hover:shadow-lg hover:scale-[1.01] retro-message-glow"
+              ? "bg-team-primary/90 text-white border border-team-primary/50"
+              : "bg-muted/80 text-foreground border border-border",
+            "hover:shadow-lg hover:scale-[1.01]"
           )}>
             <div className="font-exo2 whitespace-pre-wrap break-words">
               {message.content}
