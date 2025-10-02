@@ -11,10 +11,11 @@ import { PickEmView } from '@/components/pickem/PickEmView';
 import { useToast } from '@/hooks/use-toast';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { JumpToLatest } from '@/components/JumpToLatest';
-import { UserPlus, Zap, ArrowLeft, Settings } from 'lucide-react';
+import { Zap, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { HuddleManagement } from '@/components/HuddleManagement';
+import { HuddleSettingsDropdown } from '@/components/HuddleSettingsDropdown';
+import { InviteButton } from '@/components/InviteButton';
 
 export const Huddle = () => {
   const { huddleId } = useParams<{ huddleId: string }>();
@@ -392,15 +393,13 @@ export const Huddle = () => {
           
           {/* Action buttons - touch-friendly on mobile */}
           <div className="flex items-center gap-1 sm:gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(`/huddle/${huddleId}/settings`)}
-              className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-full hover:bg-team-primary/20"
-              aria-label="Add members"
-            >
-              <UserPlus className="h-4 w-4 sm:h-5 sm:w-5 text-team-primary" />
-            </Button>
+            {/* Invite button */}
+            <InviteButton 
+              huddleId={huddleId!} 
+              ownerDisplayName={huddle?.owner?.display_name}
+              teamName={teamName}
+              className="h-8 w-8 sm:h-9 sm:w-9"
+            />
             
             <div className="relative group">
               <Button
@@ -418,14 +417,14 @@ export const Huddle = () => {
               </div>
             </div>
 
-            {/* Huddle Management for Owners */}
-            {isOwner && (
-              <HuddleManagement 
-                huddleId={huddleId!} 
-                ownerId={huddle.owner_id}
-                huddle={huddle}
-              />
-            )}
+            {/* Settings dropdown */}
+            <HuddleSettingsDropdown
+              huddleId={huddleId!}
+              ownerId={huddle.owner_id}
+              isOwner={isOwner}
+              isVerified={huddle?.is_verified}
+              huddle={huddle}
+            />
           </div>
         </div>
       </div>

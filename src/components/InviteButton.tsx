@@ -31,12 +31,28 @@ export const InviteButton: React.FC<InviteButtonProps> = ({ huddleId, ownerDispl
     const inviteMessage = generateInviteMessage();
     
     try {
+      // Try native share API first on mobile
+      if (navigator.share && /mobile|android|iphone|ipad/i.test(navigator.userAgent)) {
+        await navigator.share({
+          title: `Join ${teamName || 'our huddle'}`,
+          text: inviteMessage,
+        });
+        
+        toast({
+          title: "Invite shared!",
+          description: "Invite link shared successfully",
+        });
+        return;
+      }
+
+      // Fallback to clipboard
       await navigator.clipboard.writeText(inviteMessage);
       setCopied(true);
       
       toast({
-        title: "Invite message copied!",
-        description: "Share this personalized invite to join the huddle",
+        title: "Invite copied!",
+        description: "Link copied - share it to invite members",
+        duration: 3000,
       });
 
       // Reset copied state after 2 seconds
@@ -52,8 +68,9 @@ export const InviteButton: React.FC<InviteButtonProps> = ({ huddleId, ownerDispl
       
       setCopied(true);
       toast({
-        title: "Invite message copied!",
-        description: "Share this personalized invite to join the huddle",
+        title: "Invite copied!",
+        description: "Link copied - share it to invite members",
+        duration: 3000,
       });
       
       setTimeout(() => setCopied(false), 2000);

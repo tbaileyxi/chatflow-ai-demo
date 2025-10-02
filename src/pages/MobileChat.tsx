@@ -6,12 +6,13 @@ import ModernChatBubble from '@/components/mobile/ModernChatBubble';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Send, Plus, Users, Settings, ArrowLeft } from 'lucide-react';
+import { Send, Plus, Users, ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { InviteButton } from '@/components/InviteButton';
+import { HuddleSettingsDropdown } from '@/components/HuddleSettingsDropdown';
 import { RealtimeMessageHandler } from '@/components/optimized/RealtimeMessageHandler';
 import { ModernChatInput } from '@/components/chat/ModernChatInput';
 import { ImprovedMediaUpload } from '@/components/chat/ImprovedMediaUpload';
@@ -20,7 +21,6 @@ import { PickEmDashboard } from "@/components/pickem/PickEmDashboard";
 import { PickEmCard } from "@/components/pickem/PickEmCard";
 import { PickEmLeaderboardCard } from "@/components/pickem/PickEmLeaderboardCard";
 import { PickEmStatusBanner } from "@/components/PickEmStatusBanner";
-import { HuddleVerificationDialog } from "@/components/HuddleVerificationDialog";
 import { useHuddleSubscription } from "@/hooks/useHuddleSubscription";
 import { useToast } from "@/hooks/use-toast";
 
@@ -676,26 +676,20 @@ const { data: messagesData, error: messagesError } = await supabase
                 Verified
               </Badge>
             )}
-            {isOwner && !subscriptionStatus?.is_verified && (
-              <HuddleVerificationDialog 
-                huddleId={huddle.id} 
-                isVerified={subscriptionStatus?.is_verified || false}
-              />
-            )}
             <InviteButton 
               huddleId={huddle.id}
               ownerDisplayName={huddle.owner_display_name}
               teamName={huddle.team_name}
               className="p-2 hover:bg-white/10 rounded-full h-8 w-8"
             />
-            <Button
-              variant="ghost"
-              size="sm"
+            <HuddleSettingsDropdown
+              huddleId={huddle.id}
+              ownerId={huddle.owner_id}
+              isOwner={isOwner}
+              isVerified={huddle.is_verified}
+              huddle={huddle}
               className="p-2 hover:bg-white/10 rounded-full"
-              onClick={() => navigate(`/huddle/${huddle.id}/settings`)}
-            >
-              <Settings className="h-5 w-5 text-foreground" />
-            </Button>
+            />
           </div>
         }
       />
