@@ -242,7 +242,21 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             </p>
           </div>
           
-          {message.embed_code && (
+          {/* New embeds array format */}
+          {message.embeds && message.embeds.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {message.embeds.map((embed, idx) => (
+                <div key={idx}>
+                  {embed.embed_type === 'x' && embed.embed_code && (
+                    <XPostEmbed embedCode={embed.embed_code} />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Legacy embed_code format */}
+          {!message.embeds && message.embed_code && (
             <div className="mt-3">
               {isXEmbed(message.embed_code) ? (
                 <XPostEmbed embedCode={message.embed_code} />
@@ -356,8 +370,21 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             </div>
           )}
 
-          {/* Embeds */}
-          {message.embed_code && (
+          {/* Embeds - New embeds array format */}
+          {message.embeds && message.embeds.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {message.embeds.map((embed, idx) => (
+                <div key={idx}>
+                  {embed.embed_type === 'x' && embed.embed_code && (
+                    <XPostEmbed embedCode={embed.embed_code} />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Legacy embed_code format */}
+          {!message.embeds && message.embed_code && (
             <div className="mt-2">
               {isXEmbed(message.embed_code) ? (
                 <XPostEmbed embedCode={message.embed_code} />

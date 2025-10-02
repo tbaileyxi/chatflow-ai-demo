@@ -17,6 +17,11 @@ interface Highlight {
   author_name: string;
   media_url?: string;
   embed_code?: string;
+  embeds?: Array<{
+    commentary: string;
+    embed_code: string;
+    embed_type: 'x' | 'iframe' | 'youtube';
+  }>;
 }
 
 interface LeaderboardEntry {
@@ -75,7 +80,7 @@ export const RetroHighlightsSidebar: React.FC<RetroHighlightsSidebarProps> = ({
     try {
       const { data, error } = await supabase
         .from('huddle_messages')
-        .select('id, content, user_id, created_at, media_url, embed_code')
+        .select('id, content, user_id, created_at, media_url, embed_code, embeds')
         .eq('huddle_id', huddleId)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -107,6 +112,7 @@ export const RetroHighlightsSidebar: React.FC<RetroHighlightsSidebarProps> = ({
             created_at: msg.created_at,
             media_url: msg.media_url,
             embed_code: msg.embed_code,
+            embeds: msg.embeds as any,
             heat_count: count || 0,
             author_name: profile?.display_name || profile?.username || 'Anonymous'
           };
@@ -276,9 +282,25 @@ export const RetroHighlightsSidebar: React.FC<RetroHighlightsSidebarProps> = ({
                                 className="w-full rounded-lg"
                               />
                             )}
-                            {highlight.embed_code && isXEmbed(highlight.embed_code) && (
+                            
+                            {/* New embeds array format */}
+                            {highlight.embeds && highlight.embeds.length > 0 && (
+                              <div className="space-y-2">
+                                {highlight.embeds.map((embed, idx) => (
+                                  <div key={idx}>
+                                    {embed.embed_type === 'x' && embed.embed_code && (
+                                      <XPostEmbed embedCode={embed.embed_code} />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {/* Legacy embed_code format */}
+                            {!highlight.embeds && highlight.embed_code && isXEmbed(highlight.embed_code) && (
                               <XPostEmbed embedCode={highlight.embed_code} />
                             )}
+                            
                             {onJumpToMessage && (
                               <Button
                                 variant="outline"

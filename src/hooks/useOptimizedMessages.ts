@@ -10,6 +10,11 @@ interface Message {
   media_url?: string;
   media_type?: string;
   embed_code?: string;
+  embeds?: Array<{
+    commentary: string;
+    embed_code: string;
+    embed_type: 'x' | 'iframe' | 'youtube';
+  }>;
   poll_data?: any;
   is_team_agent_message?: boolean;
   origin_team_id?: string;
@@ -148,6 +153,7 @@ export const useOptimizedMessages = (huddleId: string): UseOptimizedMessagesRetu
           media_url,
           media_type,
           embed_code,
+          embeds,
           poll_data,
           is_team_agent_message,
           origin_team_id,
@@ -168,6 +174,7 @@ export const useOptimizedMessages = (huddleId: string): UseOptimizedMessagesRetu
 
       const messagesWithProfiles = reversed.map(message => ({
         ...message,
+        embeds: message.embeds as any,
         profiles: profileMap.get(message.user_id) || null
       }));
 
@@ -205,6 +212,7 @@ export const useOptimizedMessages = (huddleId: string): UseOptimizedMessagesRetu
           media_url,
           media_type,
           embed_code,
+          embeds,
           poll_data,
           is_team_agent_message,
           origin_team_id,
@@ -226,6 +234,7 @@ export const useOptimizedMessages = (huddleId: string): UseOptimizedMessagesRetu
 
       const batchWithProfiles = batch.map(message => ({
         ...message,
+        embeds: message.embeds as any,
         profiles: profileMap.get(message.user_id) || null
       }));
 
@@ -284,7 +293,7 @@ export const useOptimizedMessages = (huddleId: string): UseOptimizedMessagesRetu
       // Replace optimistic message with real one
       setMessages(prev => prev.map(msg => 
         msg.id === optimisticMessage.id 
-          ? { ...inserted, profiles: optimisticMessage.profiles, reactions: {} }
+          ? { ...inserted, embeds: inserted.embeds as any, profiles: optimisticMessage.profiles, reactions: {} }
           : msg
       ));
 
