@@ -66,10 +66,12 @@ export const TwitterPortal: React.FC<TwitterPortalProps> = ({
           return;
         }
 
-        // Clear previous content
+        // Clear previous content safely
         if (portalMountRef.current) {
-          while (portalMountRef.current.firstChild) {
-            portalMountRef.current.removeChild(portalMountRef.current.firstChild);
+          try {
+            portalMountRef.current.innerHTML = '';
+          } catch (e) {
+            console.debug('TwitterPortal clear: DOM already modified', e);
           }
         }
 
@@ -107,19 +109,14 @@ export const TwitterPortal: React.FC<TwitterPortalProps> = ({
       isMountedRef.current = false;
       currentTweetIdRef.current = null;
       
-      // Cleanup portal content
+      // Safely clear portal content using innerHTML to avoid DOM conflicts
       if (portalMountRef.current) {
-        setTimeout(() => {
-          if (portalMountRef.current) {
-            while (portalMountRef.current.firstChild) {
-              try {
-                portalMountRef.current.removeChild(portalMountRef.current.firstChild);
-              } catch (e) {
-                // Twitter may have already removed it
-              }
-            }
-          }
-        }, 0);
+        try {
+          portalMountRef.current.innerHTML = '';
+        } catch (e) {
+          // Ignore errors if Twitter has already manipulated the DOM
+          console.debug('TwitterPortal cleanup: DOM already modified', e);
+        }
       }
     };
   }, [tweetId, theme, onLoad, onError]);
