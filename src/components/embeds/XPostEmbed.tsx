@@ -8,11 +8,11 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const loadedRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const tweetIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Prevent double loading
-    if (loadedRef.current) return;
+    isMountedRef.current = true;
     
     const loadTwitterWidgets = () => {
       return new Promise<void>((resolve, reject) => {
@@ -53,12 +53,14 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
 
     const processEmbed = async () => {
       try {
+        if (!isMountedRef.current) return;
+        
         setIsLoading(true);
         setError(null);
         
         await loadTwitterWidgets();
         
-        if (!containerRef.current) return;
+        if (!containerRef.current || !isMountedRef.current) return;
 
         // Extract tweet ID from blockquote HTML or direct URL
         let tweetId: string | null = null;
@@ -83,10 +85,22 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
           }
         }
 
-        if (tweetId && (window as any).twttr?.widgets) {
+        // Don't re-render if same tweet
+        if (tweetId === tweetIdRef.current) {
+          setIsLoading(false);
+          return;
+        }
+
+        if (tweetId && (window as any).twttr?.widgets && isMountedRef.current) {
           try {
-            // Clear container before rendering
-            containerRef.current.innerHTML = '';
+            // Clear container before rendering - but keep the div itself
+            if (containerRef.current) {
+              while (containerRef.current.firstChild) {
+                containerRef.current.removeChild(containerRef.current.firstChild);
+              }
+            }
+            
+            if (!isMountedRef.current) return;
             
             await (window as any).twttr.widgets.createTweet(tweetId, containerRef.current, {
               theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
@@ -97,37 +111,56 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
               dnt: true
             });
             
-            loadedRef.current = true;
-            setIsLoading(false);
+            if (isMountedRef.current) {
+              tweetIdRef.current = tweetId;
+              setIsLoading(false);
+            }
           } catch (createError) {
             console.error('createTweet failed:', createError);
-            setError('Failed to load tweet. It may be unavailable or deleted.');
-            setIsLoading(false);
+            if (isMountedRef.current) {
+              setError('Failed to load tweet. It may be unavailable or deleted.');
+              setIsLoading(false);
+            }
           }
         } else {
-          setError('Invalid tweet URL format');
-          setIsLoading(false);
+          if (isMountedRef.current) {
+            setError('Invalid tweet URL format');
+            setIsLoading(false);
+          }
         }
       } catch (error) {
         console.error('Error loading Twitter embed:', error);
-        setError('Failed to load tweet');
-        setIsLoading(false);
+        if (isMountedRef.current) {
+          setError('Failed to load tweet');
+          setIsLoading(false);
+        }
       }
     };
 
     processEmbed();
 
-    // Cleanup - properly clear Twitter widgets before React unmounts
+    // Cleanup - detach from React's reconciliation
     return () => {
-      if (containerRef.current) {
-        // Clear the container to prevent React from trying to remove Twitter's DOM nodes
-        try {
-          containerRef.current.innerHTML = '';
-        } catch (e) {
-          // Ignore errors during cleanup
+      isMountedRef.current = false;
+      tweetIdRef.current = null;
+      
+      // Use a timeout to ensure cleanup happens after any pending Twitter operations
+      setTimeout(() => {
+        if (containerRef.current) {
+          try {
+            // Manually remove all children without using innerHTML
+            while (containerRef.current.firstChild) {
+              try {
+                containerRef.current.removeChild(containerRef.current.firstChild);
+              } catch (e) {
+                // Child may have already been removed by Twitter's script
+              }
+            }
+          } catch (e) {
+            // Ignore cleanup errors
+          }
         }
-      }
-      loadedRef.current = false;
+      }, 0);
     };
   }, [embedCode]);
 
