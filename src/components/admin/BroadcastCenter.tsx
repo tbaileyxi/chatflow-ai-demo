@@ -208,7 +208,8 @@ export const BroadcastCenter = () => {
               embed_code: postData.embed_code,
               embeds: postData.embeds,
               poll_data: postData.poll_data,
-              is_team_agent_message: postData.is_team_agent_message || false
+              is_team_agent_message: postData.is_team_agent_message || false,
+              message_type: postData.message_type || null
             });
 
           if (error) {
