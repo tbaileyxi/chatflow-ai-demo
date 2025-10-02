@@ -344,7 +344,7 @@ export const Huddle = () => {
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => navigate('/huddle-search')}
+        onClick={() => navigate('/app')}
         className="fixed top-4 left-4 z-50 h-12 w-12 rounded-full bg-background/95 backdrop-blur-sm border border-team-primary/30 hover:bg-team-primary/20 shadow-lg touch-manipulation"
         aria-label="Back to huddles"
       >

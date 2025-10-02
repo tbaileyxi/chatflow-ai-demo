@@ -144,13 +144,9 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
       <div
         className={cn(
           "flex-1 min-w-0",
-          isOwnMessage ? "text-right" : "text-left"
+          isOwnMessage ? "text-right" : "text-left",
+          message.embed_code ? "max-w-[85%]" : "max-w-[75%]"
         )}
-        style={{
-          '--avatar-width': '3rem',
-          width: message.embed_code ? 'calc(100% - var(--avatar-width))' : 'auto',
-          maxWidth: message.embed_code ? '90%' : '75%'
-        } as React.CSSProperties}
       >
         {/* User info with timestamp */}
         {showProfile && (
@@ -230,21 +226,7 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
 
               {/* Embed Content with layout shift prevention - only render if not Pick 'Em */}
               {message.embed_code && !parsePickEmMessage(message) && (
-                <div
-                  className="mt-3 embed-chat rounded-xl x-embed-container"
-                  style={{
-                    contain: 'layout',
-                    contentVisibility: 'auto',
-                    WebkitOverflowScrolling: 'auto',
-                    overflowX: 'hidden',
-                    display: 'flex',
-                    position: 'relative',
-                    minHeight: 0,
-                    WebkitTransform: 'translateZ(0)',
-                    transform: 'translateZ(0)',
-                    width: 'calc(100% - var(--avatar-width))'
-                  }}
-                >
+                <div className="mt-3 embed-chat rounded-xl w-full max-w-full overflow-hidden">
                   <LazyEmbed>
                     <XPostEmbed embedCode={message.embed_code} />
                   </LazyEmbed>

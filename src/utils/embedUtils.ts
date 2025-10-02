@@ -31,28 +31,33 @@ export const parseXEmbed = (embedCode: string): { tweetId: string; username: str
   let tweetId: string | null = null;
   let username: string | null = null;
 
+  // Clean up the embed code (remove extra quotes, whitespace, etc)
+  const cleanedCode = embedCode.trim().replace(/^["']|["']$/g, '');
+
   // First, try direct URL format (most common now - stored as plain URLs in DB)
-  const directUrlMatch = embedCode.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/(?:@)?(\w+)\/status\/(\d+)/);
+  // Match patterns like: https://twitter.com/username/status/123456789
+  // or https://x.com/username/status/123456789
+  const directUrlMatch = cleanedCode.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/(?:@)?([^\/\s]+)\/status\/(\d+)/i);
   if (directUrlMatch) {
     username = directUrlMatch[1];
     tweetId = directUrlMatch[2];
-    console.log('[parseXEmbed] Parsed direct URL:', { username, tweetId, embedCode });
+    console.log('[parseXEmbed] ✅ Parsed direct URL:', { username, tweetId, originalCode: embedCode.substring(0, 100) });
     return { tweetId, username };
   }
 
   // Fallback: Try to extract from blockquote format (legacy format)
-  const blockquoteMatch = embedCode.match(/<blockquote[^>]*class="twitter-tweet"[^>]*>(.*?)<\/blockquote>/is);
+  const blockquoteMatch = cleanedCode.match(/<blockquote[^>]*class="twitter-tweet"[^>]*>(.*?)<\/blockquote>/is);
   if (blockquoteMatch) {
-    const urlMatch = embedCode.match(/href="https:\/\/(?:twitter\.com|x\.com)\/(\w+)\/status\/(\d+)/i);
+    const urlMatch = cleanedCode.match(/href="https:\/\/(?:twitter\.com|x\.com)\/([^\/\s"]+)\/status\/(\d+)/i);
     if (urlMatch) {
       username = urlMatch[1];
       tweetId = urlMatch[2];
-      console.log('[parseXEmbed] Parsed blockquote format:', { username, tweetId });
+      console.log('[parseXEmbed] ✅ Parsed blockquote format:', { username, tweetId });
       return { tweetId, username };
     }
   }
 
-  console.warn('[parseXEmbed] Failed to parse embed code:', embedCode);
+  console.error('[parseXEmbed] ❌ Failed to parse embed code:', embedCode.substring(0, 200));
   return null;
 };
 
