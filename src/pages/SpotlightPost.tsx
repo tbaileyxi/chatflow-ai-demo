@@ -81,6 +81,7 @@ export const SpotlightPost = () => {
           content,
           media_url,
           embed_code,
+          embeds,
           poll_data,
           created_at,
           author_id,

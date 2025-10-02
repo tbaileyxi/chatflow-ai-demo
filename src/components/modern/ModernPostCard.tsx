@@ -124,8 +124,21 @@ export const ModernPostCard = React.memo(({
         </div>
       )}
 
-      {/* Embedded Content */}
-      {post.embed_code && (
+      {/* Embedded Content - New embeds array format */}
+      {post.embeds && post.embeds.length > 0 && (
+        <div className="mb-4 space-y-3">
+          {post.embeds.map((embed: any, idx: number) => (
+            <div key={idx}>
+              {embed.embed_type === 'x' && embed.embed_code && (
+                <XPostEmbed embedCode={embed.embed_code} />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Legacy embed_code format for backward compatibility */}
+      {!post.embeds && post.embed_code && (
         <div className="mb-4">
           <XPostEmbed embedCode={post.embed_code} />
         </div>
