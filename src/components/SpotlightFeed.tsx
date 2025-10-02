@@ -44,6 +44,8 @@ export const SpotlightFeed = () => {
           content,
           media_url,
           embed_code,
+          embeds,
+          message_type,
           poll_data,
           created_at,
           author_id,

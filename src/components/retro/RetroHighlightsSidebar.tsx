@@ -17,6 +17,7 @@ interface Highlight {
   author_name: string;
   media_url?: string;
   embed_code?: string;
+  message_type?: string;
   embeds?: Array<{
     commentary: string;
     embed_code: string;
@@ -80,7 +81,7 @@ export const RetroHighlightsSidebar: React.FC<RetroHighlightsSidebarProps> = ({
     try {
       const { data, error } = await supabase
         .from('huddle_messages')
-        .select('id, content, user_id, created_at, media_url, embed_code, embeds')
+        .select('id, content, user_id, created_at, media_url, embed_code, embeds, message_type')
         .eq('huddle_id', huddleId)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -113,16 +114,29 @@ export const RetroHighlightsSidebar: React.FC<RetroHighlightsSidebarProps> = ({
             media_url: msg.media_url,
             embed_code: msg.embed_code,
             embeds: msg.embeds as any,
+            message_type: (msg as any).message_type,
             heat_count: count || 0,
             author_name: profile?.display_name || profile?.username || 'Anonymous'
           };
         })
       );
 
-      // Filter messages with 3+ heat and sort by heat count
+      // Filter: Include messages with 3+ heat OR special message types (highlight_feed, embed)
       const topHighlights = messagesWithHeat
-        .filter(msg => msg.heat_count >= 3)
-        .sort((a, b) => b.heat_count - a.heat_count)
+        .filter(msg => 
+          msg.heat_count >= 3 || 
+          msg.message_type === 'highlight_feed' || 
+          msg.message_type === 'embed'
+        )
+        .sort((a, b) => {
+          // Priority: highlight_feed/embed messages first, then by heat count
+          const aIsSpecial = a.message_type === 'highlight_feed' || a.message_type === 'embed';
+          const bIsSpecial = b.message_type === 'highlight_feed' || b.message_type === 'embed';
+          
+          if (aIsSpecial && !bIsSpecial) return -1;
+          if (!aIsSpecial && bIsSpecial) return 1;
+          return b.heat_count - a.heat_count;
+        })
         .slice(0, 10);
 
       setHighlights(topHighlights);
@@ -241,7 +255,7 @@ export const RetroHighlightsSidebar: React.FC<RetroHighlightsSidebarProps> = ({
                   </div>
                 ) : highlights.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground text-sm">
-                    No highlights yet. Messages with 3+ ⚡ appear here!
+                    No highlights yet. Messages with 3+ ⚡ or broadcast embeds appear here!
                   </div>
                 ) : (
                   highlights.map((highlight) => (
