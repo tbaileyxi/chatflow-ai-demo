@@ -117,8 +117,16 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
 
     processEmbed();
 
-    // Cleanup
+    // Cleanup - properly clear Twitter widgets before React unmounts
     return () => {
+      if (containerRef.current) {
+        // Clear the container to prevent React from trying to remove Twitter's DOM nodes
+        try {
+          containerRef.current.innerHTML = '';
+        } catch (e) {
+          // Ignore errors during cleanup
+        }
+      }
       loadedRef.current = false;
     };
   }, [embedCode]);
