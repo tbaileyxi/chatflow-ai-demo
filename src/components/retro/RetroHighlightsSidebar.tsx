@@ -1,47 +1,182 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Star, TrendingUp, Users } from 'lucide-react';
+import { X, Star, TrendingUp, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 
 interface Highlight {
   id: string;
-  title: string;
-  type: 'video' | 'poll' | 'stat';
-  timestamp: string;
-  thumbnail?: string;
-  engagement: number;
+  content: string;
+  user_id: string;
+  created_at: string;
+  heat_count: number;
+  author_name: string;
+  media_url?: string;
+}
+
+interface LeaderboardEntry {
+  user_id: string;
+  display_name: string;
+  heat_count: number;
+  rank: number;
 }
 
 interface RetroHighlightsSidebarProps {
-  highlights: any[];
+  huddleId: string;
   onClose: () => void;
-  teamName?: string;
-  leaderboard?: Array<{ name: string; score: number; rank: number }>;
+  onJumpToMessage?: (messageId: string) => void;
   className?: string;
 }
 
 export const RetroHighlightsSidebar: React.FC<RetroHighlightsSidebarProps> = ({
-  highlights = [],
+  huddleId,
   onClose,
-  teamName,
-  leaderboard = [],
+  onJumpToMessage,
   className
 }) => {
   const [activeTab, setActiveTab] = useState<'highlights' | 'leaderboard'>('highlights');
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [expandedHighlight, setExpandedHighlight] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data if none provided
-  const mockHighlights: Highlight[] = highlights.length > 0 ? highlights : [
-    { id: '1', title: 'Epic TD Run!', type: 'video', timestamp: '2min ago', engagement: 127 },
-    { id: '2', title: 'Defense Poll', type: 'poll', timestamp: '5min ago', engagement: 89 },
-    { id: '3', title: 'Live Stats Update', type: 'stat', timestamp: '8min ago', engagement: 203 }
-  ];
+  useEffect(() => {
+    fetchHighlights();
+    fetchLeaderboard();
+    
+    // Real-time subscriptions
+    const heatChannel = supabase
+      .channel(`huddle-heat-${huddleId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'message_heat_reactions'
+        },
+        () => {
+          fetchHighlights();
+          fetchLeaderboard();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(heatChannel);
+    };
+  }, [huddleId]);
 
-  const mockLeaderboard = leaderboard.length > 0 ? leaderboard : [
-    { name: 'You', score: 3, rank: 1 },
-    { name: 'Chris #3', score: 4, rank: 2 },
-    { name: 'Sarah', score: 2, rank: 3 }
-  ];
+  const fetchHighlights = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('huddle_messages')
+        .select('id, content, user_id, created_at, media_url')
+        .eq('huddle_id', huddleId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      // Get user profiles
+      const userIds = [...new Set(data?.map(m => m.user_id) || [])];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, display_name, username')
+        .in('user_id', userIds);
+      
+      const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+
+      // Get heat counts for each message
+      const messagesWithHeat = await Promise.all(
+        (data || []).map(async (msg) => {
+          const { count } = await supabase
+            .from('message_heat_reactions')
+            .select('*', { count: 'exact', head: true })
+            .eq('message_id', msg.id);
+
+          const profile = profileMap.get(msg.user_id);
+          return {
+            id: msg.id,
+            content: msg.content,
+            user_id: msg.user_id,
+            created_at: msg.created_at,
+            media_url: msg.media_url,
+            heat_count: count || 0,
+            author_name: profile?.display_name || profile?.username || 'Anonymous'
+          };
+        })
+      );
+
+      // Filter messages with 3+ heat and sort by heat count
+      const topHighlights = messagesWithHeat
+        .filter(msg => msg.heat_count >= 3)
+        .sort((a, b) => b.heat_count - a.heat_count)
+        .slice(0, 10);
+
+      setHighlights(topHighlights);
+    } catch (error) {
+      console.error('Failed to fetch highlights:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchLeaderboard = async () => {
+    try {
+      // Get all messages in the huddle
+      const { data: messages } = await supabase
+        .from('huddle_messages')
+        .select('id, user_id')
+        .eq('huddle_id', huddleId);
+
+      if (!messages) return;
+
+      // Get heat counts per user
+      const userHeatMap = new Map<string, number>();
+      
+      await Promise.all(
+        messages.map(async (msg) => {
+          const { count } = await supabase
+            .from('message_heat_reactions')
+            .select('*', { count: 'exact', head: true })
+            .eq('message_id', msg.id);
+
+          const currentCount = userHeatMap.get(msg.user_id) || 0;
+          userHeatMap.set(msg.user_id, currentCount + (count || 0));
+        })
+      );
+
+      // Get user profiles
+      const userIds = Array.from(userHeatMap.keys());
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, display_name, username')
+        .in('user_id', userIds);
+
+      // Create leaderboard
+      const leaderboardData = Array.from(userHeatMap.entries())
+        .map(([userId, heatCount]) => {
+          const profile = profiles?.find(p => p.user_id === userId);
+          return {
+            user_id: userId,
+            display_name: profile?.display_name || profile?.username || 'Anonymous',
+            heat_count: heatCount
+          };
+        })
+        .sort((a, b) => b.heat_count - a.heat_count)
+        .map((entry, index) => ({
+          ...entry,
+          rank: index + 1
+        }))
+        .slice(0, 10);
+
+      setLeaderboard(leaderboardData);
+    } catch (error) {
+      console.error('Failed to fetch leaderboard:', error);
+    }
+  };
 
   return (
     <div className={cn(
@@ -88,53 +223,112 @@ export const RetroHighlightsSidebar: React.FC<RetroHighlightsSidebarProps> = ({
           <div className="flex-1 overflow-y-auto">
             {activeTab === 'highlights' ? (
               <div className="space-y-3">
-                {mockHighlights.map((highlight) => (
-                  <div
-                    key={highlight.id}
-                    className="retro-embed p-3 cursor-pointer group"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
-                        {highlight.type === 'video' && '🎬'}
-                        {highlight.type === 'poll' && '📊'}
-                        {highlight.type === 'stat' && '📈'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-chat font-medium text-sm truncate">
-                          {highlight.title}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                          {highlight.timestamp}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="secondary" className="text-xs">
-                            {highlight.engagement} 🔥
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Loading highlights...
+                  </div>
+                ) : highlights.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No highlights yet. Messages with 3+ ⚡ appear here!
+                  </div>
+                ) : (
+                  highlights.map((highlight) => (
+                    <div
+                      key={highlight.id}
+                      className="retro-embed p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => setExpandedHighlight(
+                        expandedHighlight === highlight.id ? null : highlight.id
+                      )}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-chat font-medium text-sm">
+                              {highlight.author_name}
+                            </h3>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(highlight.created_at), 'MMM d, h:mm a')}
+                            </p>
+                          </div>
+                          <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                            <Zap className="w-3 h-3 fill-current text-yellow-500" />
+                            {highlight.heat_count}
                           </Badge>
                         </div>
+                        
+                        <p className={cn(
+                          "text-sm text-foreground/90",
+                          expandedHighlight !== highlight.id && "line-clamp-2"
+                        )}>
+                          {highlight.content}
+                        </p>
+                        
+                        {expandedHighlight === highlight.id && (
+                          <div className="pt-2 border-t border-border space-y-2">
+                            {highlight.media_url && (
+                              <img 
+                                src={highlight.media_url} 
+                                alt="Message media"
+                                className="w-full rounded-lg"
+                              />
+                            )}
+                            {onJumpToMessage && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onJumpToMessage(highlight.id);
+                                  onClose();
+                                }}
+                                className="w-full text-xs"
+                              >
+                                Jump to Message
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             ) : (
               <div className="space-y-3">
                 <h3 className="font-arcade text-sm text-center neon-text">Huddle Heat</h3>
-                {mockLeaderboard.map((player) => (
-                  <div
-                    key={player.name}
-                    className="flex items-center justify-between p-2 rounded-lg bg-muted/30"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-team-primary/20 flex items-center justify-center text-xs font-pixel">
-                        {player.rank}
-                      </span>
-                      <span className="font-chat text-sm">{player.name}</span>
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {player.score}/5 ⚡
-                    </Badge>
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Loading leaderboard...
                   </div>
-                ))}
+                ) : leaderboard.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No heat yet. Give ⚡ to messages you like!
+                  </div>
+                ) : (
+                  leaderboard.map((player) => (
+                    <div
+                      key={player.user_id}
+                      className="flex items-center justify-between p-2 rounded-lg bg-muted/30"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "w-6 h-6 rounded-full flex items-center justify-center text-xs font-pixel",
+                          player.rank === 1 && "bg-yellow-500/20 text-yellow-500",
+                          player.rank === 2 && "bg-slate-400/20 text-slate-400",
+                          player.rank === 3 && "bg-orange-500/20 text-orange-500",
+                          player.rank > 3 && "bg-team-primary/20"
+                        )}>
+                          {player.rank}
+                        </span>
+                        <span className="font-chat text-sm">{player.display_name}</span>
+                      </div>
+                      <Badge variant="outline" className="text-xs flex items-center gap-1">
+                        <Zap className="w-3 h-3 fill-current text-yellow-500" />
+                        {player.heat_count}
+                      </Badge>
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>

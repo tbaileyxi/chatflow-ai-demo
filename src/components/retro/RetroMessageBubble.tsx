@@ -1,12 +1,14 @@
-import React, { memo, useState, useCallback, useMemo, useRef } from 'react';
+import React, { memo, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatDistanceToNow } from 'date-fns';
-import { Megaphone, Copy, Trophy } from 'lucide-react';
+import { Megaphone, Copy, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface RetroMessageBubbleProps {
   message: {
@@ -40,8 +42,8 @@ interface RetroMessageBubbleProps {
   className?: string;
 }
 
-// Simplified reactions - only 3 static emojis for mobile-first (Lightning = Heat Check)
-const SIMPLE_REACTIONS = ['⚡', '👍', '😂'];
+// Simplified reactions - only 3 static emojis for mobile-first
+const SIMPLE_REACTIONS = ['👍', '❤️', '😂'];
 
 export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   message,
@@ -54,15 +56,66 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   onCopyCallout,
   className
 }) => {
+  const { user: currentUser } = useAuth();
   const [showActions, setShowActions] = useState(false);
   const [broadcastPopoverOpen, setBroadcastPopoverOpen] = useState(false);
   const [includeHighlight, setIncludeHighlight] = useState(false);
   const [reactions, setReactions] = useState<{ emoji: string; count: number }[]>([]);
   const [showReactions, setShowReactions] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const [heatCount, setHeatCount] = useState(0);
+  const [hasGivenHeat, setHasGivenHeat] = useState(false);
+  const [isGivingHeat, setIsGivingHeat] = useState(false);
   const { toast } = useToast();
 
   const isBot = message.is_bot_message || message.is_team_agent_message;
+
+  useEffect(() => {
+    const fetchHeatData = async () => {
+      if (!currentUser) return;
+      
+      // Get heat count
+      const { count } = await supabase
+        .from('message_heat_reactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('message_id', message.id);
+      
+      setHeatCount(count || 0);
+      
+      // Check if current user has given heat
+      const { data: userHeat } = await supabase
+        .from('message_heat_reactions')
+        .select('id')
+        .eq('message_id', message.id)
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+      
+      setHasGivenHeat(!!userHeat);
+    };
+    
+    fetchHeatData();
+    
+    // Real-time subscription for heat updates
+    const channel = supabase
+      .channel(`message-heat-${message.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'message_heat_reactions',
+          filter: `message_id=eq.${message.id}`
+        },
+        () => {
+          fetchHeatData();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [message.id, currentUser]);
 
   const formattedTime = useMemo(() => {
     return formatDistanceToNow(new Date(message.created_at), { addSuffix: true });
@@ -121,6 +174,44 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
       description: `Added ${emoji} reaction`,
     });
   }, [toast]);
+
+  const handleGiveHeat = useCallback(async () => {
+    if (!currentUser || isGivingHeat || message.user_id === currentUser.id) return;
+    
+    setIsGivingHeat(true);
+    try {
+      if (hasGivenHeat) {
+        // Remove heat
+        await supabase
+          .from('message_heat_reactions')
+          .delete()
+          .eq('message_id', message.id)
+          .eq('user_id', currentUser.id);
+      } else {
+        // Give heat
+        await supabase
+          .from('message_heat_reactions')
+          .insert({
+            message_id: message.id,
+            user_id: currentUser.id
+          });
+        
+        toast({
+          title: "Heat given! ⚡",
+          description: "You gave this message some heat",
+        });
+      }
+    } catch (error) {
+      console.error('Failed to toggle heat:', error);
+      toast({
+        title: "Error",
+        description: "Failed to give heat. Try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGivingHeat(false);
+    }
+  }, [currentUser, message.id, message.user_id, hasGivenHeat, isGivingHeat, toast]);
 
   // Bot messages = full-width updates with solid text
   if (isBot) {
@@ -188,6 +279,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
 
   return (
     <motion.div
+      id={`message-${message.id}`}
       className={cn(
         "group flex gap-2 sm:gap-3 hover:bg-team-primary/5 p-1 sm:p-2 rounded-lg transition-colors",
         "relative touch-manipulation"
@@ -291,21 +383,20 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              {/* Simple static reactions - mobile-first */}
-            {/* Simple static reactions - desktop only */}
-            <div className="hidden sm:flex items-center gap-1">
-              {SIMPLE_REACTIONS.map((emoji) => (
-                <Button
-                  key={emoji}
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 sm:h-9 sm:w-9 p-0 text-lg sm:text-xl hover:bg-team-primary/20 hover:scale-110 transition-all rounded-full touch-manipulation"
-                  onClick={() => handleReaction(emoji)}
-                >
-                  {emoji}
-                </Button>
-              ))}
-            </div>
+              {/* Simple static reactions - desktop only */}
+              <div className="hidden sm:flex items-center gap-1">
+                {SIMPLE_REACTIONS.map((emoji) => (
+                  <Button
+                    key={emoji}
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 sm:h-9 sm:w-9 p-0 text-lg sm:text-xl hover:bg-team-primary/20 hover:scale-110 transition-all rounded-full touch-manipulation"
+                    onClick={() => handleReaction(emoji)}
+                  >
+                    {emoji}
+                  </Button>
+                ))}
+              </div>
 
               {/* Copy */}
               <Button
@@ -317,6 +408,34 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                 <Copy className="h-3 w-3 sm:mr-1" />
                 <span className="hidden sm:inline">Copy</span>
               </Button>
+
+              {/* Lightning Heat Button - Only show if not own message */}
+              {message.user_id !== currentUser?.id && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleGiveHeat}
+                  disabled={isGivingHeat}
+                  className={cn(
+                    "h-8 px-2 text-xs hover:bg-yellow-500/20 rounded-full touch-manipulation transition-all",
+                    hasGivenHeat && "text-yellow-500"
+                  )}
+                >
+                  <Zap className={cn("h-3 w-3 sm:mr-1", hasGivenHeat && "fill-current")} />
+                  <span className="hidden sm:inline">Heat</span>
+                  {heatCount > 0 && (
+                    <span className="ml-1 text-xs font-pixel">{heatCount}</span>
+                  )}
+                </Button>
+              )}
+              
+              {/* Show heat count even on own messages */}
+              {message.user_id === currentUser?.id && heatCount > 0 && (
+                <div className="flex items-center gap-1 px-2 py-1 bg-yellow-500/10 border border-yellow-500/30 rounded-full text-xs">
+                  <Zap className="h-3 w-3 text-yellow-500 fill-current" />
+                  <span className="font-pixel text-yellow-500">{heatCount}</span>
+                </div>
+              )}
 
               {/* Admin broadcast - mobile optimized */}
               {isAdmin && (

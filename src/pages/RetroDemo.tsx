@@ -145,20 +145,25 @@ export const RetroDemo = () => {
         </div>
       </div>
 
-      {/* Highlights Sidebar */}
+      {/* Highlights Sidebar - Demo placeholder */}
       {sidebarOpen && (
-        <div className="fixed right-0 top-0 bottom-0 w-80 z-30">
-          <RetroHighlightsSidebar
-            onClose={() => setSidebarOpen(false)}
-            highlights={highlights.map((h, index) => ({
-              id: h.id,
-              title: h.content.slice(0, 30) + '...',
-              type: 'video' as const,
-              timestamp: `${index + 1}min ago`,
-              engagement: Math.floor(Math.random() * 100) + 50
-            }))}
-            teamName="Colorado Buffaloes"
-          />
+        <div className="fixed right-0 top-0 bottom-0 w-80 z-30 bg-background border-l border-team-primary/30">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-arcade text-lg">Demo Mode</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSidebarOpen(false)}
+                className="h-8 w-8 p-0"
+              >
+                ×
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This is a demo. Real heat tracking and highlights work in live huddles!
+            </p>
+          </div>
         </div>
       )}
 

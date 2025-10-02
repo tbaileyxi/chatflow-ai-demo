@@ -25,7 +25,7 @@ interface RetroChatInputProps {
 }
 
 const TEAM_EMOJIS = [
-  '🔥', '⚡', '💪', '🦬', '⭐', '🏆', '💯', '👏', '🙌', '❤️',
+  '🔥', '💪', '🦬', '⭐', '🏆', '💯', '👏', '🙌', '❤️',
   '😤', '🤝', '👊', '💥', '⚽', '🏀', '🏈', '⚾', '🎯', '🚀'
 ];
 
@@ -335,18 +335,6 @@ export const RetroChatInput = ({
                   disabled={disabled || sending}
                 >
                   ⚡ Lightning
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    toast({ title: "Heat Check!", description: "Quick Pick 'Em coming soon!" });
-                    setMediaOptionsOpen(false);
-                  }}
-                  className="justify-start h-10 w-full font-exo2 text-base"
-                  disabled={disabled || sending}
-                >
-                  ⚡ Heat Check
                 </Button>
                 <Button
                   variant="ghost"

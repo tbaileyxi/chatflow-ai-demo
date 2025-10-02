@@ -489,8 +489,12 @@ export const Huddle = () => {
           showHighlights ? "translate-x-0" : "translate-x-full"
         )}>
           <RetroHighlightsSidebar
-            highlights={[]}
+            huddleId={huddleId!}
             onClose={() => setShowHighlights(false)}
+            onJumpToMessage={(messageId) => {
+              const element = document.getElementById(`message-${messageId}`);
+              element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}
           />
         </div>
       </div>

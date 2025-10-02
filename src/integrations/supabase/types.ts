@@ -530,6 +530,35 @@ export type Database = {
           },
         ]
       }
+      message_heat_reactions: {
+        Row: {
+          created_at: string
+          id: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_heat_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "huddle_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pickem_entries: {
         Row: {
           created_at: string
