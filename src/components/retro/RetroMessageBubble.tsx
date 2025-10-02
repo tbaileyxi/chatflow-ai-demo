@@ -40,8 +40,8 @@ interface RetroMessageBubbleProps {
   className?: string;
 }
 
-// Simplified reactions - only 3 static emojis for mobile-first
-const SIMPLE_REACTIONS = ['🔥', '👍', '😂'];
+// Simplified reactions - only 3 static emojis for mobile-first (Lightning = Heat Check)
+const SIMPLE_REACTIONS = ['⚡', '👍', '😂'];
 
 export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   message,
@@ -166,9 +166,6 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
               <Copy className="h-3 w-3 mr-1" />
               Copy
             </Button>
-            <span className="text-lg ml-1">
-              🔥
-            </span>
           </div>
         </motion.div>
       </div>

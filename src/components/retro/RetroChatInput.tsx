@@ -328,13 +328,13 @@ export const RetroChatInput = ({
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    handleEmojiSelect('🔥');
+                    handleEmojiSelect('⚡');
                     setMediaOptionsOpen(false);
                   }}
                   className="justify-start h-10 w-full font-exo2 text-base"
                   disabled={disabled || sending}
                 >
-                  🔥 Fire
+                  ⚡ Lightning
                 </Button>
                 <Button
                   variant="ghost"

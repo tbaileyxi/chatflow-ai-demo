@@ -11,10 +11,10 @@ import { PickEmView } from '@/components/pickem/PickEmView';
 import { useToast } from '@/hooks/use-toast';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { JumpToLatest } from '@/components/JumpToLatest';
-import { UserPlus, Trophy, ArrowLeft } from 'lucide-react';
+import { UserPlus, Zap, ArrowLeft, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
+import { HuddleManagement } from '@/components/HuddleManagement';
 
 export const Huddle = () => {
   const { huddleId } = useParams<{ huddleId: string }>();
@@ -393,13 +393,22 @@ export const Huddle = () => {
                 className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-full hover:bg-team-primary/20"
                 aria-label="Blitz Board - Heat Check"
               >
-                <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-team-primary" />
+                <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-team-primary" />
               </Button>
               <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-background/95 backdrop-blur-sm border border-team-primary/30 rounded-lg text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg">
-                <div className="font-semibold mb-1">Heat Check 🔥</div>
+                <div className="font-semibold mb-1">Heat Check ⚡</div>
                 <div className="text-muted-foreground">Pick games, compete with your huddle!</div>
               </div>
             </div>
+
+            {/* Huddle Management for Owners */}
+            {isOwner && (
+              <HuddleManagement 
+                huddleId={huddleId!} 
+                ownerId={huddle.owner_id}
+                huddle={huddle}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -486,15 +495,15 @@ export const Huddle = () => {
         </div>
       </div>
 
-      {/* Floating Highlights Button - always accessible */}
+      {/* Floating Highlights Button - smaller lightning bolt */}
       <Button
         variant="ghost"
-        size="sm"
+        size="icon"
         onClick={() => setShowHighlights(!showHighlights)}
-        className="fixed bottom-20 right-4 z-40 h-14 w-14 rounded-full bg-team-primary/90 hover:bg-team-primary backdrop-blur-sm shadow-lg touch-manipulation"
-        aria-label="View highlights"
+        className="fixed bottom-20 right-4 z-40 h-12 w-12 rounded-full bg-team-primary/90 hover:bg-team-primary backdrop-blur-sm shadow-lg touch-manipulation"
+        aria-label="Toggle Highlights"
       >
-        <Trophy className="h-6 w-6 text-white" />
+        <Zap className="h-5 w-5 text-white" />
       </Button>
 
       {/* Pick 'Em Dialog */}
