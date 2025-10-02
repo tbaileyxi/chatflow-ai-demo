@@ -24,6 +24,13 @@ interface RetroMessageBubbleProps {
     media_url?: string;
     media_type?: string;
     embed_code?: string;
+    poll_data?: {
+      question: string;
+      options: Array<{
+        text: string;
+        votes: number;
+      }>;
+    };
     embeds?: Array<{
       commentary: string;
       embed_code: string;
@@ -131,7 +138,36 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(message.content);
+      // Build complete copy with text, media, and embeds
+      let copyContent = message.content;
+      
+      // Add media URLs
+      if (message.media_url) {
+        copyContent += `\n\n${message.media_url}`;
+      }
+      
+      // Add embedded tweet URLs
+      if (message.embed_code) {
+        // Extract URL from embed code
+        const urlMatch = message.embed_code.match(/https?:\/\/(twitter\.com|x\.com)\/[^\s"<]+/i);
+        if (urlMatch) {
+          copyContent += `\n\n${urlMatch[0]}`;
+        }
+      }
+      
+      // Add embeds array URLs
+      if (message.embeds && Array.isArray(message.embeds)) {
+        message.embeds.forEach((embed: any) => {
+          if (embed.embed_code) {
+            const urlMatch = embed.embed_code.match(/https?:\/\/(twitter\.com|x\.com)\/[^\s"<]+/i);
+            if (urlMatch) {
+              copyContent += `\n\n${urlMatch[0]}`;
+            }
+          }
+        });
+      }
+      
+      await navigator.clipboard.writeText(copyContent);
       toast({
         title: "Copied!",
         description: "Message copied to clipboard",
@@ -139,7 +175,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
     } catch (error) {
       console.error('Failed to copy:', error);
     }
-  }, [message.content, toast]);
+  }, [message.content, message.media_url, message.embed_code, message.embeds, toast]);
 
   const handleCallout = useCallback(() => {
     onCopyCallout?.(message.id, message.content);
@@ -347,6 +383,40 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
 
         {/* Message content - mobile optimized padding */}
         <div className="retro-bubble p-2 rounded-lg border border-team-primary/30 bg-gradient-to-br from-background/80 to-team-primary/5 backdrop-blur-sm relative">
+          {/* Render Poll if present */}
+          {message.poll_data && (
+            <div className="mb-3 p-3 rounded-lg border border-team-primary/30 bg-team-primary/5">
+              <div className="text-sm font-semibold mb-3 text-foreground">
+                {message.poll_data.question}
+              </div>
+              <div className="space-y-2">
+                {message.poll_data.options?.map((option: any, idx: number) => {
+                  const totalVotes = message.poll_data.options.reduce((sum: number, opt: any) => sum + (opt.votes || 0), 0);
+                  const voteCount = option.votes || 0;
+                  const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+                  
+                  return (
+                    <div key={idx} className="relative">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-medium">{option.text}</span>
+                        <span className="text-muted-foreground">{voteCount} votes ({percentage}%)</span>
+                      </div>
+                      <div className="h-2 bg-background/50 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-team-primary/60 transition-all duration-300"
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground text-center">
+                Total votes: {message.poll_data.options.reduce((sum: number, opt: any) => sum + (opt.votes || 0), 0)}
+              </div>
+            </div>
+          )}
+
           <p className="text-xs sm:text-sm text-foreground whitespace-pre-wrap break-words">
             {message.content}
           </p>
@@ -489,8 +559,8 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                 </div>
               )}
 
-              {/* Admin broadcast - mobile optimized */}
-              {isAdmin && (
+              {/* Admin broadcast - Only show on own messages */}
+              {isAdmin && message.user_id === currentUserId && (
                 <Popover open={broadcastPopoverOpen} onOpenChange={setBroadcastPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button

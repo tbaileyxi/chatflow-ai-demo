@@ -135,11 +135,13 @@ export const RetroHighlightsSidebar: React.FC<RetroHighlightsSidebarProps> = ({
 
   const fetchLeaderboard = async () => {
     try {
-      // Get all messages in the huddle
+      // Get all messages in the huddle (excluding bots and agents)
       const { data: messages } = await supabase
         .from('huddle_messages')
         .select('id, user_id')
-        .eq('huddle_id', huddleId);
+        .eq('huddle_id', huddleId)
+        .eq('is_bot_message', false)
+        .eq('is_team_agent_message', false);
 
       if (!messages) return;
 

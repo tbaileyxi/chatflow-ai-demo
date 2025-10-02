@@ -195,6 +195,23 @@ export const Huddle = () => {
     };
   }, [huddleId, user, scrollToBottom]);
 
+  // Auto-scroll when messages change (if user is near bottom)
+  useEffect(() => {
+    if (messages.length === 0) return;
+    
+    // Use requestAnimationFrame to ensure DOM is updated
+    requestAnimationFrame(() => {
+      const scrollContainer = document.querySelector('.retro-chat-column');
+      if (!scrollContainer) return;
+      
+      const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 200;
+      
+      if (isNearBottom) {
+        scrollToBottom('smooth');
+      }
+    });
+  }, [messages.length, scrollToBottom]);
+
   // Send message
   const sendMessage = useCallback(async (content: string) => {
     if (!huddleId || !user || !content.trim()) return;
