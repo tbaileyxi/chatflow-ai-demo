@@ -5,6 +5,8 @@ import { X, Star, TrendingUp, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { XPostEmbed } from '@/components/embeds/XPostEmbed';
+import { isXEmbed } from '@/utils/embedUtils';
 
 interface Highlight {
   id: string;
@@ -14,6 +16,7 @@ interface Highlight {
   heat_count: number;
   author_name: string;
   media_url?: string;
+  embed_code?: string;
 }
 
 interface LeaderboardEntry {
@@ -72,7 +75,7 @@ export const RetroHighlightsSidebar: React.FC<RetroHighlightsSidebarProps> = ({
     try {
       const { data, error } = await supabase
         .from('huddle_messages')
-        .select('id, content, user_id, created_at, media_url')
+        .select('id, content, user_id, created_at, media_url, embed_code')
         .eq('huddle_id', huddleId)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -103,6 +106,7 @@ export const RetroHighlightsSidebar: React.FC<RetroHighlightsSidebarProps> = ({
             user_id: msg.user_id,
             created_at: msg.created_at,
             media_url: msg.media_url,
+            embed_code: msg.embed_code,
             heat_count: count || 0,
             author_name: profile?.display_name || profile?.username || 'Anonymous'
           };
@@ -271,6 +275,9 @@ export const RetroHighlightsSidebar: React.FC<RetroHighlightsSidebarProps> = ({
                                 alt="Message media"
                                 className="w-full rounded-lg"
                               />
+                            )}
+                            {highlight.embed_code && isXEmbed(highlight.embed_code) && (
+                              <XPostEmbed embedCode={highlight.embed_code} />
                             )}
                             {onJumpToMessage && (
                               <Button

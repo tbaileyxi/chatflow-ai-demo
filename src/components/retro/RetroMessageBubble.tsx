@@ -9,6 +9,9 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { XPostEmbed } from '@/components/embeds/XPostEmbed';
+import { isXEmbed } from '@/utils/embedUtils';
+import DOMPurify from 'dompurify';
 
 interface RetroMessageBubbleProps {
   message: {
@@ -240,10 +243,22 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
           </div>
           
           {message.embed_code && (
-            <div 
-              className="mt-3 retro-embed" 
-              dangerouslySetInnerHTML={{ __html: message.embed_code }}
-            />
+            <div className="mt-3">
+              {isXEmbed(message.embed_code) ? (
+                <XPostEmbed embedCode={message.embed_code} />
+              ) : (
+                <div 
+                  className="retro-embed"
+                  dangerouslySetInnerHTML={{ 
+                    __html: DOMPurify.sanitize(message.embed_code, {
+                      ALLOWED_TAGS: ['iframe', 'video', 'source', 'img'],
+                      ALLOWED_ATTR: ['src', 'width', 'height', 'frameborder', 'allowfullscreen', 'controls'],
+                      ADD_ATTR: ['allowfullscreen']
+                    })
+                  }}
+                />
+              )}
+            </div>
           )}
 
           {/* Bot message actions - simplified */}
@@ -344,10 +359,20 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
           {/* Embeds */}
           {message.embed_code && (
             <div className="mt-2">
-              <div 
-                className="retro-embed"
-                dangerouslySetInnerHTML={{ __html: message.embed_code }}
-              />
+              {isXEmbed(message.embed_code) ? (
+                <XPostEmbed embedCode={message.embed_code} />
+              ) : (
+                <div 
+                  className="retro-embed"
+                  dangerouslySetInnerHTML={{ 
+                    __html: DOMPurify.sanitize(message.embed_code, {
+                      ALLOWED_TAGS: ['iframe', 'video', 'source', 'img'],
+                      ALLOWED_ATTR: ['src', 'width', 'height', 'frameborder', 'allowfullscreen', 'controls'],
+                      ADD_ATTR: ['allowfullscreen']
+                    })
+                  }}
+                />
+              )}
             </div>
           )}
         </div>
