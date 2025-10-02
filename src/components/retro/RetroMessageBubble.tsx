@@ -69,7 +69,6 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   const { user: currentUser } = useAuth();
   const [showActions, setShowActions] = useState(false);
   const [broadcastPopoverOpen, setBroadcastPopoverOpen] = useState(false);
-  const [includeHighlight, setIncludeHighlight] = useState(false);
   const [reactions, setReactions] = useState<{ emoji: string; count: number }[]>([]);
   const [showReactions, setShowReactions] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -187,18 +186,12 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
 
   const handleBroadcast = useCallback(() => {
     onMegaphone?.(message.id);
-    if (includeHighlight) {
-      onHighlight?.(message.id);
-    }
     toast({
       title: "Broadcasted!",
-      description: includeHighlight 
-        ? "Message sent to Spotlight and saved to Highlights"
-        : "Message sent to Spotlight Feed",
+      description: "Message sent to Spotlight Feed",
     });
     setBroadcastPopoverOpen(false);
-    setIncludeHighlight(false);
-  }, [message.id, includeHighlight, onMegaphone, onHighlight, toast]);
+  }, [message.id, onMegaphone, toast]);
 
   const handleReaction = useCallback((emoji: string) => {
     setReactions(prev => {
@@ -574,18 +567,6 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                   </PopoverTrigger>
                   <PopoverContent className="w-64 p-3 bg-background/95 backdrop-blur-sm border-team-primary/30" align="end">
                     <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="includeHighlight"
-                          checked={includeHighlight}
-                          onChange={(e) => setIncludeHighlight(e.target.checked)}
-                          className="h-4 w-4 touch-manipulation"
-                        />
-                        <label htmlFor="includeHighlight" className="text-sm">
-                          Also add to highlights
-                        </label>
-                      </div>
                       <Button
                         onClick={() => {
                           handleBroadcast();

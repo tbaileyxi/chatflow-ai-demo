@@ -52,6 +52,8 @@ export const RetroChatInput = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const videoSelectInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const handleSend = useCallback(async () => {
@@ -298,6 +300,21 @@ export const RetroChatInput = ({
         onChange={handleFileChange}
         style={{ display: 'none' }}
       />
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*"
+        capture="environment"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={videoSelectInputRef}
+        type="file"
+        accept="video/*"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
       
       <motion.div 
         className="p-3 bg-team-primary/10 border-t border-team-primary/30 sticky bottom-0 left-0 right-0 pb-[calc(env(safe-area-inset-bottom)+8px)]"
@@ -321,65 +338,6 @@ export const RetroChatInput = ({
             </PopoverTrigger>
             <PopoverContent className="w-56 p-2 bg-background/95 backdrop-blur-sm border-team-primary/30" side="top">
               <div className="space-y-1">
-                <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
-                  Quick Actions
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    handleEmojiSelect('⚡');
-                    setMediaOptionsOpen(false);
-                  }}
-                  className="justify-start h-10 w-full font-exo2 text-base"
-                  disabled={disabled || sending}
-                >
-                  ⚡ Lightning
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    handleEmojiSelect('👍');
-                    setMediaOptionsOpen(false);
-                  }}
-                  className="justify-start h-10 w-full font-exo2 text-base"
-                  disabled={disabled || sending}
-                >
-                  👍 Thumbs Up
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(message);
-                      toast({ title: "Copied!", description: "Message copied to clipboard" });
-                    } catch (err) {
-                      toast({ title: "Error", description: "Failed to copy", variant: "destructive" });
-                    }
-                    setMediaOptionsOpen(false);
-                  }}
-                  className="justify-start h-10 w-full font-exo2"
-                  disabled={disabled || sending || !message.trim()}
-                >
-                  📋 Copy Message
-                </Button>
-                {isAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      toast({ title: "Sent to Spotlight!", description: "Message broadcasted" });
-                      setMediaOptionsOpen(false);
-                    }}
-                    className="justify-start h-10 w-full font-exo2 text-destructive"
-                    disabled={disabled || sending || !message.trim()}
-                  >
-                    📣 Send to Spotlight
-                  </Button>
-                )}
-                <div className="h-px bg-border my-1" />
                 <Button
                   variant="ghost"
                   size="sm"
@@ -405,6 +363,32 @@ export const RetroChatInput = ({
                 >
                   <Image className="h-4 w-4 mr-2" />
                   Choose Photo
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    videoInputRef.current?.click();
+                    setMediaOptionsOpen(false);
+                  }}
+                  className="justify-start h-10 w-full font-exo2"
+                  disabled={disabled || sending || uploading}
+                >
+                  <Video className="h-4 w-4 mr-2" />
+                  Record Video
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    videoSelectInputRef.current?.click();
+                    setMediaOptionsOpen(false);
+                  }}
+                  className="justify-start h-10 w-full font-exo2"
+                  disabled={disabled || sending || uploading}
+                >
+                  <Video className="h-4 w-4 mr-2" />
+                  Choose Video
                 </Button>
               </div>
             </PopoverContent>

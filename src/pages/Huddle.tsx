@@ -358,7 +358,7 @@ export const Huddle = () => {
 
   return (
     <div className="min-h-screen-dynamic w-full bg-gradient-to-br from-background via-background to-team-primary/5 flex flex-col">
-      {/* Floating back button - always visible */}
+      {/* Floating back button - top left */}
       <Button
         variant="ghost"
         size="sm"
@@ -515,15 +515,15 @@ export const Huddle = () => {
         </div>
       </div>
 
-      {/* Floating Highlights Button - smaller lightning bolt */}
+      {/* Floating Highlights Button - aligned under back button in upper left */}
       <Button
         variant="ghost"
         size="icon"
         onClick={() => setShowHighlights(!showHighlights)}
-        className="fixed bottom-20 right-4 z-40 h-12 w-12 rounded-full bg-team-primary/90 hover:bg-team-primary backdrop-blur-sm shadow-lg touch-manipulation"
+        className="fixed top-20 left-4 z-50 h-12 w-12 rounded-full bg-team-primary/20 backdrop-blur-sm border border-team-primary/30 hover:bg-team-primary/30 shadow-lg touch-manipulation"
         aria-label="Toggle Highlights"
       >
-        <Zap className="h-5 w-5 text-white" />
+        <Zap className="h-5 w-5 text-team-primary" />
       </Button>
 
       {/* Pick 'Em Dialog */}
