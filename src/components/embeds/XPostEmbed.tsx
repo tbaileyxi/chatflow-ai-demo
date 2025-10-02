@@ -30,11 +30,15 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
 
   // Parse tweet data
   const tweetData = parseXEmbed(embedCode);
+  
+  console.log('[XPostEmbed] Rendering embed:', { embedCode, tweetData, theme });
 
   if (!tweetData) {
+    console.error('[XPostEmbed] Failed to parse tweet data from:', embedCode);
     return (
       <div className="rounded-xl overflow-hidden w-full my-2 p-6 bg-muted/50 text-center">
         <p className="text-sm text-muted-foreground">Invalid tweet format</p>
+        <p className="text-xs text-muted-foreground mt-1">{embedCode.substring(0, 100)}</p>
       </div>
     );
   }
@@ -42,11 +46,13 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
   const tweetUrl = `https://twitter.com/${tweetData.username}/status/${tweetData.tweetId}`;
 
   const handleLoad = () => {
+    console.log('[XPostEmbed] Tweet loaded successfully:', tweetData.tweetId);
     setIsLoading(false);
     setError(null);
   };
 
   const handleError = (errorMessage: string) => {
+    console.error('[XPostEmbed] Tweet load error:', errorMessage, tweetData.tweetId);
     setError(errorMessage);
     setIsLoading(false);
   };

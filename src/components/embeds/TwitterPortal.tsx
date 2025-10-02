@@ -27,11 +27,14 @@ export const TwitterPortal: React.FC<TwitterPortalProps> = ({
     isMountedRef.current = true;
 
     const loadTwitterWidget = async () => {
+      console.log('[TwitterPortal] Starting to load tweet:', tweetId, 'theme:', theme);
       try {
         // Wait for Twitter widgets to be available
         if (!(window as any).twttr?.widgets) {
+          console.log('[TwitterPortal] Twitter widgets not loaded, loading script...');
           // Check if script already exists
           if (!document.querySelector('script[src="https://platform.twitter.com/widgets.js"]')) {
+            console.log('[TwitterPortal] Adding Twitter widgets script to DOM');
             const script = document.createElement('script');
             script.src = 'https://platform.twitter.com/widgets.js';
             script.async = true;
@@ -39,13 +42,17 @@ export const TwitterPortal: React.FC<TwitterPortalProps> = ({
             document.head.appendChild(script);
 
             await new Promise<void>((resolve, reject) => {
-              script.onload = () => resolve();
+              script.onload = () => {
+                console.log('[TwitterPortal] Twitter widgets script loaded successfully');
+                resolve();
+              };
               script.onerror = () => reject(new Error('Failed to load Twitter widgets'));
               
               // Timeout after 10 seconds
               setTimeout(() => reject(new Error('Twitter widget load timeout')), 10000);
             });
           } else {
+            console.log('[TwitterPortal] Twitter widgets script already in DOM, waiting...');
             // Wait for existing script to load
             let attempts = 0;
             while (!(window as any).twttr?.widgets && attempts < 50) {
@@ -55,13 +62,18 @@ export const TwitterPortal: React.FC<TwitterPortalProps> = ({
             if (!(window as any).twttr?.widgets) {
               throw new Error('Twitter widgets not available');
             }
+            console.log('[TwitterPortal] Twitter widgets now available');
           }
         }
 
-        if (!isMountedRef.current || !portalMountRef.current) return;
+        if (!isMountedRef.current || !portalMountRef.current) {
+          console.warn('[TwitterPortal] Component unmounted before tweet load');
+          return;
+        }
 
         // Don't reload if same tweet
         if (currentTweetIdRef.current === tweetId) {
+          console.log('[TwitterPortal] Tweet already loaded:', tweetId);
           onLoad?.();
           return;
         }
@@ -71,14 +83,15 @@ export const TwitterPortal: React.FC<TwitterPortalProps> = ({
           try {
             portalMountRef.current.innerHTML = '';
           } catch (e) {
-            console.debug('TwitterPortal clear: DOM already modified', e);
+            console.debug('[TwitterPortal] Error clearing: DOM already modified', e);
           }
         }
 
         if (!isMountedRef.current) return;
 
         // Create tweet widget
-        await (window as any).twttr.widgets.createTweet(
+        console.log('[TwitterPortal] Calling createTweet for:', tweetId);
+        const tweetElement = await (window as any).twttr.widgets.createTweet(
           tweetId,
           portalMountRef.current,
           {
@@ -92,11 +105,17 @@ export const TwitterPortal: React.FC<TwitterPortalProps> = ({
         );
 
         if (isMountedRef.current) {
-          currentTweetIdRef.current = tweetId;
-          onLoad?.();
+          if (tweetElement) {
+            console.log('[TwitterPortal] Tweet widget created successfully:', tweetId);
+            currentTweetIdRef.current = tweetId;
+            onLoad?.();
+          } else {
+            console.error('[TwitterPortal] createTweet returned null for:', tweetId);
+            onError?.('Tweet could not be loaded');
+          }
         }
       } catch (error) {
-        console.error('Failed to load tweet:', error);
+        console.error('[TwitterPortal] Error loading tweet:', tweetId, error);
         if (isMountedRef.current) {
           onError?.('Failed to load tweet. It may be unavailable or deleted.');
         }

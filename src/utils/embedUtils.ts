@@ -31,28 +31,29 @@ export const parseXEmbed = (embedCode: string): { tweetId: string; username: str
   let tweetId: string | null = null;
   let username: string | null = null;
 
-  // Try to extract from blockquote format
+  // First, try direct URL format (most common now - stored as plain URLs in DB)
+  const directUrlMatch = embedCode.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/(?:@)?(\w+)\/status\/(\d+)/);
+  if (directUrlMatch) {
+    username = directUrlMatch[1];
+    tweetId = directUrlMatch[2];
+    console.log('[parseXEmbed] Parsed direct URL:', { username, tweetId, embedCode });
+    return { tweetId, username };
+  }
+
+  // Fallback: Try to extract from blockquote format (legacy format)
   const blockquoteMatch = embedCode.match(/<blockquote[^>]*class="twitter-tweet"[^>]*>(.*?)<\/blockquote>/is);
   if (blockquoteMatch) {
     const urlMatch = embedCode.match(/href="https:\/\/(?:twitter\.com|x\.com)\/(\w+)\/status\/(\d+)/i);
     if (urlMatch) {
       username = urlMatch[1];
       tweetId = urlMatch[2];
+      console.log('[parseXEmbed] Parsed blockquote format:', { username, tweetId });
+      return { tweetId, username };
     }
   }
 
-  // If not found, try direct URL format
-  if (!tweetId) {
-    const directUrlMatch = embedCode.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/(?:@)?(\w+)\/status\/(\d+)/);
-    if (directUrlMatch) {
-      username = directUrlMatch[1];
-      tweetId = directUrlMatch[2];
-    }
-  }
-
-  if (!tweetId || !username) return null;
-
-  return { tweetId, username };
+  console.warn('[parseXEmbed] Failed to parse embed code:', embedCode);
+  return null;
 };
 
 /**

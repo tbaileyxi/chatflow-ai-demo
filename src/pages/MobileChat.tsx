@@ -713,7 +713,7 @@ const { data: messagesData, error: messagesError } = await supabase
       <Button
         variant="secondary"
         size="sm"
-        onClick={() => navigate('/app')}
+        onClick={() => navigate('/huddle-search')}
         className="fixed top-20 left-4 z-40 rounded-full h-10 w-10 p-0 bg-background/80 backdrop-blur-sm border border-border/50 shadow-lg hover:bg-background/90"
       >
         <ArrowLeft className="h-5 w-5" />
