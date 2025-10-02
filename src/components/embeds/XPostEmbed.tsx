@@ -58,38 +58,32 @@ export const XPostEmbed = memo<XPostEmbedProps>(({ embedCode }) => {
   };
 
   return (
-    <div 
-      className="rounded-xl overflow-hidden w-full my-2 relative"
-      style={{ 
-        pointerEvents: 'auto',
-        minHeight: isLoading ? '200px' : 'auto'
-      }}
-    >
+    <div className="rounded-xl overflow-hidden w-full my-2">
       {isLoading && !error && (
-        <div className="flex items-center justify-center p-8 bg-muted/50 rounded-xl min-h-[200px]">
-          <div className="flex flex-col items-center space-y-2">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <div className="text-sm text-muted-foreground">Loading tweet...</div>
+        <div className="flex items-center justify-center p-6 bg-muted/30 rounded-xl">
+          <div className="flex flex-col items-center gap-2">
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+            <div className="text-xs text-muted-foreground">Loading tweet...</div>
           </div>
         </div>
       )}
       
       {error && (
-        <div className="flex flex-col items-center justify-center p-6 bg-muted/50 rounded-xl min-h-[150px] space-y-3">
-          <div className="text-sm font-medium text-muted-foreground">{error}</div>
+        <div className="flex flex-col items-center justify-center p-4 bg-muted/30 rounded-xl space-y-2">
+          <div className="text-xs text-muted-foreground">{error}</div>
           <a 
             href={tweetUrl} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="text-xs text-primary hover:underline"
+            className="text-xs text-primary hover:underline font-medium"
           >
-            View on X/Twitter →
+            View on X →
           </a>
         </div>
       )}
 
       {!error && (
-        <div style={{ display: isLoading ? 'none' : 'block' }}>
+        <div className={isLoading ? 'hidden' : 'block'}>
           <TwitterPortal
             tweetId={tweetData.tweetId}
             theme={theme}
