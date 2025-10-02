@@ -24,40 +24,63 @@ export const isXEmbed = (embedCode: string): boolean => {
 
 /**
  * Extract tweet ID and username from X embed code
+ * Handles: direct URLs, blockquote HTML, script tags, x.com variants
  */
 export const parseXEmbed = (embedCode: string): { tweetId: string; username: string } | null => {
   if (!embedCode || typeof embedCode !== 'string') {
+    console.warn('[parseXEmbed] Invalid input:', typeof embedCode);
     return null;
   }
 
-  // Clean input - remove quotes, whitespace, newlines
-  const cleaned = embedCode.trim().replace(/^["'`]|["'`]$/g, '').replace(/\n/g, '');
-  
-  // Pattern 1: Direct URL - https://twitter.com/user/status/123 or https://x.com/user/status/123
-  const urlPattern = /(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)\/status\/(\d+)/i;
+  // Aggressive cleaning - remove all extra characters, newlines, quotes
+  const cleaned = embedCode
+    .trim()
+    .replace(/[\r\n\t]+/g, ' ')  // Replace newlines/tabs with spaces
+    .replace(/\s+/g, ' ')        // Normalize whitespace
+    .replace(/^["'`]+|["'`]+$/g, ''); // Remove surrounding quotes
+
+  console.log('[parseXEmbed] Cleaned input:', cleaned.substring(0, 150));
+
+  // Pattern 1: Direct URL (most common)
+  // Matches: https://twitter.com/user/status/123, https://x.com/user/status/123
+  const urlPattern = /(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)\/status(?:es)?\/(\d+)/i;
   const urlMatch = cleaned.match(urlPattern);
   
-  if (urlMatch) {
-    console.log('[parseXEmbed] ✅ Parsed URL:', { username: urlMatch[1], tweetId: urlMatch[2] });
+  if (urlMatch && urlMatch[1] && urlMatch[2]) {
+    console.log('[parseXEmbed] ✅ Direct URL match:', { username: urlMatch[1], tweetId: urlMatch[2] });
     return {
       username: urlMatch[1],
       tweetId: urlMatch[2]
     };
   }
 
-  // Pattern 2: Blockquote HTML - <blockquote class="twitter-tweet">...</blockquote>
-  const blockquotePattern = /<blockquote[^>]*class="twitter-tweet"[^>]*>.*?href="https?:\/\/(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)\/status\/(\d+)/is;
+  // Pattern 2: Blockquote HTML (from database embed_code)
+  // Matches: <blockquote class="twitter-tweet">...<a href="https://twitter.com/user/status/123">
+  const blockquotePattern = /<blockquote[^>]*(?:class=["']twitter-tweet["']|twitter-tweet)[^>]*>.*?(?:href=["'])?(https?:\/\/(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)\/status(?:es)?\/(\d+))/is;
   const blockquoteMatch = cleaned.match(blockquotePattern);
   
-  if (blockquoteMatch) {
-    console.log('[parseXEmbed] ✅ Parsed blockquote:', { username: blockquoteMatch[1], tweetId: blockquoteMatch[2] });
+  if (blockquoteMatch && blockquoteMatch[2] && blockquoteMatch[3]) {
+    console.log('[parseXEmbed] ✅ Blockquote HTML match:', { username: blockquoteMatch[2], tweetId: blockquoteMatch[3] });
     return {
-      username: blockquoteMatch[1],
-      tweetId: blockquoteMatch[2]
+      username: blockquoteMatch[2],
+      tweetId: blockquoteMatch[3]
     };
   }
 
-  console.warn('[parseXEmbed] ❌ Failed to parse:', cleaned.substring(0, 100));
+  // Pattern 3: Script tag embed (legacy format)
+  // Extract URL from script or blockquote even if malformed
+  const scriptUrlPattern = /(?:https?:\/\/)?(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)\/status(?:es)?\/(\d+)/i;
+  const scriptMatch = cleaned.match(scriptUrlPattern);
+  
+  if (scriptMatch && scriptMatch[1] && scriptMatch[2]) {
+    console.log('[parseXEmbed] ✅ Script/fallback match:', { username: scriptMatch[1], tweetId: scriptMatch[2] });
+    return {
+      username: scriptMatch[1],
+      tweetId: scriptMatch[2]
+    };
+  }
+
+  console.error('[parseXEmbed] ❌ All patterns failed for:', cleaned.substring(0, 200));
   return null;
 };
 

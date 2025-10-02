@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatDistanceToNow } from "date-fns";
 import { MediaViewer } from "@/components/MediaViewer";
-import { LazyEmbed } from "@/components/chat/LazyEmbed";
 import { MakePublicButton } from "@/components/MakePublicButton";
 import { cn } from "@/lib/utils";
 import { XPostEmbed } from "@/components/embeds/XPostEmbed";
 import { supabase } from "@/integrations/supabase/client";
 import { shouldShowProfile, parsePickEmMessage } from "@/utils/chatMessage";
 import { PickEmCard } from "@/components/pickem/PickEmCard";
+import { ModernMediaViewer } from "@/components/chat/ModernMediaViewer";
 interface ModernChatBubbleProps {
   message: any;
   currentUserId?: string;
@@ -100,7 +100,7 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
   return (
     <div
       className={cn(
-        "group flex gap-4 py-2 px-6 transition-colors duration-200",
+        "group flex gap-3 py-2 px-3 sm:px-4 md:px-6 transition-colors duration-200",
         "hover:bg-muted/30",
         isOwnMessage ? "flex-row-reverse" : "flex-row"
       )}
@@ -143,7 +143,7 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
       {/* Message Content */}
       <div
         className={cn(
-          "flex-1 w-full",
+          "flex-1 min-w-0 max-w-[calc(100%-3rem)]",
           isOwnMessage ? "text-right" : "text-left"
         )}
       >
@@ -172,9 +172,9 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
           <PopoverTrigger asChild>
             <div
               className={cn(
-                "inline-block max-w-full rounded-2xl px-4 py-3",
-                "text-base cursor-pointer select-text transition-all duration-200",
-                "relative group/bubble",
+                "inline-block w-full max-w-full rounded-2xl px-3 sm:px-4 py-2.5",
+                "text-sm sm:text-base cursor-pointer select-text transition-all duration-200",
+                "relative group/bubble break-words",
                 isOwnMessage
                   ? "bg-primary text-primary-foreground shadow-lg"
                   : "bg-muted/80 backdrop-blur-sm text-foreground shadow-sm",
@@ -207,28 +207,26 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
 
               {/* Text Content */}
               <div
-                className="whitespace-pre-wrap break-words leading-relaxed"
+                className="whitespace-pre-wrap break-words leading-relaxed overflow-wrap-anywhere"
                 dangerouslySetInnerHTML={{ __html: message.content }}
               />
 
               {/* Media Content with layout shift prevention */}
               {message.media_url && (
-                <div className="mt-3">
+                <div className="mt-2 w-full overflow-hidden rounded-lg">
                   <MediaViewer
                     mediaUrl={message.media_url}
                     mediaType={message.media_type || 'image'}
                     showLightbox={message.media_type === 'image'}
-                    className="rounded-xl"
+                    className="rounded-xl w-full"
                   />
                 </div>
               )}
 
               {/* Embed Content - only render if not Pick 'Em */}
               {message.embed_code && !parsePickEmMessage(message) && (
-                <div className="mt-3 w-full max-w-[550px] mx-auto">
-                  <LazyEmbed>
-                    <XPostEmbed embedCode={message.embed_code} />
-                  </LazyEmbed>
+                <div className="mt-2 w-full overflow-hidden">
+                  <XPostEmbed embedCode={message.embed_code} />
                 </div>
               )}
             </div>
