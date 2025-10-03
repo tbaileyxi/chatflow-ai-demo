@@ -153,6 +153,8 @@ const { data: messagesData, error: messagesError } = await supabase
     content,
     created_at,
     user_id,
+    poll_data,
+    message_type,
     is_bot_message,
     is_team_agent_message,
     origin_team_id,
@@ -587,7 +589,7 @@ const { data: messagesData, error: messagesError } = await supabase
       setMessages(prev => [...prev, enrichedMessage]);
       
       // Auto-scroll to bottom after sending
-      setTimeout(() => scrollToBottom(), 100);
+      setTimeout(() => scrollToBottom(), 300);
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
@@ -628,7 +630,7 @@ const { data: messagesData, error: messagesError } = await supabase
       setMessages(prev => [...prev, enrichedMessage]);
       
       // Auto-scroll to bottom after sending media
-      setTimeout(() => scrollToBottom(), 100);
+      setTimeout(() => scrollToBottom(), 300);
     } catch (error) {
       console.error('Error sending media:', error);
     } finally {

@@ -82,7 +82,7 @@ export const Huddle = () => {
 
         const { data: rawMessages } = await supabase
           .from('huddle_messages')
-          .select('*')
+          .select('*, poll_data, message_type')
           .eq('huddle_id', huddleId)
           .order('created_at', { ascending: true })
           .limit(100);
@@ -238,7 +238,7 @@ export const Huddle = () => {
       setMessages(prev => [...prev, messageWithProfile]);
       
       // Auto-scroll after sending
-      setTimeout(() => scrollToBottom('smooth'), 100);
+      setTimeout(() => scrollToBottom('smooth'), 300);
 
       supabase
         .from('huddle_messages')
@@ -266,36 +266,17 @@ export const Huddle = () => {
   }, [huddleId, user, toast]);
 
   // Send media message
-  const sendMediaMessage = useCallback(async (file: File) => {
+  const sendMediaMessage = useCallback(async (url: string, type: 'image' | 'video') => {
     if (!huddleId || !user) return;
 
     try {
-      toast({
-        title: "Uploading...",
-        description: "Uploading media file",
-      });
-
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `huddle-media/${huddleId}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('media')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('media')
-        .getPublicUrl(filePath);
-
       const messageData = {
         id: crypto.randomUUID(),
-        content: `[Shared ${file.type.startsWith('image/') ? 'image' : 'video'}]`,
+        content: `[Shared ${type}]`,
         huddle_id: huddleId,
         user_id: user.id,
-        media_url: publicUrl,
-        media_type: file.type.startsWith('image/') ? 'image' : 'video',
+        media_url: url,
+        media_type: type,
         created_at: new Date().toISOString()
       };
 
@@ -311,7 +292,7 @@ export const Huddle = () => {
       setMessages(prev => [...prev, messageWithProfile]);
       
       // Auto-scroll after sending media
-      setTimeout(() => scrollToBottom('smooth'), 100);
+      setTimeout(() => scrollToBottom('smooth'), 300);
 
       const { error } = await supabase
         .from('huddle_messages')
@@ -401,21 +382,6 @@ export const Huddle = () => {
               className="h-8 w-8 sm:h-9 sm:w-9"
             />
             
-            <div className="relative group">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setPickEmDialog({ open: true })}
-                className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-full hover:bg-team-primary/20"
-                aria-label="Blitz Board - Heat Check"
-              >
-                <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-team-primary" />
-              </Button>
-              <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-background/95 backdrop-blur-sm border border-team-primary/30 rounded-lg text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg">
-                <div className="font-semibold mb-1">Heat Check ⚡</div>
-                <div className="text-muted-foreground">Pick games, compete with your huddle!</div>
-              </div>
-            </div>
 
             {/* Settings dropdown */}
             <HuddleSettingsDropdown

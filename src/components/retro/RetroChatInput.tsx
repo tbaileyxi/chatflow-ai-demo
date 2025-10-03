@@ -10,7 +10,7 @@ import { motion } from 'framer-motion';
 
 interface RetroChatInputProps {
   onSendMessage: (content: string) => Promise<void>;
-  onSendMedia?: (file: File) => Promise<void>;
+  onSendMedia?: (url: string, type: 'image' | 'video') => Promise<void>;
   onTyping?: (isTyping: boolean) => void;
   placeholder?: string;
   disabled?: boolean;
@@ -139,13 +139,14 @@ export const RetroChatInput = ({
         .from('chat-media')
         .getPublicUrl(data.path);
 
-      const type = file.type.startsWith('video/') ? 'video' : 'image';
-      await onSendMedia(file);
+      const fileType = file.type.startsWith('video/') ? 'video' : 'image';
       
       toast({
         title: "Upload successful",
-        description: `${type} uploaded successfully`,
+        description: `${fileType} uploaded successfully`,
       });
+
+      await onSendMedia?.(publicUrl, fileType);
 
     } catch (error) {
       console.error('Upload error:', error);
