@@ -31,8 +31,14 @@ export const Huddle = () => {
   const [teamName, setTeamName] = useState<string>('');
   const [showHighlights, setShowHighlights] = useState(false);
   
+  // Pagination state
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [oldestCreatedAt, setOldestCreatedAt] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
   // Auto-scroll functionality
-  const { showJumpToLatest, scrollRef, handleAtBottomStateChange, jumpToLatest, scrollToBottom } = useAutoScroll();
+  const { showJumpToLatest, scrollRef, handleAtBottomStateChange, jumpToLatest } = useAutoScroll();
 
   // Check if current user is owner
   const isOwner = user?.id === huddle?.owner_id;
@@ -84,8 +90,8 @@ export const Huddle = () => {
           .from('huddle_messages')
           .select('*, poll_data, message_type')
           .eq('huddle_id', huddleId)
-          .order('created_at', { ascending: true })
-          .limit(100);
+          .order('created_at', { ascending: false })
+          .limit(50);
 
         if (rawMessages && rawMessages.length > 0) {
           const messageUserIds = [...new Set(rawMessages.map((m: any) => m.user_id))];
@@ -104,7 +110,9 @@ export const Huddle = () => {
             }
           }));
 
-          setMessages(messagesWithProfiles);
+          setMessages(messagesWithProfiles.reverse());
+          setOldestCreatedAt(rawMessages[rawMessages.length - 1]?.created_at || null);
+          setHasMore(rawMessages.length === 50);
         }
 
         const { data: membersData } = await supabase
@@ -127,9 +135,9 @@ export const Huddle = () => {
         setLoading(false);
         
         // Auto-scroll to bottom after loading
-        requestAnimationFrame(() => {
-          setTimeout(() => scrollToBottom('auto'), 200);
-        });
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+        }, 100);
         
       } catch (error) {
         console.error('❌ Critical error loading huddle:', error);
@@ -139,7 +147,52 @@ export const Huddle = () => {
     };
 
     loadHuddle();
-  }, [huddleId, navigate, toast, scrollToBottom]);
+  }, [huddleId, navigate, toast]);
+
+  // Load older messages function
+  const loadMoreMessages = useCallback(async () => {
+    if (!hasMore || loadingMore || !oldestCreatedAt || !huddleId) return;
+    
+    setLoadingMore(true);
+    try {
+      const { data: olderMessages } = await supabase
+        .from('huddle_messages')
+        .select('*, poll_data, message_type')
+        .eq('huddle_id', huddleId)
+        .lt('created_at', oldestCreatedAt)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (olderMessages && olderMessages.length > 0) {
+        // Fetch profiles for older messages
+        const messageUserIds = [...new Set(olderMessages.map((m: any) => m.user_id))];
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, display_name, username, avatar_url')
+          .in('user_id', messageUserIds);
+
+        const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+        const messagesWithProfiles = olderMessages.map((m: any) => ({
+          ...m,
+          profile: profilesMap.get(m.user_id) || {
+            user_id: m.user_id,
+            display_name: 'User',
+            username: 'user'
+          }
+        }));
+
+        setMessages(prev => [...messagesWithProfiles.reverse(), ...prev]);
+        setOldestCreatedAt(olderMessages[olderMessages.length - 1].created_at);
+        setHasMore(olderMessages.length === 50);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error loading older messages:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMore, loadingMore, oldestCreatedAt, huddleId]);
 
   // Real-time subscriptions
   useEffect(() => {
@@ -188,9 +241,9 @@ export const Huddle = () => {
           });
           
           // Auto-scroll to new messages
-          requestAnimationFrame(() => {
-            setTimeout(() => scrollToBottom('smooth'), 100);
-          });
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          }, 100);
         }
       })
       .subscribe();
@@ -198,24 +251,14 @@ export const Huddle = () => {
     return () => {
       messagesChannel.unsubscribe();
     };
-  }, [huddleId, user, scrollToBottom]);
+  }, [huddleId, user]);
 
-  // Auto-scroll when messages change (if user is near bottom)
+  // Auto-scroll when messages change
   useEffect(() => {
-    if (messages.length === 0) return;
-    
-    // Use requestAnimationFrame to ensure DOM is updated
-    requestAnimationFrame(() => {
-      const scrollContainer = document.querySelector('.retro-chat-column');
-      if (!scrollContainer) return;
-      
-      const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 200;
-      
-      if (isNearBottom) {
-        scrollToBottom('smooth');
-      }
-    });
-  }, [messages.length, scrollToBottom]);
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [messages.length]);
 
   // Send message
   const sendMessage = useCallback(async (content: string) => {
@@ -242,9 +285,9 @@ export const Huddle = () => {
       setMessages(prev => [...prev, messageWithProfile]);
       
       // Auto-scroll after sending
-      requestAnimationFrame(() => {
-        setTimeout(() => scrollToBottom('smooth'), 100);
-      });
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 100);
 
       supabase
         .from('huddle_messages')
@@ -298,9 +341,9 @@ export const Huddle = () => {
       setMessages(prev => [...prev, messageWithProfile]);
       
       // Auto-scroll after sending media
-      requestAnimationFrame(() => {
-        setTimeout(() => scrollToBottom('smooth'), 100);
-      });
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 100);
 
       const { error } = await supabase
         .from('huddle_messages')
@@ -412,7 +455,7 @@ export const Huddle = () => {
             ref={(el) => {
               if (el && scrollRef.current) {
                 scrollRef.current.scrollToBottom = (behavior = 'smooth') => {
-                  el.scrollTo({ top: el.scrollHeight, behavior });
+                  messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
                 };
               }
             }}
@@ -424,6 +467,21 @@ export const Huddle = () => {
             }}
           >
             <div className="max-w-4xl mx-auto space-y-1">
+              {/* Load older messages button */}
+              {hasMore && (
+                <div className="flex justify-center py-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadMoreMessages}
+                    disabled={loadingMore}
+                    className="text-sm bg-background/80 backdrop-blur-sm"
+                  >
+                    {loadingMore ? 'Loading...' : 'Load Older Messages'}
+                  </Button>
+                </div>
+              )}
+              
               {messages.map((message, index) => {
                 const prevMessage = index > 0 ? messages[index - 1] : null;
                 const isGrouped = prevMessage && 
@@ -443,6 +501,7 @@ export const Huddle = () => {
                   />
                 );
               })}
+              <div ref={messagesEndRef} />
             </div>
           </div>
           

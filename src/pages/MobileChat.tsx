@@ -105,16 +105,15 @@ export const MobileChat = () => {
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   };
 
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (messages.length > 0) {
-      requestAnimationFrame(() => {
-        setTimeout(() => scrollToBottom(), 100);
-      });
+      scrollToBottom();
     }
-  }, [messages]);
+  }, [messages.length]);
 
   useEffect(() => {
     if (!huddleId || !currentUser) return;
@@ -593,9 +592,7 @@ const { data: messagesData, error: messagesError } = await supabase
       setMessages(prev => [...prev, enrichedMessage]);
       
       // Auto-scroll to bottom after sending
-      requestAnimationFrame(() => {
-        setTimeout(() => scrollToBottom(), 100);
-      });
+      scrollToBottom();
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
@@ -636,9 +633,7 @@ const { data: messagesData, error: messagesError } = await supabase
       setMessages(prev => [...prev, enrichedMessage]);
       
       // Auto-scroll to bottom after sending media
-      requestAnimationFrame(() => {
-        setTimeout(() => scrollToBottom(), 100);
-      });
+      scrollToBottom();
     } catch (error) {
       console.error('Error sending media:', error);
     } finally {
@@ -734,13 +729,15 @@ const { data: messagesData, error: messagesError } = await supabase
         <div className="pb-4">
           {hasMore && !loading && (
             <div className="flex justify-center py-2">
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={loadOlderMessages}
                 disabled={loadingMore}
-                className="text-sm text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg border bg-background hover:bg-muted transition-colors"
+                className="text-xs"
               >
-                {loadingMore ? 'Loading...' : 'Load older messages'}
-              </button>
+                {loadingMore ? 'Loading...' : 'Load Older Messages'}
+              </Button>
             </div>
           )}
           {[...messages, ...ephemeralMessages].map((message, index) => {
