@@ -109,7 +109,11 @@ export const MobileChat = () => {
   };
 
   useEffect(() => {
-    scrollToBottom();
+    if (messages.length > 0) {
+      requestAnimationFrame(() => {
+        setTimeout(() => scrollToBottom(), 100);
+      });
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -589,7 +593,9 @@ const { data: messagesData, error: messagesError } = await supabase
       setMessages(prev => [...prev, enrichedMessage]);
       
       // Auto-scroll to bottom after sending
-      setTimeout(() => scrollToBottom(), 300);
+      requestAnimationFrame(() => {
+        setTimeout(() => scrollToBottom(), 100);
+      });
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
@@ -630,7 +636,9 @@ const { data: messagesData, error: messagesError } = await supabase
       setMessages(prev => [...prev, enrichedMessage]);
       
       // Auto-scroll to bottom after sending media
-      setTimeout(() => scrollToBottom(), 300);
+      requestAnimationFrame(() => {
+        setTimeout(() => scrollToBottom(), 100);
+      });
     } catch (error) {
       console.error('Error sending media:', error);
     } finally {

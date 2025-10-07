@@ -127,7 +127,9 @@ export const Huddle = () => {
         setLoading(false);
         
         // Auto-scroll to bottom after loading
-        setTimeout(() => scrollToBottom('auto'), 100);
+        requestAnimationFrame(() => {
+          setTimeout(() => scrollToBottom('auto'), 200);
+        });
         
       } catch (error) {
         console.error('❌ Critical error loading huddle:', error);
@@ -186,7 +188,9 @@ export const Huddle = () => {
           });
           
           // Auto-scroll to new messages
-          setTimeout(() => scrollToBottom('smooth'), 100);
+          requestAnimationFrame(() => {
+            setTimeout(() => scrollToBottom('smooth'), 100);
+          });
         }
       })
       .subscribe();
@@ -238,7 +242,9 @@ export const Huddle = () => {
       setMessages(prev => [...prev, messageWithProfile]);
       
       // Auto-scroll after sending
-      setTimeout(() => scrollToBottom('smooth'), 300);
+      requestAnimationFrame(() => {
+        setTimeout(() => scrollToBottom('smooth'), 100);
+      });
 
       supabase
         .from('huddle_messages')
@@ -292,7 +298,9 @@ export const Huddle = () => {
       setMessages(prev => [...prev, messageWithProfile]);
       
       // Auto-scroll after sending media
-      setTimeout(() => scrollToBottom('smooth'), 300);
+      requestAnimationFrame(() => {
+        setTimeout(() => scrollToBottom('smooth'), 100);
+      });
 
       const { error } = await supabase
         .from('huddle_messages')
