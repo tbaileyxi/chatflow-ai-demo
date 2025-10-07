@@ -269,17 +269,29 @@ async function processGame(game: ESPNGame, league: string, teamIds: Set<string>,
       await detectAndPostChanges(previousState, currentState, league, supabase)
     }
 
-    // Update stored state only if game is not completed
-    if (!status.type.completed) {
-      await setGameState(currentState, supabase)
-    }
+    // Always update game state (even for completed games) to prevent re-processing
+    await setGameState(currentState, supabase)
 
-    // Clean up completed games from database
+    // Clean up games that have been final for >24 hours (not just completed)
     if (status.type.completed && previousState) {
-      await supabase
+      const { data: existingState } = await supabase
         .from('game_states')
-        .delete()
+        .select('updated_at')
         .eq('game_id', gameId)
+        .single()
+      
+      if (existingState) {
+        const lastUpdate = new Date(existingState.updated_at)
+        const hoursSinceFinal = (Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60)
+        
+        if (hoursSinceFinal > 24) {
+          console.log(`Cleaning up game ${gameId} (final for ${hoursSinceFinal.toFixed(1)} hours)`)
+          await supabase
+            .from('game_states')
+            .delete()
+            .eq('game_id', gameId)
+        }
+      }
     }
 
   } catch (error) {
@@ -288,8 +300,9 @@ async function processGame(game: ESPNGame, league: string, teamIds: Set<string>,
 }
 
 async function detectAndPostChanges(previous: GameState, current: GameState, league: string, supabase: any) {
-  // Skip processing if game is already completed
-  if (previous.lastStatus === 'post' && current.lastStatus === 'post') {
+  // Skip processing if game was already completed in previous state
+  if (previous.lastStatus === 'post') {
+    console.log(`Skipping already-completed game ${current.gameId}`)
     return // Game is already finished, no need to process further
   }
 
