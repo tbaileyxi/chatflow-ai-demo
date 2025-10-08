@@ -33,6 +33,51 @@ export const SpotlightFeed = () => {
 
   useEffect(() => {
     fetchSpotlightPosts();
+    
+    // Set up real-time subscription for new spotlight posts
+    const channel = supabase
+      .channel('spotlight-posts')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'posts',
+        filter: 'is_spotlight=eq.true'
+      }, async (payload) => {
+        console.log('New spotlight post detected:', payload);
+        const newPost = payload.new as any;
+        
+        // Fetch team and author data for the new post
+        const { data: team } = await supabase
+          .from('teams')
+          .select('id, name, logo_url, sponsor')
+          .eq('id', newPost.team_id)
+          .single();
+        
+        let author = null;
+        if (newPost.author_id && !newPost.is_agent_post) {
+          const { data: authorData } = await supabase
+            .from('profiles')
+            .select('user_id, display_name, username, avatar_url')
+            .eq('user_id', newPost.author_id)
+            .single();
+          author = authorData;
+        }
+        
+        const enrichedPost = {
+          ...newPost,
+          team,
+          author,
+          post_reactions: []
+        };
+        
+        // Prepend new post to the top of the feed
+        setPosts(prev => [enrichedPost, ...prev]);
+      })
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchSpotlightPosts = async () => {

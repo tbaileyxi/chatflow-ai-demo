@@ -265,6 +265,13 @@ export const Huddle = () => {
     if (!huddleId || !user || !content.trim()) return;
 
     try {
+      // Fetch current user's profile from database
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_id, display_name, username, avatar_url')
+        .eq('user_id', user.id)
+        .single();
+      
       const messageData = {
         id: crypto.randomUUID(),
         content: content.trim(),
@@ -275,11 +282,11 @@ export const Huddle = () => {
 
       const messageWithProfile = {
         ...messageData,
-        profile: {
+        profile: profile || {
           user_id: user.id,
-          display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
-          username: user.email?.split('@')[0] || 'user',
-          avatar_url: user.user_metadata?.avatar_url
+          display_name: 'User',
+          username: 'user',
+          avatar_url: null
         }
       };
       setMessages(prev => [...prev, messageWithProfile]);
@@ -319,6 +326,13 @@ export const Huddle = () => {
     if (!huddleId || !user) return;
 
     try {
+      // Fetch current user's profile from database
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_id, display_name, username, avatar_url')
+        .eq('user_id', user.id)
+        .single();
+      
       const messageData = {
         id: crypto.randomUUID(),
         content: `[Shared ${type}]`,
@@ -331,11 +345,11 @@ export const Huddle = () => {
 
       const messageWithProfile = {
         ...messageData,
-        profile: {
+        profile: profile || {
           user_id: user.id,
-          display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
-          username: user.email?.split('@')[0] || 'user',
-          avatar_url: user.user_metadata?.avatar_url
+          display_name: 'User',
+          username: 'user',
+          avatar_url: null
         }
       };
       setMessages(prev => [...prev, messageWithProfile]);

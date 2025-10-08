@@ -3,6 +3,7 @@ import { VirtualizedChat } from "@/components/chat/VirtualizedChat";
 import { ModernPostCard } from "@/components/modern/ModernPostCard";
 import { FeedSkeleton } from "./PostSkeleton";
 import { useSpotlightPosts } from "@/hooks/useInfiniteQuery";
+import { supabase } from "@/integrations/supabase/client";
 
 export const OptimizedSpotlightFeed = () => {
   const {
@@ -11,7 +12,8 @@ export const OptimizedSpotlightFeed = () => {
     isError,
     fetchNextPage,
     hasNextPage,
-    isFetchingNextPage
+    isFetchingNextPage,
+    refetch
   } = useSpotlightPosts();
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -19,6 +21,26 @@ export const OptimizedSpotlightFeed = () => {
   const allPosts = useMemo(() => {
     return data?.pages.flat() || [];
   }, [data]);
+  
+  // Set up real-time subscription for new spotlight posts
+  useEffect(() => {
+    const channel = supabase
+      .channel('spotlight-posts-optimized')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'posts',
+        filter: 'is_spotlight=eq.true'
+      }, () => {
+        console.log('New spotlight post detected, refetching...');
+        refetch();
+      })
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
   
   // Auto-scroll to top when posts load/update (newest posts are at top)
   useEffect(() => {
