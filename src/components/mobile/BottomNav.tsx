@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { MessageSquare, Users, User, Compass } from 'lucide-react';
+import { MessageSquare, Sparkles, User, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
@@ -14,7 +14,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { icon: MessageSquare, label: 'Huddles', to: '/app' },
   { icon: Compass, label: 'Discover', to: '/huddle-search' },
-  { icon: Users, label: 'Spotlight', to: '/spotlight' },
+  { icon: Sparkles, label: 'Spotlight', to: '/spotlight' },
   { icon: User, label: 'Profile', to: '/profile' },
 ];
 

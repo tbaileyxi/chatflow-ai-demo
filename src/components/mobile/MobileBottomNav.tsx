@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { MessageSquare, Users, User, Compass, Trophy } from 'lucide-react';
+import { MessageSquare, Sparkles, User, Compass, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -31,7 +31,7 @@ export const MobileBottomNav = ({ onPickEmClick, showPickEm }: MobileBottomNavPr
       tooltip: 'Heat Check - Test your predictions!'
     }] : []),
     { icon: Compass, label: 'Discover', to: '/huddle-search' },
-    { icon: Users, label: 'Spotlight', to: '/spotlight' },
+    { icon: Sparkles, label: 'Spotlight', to: '/spotlight' },
     { icon: User, label: 'Profile', to: '/profile' },
   ];
 

@@ -94,11 +94,11 @@ export const GlassHeader = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => window.open('mailto:support@sidehuddle.app', '_blank')}>
+              <DropdownMenuItem onClick={() => window.open('https://sidehuddlefounders.carrd.co/#contactus', '_blank')}>
                 <Mail className="mr-2 h-4 w-4" />
                 Contact Us
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => window.open('/faq', '_blank')}>
+              <DropdownMenuItem onClick={() => window.open('https://sidehuddlefounders.carrd.co/#faqs', '_blank')}>
                 <HelpCircle className="mr-2 h-4 w-4" />
                 FAQs
               </DropdownMenuItem>
