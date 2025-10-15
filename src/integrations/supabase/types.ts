@@ -601,6 +601,7 @@ export type Database = {
           espn_game_id: string
           home_team: string
           id: string
+          match_id: string | null
           start_time: string
           status: string
           updated_at: string
@@ -613,6 +614,7 @@ export type Database = {
           espn_game_id: string
           home_team: string
           id?: string
+          match_id?: string | null
           start_time: string
           status?: string
           updated_at?: string
@@ -625,6 +627,7 @@ export type Database = {
           espn_game_id?: string
           home_team?: string
           id?: string
+          match_id?: string | null
           start_time?: string
           status?: string
           updated_at?: string
@@ -941,6 +944,38 @@ export type Database = {
           },
         ]
       }
+      processed_highlights: {
+        Row: {
+          highlight_id: number
+          id: string
+          match_id: number
+          posted_at: string
+          team_id: string | null
+        }
+        Insert: {
+          highlight_id: number
+          id?: string
+          match_id: number
+          posted_at?: string
+          team_id?: string | null
+        }
+        Update: {
+          highlight_id?: number
+          id?: string
+          match_id?: number
+          posted_at?: string
+          team_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "processed_highlights_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1219,6 +1254,8 @@ export type Database = {
           created_at: string
           description: string | null
           division: string | null
+          highlightly_display_name: string | null
+          highlightly_id: number | null
           id: string
           league: string | null
           logo_url: string | null
@@ -1235,6 +1272,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           division?: string | null
+          highlightly_display_name?: string | null
+          highlightly_id?: number | null
           id?: string
           league?: string | null
           logo_url?: string | null
@@ -1251,6 +1290,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           division?: string | null
+          highlightly_display_name?: string | null
+          highlightly_id?: number | null
           id?: string
           league?: string | null
           logo_url?: string | null

@@ -1,683 +1,431 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createHighlightlyClient } from "../_shared/highlightly-client.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-interface ESPNGame {
-  id: string
-  status: {
-    type: {
-      id: string
-      name: string
-      state: string
-      completed: boolean
-    }
-    period: number
-    displayClock: string
-  }
-  competitions: Array<{
-    id: string
-    date: string
-    competitors: Array<{
-      id: string
-      team: {
-        id: string
-        displayName: string
-        abbreviation: string
-        logo: string
-      }
-      score: string
-      homeAway: string
-    }>
-    status: {
-      type: {
-        id: string
-        name: string
-        state: string
-      }
-      period: number
-      displayClock: string
-    }
-  }>
-}
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 interface GameState {
-  gameId: string
-  lastScore: string
-  lastPeriod: number
-  lastClock: string
-  lastStatus: string
+  gameId: string;
+  lastScore: string;
+  lastPeriod: number;
+  lastClock: string;
+  lastStatus: string;
   teams: Array<{
-    id: string
-    name: string
-    score: number
-  }>
+    id: number;
+    name: string;
+    score: number;
+  }>;
 }
 
 // Store game states in database for persistence across function calls
 async function getGameState(gameId: string, supabase: any): Promise<GameState | null> {
   try {
     const { data } = await supabase
-      .from('game_states')
-      .select('*')
-      .eq('game_id', gameId)
-      .single()
-    
-    return data ? {
-      gameId: data.game_id,
-      lastScore: data.last_score,
-      lastPeriod: data.last_period,
-      lastClock: data.last_clock,
-      lastStatus: data.last_status,
-      teams: data.teams
-    } : null
+      .from("game_states")
+      .select("*")
+      .eq("game_id", gameId)
+      .single();
+
+    return data
+      ? {
+          gameId: data.game_id,
+          lastScore: data.last_score,
+          lastPeriod: data.last_period,
+          lastClock: data.last_clock,
+          lastStatus: data.last_status,
+          teams: data.teams,
+        }
+      : null;
   } catch {
-    return null
+    return null;
   }
 }
 
 async function setGameState(gameState: GameState, supabase: any) {
   try {
-    await supabase
-      .from('game_states')
-      .upsert({
+    await supabase.from("game_states").upsert(
+      {
         game_id: gameState.gameId,
         last_score: gameState.lastScore,
         last_period: gameState.lastPeriod,
         last_clock: gameState.lastClock,
         last_status: gameState.lastStatus,
         teams: gameState.teams,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'game_id'
-      })
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "game_id",
+      }
+    );
   } catch (error) {
-    console.error(`Failed to update game state for ${gameState.gameId}:`, error)
-    // Continue processing other games even if one fails
+    console.error(`Failed to update game state for ${gameState.gameId}:`, error);
   }
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
 
-    console.log('Starting live game bot polling...')
+    const highlightly = createHighlightlyClient();
+
+    console.log("Starting live game bot polling...");
 
     // Clean up old entries from in-memory cache
-    cleanupCache()
+    cleanupCache();
 
-    // Fetch followed teams to know which games to monitor
-    const { data: followedTeams } = await supabase
-      .from('user_follows')
-      .select('team_id, teams(name, city, conference)')
+    // Fetch teams with Highlightly IDs
+    const { data: allTeamsData } = await supabase
+      .from("teams")
+      .select("id, highlightly_id, name, city, league")
+      .not("highlightly_id", "is", null);
 
-    // Fetch all Power 4 NCAA teams (automatically included in monitoring)
-    const { data: power4Teams } = await supabase
-      .from('teams')
-      .select('id, name, city, conference, league')
-      .eq('league', 'NCAA')
-      .in('conference', ['SEC', 'Big Ten', 'Big 12', 'ACC'])
+    const allTeams = new Map();
+    allTeamsData?.forEach((team) => {
+      allTeams.set(team.id, team);
+    });
 
-    // Fetch teams that have active huddles (ensure we monitor what users care about)
-    const { data: huddleTeamRefs } = await supabase
-      .from('huddles')
-      .select('team_id')
-      .not('team_id', 'is', null)
+    const teamHighlightlyIds = new Set(
+      allTeamsData?.map((t) => t.highlightly_id).filter(Boolean) || []
+    );
 
-    const huddleTeamIds = Array.from(new Set((huddleTeamRefs || []).map(h => h.team_id)))
-    let huddleTeams: any[] = []
-    if (huddleTeamIds.length > 0) {
-      const { data: fetchedHuddleTeams } = await supabase
-        .from('teams')
-        .select('id, name, city, conference, league')
-        .in('id', huddleTeamIds)
-      huddleTeams = fetchedHuddleTeams || []
-    }
-
-    // Combine followed teams, Power 4 teams, and huddle teams
-    const allTeams = new Map()
-    
-    // Add followed teams
-    followedTeams?.forEach(f => {
-      if (f.teams) {
-        allTeams.set(f.team_id, {
-          id: f.team_id,
-          name: f.teams.name,
-          city: f.teams.city,
-          conference: f.teams.conference,
-          league: 'UNKNOWN'
-        })
-      }
-    })
-    
-    // Add Power 4 teams (automatically monitored)
-    power4Teams?.forEach(team => {
-      allTeams.set(team.id, team)
-    })
-
-    // Add teams that have huddles
-    huddleTeams.forEach(team => {
-      allTeams.set(team.id, team)
-    })
-
-    const teamIds = new Set(Array.from(allTeams.keys()))
-    console.log(`Monitoring ${teamIds.size} teams (${followedTeams?.length || 0} followed + ${power4Teams?.length || 0} Power 4 NCAA teams + ${huddleTeamIds.length} huddle teams)`)
+    console.log(`Monitoring ${teamHighlightlyIds.size} teams with Highlightly integration`);
 
     // Poll NFL games
-    await pollLeague('nfl', teamIds, allTeams, supabase)
-    
-    // Poll NCAA games  
-    await pollLeague('college-football', teamIds, allTeams, supabase)
+    await pollLeague("NFL", teamHighlightlyIds, allTeams, supabase, highlightly);
+
+    // Poll NCAA games
+    await pollLeague("NCAA", teamHighlightlyIds, allTeams, supabase, highlightly);
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Live game bot completed' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-
+      JSON.stringify({ success: true, message: "Live game bot completed" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (error) {
-    console.error('Live game bot error:', error)
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.error("Live game bot error:", error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
-})
+});
 
-async function pollLeague(league: string, teamIds: Set<string>, allTeams: Map<string, any>, supabase: any) {
+async function pollLeague(
+  league: "NFL" | "NCAA",
+  teamIds: Set<number>,
+  allTeams: Map<string, any>,
+  supabase: any,
+  highlightly: any
+) {
   try {
-    console.log(`Polling ${league} games...`)
-    
-    const apiUrl = `https://site.api.espn.com/apis/site/v2/sports/football/${league}/scoreboard`
-    const response = await fetch(apiUrl)
-    
-    if (!response.ok) {
-      throw new Error(`ESPN API error: ${response.status}`)
+    console.log(`Polling ${league} games...`);
+
+    const today = new Date().toISOString().split("T")[0];
+    const matches = await highlightly.getMatches({ league, date: today });
+
+    console.log(`Found ${matches.length} ${league} games`);
+
+    for (const match of matches) {
+      await processGame(match, league, teamIds, allTeams, supabase);
     }
-
-    const data = await response.json()
-    const games = data.events || []
-
-    console.log(`Found ${games.length} ${league} games`)
-
-    for (const game of games) {
-      await processGame(game, league, teamIds, allTeams, supabase)
-    }
-
   } catch (error) {
-    console.error(`Error polling ${league}:`, error)
+    console.error(`Error polling ${league}:`, error);
   }
 }
 
-async function processGame(game: ESPNGame, league: string, teamIds: Set<string>, allTeams: Map<string, any>, supabase: any) {
+async function processGame(
+  match: any,
+  league: string,
+  teamIds: Set<number>,
+  allTeams: Map<string, any>,
+  supabase: any
+) {
   try {
-    const gameId = game.id
-    const competition = game.competitions[0]
-    const status = competition.status || game.status
-    
-    const teams = competition.competitors.map(comp => ({
-      id: comp.team.id,
-      name: comp.team.displayName,
-      abbreviation: comp.team.abbreviation,
-      score: parseInt(comp.score || '0'),
-      isHome: comp.homeAway === 'home'
-    }))
+    const gameId = match.id.toString();
 
     // Check if any of our monitored teams are playing
-    const relevantTeams = teams.filter(team => 
-      hasTeamMatch(team, allTeams, supabase)
-    )
+    const isRelevant =
+      teamIds.has(match.homeTeam.id) || teamIds.has(match.awayTeam.id);
 
-    if (relevantTeams.length === 0) {
-      return // Skip games we don't care about
+    if (!isRelevant) {
+      return; // Skip games we don't care about
     }
 
-    console.log(`Processing game: ${teams[0].name} vs ${teams[1].name}`)
+    console.log(`Processing game: ${match.awayTeam.name} @ ${match.homeTeam.name}`);
+
+    const teams = [
+      {
+        id: match.homeTeam.id,
+        name: match.homeTeam.name,
+        score: match.homeTeam.score || 0,
+      },
+      {
+        id: match.awayTeam.id,
+        name: match.awayTeam.name,
+        score: match.awayTeam.score || 0,
+      },
+    ];
 
     const currentState: GameState = {
       gameId,
-      lastScore: `${teams[0].score}-${teams[1].score}`,
-      lastPeriod: status.period || 0,
-      lastClock: status.displayClock || '',
-      lastStatus: status.type.state || '',
-      teams
-    }
+      lastScore: `${match.awayTeam.score}-${match.homeTeam.score}`,
+      lastPeriod: match.period || 0,
+      lastClock: match.clock || "",
+      lastStatus: match.status,
+      teams,
+    };
 
-    const previousState = await getGameState(gameId, supabase)
-    
+    const previousState = await getGameState(gameId, supabase);
+
     // Detect changes and post updates
     if (!previousState) {
-      // New game detected - post pregame info for scheduled games
-      if (status.type.state === 'pre') {
-        await postPregameInfo(teams, competition.date, league, supabase)
-      } else if (status.type.state === 'in') {
-        await postGameStart(teams, competition.date, league, supabase)
-      } else if (status.type.state === 'post') {
-        // Game already completed when first detected - post final score
-        await postGameEnd(currentState, league, supabase)
+      if (match.status === "scheduled") {
+        await postPregameInfo(teams, match.startTime, league, supabase, allTeams);
+      } else if (match.status === "in_progress") {
+        await postGameStart(teams, match.startTime, league, supabase, allTeams);
+      } else if (match.status === "finished") {
+        await postGameEnd(currentState, league, supabase, allTeams);
       }
     } else {
-      await detectAndPostChanges(previousState, currentState, league, supabase)
+      await detectAndPostChanges(previousState, currentState, league, supabase, allTeams);
     }
 
-    // Always update game state (even for completed games) to prevent re-processing
-    await setGameState(currentState, supabase)
+    // Always update game state
+    await setGameState(currentState, supabase);
 
-    // Clean up games that have been final for >24 hours (not just completed)
-    if (status.type.completed && previousState) {
+    // Clean up old finished games
+    if (match.status === "finished" && previousState) {
       const { data: existingState } = await supabase
-        .from('game_states')
-        .select('updated_at')
-        .eq('game_id', gameId)
-        .single()
-      
+        .from("game_states")
+        .select("updated_at")
+        .eq("game_id", gameId)
+        .single();
+
       if (existingState) {
-        const lastUpdate = new Date(existingState.updated_at)
-        const hoursSinceFinal = (Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60)
-        
+        const lastUpdate = new Date(existingState.updated_at);
+        const hoursSinceFinal = (Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60);
+
         if (hoursSinceFinal > 24) {
-          console.log(`Cleaning up game ${gameId} (final for ${hoursSinceFinal.toFixed(1)} hours)`)
-          await supabase
-            .from('game_states')
-            .delete()
-            .eq('game_id', gameId)
+          console.log(`Cleaning up game ${gameId} (final for ${hoursSinceFinal.toFixed(1)} hours)`);
+          await supabase.from("game_states").delete().eq("game_id", gameId);
         }
       }
     }
-
   } catch (error) {
-    console.error('Error processing game:', error)
+    console.error("Error processing game:", error);
   }
 }
 
-async function detectAndPostChanges(previous: GameState, current: GameState, league: string, supabase: any) {
-  // Skip processing if game was already completed in previous state
-  if (previous.lastStatus === 'post') {
-    console.log(`Skipping already-completed game ${current.gameId}`)
-    return // Game is already finished, no need to process further
+async function detectAndPostChanges(
+  previous: GameState,
+  current: GameState,
+  league: string,
+  supabase: any,
+  allTeams: Map<string, any>
+) {
+  if (previous.lastStatus === "finished") {
+    return; // Game already completed
   }
 
-  // Skip if transitioning from completed state back to earlier state (data inconsistency)
-  if (previous.lastStatus === 'post' && current.lastStatus !== 'post') {
-    console.log('Skipping invalid state transition from post to non-post status')
-    return
+  // Game start
+  if (previous.lastStatus === "scheduled" && current.lastStatus === "in_progress") {
+    await postGameStart(current.teams, "", league, supabase, allTeams);
   }
 
-  // Game start (pre -> in) - only post if not already posted
-  if (previous.lastStatus === 'pre' && current.lastStatus === 'in') {
-    await postGameStart(current.teams, '', league, supabase)
+  // Score change
+  if (current.lastStatus === "in_progress" && previous.lastScore !== current.lastScore) {
+    await postScoreUpdate(current, league, supabase, allTeams);
   }
 
-  // Score change - only post if it's an actual score change AND game is in progress
-  if (current.lastStatus === 'in' && previous.lastScore !== current.lastScore) {
-    // Make sure it's not just a formatting difference
-    const prevScores = previous.lastScore.split('-').map(s => parseInt(s.trim()))
-    const currScores = current.lastScore.split('-').map(s => parseInt(s.trim()))
-    
-    if (prevScores[0] !== currScores[0] || prevScores[1] !== currScores[1]) {
-      await postScoreUpdate(current, league, supabase)
-    }
+  // Period change
+  if (current.lastStatus === "in_progress" && current.lastPeriod > previous.lastPeriod) {
+    await postPeriodChange(previous, current, league, supabase, allTeams);
   }
 
-  // Period change - only on actual period transitions while game is in progress
-  if (current.lastStatus === 'in') {
-    const periodIncreased = current.lastPeriod > previous.lastPeriod
-    const isPeriodEnd = periodIncreased && previous.lastPeriod > 0
-
-    if (isPeriodEnd) {
-      await postPeriodChange(previous, current, league, supabase)
-    }
-  }
-
-  // Game status change (end of game) - only post once when transitioning to final
-  if (previous.lastStatus !== 'post' && current.lastStatus === 'post') {
-    await postGameEnd(current, league, supabase)
+  // Game end
+  if (previous.lastStatus !== "finished" && current.lastStatus === "finished") {
+    await postGameEnd(current, league, supabase, allTeams);
   }
 }
 
-async function postPregameInfo(teams: any[], gameDate: string, league: string, supabase: any) {
-  const gameTime = new Date(gameDate).toLocaleTimeString('en-US', { 
-    hour: 'numeric', 
-    minute: '2-digit',
-    timeZone: 'America/New_York'
-  })
-  const content = `🏈 PREGAME: ${teams[0].name} vs ${teams[1].name}\nKickoff: ${gameTime} ET`
-  
-  console.log('Posting pregame info:', content)
-  
-  await postToTeamFeeds(teams, content, league, supabase, `pregame-${teams[0].name}-${teams[1].name}`)
+async function postPregameInfo(
+  teams: any[],
+  gameDate: string,
+  league: string,
+  supabase: any,
+  allTeams: Map<string, any>
+) {
+  const gameTime = new Date(gameDate).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/New_York",
+  });
+  const content = `🏈 PREGAME: ${teams[1].name} vs ${teams[0].name}\nKickoff: ${gameTime} ET`;
+
+  await postToTeamFeeds(teams, content, league, supabase, allTeams, `pregame-${teams[0].id}-${teams[1].id}`);
 }
 
-async function postGameStart(teams: any[], gameDate: string, league: string, supabase: any) {
-  const content = `🏈 KICKOFF! ${teams[0].name} vs ${teams[1].name} - Game is LIVE!`
-  
-  console.log('Posting game start:', content)
-  
-  await postToTeamFeeds(teams, content, league, supabase, `kickoff-${teams[0].name}-${teams[1].name}`)
+async function postGameStart(
+  teams: any[],
+  gameDate: string,
+  league: string,
+  supabase: any,
+  allTeams: Map<string, any>
+) {
+  const content = `🏈 KICKOFF! ${teams[1].name} vs ${teams[0].name} - Game is LIVE!`;
+
+  await postToTeamFeeds(teams, content, league, supabase, allTeams, `kickoff-${teams[0].id}-${teams[1].id}`);
 }
 
-async function postScoreUpdate(gameState: GameState, league: string, supabase: any) {
-  const { teams, lastPeriod, lastClock } = gameState
-  const periodText = getPeriodText(lastPeriod)
-  
-  const content = `🔥 ${teams[0].name} ${teams[0].score} - ${teams[1].score} ${teams[1].name}\n${periodText}${lastClock ? ` | ${lastClock}` : ''}`
-  
-  console.log('Posting score update:', content)
-  
-  await postToTeamFeeds(teams, content, league, supabase)
+async function postScoreUpdate(
+  gameState: GameState,
+  league: string,
+  supabase: any,
+  allTeams: Map<string, any>
+) {
+  const { teams, lastPeriod, lastClock } = gameState;
+  const periodText = getPeriodText(lastPeriod);
+
+  const content = `🔥 ${teams[1].name} ${teams[1].score} - ${teams[0].score} ${teams[0].name}\n${periodText}${
+    lastClock ? ` | ${lastClock}` : ""
+  }`;
+
+  await postToTeamFeeds(teams, content, league, supabase, allTeams);
 }
 
-async function postPeriodChange(previous: GameState, current: GameState, league: string, supabase: any) {
-  const periodText = getPeriodEndText(previous.lastPeriod)
-  const { teams } = current
-  
-  const content = `⏰ ${periodText}\n${teams[0].name} ${teams[0].score} - ${teams[1].score} ${teams[1].name}`
-  
-  console.log('Posting period change:', content)
-  
-  // Stronger de-duplication: one period-change per gameId+period
-  const dedupeId = `period-${current.gameId}-${previous.lastPeriod}`
-  await postToTeamFeeds(teams, content, league, supabase, dedupeId)
+async function postPeriodChange(
+  previous: GameState,
+  current: GameState,
+  league: string,
+  supabase: any,
+  allTeams: Map<string, any>
+) {
+  const periodText = getPeriodEndText(previous.lastPeriod);
+  const { teams } = current;
+
+  const content = `⏰ ${periodText}\n${teams[1].name} ${teams[1].score} - ${teams[0].score} ${teams[0].name}`;
+
+  const dedupeId = `period-${current.gameId}-${previous.lastPeriod}`;
+  await postToTeamFeeds(teams, content, league, supabase, allTeams, dedupeId);
 }
 
-async function postGameEnd(gameState: GameState, league: string, supabase: any) {
-  const { teams } = gameState
-  const winner = teams[0].score > teams[1].score ? teams[0] : teams[1]
-  const loser = teams[0].score > teams[1].score ? teams[1] : teams[0]
-  
-  const content = `🏆 FINAL: ${winner.name.toUpperCase()} WIN!\n${teams[0].name} ${teams[0].score} - ${teams[1].score} ${teams[1].name}`
-  
-  console.log('Posting game end:', content)
-  
-  await postToTeamFeeds(teams, content, league, supabase)
+async function postGameEnd(gameState: GameState, league: string, supabase: any, allTeams: Map<string, any>) {
+  const { teams } = gameState;
+  const winner = teams[0].score > teams[1].score ? teams[0] : teams[1];
+
+  const content = `🏆 FINAL: ${winner.name.toUpperCase()} WIN!\n${teams[1].name} ${teams[1].score} - ${
+    teams[0].score
+  } ${teams[0].name}`;
+
+  await postToTeamFeeds(teams, content, league, supabase, allTeams);
 }
 
-// In-memory cache to track recent messages and prevent rapid duplicates
-const recentMessages = new Map<string, number>()
+const recentMessages = new Map<string, number>();
 
-// Clean up old entries from cache (run every 10 minutes)
 function cleanupCache() {
-  const now = Date.now()
-  const tenMinAgo = now - 10 * 60 * 1000
-  
+  const now = Date.now();
+  const tenMinAgo = now - 10 * 60 * 1000;
+
   for (const [key, timestamp] of recentMessages) {
     if (timestamp < tenMinAgo) {
-      recentMessages.delete(key)
+      recentMessages.delete(key);
     }
   }
 }
 
-async function postToTeamFeeds(teams: any[], content: string, league: string, supabase: any, dedupeId?: string) {
+async function postToTeamFeeds(
+  teams: any[],
+  content: string,
+  league: string,
+  supabase: any,
+  allTeams: Map<string, any>,
+  dedupeId?: string
+) {
   try {
-    // Get or create system user for bot messages
-    const { data: systemUserId } = await supabase.rpc('get_or_create_system_user')
-    
+    const { data: systemUserId } = await supabase.rpc("get_or_create_system_user");
+
     if (!systemUserId) {
-      console.error('Failed to get system user ID')
-      return
+      console.error("Failed to get system user ID");
+      return;
     }
 
-    // Get team IDs from our database by improved matching for NCAA teams
     for (const team of teams) {
-      // Try multiple matching strategies for better NCAA team identification
-      let dbTeam = null
-      
-      // Special handling for North Carolina (UNC Tar Heels)
-      if (team.name.toLowerCase().includes('north carolina') || 
-          team.name.toLowerCase().includes('tar heels') ||
-          team.name.toLowerCase() === 'unc') {
-        console.log(`🎯 Special UNC matching for: ${team.name}`)
-        const { data: uncMatch } = await supabase
-          .from('teams')
-          .select('id, name, city, league')
-          .or('name.ilike.%Tar Heels%,name.ilike.%North Carolina%,city.ilike.%Chapel Hill%')
-          .eq('league', 'NCAA')
-          .limit(1)
-          .maybeSingle()
-        if (uncMatch) {
-          dbTeam = uncMatch
-          console.log(`✅ UNC match found: ${uncMatch.name} (${uncMatch.city})`)
-        }
-      }
-      
-      // Strategy 1: Try nickname-based match with wildcards (handles multi-word nicknames)
+      // Find database team by Highlightly ID
+      const dbTeam = Array.from(allTeams.values()).find((t) => t.highlightly_id === team.id);
+
       if (!dbTeam) {
-        const teamWords = team.name.split(' ')
-        const nicknameTwoWords = teamWords.slice(-2).join(' ') // e.g., "Fighting Irish"
-        const nicknameOneWord = teamWords[teamWords.length - 1] // e.g., "Hurricanes"
-
-        const orFilters: string[] = []
-        if (nicknameTwoWords) orFilters.push(`name.ilike.%${nicknameTwoWords}%`)
-        if (nicknameOneWord) orFilters.push(`name.ilike.%${nicknameOneWord}%`)
-
-        if (orFilters.length > 0) {
-          const { data: nicknameMatch } = await supabase
-            .from('teams')
-            .select('id, name, city, league')
-            .or(orFilters.join(','))
-            .limit(10)
-          
-          if (nicknameMatch && nicknameMatch.length > 0) {
-            // Prefer by league context and city alignment
-            for (const match of nicknameMatch) {
-              const cityMatches = match.city && team.name.toLowerCase().includes((match.city as string).toLowerCase())
-              if (league === 'college-football' && match.league === 'NCAA') {
-                dbTeam = match
-                if (cityMatches) break
-              } else if (league === 'nfl' && match.league === 'NFL') {
-                dbTeam = match
-                if (cityMatches) break
-              } else if (!dbTeam) {
-                // Fallback to the first candidate
-                dbTeam = match
-              }
-            }
-          }
-        }
-      }
-      
-      // Strategy 2: If still no match, try full name contains
-      if (!dbTeam) {
-        const { data: nameContains } = await supabase
-          .from('teams')
-          .select('id, name, city, league')
-          .ilike('name', `%${team.name}%`)
-          .limit(1)
-          .maybeSingle()
-        if (nameContains) dbTeam = nameContains
+        console.log(`No DB team found for Highlightly ID ${team.id}`);
+        continue;
       }
 
-      // Strategy 3: If still no match, try city-based fallback (useful for colleges like "Notre Dame")
-      if (!dbTeam && team.name.includes(' ')) {
-        const cityToken = team.name.split(' ')[0]
-        const { data: cityMatch } = await supabase
-          .from('teams')
-          .select('id, name, city, league')
-          .or(`city.ilike.%${cityToken}%,name.ilike.%${cityToken}%`)
-          .limit(1)
-          .maybeSingle()
-        if (cityMatch) dbTeam = cityMatch
+      // Find all huddles for this team
+      const { data: huddles } = await supabase.from("huddles").select("id").eq("team_id", dbTeam.id);
+
+      if (!huddles || huddles.length === 0) {
+        continue;
       }
 
+      // Post to each huddle
+      for (const huddle of huddles) {
+        // Check for recent duplicate
+        const cacheKey = dedupeId
+          ? `${huddle.id}-${dedupeId}`
+          : `${huddle.id}-${content.substring(0, 50)}`;
 
-      if (dbTeam) {
-        console.log(`Matched ESPN team "${team.name}" to DB team "${dbTeam.name}" (${dbTeam.city})`)
-        
-        // Find all huddles for this team
-        const { data: huddles } = await supabase
-          .from('huddles')
-          .select('id, name')
-          .eq('team_id', dbTeam.id)
-
-        console.log(`Found ${huddles?.length || 0} huddles for team ${dbTeam.name}`)
-
-        // Post to each team huddle with enhanced de-duplication
-        const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
-        for (const huddle of huddles || []) {
-          // Enhanced deduplication with content hashing
-          const contentHash = content.substring(0, 100) // Use first 100 chars as hash
-          const cacheKey = dedupeId ? `${huddle.id}-${dedupeId}` : `${huddle.id}-${contentHash}`
-          const lastMessageTime = recentMessages.get(cacheKey)
-          const now = Date.now()
-          
-          // Increase rapid duplicate prevention to 5 minutes
-          if (lastMessageTime && (now - lastMessageTime) < 5 * 60 * 1000) {
-            console.log(`Skipping duplicate game update in huddle: ${huddle.name} (in-memory cache)`)
-            continue
-          }
-
-          // Check database for recent duplicates with stricter matching
-          const { data: existingMsg } = await supabase
-            .from('huddle_messages')
-            .select('id, created_at')
-            .eq('huddle_id', huddle.id)
-            .eq('is_bot_message', true)
-            .eq('content', content)
-            .gte('created_at', tenMinAgo)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-
-          if (existingMsg) {
-            console.log(`Skipping duplicate game update in huddle: ${huddle.name} (DB check)`)
-            continue
-          }
-
-          // Update in-memory cache
-          recentMessages.set(cacheKey, now)
-
-          const { error } = await supabase
-            .from('huddle_messages')
-            .insert({
-              content,
-              huddle_id: huddle.id,
-              user_id: systemUserId,
-              is_bot_message: true,
-              message_type: 'game_update'
-            })
-
-          if (error) {
-            console.error(`Error posting to huddle ${huddle.name}:`, error)
-          } else {
-            console.log(`Posted game update to huddle: ${huddle.name}`)
+        if (recentMessages.has(cacheKey)) {
+          const lastPosted = recentMessages.get(cacheKey)!;
+          if (Date.now() - lastPosted < 5 * 60 * 1000) {
+            console.log(`Skipping duplicate message to huddle ${huddle.id}`);
+            continue;
           }
         }
 
-        // Also post to main team feed for visibility (de-duplicated within 24 hours for final scores)
-        const isDuplicateHours = content.includes('🏆 FINAL:') ? 24 : 1 // 24 hours for final scores, 1 hour for others
-        const dedupeCutoff = new Date(Date.now() - isDuplicateHours * 60 * 60 * 1000).toISOString()
-        const { data: existingPost } = await supabase
-          .from('posts')
-          .select('id')
-          .eq('team_id', dbTeam.id)
-          .eq('is_team_agent_message', true)
-          .eq('content', content)
-          .gte('created_at', dedupeCutoff)
-          .limit(1)
-          .maybeSingle()
+        const { error } = await supabase.from("huddle_messages").insert({
+          huddle_id: huddle.id,
+          user_id: systemUserId,
+          content,
+          is_bot_message: true,
+          message_type: "text",
+        });
 
-        if (!existingPost) {
-          // Additional check: don't post final scores if the game was already marked as final over 4 hours ago
-          if (content.includes('🏆 FINAL:')) {
-            const gameStateAge = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString() // 4 hours ago
-            const { data: oldGameState } = await supabase
-              .from('game_states')
-              .select('last_status, updated_at')
-              .eq('teams', JSON.stringify(dbTeam.name))
-              .eq('last_status', 'post')
-              .lt('updated_at', gameStateAge)
-              .limit(1)
-              .maybeSingle()
-            
-            if (oldGameState) {
-              console.log(`Skipping old final score post for ${dbTeam.name} - game was already final over 4 hours ago`)
-              continue
-            }
-          }
-
-          const { error: postError } = await supabase
-            .from('posts')
-            .insert({
-              content,
-              team_id: dbTeam.id,
-              is_agent_post: true,
-              is_team_agent_message: true,
-              target_audience: ['team_feed'],
-              delivery_status: 'sent'
-            })
-
-          if (postError) {
-            console.error(`Error posting to team ${dbTeam.name} feed:`, postError)
-          } else {
-            console.log(`Posted to team ${dbTeam.name} feed and ${huddles?.length || 0} huddles`)
-          }
+        if (error) {
+          console.error(`Error posting to huddle ${huddle.id}:`, error);
         } else {
-          console.log(`Skipping duplicate post to team ${dbTeam.name} feed`)
+          recentMessages.set(cacheKey, Date.now());
         }
-      } else {
-        console.log(`Could not match ESPN team "${team.name}" (${team.abbreviation}) to any team in database`)
       }
     }
   } catch (error) {
-    console.error('Error posting to team feeds:', error)
+    console.error("Error posting to team feeds:", error);
   }
 }
 
 function getPeriodText(period: number): string {
   switch (period) {
-    case 1: return '1st Quarter'
-    case 2: return '2nd Quarter'
-    case 3: return '3rd Quarter'
-    case 4: return '4th Quarter'
-    default: return period > 4 ? 'Overtime' : 'Game'
+    case 1:
+      return "1st Quarter";
+    case 2:
+      return "2nd Quarter";
+    case 3:
+      return "3rd Quarter";
+    case 4:
+      return "4th Quarter";
+    default:
+      return `Period ${period}`;
   }
 }
 
 function getPeriodEndText(period: number): string {
-  switch (period) {
-    case 1: return 'End of 1st Quarter'
-    case 2: return 'HALFTIME'
-    case 3: return 'End of 3rd Quarter'
-    case 4: return 'End of 4th Quarter'
-    default: return 'End of Period'
-  }
-}
-
-function hasTeamMatch(espnTeam: any, allTeams: Map<string, any>, supabase: any): boolean {
-  // Check if this ESPN team matches any of our monitored teams
-  for (const [teamId, team] of allTeams) {
-    // Direct name match (case insensitive)
-    if (team.name.toLowerCase() === espnTeam.name.toLowerCase()) {
-      return true
-    }
-    
-    // NCAA-specific matching: check if city matches ESPN team name
-    if (team.city && espnTeam.name.toLowerCase().includes(team.city.toLowerCase())) {
-      return true
-    }
-    
-    // Check if ESPN team name contains our team's name  
-    if (espnTeam.name.toLowerCase().includes(team.name.toLowerCase())) {
-      return true
-    }
-    
-    // Check abbreviation matches
-    if (espnTeam.abbreviation && (
-      espnTeam.abbreviation.toLowerCase() === team.name.toLowerCase() ||
-      team.city?.toLowerCase().startsWith(espnTeam.abbreviation.toLowerCase())
-    )) {
-      return true
-    }
-  }
-  
-  return false
+  if (period === 2) return "HALFTIME";
+  if (period === 4) return "END OF REGULATION";
+  return `END OF ${getPeriodText(period)}`;
 }

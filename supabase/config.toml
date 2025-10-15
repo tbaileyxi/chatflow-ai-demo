@@ -31,3 +31,10 @@ on_schedule = "*/5 * * * *"
 
 [functions.pickem-backfill-week1]
 verify_jwt = false
+
+[functions.sync-highlightly-teams]
+verify_jwt = false
+
+[functions.fetch-highlights]
+verify_jwt = false
+on_schedule = "*/5 * * * *"
