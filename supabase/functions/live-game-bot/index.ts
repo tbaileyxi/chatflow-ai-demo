@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createHighlightlyClient } from "../_shared/highlightly-client.ts";
+import { shouldPollNow } from "../_shared/game-schedule.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -119,6 +120,10 @@ serve(async (req) => {
   }
 });
 
+// Match data cache to reduce API calls
+const matchCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
+
 async function pollLeague(
   league: "NFL" | "NCAA",
   teamIds: Set<number>,
@@ -127,6 +132,11 @@ async function pollLeague(
   highlightly: any
 ) {
   try {
+    // Smart scheduling: only poll during game times
+    if (!shouldPollNow(league)) {
+      console.log(`Skipping ${league} poll - outside game window`);
+      return;
+    }
     console.log(`Polling ${league} games...`);
 
     const today = new Date().toISOString().split("T")[0];
@@ -135,7 +145,18 @@ async function pollLeague(
     console.log(`Found ${matches.length} ${league} games`);
 
     for (const match of matches) {
+      // Check cache first to reduce API calls
+      const cacheKey = `${league}-${match.id}`;
+      const cached = matchCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        console.log(`Using cached data for match ${match.id}`);
+        continue;
+      }
+      
       await processGame(match, league, teamIds, allTeams, supabase);
+      
+      // Cache the match data
+      matchCache.set(cacheKey, { data: match, timestamp: Date.now() });
     }
   } catch (error) {
     console.error(`Error polling ${league}:`, error);

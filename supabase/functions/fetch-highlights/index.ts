@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createHighlightlyClient } from "../_shared/highlightly-client.ts";
+import { isNFLGameTime, isNCAAGameTime } from "../_shared/game-schedule.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,22 +20,54 @@ serve(async (req) => {
 
     const highlightly = createHighlightlyClient();
 
-    console.log("Fetching active matches...");
+    console.log("Fetching active and recently finished matches...");
     
-    // Get today's matches that are in progress or recently finished
     const today = new Date().toISOString().split("T")[0];
-    const nflMatches = await highlightly.getMatches({ league: "NFL", date: today });
-    const ncaaMatches = await highlightly.getMatches({ league: "NCAA", date: today });
+    const allMatches = [];
     
-    const activeMatches = [...nflMatches, ...ncaaMatches].filter(
-      (m) => m.status === "in_progress" || m.status === "finished"
-    );
+    // Only fetch NFL if game time
+    if (isNFLGameTime()) {
+      const nflMatches = await highlightly.getMatches({
+        league: "NFL",
+        date: today,
+      });
+      allMatches.push(...nflMatches);
+      console.log(`Found ${nflMatches.length} NFL matches`);
+    } else {
+      console.log("Skipping NFL - outside game window");
+    }
+    
+    // Only fetch NCAA if game time
+    if (isNCAAGameTime()) {
+      const ncaaMatches = await highlightly.getMatches({
+        league: "NCAA",
+        date: today,
+      });
+      allMatches.push(...ncaaMatches);
+      console.log(`Found ${ncaaMatches.length} NCAA matches`);
+    } else {
+      console.log("Skipping NCAA - outside game window");
+    }
+    
+    // Filter to recent games only (within 3 hours of finish)
+    const threeHoursAgo = Date.now() - (3 * 60 * 60 * 1000);
+    const activeMatches = allMatches.filter(m => {
+      if (m.status === 'in_progress') return true;
+      if (m.status === 'finished') {
+        const finishTime = new Date(m.date).getTime();
+        return finishTime > threeHoursAgo;
+      }
+      return false;
+    });
 
-    console.log(`Found ${activeMatches.length} active/finished matches`);
+    console.log(`Found ${activeMatches.length} active/recent matches to check`);
 
     let highlightsPosted = 0;
+    
+    // Process max 10 games per run to stay within API limits
+    const matchesToProcess = activeMatches.slice(0, 10);
 
-    for (const match of activeMatches) {
+    for (const match of matchesToProcess) {
       try {
         console.log(`Checking highlights for match ${match.id}: ${match.awayTeam.name} @ ${match.homeTeam.name}`);
         
@@ -85,7 +118,9 @@ serve(async (req) => {
             // Get system user for posting
             const { data: systemUser } = await supabase.rpc("get_or_create_system_user");
 
-            // Post highlight to each huddle
+            // DUAL POSTING: Post to huddles AND Spotlight
+            
+            // 1. Post to each team huddle
             for (const huddle of huddles) {
               const message = `🎥 HIGHLIGHT: ${highlight.title}
 
@@ -117,6 +152,37 @@ Q${highlight.period} - ${highlight.clock}`;
                 highlightsPosted++;
               }
             }
+            
+            // 2. Post to Spotlight (Bot's Blitz Board)
+            const { error: spotlightError } = await supabase
+              .from("posts")
+              .insert({
+                content: `🎥 ${highlight.title}\n\n${highlight.description || ''}\n\nQ${highlight.period} - ${highlight.clock}`,
+                author_id: systemUser,
+                team_id: team.id,
+                origin_team_id: team.id,
+                is_spotlight: true,
+                is_agent_post: true,
+                target_audience: ['spotlight'],
+                message_type: 'highlight',
+                embeds: {
+                  type: 'video',
+                  url: highlight.embedUrl,
+                  thumbnail: highlight.thumbnailUrl || null,
+                  title: highlight.title,
+                  description: highlight.description || null,
+                  duration: highlight.duration || null,
+                  period: highlight.period,
+                  clock: highlight.clock
+                },
+                embed_code: highlight.embedUrl
+              });
+            
+            if (spotlightError) {
+              console.error("Error posting highlight to Spotlight:", spotlightError);
+            } else {
+              console.log(`Posted highlight ${highlight.id} to Spotlight for team ${team.id}`);
+            }
 
             // Mark highlight as processed
             await supabase.from("processed_highlights").insert({
@@ -134,7 +200,8 @@ Q${highlight.period} - ${highlight.clock}`;
     return new Response(
       JSON.stringify({
         success: true,
-        matchesChecked: activeMatches.length,
+        matchesChecked: matchesToProcess.length,
+        totalMatchesFound: activeMatches.length,
         highlightsPosted,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

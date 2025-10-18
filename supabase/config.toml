@@ -2,6 +2,7 @@ project_id = "dejuwyeypiggvlyfliap"
 
 [functions.live-game-bot]
 verify_jwt = false
+on_schedule = "*/3 * * * *"
 
 [functions.create-huddle-subscription]
 verify_jwt = true
@@ -27,13 +28,14 @@ verify_jwt = false
 
 [functions.pickem-scoring]
 verify_jwt = false
-on_schedule = "*/5 * * * *"
+on_schedule = "*/10 * * * *"
 
 [functions.pickem-backfill-week1]
 verify_jwt = false
 
 [functions.sync-highlightly-teams]
 verify_jwt = false
+on_schedule = "0 2 * * *"
 
 [functions.fetch-highlights]
 verify_jwt = false

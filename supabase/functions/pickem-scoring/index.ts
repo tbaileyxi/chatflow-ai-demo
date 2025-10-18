@@ -2,6 +2,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createHighlightlyClient } from "../_shared/highlightly-client.ts";
 
+// Cache for match results to reduce API calls
+const resultCache = new Map<number, { status: string; winner: string | null; timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -22,7 +26,7 @@ serve(async (req) => {
 
     console.log("Starting pick'em scoring update...");
 
-    // Get all games from recent weeks that might need updates
+    // Get only games that are in progress or recently finished (last 7 days)
     const { data: games, error: gamesError } = await supabase
       .from("pickem_games")
       .select(
@@ -31,9 +35,9 @@ serve(async (req) => {
         pickem_weeks!inner(*)
       `
       )
-      .gte("start_time", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // Last 30 days
-      .lte("start_time", new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()) // Next 7 days
-      .in("status", ["scheduled", "in_progress", "final"]);
+      .gte("start_time", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Last 7 days
+      .lte("start_time", new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString()) // Next 1 hour
+      .in("status", ["in_progress", "scheduled"]);
 
     if (gamesError) throw gamesError;
     if (!games || games.length === 0) {
@@ -59,6 +63,31 @@ serve(async (req) => {
         }
 
         const matchId = parseInt(game.match_id);
+        
+        // Check cache first
+        const cached = resultCache.get(matchId);
+        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+          console.log(`Using cached result for match ${matchId}`);
+          
+          // Use cached data instead of API call
+          if (game.status !== cached.status || game.winning_team !== cached.winner) {
+            const { error: updateError } = await supabase
+              .from("pickem_games")
+              .update({
+                status: cached.status,
+                winning_team: cached.winner,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", game.id);
+
+            if (!updateError) {
+              updatedGames++;
+              console.log(`Updated game ${matchId} from cache: ${cached.status}, winner: ${cached.winner}`);
+            }
+          }
+          continue;
+        }
+        
         const match = await highlightly.getMatch(matchId);
 
         if (!match) {
@@ -93,6 +122,9 @@ serve(async (req) => {
           }
         }
 
+        // Cache the result
+        resultCache.set(matchId, { status, winner: winningTeam, timestamp: Date.now() });
+        
         // Only update if status or winner changed
         if (game.status !== status || game.winning_team !== winningTeam) {
           const { error: updateError } = await supabase
