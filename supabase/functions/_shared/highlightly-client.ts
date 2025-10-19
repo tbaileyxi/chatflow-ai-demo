@@ -128,8 +128,9 @@ export class HighlightlyClient {
     // Map API fields to expected format - extract from nested 'state' object
     const matches: HighlightlyMatch[] = rawMatches.map((match: any) => {
       // Parse scores from state.score.current string (e.g., "14 - 7")
+      // API returns scores in "home - away" format
       const scoreString = match.state?.score?.current || "0 - 0";
-      const [awayScoreStr, homeScoreStr] = scoreString.split(" - ").map((s: string) => s.trim());
+      const [homeScoreStr, awayScoreStr] = scoreString.split(" - ").map((s: string) => s.trim());
       
       // Normalize status description to expected values
       let normalizedStatus = (match.state?.description || 'scheduled').toLowerCase();
