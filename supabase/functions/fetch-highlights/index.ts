@@ -9,6 +9,13 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const startTime = new Date().toISOString();
+  console.log(`🎥 ============================================`);
+  console.log(`🎥 HIGHLIGHTS FUNCTION TRIGGERED at ${startTime}`);
+  console.log(`🎥 Current day: ${new Date().toLocaleDateString()}`);
+  console.log(`🎥 Current time: ${new Date().toLocaleTimeString()}`);
+  console.log(`🎥 ============================================`);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -20,13 +27,19 @@ serve(async (req) => {
 
     const highlightly = createHighlightlyClient();
 
+    console.log("🎥 Initialized Supabase and Highlightly clients");
     console.log("🎥 Fetching highlights for active and recently finished matches...");
     
     const today = new Date().toISOString().split("T")[0];
+    console.log(`🎥 Today's date: ${today}`);
     const allMatches = [];
     
     // Only fetch NFL if game time (with error handling)
-    if (isNFLGameTime()) {
+    const nflGameTime = isNFLGameTime();
+    console.log(`🎥 NFL game time check: ${nflGameTime}`);
+    
+    if (nflGameTime) {
+      console.log(`🎥 Fetching NFL matches for ${today}...`);
       try {
         const nflMatches = await highlightly.getMatches({
           league: "NFL",
@@ -48,7 +61,11 @@ serve(async (req) => {
     }
     
     // Only fetch NCAA if game time (with error handling)
-    if (isNCAAGameTime()) {
+    const ncaaGameTime = isNCAAGameTime();
+    console.log(`🎥 NCAA game time check: ${ncaaGameTime}`);
+    
+    if (ncaaGameTime) {
+      console.log(`🎥 Fetching NCAA matches for ${today}...`);
       try {
         const ncaaMatches = await highlightly.getMatches({
           league: "NCAA",
@@ -80,7 +97,15 @@ serve(async (req) => {
       return false;
     });
 
-    console.log(`Found ${activeMatches.length} active/recent matches to check`);
+    console.log(`🎥 Total matches fetched: ${allMatches.length}`);
+    console.log(`🎥 Active/recent matches to check: ${activeMatches.length}`);
+    
+    if (activeMatches.length > 0) {
+      console.log(`🎥 Active matches:`);
+      activeMatches.forEach(m => {
+        console.log(`   📺 ${m.id}: ${m.awayTeam.name} @ ${m.homeTeam.name} - ${m.status}`);
+      });
+    }
 
     let highlightsPosted = 0;
     
@@ -89,9 +114,12 @@ serve(async (req) => {
 
     for (const match of matchesToProcess) {
       try {
-        console.log(`🎥 Checking highlights for match ${match.id}: ${match.awayTeam.name} @ ${match.homeTeam.name}`);
+        console.log(`🎥 ----------------------------------------`);
+        console.log(`🎥 Processing match ${match.id}: ${match.awayTeam.name} @ ${match.homeTeam.name}`);
+        console.log(`🎥 Status: ${match.status}`);
         
         const highlights = await highlightly.getHighlights(match.id, 10);
+        console.log(`🎥 API returned highlights:`, highlights ? highlights.length : 'null');
         
         if (!highlights || !Array.isArray(highlights)) {
           console.warn(`⚠️ No highlights returned for match ${match.id}`);
@@ -101,6 +129,8 @@ serve(async (req) => {
         console.log(`🎥 Found ${highlights.length} highlights for match ${match.id}`);
         
         for (const highlight of highlights) {
+          console.log(`🎥 Checking highlight ${highlight.id}: "${highlight.title}"`);
+          
           // Check if already posted
           const { data: existing } = await supabase
             .from("processed_highlights")
@@ -109,11 +139,15 @@ serve(async (req) => {
             .single();
 
           if (existing) {
-            console.log(`Highlight ${highlight.id} already posted, skipping`);
+            console.log(`   ⏭️  Highlight ${highlight.id} already posted, skipping`);
             continue;
           }
+          
+          console.log(`   ✨ NEW highlight found!`);
 
           // Find teams in database
+          console.log(`   🔍 Looking up teams: ${match.homeTeam.name} (HL ID: ${match.homeTeam.id}), ${match.awayTeam.name} (HL ID: ${match.awayTeam.id})`);
+          
           const { data: homeTeam } = await supabase
             .from("teams")
             .select("id")
@@ -126,29 +160,39 @@ serve(async (req) => {
             .eq("highlightly_id", match.awayTeam.id)
             .single();
 
+          console.log(`   📊 Team lookup: home=${homeTeam?.id || 'NOT FOUND'}, away=${awayTeam?.id || 'NOT FOUND'}`);
+          
           const teams = [homeTeam, awayTeam].filter(Boolean);
+          console.log(`   👥 Found ${teams.length} teams to post to`);
 
           for (const team of teams) {
             if (!team) continue;
 
+            console.log(`   🏟️  Processing team ${team.id}...`);
+            
             // Find all huddles for this team
             const { data: huddles } = await supabase
               .from("huddles")
               .select("id")
               .eq("team_id", team.id);
 
+            console.log(`   💬 Found ${huddles?.length || 0} huddles for team ${team.id}`);
+            
             if (!huddles || huddles.length === 0) {
-              console.log(`No huddles found for team ${team.id}`);
+              console.log(`   ⚠️  No huddles found for team ${team.id}`);
               continue;
             }
 
             // Get system user for posting
             const { data: systemUser } = await supabase.rpc("get_or_create_system_user");
+            console.log(`   🤖 System user ID: ${systemUser}`);
 
             // DUAL POSTING: Post to huddles AND Spotlight
             
             // 1. Post to each team huddle
+            console.log(`   📝 Posting to ${huddles.length} huddles...`);
             for (const huddle of huddles) {
+              console.log(`      📤 Posting to huddle ${huddle.id}...`);
               const message = `🎥 HIGHLIGHT: ${highlight.title}
 
 ${highlight.description}
@@ -173,14 +217,17 @@ Q${highlight.period} - ${highlight.clock}`;
                 });
 
               if (insertError) {
-                console.error(`❌ Error posting highlight to huddle ${huddle.id}:`, insertError);
+                console.error(`      ❌ Error posting highlight to huddle ${huddle.id}:`, insertError);
               } else {
-                console.log(`✅ Posted highlight ${highlight.id} to huddle ${huddle.id}`);
+                console.log(`      ✅ Posted highlight ${highlight.id} to huddle ${huddle.id}`);
                 highlightsPosted++;
               }
             }
             
+            console.log(`   📊 Posted to ${huddles.length} huddles`);
+            
             // 2. Post to Spotlight (Bot's Blitz Board)
+            console.log(`   🌟 Posting to Spotlight...`);
             const { error: spotlightError } = await supabase
               .from("posts")
               .insert({
@@ -206,24 +253,39 @@ Q${highlight.period} - ${highlight.clock}`;
               });
             
             if (spotlightError) {
-              console.error("❌ Error posting highlight to Spotlight:", spotlightError);
+              console.error("   ❌ Error posting highlight to Spotlight:", spotlightError);
             } else {
-              console.log(`✅ Posted highlight ${highlight.id} to Spotlight for team ${team.id}`);
+              console.log(`   ✅ Posted highlight ${highlight.id} to Spotlight for team ${team.id}`);
             }
 
             // Mark highlight as processed
-            await supabase.from("processed_highlights").insert({
+            console.log(`   ✔️  Marking highlight ${highlight.id} as processed...`);
+            const { error: processError } = await supabase.from("processed_highlights").insert({
               highlight_id: highlight.id,
               match_id: match.id,
               team_id: team.id,
             });
+            
+            if (processError) {
+              console.error(`   ❌ Error marking highlight as processed:`, processError);
+            } else {
+              console.log(`   ✔️  Highlight marked as processed`);
+            }
           }
         }
       } catch (error) {
         console.error(`❌ Error processing match ${match.id}:`, error.message || error);
+        console.error(`   Stack:`, error.stack);
         // Continue processing other matches
       }
     }
+    
+    console.log(`🎥 ============================================`);
+    console.log(`🎥 HIGHLIGHTS FETCH COMPLETE`);
+    console.log(`🎥 Total matches found: ${allMatches.length}`);
+    console.log(`🎥 Active matches checked: ${matchesToProcess.length}`);
+    console.log(`🎥 Highlights posted: ${highlightsPosted}`);
+    console.log(`🎥 ============================================`);
 
     return new Response(
       JSON.stringify({
@@ -235,7 +297,9 @@ Q${highlight.period} - ${highlight.clock}`;
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Highlight fetch error:", error);
+    console.error("❌❌❌ FATAL ERROR in fetch-highlights:", error);
+    console.error("Error message:", error.message);
+    console.error("Stack trace:", error.stack);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
