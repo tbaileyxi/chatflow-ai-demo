@@ -113,19 +113,54 @@ export class HighlightlyClient {
     const url = `/matches${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
     console.log(`🔍 Highlightly API Request: GET ${url}`);
     
-    const response = await this.fetch<{ data: HighlightlyMatch[] }>(url);
+    const response = await this.fetch<{ data: any[] }>(url);
     
     // Extract data from nested structure
-    const matches = response?.data || [];
+    const rawMatches = response?.data || [];
     
-    console.log(`📊 Highlightly API Response: ${matches.length} matches returned`);
+    console.log(`📊 Highlightly API Response: ${rawMatches.length} matches returned`);
+    
+    // Debug: Log raw API response for first match to see actual field names
+    if (rawMatches.length > 0) {
+      console.log(`🔍 RAW API RESPONSE (first match):`, JSON.stringify(rawMatches[0], null, 2));
+    }
+    
+    // Map API fields to expected format
+    const matches: HighlightlyMatch[] = rawMatches.map((match: any) => ({
+      id: match.id,
+      league: match.league,
+      season: match.season,
+      week: match.week,
+      round: match.round,
+      date: match.date,
+      startTime: match.startTime || match.start_time || match.scheduled,
+      // Try different possible status field names
+      status: (match.status || match.state || match.matchStatus || match.game_status || 'scheduled') as any,
+      homeTeam: {
+        id: match.homeTeam?.id || match.home_team?.id,
+        name: match.homeTeam?.name || match.home_team?.name,
+        displayName: match.homeTeam?.displayName || match.home_team?.displayName || match.homeTeam?.name,
+        abbreviation: match.homeTeam?.abbreviation || match.home_team?.abbreviation,
+        score: Number(match.homeTeam?.score || match.home_team?.score || match.homeScore || 0)
+      },
+      awayTeam: {
+        id: match.awayTeam?.id || match.away_team?.id,
+        name: match.awayTeam?.name || match.away_team?.name,
+        displayName: match.awayTeam?.displayName || match.away_team?.displayName || match.awayTeam?.name,
+        abbreviation: match.awayTeam?.abbreviation || match.away_team?.abbreviation,
+        score: Number(match.awayTeam?.score || match.away_team?.score || match.awayScore || 0)
+      },
+      period: match.period || match.quarter || match.currentPeriod || 0,
+      clock: match.clock || match.gameClock || match.timeRemaining || '',
+      venue: match.venue
+    }));
     
     // Log first few matches for debugging
     if (matches.length > 0) {
       matches.slice(0, 3).forEach(m => {
         const home = m.homeTeam?.name || m.homeTeam?.abbreviation || 'Unknown';
         const away = m.awayTeam?.name || m.awayTeam?.abbreviation || 'Unknown';
-        console.log(`   📋 ${away} @ ${home} - ${m.status}`);
+        console.log(`   📋 ${away} @ ${home} - Status: ${m.status}`);
       });
     }
     
