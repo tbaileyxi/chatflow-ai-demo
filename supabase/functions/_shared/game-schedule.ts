@@ -3,16 +3,19 @@ export function shouldPollNow(league: 'NFL' | 'NCAA'): boolean {
   const now = new Date();
   const utcHours = now.getUTCHours();
   const utcDay = now.getUTCDay(); // 0=Sun, 6=Sat
+  const month = now.getMonth();
   
-  // Convert UTC to ET (UTC-5 or UTC-4 depending on DST)
-  // Simplified: assume EST (UTC-5) for conservative polling
-  const etHour = (utcHours - 5 + 24) % 24;
+  // Proper DST handling for Eastern Time
+  // DST: Second Sunday in March to First Sunday in November (approximately months 2-10)
+  const isDST = month >= 2 && month <= 10;
+  const etOffset = isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
+  const etHour = (utcHours - etOffset + 24) % 24;
   
   if (league === 'NFL') {
     // Thursday Night Football (7pm-midnight ET) - extended for pregame
     if (utcDay === 4 && etHour >= 19 && etHour <= 23) return true;
-    // Sunday games (10am-midnight ET) - catch all pregame + late games
-    if (utcDay === 0 && etHour >= 10 && etHour <= 23) return true;
+    // Sunday games (8am-midnight ET) - catch pregame shows + London games + all games
+    if (utcDay === 0 && etHour >= 8 && etHour <= 23) return true;
     // Monday Night Football (7pm-midnight ET) - extended for pregame
     if (utcDay === 1 && etHour >= 19 && etHour <= 23) return true;
   }
@@ -20,8 +23,8 @@ export function shouldPollNow(league: 'NFL' | 'NCAA'): boolean {
   if (league === 'NCAA') {
     // Friday night games (6pm-midnight ET) - extended for pregame
     if (utcDay === 5 && etHour >= 18 && etHour <= 23) return true;
-    // Saturday games (10am-midnight ET) - catch all day games + late games
-    if (utcDay === 6 && etHour >= 10 && etHour <= 23) return true;
+    // Saturday games (9am-midnight ET) - catch College GameDay + early games + late games
+    if (utcDay === 6 && etHour >= 9 && etHour <= 23) return true;
   }
   
   return false; // Off-peak, skip intensive polling
@@ -36,10 +39,13 @@ export function isNFLGameTime(): boolean {
   // NFL season: September (8) through February (1)
   if (month < 8 && month > 1) return false;
   
-  const etHour = (utcHours - 5 + 24) % 24;
+  // Proper DST handling
+  const isDST = month >= 2 && month <= 10;
+  const etOffset = isDST ? 4 : 5;
+  const etHour = (utcHours - etOffset + 24) % 24;
   
-  // Sunday games (10am-midnight ET for full coverage)
-  if (utcDay === 0 && etHour >= 10 && etHour <= 23) return true;
+  // Sunday games (8am-midnight ET for full coverage)
+  if (utcDay === 0 && etHour >= 8 && etHour <= 23) return true;
   
   // Monday Night Football (7pm-midnight ET)
   if (utcDay === 1 && etHour >= 19 && etHour <= 23) return true;
@@ -62,13 +68,16 @@ export function isNCAAGameTime(): boolean {
   // NCAA season: August (7) through January (0)
   if (month > 1 && month < 7) return false;
   
-  const etHour = (utcHours - 5 + 24) % 24;
+  // Proper DST handling
+  const isDST = month >= 2 && month <= 10;
+  const etOffset = isDST ? 4 : 5;
+  const etHour = (utcHours - etOffset + 24) % 24;
   
   // Friday night games (6pm-midnight ET)
   if (utcDay === 5 && etHour >= 18 && etHour <= 23) return true;
   
-  // Saturday games (10am-midnight ET for full coverage)
-  if (utcDay === 6 && etHour >= 10 && etHour <= 23) return true;
+  // Saturday games (9am-midnight ET for full coverage)
+  if (utcDay === 6 && etHour >= 9 && etHour <= 23) return true;
   
   return false;
 }
