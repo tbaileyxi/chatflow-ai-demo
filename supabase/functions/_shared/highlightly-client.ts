@@ -6,23 +6,27 @@ export interface HighlightlyMatch {
   id: number;
   league: string;
   season: number;
-  week: number;
-  startTime: string;
-  status: "scheduled" | "in_progress" | "finished";
+  week?: number;
+  round?: string;
+  date?: string;
+  startTime?: string;
+  status: "scheduled" | "in_progress" | "finished" | "postponed" | "suspended" | "cancelled" | "abandoned";
   homeTeam: {
     id: number;
     name: string;
+    displayName?: string;
     abbreviation: string;
-    score: number;
+    score?: number;
   };
   awayTeam: {
     id: number;
     name: string;
+    displayName?: string;
     abbreviation: string;
-    score: number;
+    score?: number;
   };
-  period: number;
-  clock: string;
+  period?: number;
+  clock?: string;
   venue?: string;
 }
 
@@ -91,20 +95,41 @@ export class HighlightlyClient {
   async getMatches(params: {
     league?: "NFL" | "NCAA";
     date?: string; // YYYY-MM-DD
-    week?: number;
     season?: number;
-    teamId?: number;
-    status?: "scheduled" | "in_progress" | "finished";
+    homeTeamId?: number;
+    awayTeamId?: number;
+    limit?: number;
+    offset?: number;
   }): Promise<HighlightlyMatch[]> {
     const queryParams = new URLSearchParams();
     if (params.league) queryParams.append("league", params.league);
     if (params.date) queryParams.append("date", params.date);
-    if (params.week) queryParams.append("week", params.week.toString());
     if (params.season) queryParams.append("season", params.season.toString());
-    if (params.teamId) queryParams.append("teamId", params.teamId.toString());
-    if (params.status) queryParams.append("status", params.status);
+    if (params.homeTeamId) queryParams.append("homeTeamId", params.homeTeamId.toString());
+    if (params.awayTeamId) queryParams.append("awayTeamId", params.awayTeamId.toString());
+    if (params.limit) queryParams.append("limit", params.limit.toString());
+    if (params.offset) queryParams.append("offset", params.offset.toString());
 
-    return this.fetch<HighlightlyMatch[]>(`/matches?${queryParams.toString()}`);
+    const url = `/matches${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    console.log(`🔍 Highlightly API Request: GET ${url}`);
+    
+    const response = await this.fetch<{ data: HighlightlyMatch[] }>(url);
+    
+    // Extract data from nested structure
+    const matches = response?.data || [];
+    
+    console.log(`📊 Highlightly API Response: ${matches.length} matches returned`);
+    
+    // Log first few matches for debugging
+    if (matches.length > 0) {
+      matches.slice(0, 3).forEach(m => {
+        const home = m.homeTeam?.name || m.homeTeam?.abbreviation || 'Unknown';
+        const away = m.awayTeam?.name || m.awayTeam?.abbreviation || 'Unknown';
+        console.log(`   📋 ${away} @ ${home} - ${m.status}`);
+      });
+    }
+    
+    return matches;
   }
 
   // Get specific match details

@@ -140,25 +140,98 @@ async function pollLeague(
 
     const now = new Date();
     const etTime = now.toLocaleString("en-US", { timeZone: "America/New_York" });
+    const today = now.toISOString().split("T")[0];
+    const currentYear = now.getFullYear();
+    
     console.log(`🏈 [${league}] Polling games at ${etTime} ET`);
 
-    const today = new Date().toISOString().split("T")[0];
-    const matches = await highlightly.getMatches({ league, date: today });
+    let matches: any[] = [];
+    let strategyUsed = '';
 
-    // Defensive check for API failures
-    if (!matches || !Array.isArray(matches)) {
-      console.warn(`⚠️ [${league}] No matches returned or invalid response for ${today}`);
+    // Strategy 1: Query by date + league (most specific)
+    console.log(`🔍 [${league}] Strategy 1: Querying by date (${today})`);
+    const dateMatches = await highlightly.getMatches({ 
+      league, 
+      date: today,
+      limit: 100 
+    });
+    
+    if (dateMatches && dateMatches.length > 0) {
+      matches = dateMatches;
+      strategyUsed = 'date';
+      console.log(`✅ [${league}] Strategy 1 SUCCESS: Found ${matches.length} games`);
+    } else {
+      console.log(`⚠️ [${league}] Strategy 1 FAILED: No games found by date`);
+      
+      // Strategy 2: Query by season + league
+      console.log(`🔍 [${league}] Strategy 2: Querying by season (${currentYear})`);
+      const seasonMatches = await highlightly.getMatches({ 
+        league,
+        season: currentYear,
+        limit: 100
+      });
+      
+      if (seasonMatches && seasonMatches.length > 0) {
+        // Filter to today's games manually
+        matches = seasonMatches.filter(m => {
+          const matchDate = new Date(m.startTime || m.date).toISOString().split("T")[0];
+          return matchDate === today;
+        });
+        strategyUsed = 'season+filter';
+        console.log(`✅ [${league}] Strategy 2 SUCCESS: Found ${matches.length} games for today`);
+      } else {
+        console.log(`⚠️ [${league}] Strategy 2 FAILED: No games found by season`);
+        
+        // Strategy 3: Get all league games (last resort)
+        console.log(`🔍 [${league}] Strategy 3: Querying all ${league} games`);
+        const allMatches = await highlightly.getMatches({ 
+          league,
+          limit: 100
+        });
+        
+        if (allMatches && allMatches.length > 0) {
+          // Filter to live or today's games
+          const todayOrLive = allMatches.filter(m => {
+            if (m.status === 'in_progress') return true;
+            const matchDate = new Date(m.startTime || m.date).toISOString().split("T")[0];
+            return matchDate === today;
+          });
+          matches = todayOrLive;
+          strategyUsed = 'all+filter';
+          console.log(`✅ [${league}] Strategy 3 SUCCESS: Found ${matches.length} relevant games`);
+        } else {
+          console.error(`❌ [${league}] All strategies FAILED - API returned no data`);
+          return;
+        }
+      }
+    }
+
+    // Final validation
+    if (!matches || !Array.isArray(matches) || matches.length === 0) {
+      console.warn(`⚠️ [${league}] No relevant matches found after all strategies`);
       return;
     }
 
-    console.log(`🏈 [${league}] Found ${matches.length} games for ${today}`);
+    console.log(`📊 [${league}] Processing ${matches.length} games (strategy: ${strategyUsed})`);
+    
+    // Log game details for debugging
+    matches.forEach(match => {
+      const homeTeam = match.homeTeam?.name || match.homeTeam?.displayName || 'Unknown';
+      const awayTeam = match.awayTeam?.name || match.awayTeam?.displayName || 'Unknown';
+      const status = match.status || 'unknown';
+      const score = match.homeTeam?.score !== undefined 
+        ? `${awayTeam} ${match.awayTeam?.score || 0} @ ${homeTeam} ${match.homeTeam?.score || 0}` 
+        : `${awayTeam} @ ${homeTeam}`;
+      
+      console.log(`   🏈 Game ${match.id}: ${score} - ${status}`);
+    });
 
+    // Process each game
     for (const match of matches) {
       // Check cache first to reduce API calls
       const cacheKey = `${league}-${match.id}`;
       const cached = matchCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log(`Using cached data for match ${match.id}`);
         continue;
       }
       
@@ -167,8 +240,10 @@ async function pollLeague(
       // Cache the match data
       matchCache.set(cacheKey, { data: match, timestamp: Date.now() });
     }
+    
+    console.log(`✅ [${league}] Polling cycle complete`);
   } catch (error) {
-    console.error(`Error polling ${league}:`, error);
+    console.error(`❌ [${league}] Error in pollLeague:`, error);
   }
 }
 
