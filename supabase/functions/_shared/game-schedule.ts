@@ -9,19 +9,19 @@ export function shouldPollNow(league: 'NFL' | 'NCAA'): boolean {
   const etHour = (utcHours - 5 + 24) % 24;
   
   if (league === 'NFL') {
-    // Thursday Night Football (8pm-11pm ET)
-    if (utcDay === 4 && etHour >= 20 && etHour <= 23) return true;
-    // Sunday games (1pm-11pm ET)
-    if (utcDay === 0 && etHour >= 13 && etHour <= 23) return true;
-    // Monday Night Football (8pm-11pm ET)
-    if (utcDay === 1 && etHour >= 20 && etHour <= 23) return true;
+    // Thursday Night Football (7pm-midnight ET) - extended for pregame
+    if (utcDay === 4 && etHour >= 19 && etHour <= 23) return true;
+    // Sunday games (10am-midnight ET) - catch all pregame + late games
+    if (utcDay === 0 && etHour >= 10 && etHour <= 23) return true;
+    // Monday Night Football (7pm-midnight ET) - extended for pregame
+    if (utcDay === 1 && etHour >= 19 && etHour <= 23) return true;
   }
   
   if (league === 'NCAA') {
-    // Friday night games (7pm-11pm ET)
-    if (utcDay === 5 && etHour >= 19 && etHour <= 23) return true;
-    // Saturday games (12pm-11pm ET)
-    if (utcDay === 6 && etHour >= 12 && etHour <= 23) return true;
+    // Friday night games (6pm-midnight ET) - extended for pregame
+    if (utcDay === 5 && etHour >= 18 && etHour <= 23) return true;
+    // Saturday games (10am-midnight ET) - catch all day games + late games
+    if (utcDay === 6 && etHour >= 10 && etHour <= 23) return true;
   }
   
   return false; // Off-peak, skip intensive polling
@@ -38,17 +38,17 @@ export function isNFLGameTime(): boolean {
   
   const etHour = (utcHours - 5 + 24) % 24;
   
-  // Sunday games
-  if (utcDay === 0 && etHour >= 13 && etHour <= 23) return true;
+  // Sunday games (10am-midnight ET for full coverage)
+  if (utcDay === 0 && etHour >= 10 && etHour <= 23) return true;
   
-  // Monday Night Football
-  if (utcDay === 1 && etHour >= 20 && etHour <= 23) return true;
+  // Monday Night Football (7pm-midnight ET)
+  if (utcDay === 1 && etHour >= 19 && etHour <= 23) return true;
   
-  // Thursday Night Football
-  if (utcDay === 4 && etHour >= 20 && etHour <= 23) return true;
+  // Thursday Night Football (7pm-midnight ET)
+  if (utcDay === 4 && etHour >= 19 && etHour <= 23) return true;
   
-  // Saturday games (December/January only)
-  if (utcDay === 6 && month >= 11 && etHour >= 16 && etHour <= 23) return true;
+  // Saturday games (December/January only, 1pm-midnight ET)
+  if (utcDay === 6 && month >= 11 && etHour >= 13 && etHour <= 23) return true;
   
   return false;
 }
@@ -64,11 +64,11 @@ export function isNCAAGameTime(): boolean {
   
   const etHour = (utcHours - 5 + 24) % 24;
   
-  // Friday night games
-  if (utcDay === 5 && etHour >= 19 && etHour <= 23) return true;
+  // Friday night games (6pm-midnight ET)
+  if (utcDay === 5 && etHour >= 18 && etHour <= 23) return true;
   
-  // Saturday games (all day)
-  if (utcDay === 6 && etHour >= 12 && etHour <= 23) return true;
+  // Saturday games (10am-midnight ET for full coverage)
+  if (utcDay === 6 && etHour >= 10 && etHour <= 23) return true;
   
   return false;
 }

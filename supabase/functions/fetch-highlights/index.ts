@@ -20,33 +20,53 @@ serve(async (req) => {
 
     const highlightly = createHighlightlyClient();
 
-    console.log("Fetching active and recently finished matches...");
+    console.log("🎥 Fetching highlights for active and recently finished matches...");
     
     const today = new Date().toISOString().split("T")[0];
     const allMatches = [];
     
-    // Only fetch NFL if game time
+    // Only fetch NFL if game time (with error handling)
     if (isNFLGameTime()) {
-      const nflMatches = await highlightly.getMatches({
-        league: "NFL",
-        date: today,
-      });
-      allMatches.push(...nflMatches);
-      console.log(`Found ${nflMatches.length} NFL matches`);
+      try {
+        const nflMatches = await highlightly.getMatches({
+          league: "NFL",
+          date: today,
+        });
+        
+        if (nflMatches && Array.isArray(nflMatches)) {
+          allMatches.push(...nflMatches);
+          console.log(`🎥 Found ${nflMatches.length} NFL matches`);
+        } else {
+          console.warn("⚠️ NFL API returned invalid data");
+        }
+      } catch (error) {
+        console.error("❌ Error fetching NFL highlights:", error);
+        // Continue to NCAA instead of crashing
+      }
     } else {
-      console.log("Skipping NFL - outside game window");
+      console.log("🎥 Skipping NFL - outside game window");
     }
     
-    // Only fetch NCAA if game time
+    // Only fetch NCAA if game time (with error handling)
     if (isNCAAGameTime()) {
-      const ncaaMatches = await highlightly.getMatches({
-        league: "NCAA",
-        date: today,
-      });
-      allMatches.push(...ncaaMatches);
-      console.log(`Found ${ncaaMatches.length} NCAA matches`);
+      try {
+        const ncaaMatches = await highlightly.getMatches({
+          league: "NCAA",
+          date: today,
+        });
+        
+        if (ncaaMatches && Array.isArray(ncaaMatches)) {
+          allMatches.push(...ncaaMatches);
+          console.log(`🎥 Found ${ncaaMatches.length} NCAA matches`);
+        } else {
+          console.warn("⚠️ NCAA API returned invalid data");
+        }
+      } catch (error) {
+        console.error("❌ Error fetching NCAA highlights:", error);
+        // Continue processing what we have
+      }
     } else {
-      console.log("Skipping NCAA - outside game window");
+      console.log("🎥 Skipping NCAA - outside game window");
     }
     
     // Filter to recent games only (within 3 hours of finish)
@@ -69,9 +89,16 @@ serve(async (req) => {
 
     for (const match of matchesToProcess) {
       try {
-        console.log(`Checking highlights for match ${match.id}: ${match.awayTeam.name} @ ${match.homeTeam.name}`);
+        console.log(`🎥 Checking highlights for match ${match.id}: ${match.awayTeam.name} @ ${match.homeTeam.name}`);
         
         const highlights = await highlightly.getHighlights(match.id, 10);
+        
+        if (!highlights || !Array.isArray(highlights)) {
+          console.warn(`⚠️ No highlights returned for match ${match.id}`);
+          continue;
+        }
+        
+        console.log(`🎥 Found ${highlights.length} highlights for match ${match.id}`);
         
         for (const highlight of highlights) {
           // Check if already posted
@@ -146,9 +173,9 @@ Q${highlight.period} - ${highlight.clock}`;
                 });
 
               if (insertError) {
-                console.error(`Error posting highlight to huddle ${huddle.id}:`, insertError);
+                console.error(`❌ Error posting highlight to huddle ${huddle.id}:`, insertError);
               } else {
-                console.log(`Posted highlight ${highlight.id} to huddle ${huddle.id}`);
+                console.log(`✅ Posted highlight ${highlight.id} to huddle ${huddle.id}`);
                 highlightsPosted++;
               }
             }
@@ -179,9 +206,9 @@ Q${highlight.period} - ${highlight.clock}`;
               });
             
             if (spotlightError) {
-              console.error("Error posting highlight to Spotlight:", spotlightError);
+              console.error("❌ Error posting highlight to Spotlight:", spotlightError);
             } else {
-              console.log(`Posted highlight ${highlight.id} to Spotlight for team ${team.id}`);
+              console.log(`✅ Posted highlight ${highlight.id} to Spotlight for team ${team.id}`);
             }
 
             // Mark highlight as processed
@@ -193,7 +220,8 @@ Q${highlight.period} - ${highlight.clock}`;
           }
         }
       } catch (error) {
-        console.error(`Error processing match ${match.id}:`, error);
+        console.error(`❌ Error processing match ${match.id}:`, error.message || error);
+        // Continue processing other matches
       }
     }
 

@@ -137,12 +137,21 @@ async function pollLeague(
       console.log(`Skipping ${league} poll - outside game window`);
       return;
     }
-    console.log(`Polling ${league} games...`);
+
+    const now = new Date();
+    const etTime = now.toLocaleString("en-US", { timeZone: "America/New_York" });
+    console.log(`🏈 [${league}] Polling games at ${etTime} ET`);
 
     const today = new Date().toISOString().split("T")[0];
     const matches = await highlightly.getMatches({ league, date: today });
 
-    console.log(`Found ${matches.length} ${league} games`);
+    // Defensive check for API failures
+    if (!matches || !Array.isArray(matches)) {
+      console.warn(`⚠️ [${league}] No matches returned or invalid response for ${today}`);
+      return;
+    }
+
+    console.log(`🏈 [${league}] Found ${matches.length} games for ${today}`);
 
     for (const match of matches) {
       // Check cache first to reduce API calls
@@ -181,7 +190,7 @@ async function processGame(
       return; // Skip games we don't care about
     }
 
-    console.log(`Processing game: ${match.awayTeam.name} @ ${match.homeTeam.name}`);
+    console.log(`🏈 Processing: ${match.awayTeam.name} @ ${match.homeTeam.name} (Status: ${match.status})`);
 
     const teams = [
       {
@@ -419,8 +428,9 @@ async function postToTeamFeeds(
         });
 
         if (error) {
-          console.error(`Error posting to huddle ${huddle.id}:`, error);
+          console.error(`❌ Error posting to huddle ${huddle.id}:`, error);
         } else {
+          console.log(`✅ Posted to huddle ${huddle.id}: ${content.substring(0, 50)}...`);
           recentMessages.set(cacheKey, Date.now());
         }
       }

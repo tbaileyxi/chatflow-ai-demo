@@ -66,9 +66,17 @@ export class HighlightlyClient {
       },
     });
 
+    // Check for rate limiting
+    if (response.status === 429) {
+      console.error("⚠️ Highlightly API rate limit hit - backing off");
+      throw new Error("RATE_LIMIT_EXCEEDED");
+    }
+
+    // Check for other HTTP errors
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Highlightly API error: ${response.status} - ${error}`);
+      const errorText = await response.text();
+      console.error(`❌ Highlightly API error (${response.status}):`, errorText);
+      throw new Error(`API_ERROR_${response.status}: ${errorText}`);
     }
 
     return response.json();
