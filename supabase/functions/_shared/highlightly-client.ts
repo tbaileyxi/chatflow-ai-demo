@@ -125,35 +125,50 @@ export class HighlightlyClient {
       console.log(`🔍 RAW API RESPONSE (first match):`, JSON.stringify(rawMatches[0], null, 2));
     }
     
-    // Map API fields to expected format
-    const matches: HighlightlyMatch[] = rawMatches.map((match: any) => ({
-      id: match.id,
-      league: match.league,
-      season: match.season,
-      week: match.week,
-      round: match.round,
-      date: match.date,
-      startTime: match.startTime || match.start_time || match.scheduled,
-      // Try different possible status field names
-      status: (match.status || match.state || match.matchStatus || match.game_status || 'scheduled') as any,
-      homeTeam: {
-        id: match.homeTeam?.id || match.home_team?.id,
-        name: match.homeTeam?.name || match.home_team?.name,
-        displayName: match.homeTeam?.displayName || match.home_team?.displayName || match.homeTeam?.name,
-        abbreviation: match.homeTeam?.abbreviation || match.home_team?.abbreviation,
-        score: Number(match.homeTeam?.score || match.home_team?.score || match.homeScore || 0)
-      },
-      awayTeam: {
-        id: match.awayTeam?.id || match.away_team?.id,
-        name: match.awayTeam?.name || match.away_team?.name,
-        displayName: match.awayTeam?.displayName || match.away_team?.displayName || match.awayTeam?.name,
-        abbreviation: match.awayTeam?.abbreviation || match.away_team?.abbreviation,
-        score: Number(match.awayTeam?.score || match.away_team?.score || match.awayScore || 0)
-      },
-      period: match.period || match.quarter || match.currentPeriod || 0,
-      clock: match.clock || match.gameClock || match.timeRemaining || '',
-      venue: match.venue
-    }));
+    // Map API fields to expected format - extract from nested 'state' object
+    const matches: HighlightlyMatch[] = rawMatches.map((match: any) => {
+      // Parse scores from state.score.current string (e.g., "14 - 7")
+      const scoreString = match.state?.score?.current || "0 - 0";
+      const [awayScoreStr, homeScoreStr] = scoreString.split(" - ").map((s: string) => s.trim());
+      
+      // Normalize status description to expected values
+      let normalizedStatus = (match.state?.description || 'scheduled').toLowerCase();
+      if (normalizedStatus.includes('progress') || normalizedStatus.includes('live')) {
+        normalizedStatus = 'in_progress';
+      } else if (normalizedStatus.includes('final') || normalizedStatus.includes('complete')) {
+        normalizedStatus = 'finished';
+      } else if (normalizedStatus.includes('schedul')) {
+        normalizedStatus = 'scheduled';
+      }
+      
+      return {
+        id: match.id,
+        league: match.league,
+        season: match.season,
+        week: match.week,
+        round: match.round,
+        date: match.date,
+        startTime: match.date, // Use date field as start time
+        status: normalizedStatus as any,
+        homeTeam: {
+          id: match.homeTeam?.id,
+          name: match.homeTeam?.name,
+          displayName: match.homeTeam?.displayName,
+          abbreviation: match.homeTeam?.abbreviation,
+          score: Number(homeScoreStr) || 0
+        },
+        awayTeam: {
+          id: match.awayTeam?.id,
+          name: match.awayTeam?.name,
+          displayName: match.awayTeam?.displayName,
+          abbreviation: match.awayTeam?.abbreviation,
+          score: Number(awayScoreStr) || 0
+        },
+        period: match.state?.period || 0,
+        clock: match.state?.clock?.toString() || '',
+        venue: match.venue
+      };
+    });
     
     // Log first few matches for debugging
     if (matches.length > 0) {
