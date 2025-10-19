@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trigger Highlights Fetch</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        #result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .loading {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin-top: 15px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .info-box strong {
+            color: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Fetch Game Highlights</h1>
+        <p>Click the button below to manually fetch and post highlights from today's games. This will also activate the automatic 5-minute cron schedule.</p>
+        
+        <div class="info-box">
+            <strong>What this does:</strong>
+            <ul style="margin: 10px 0 0 20px; padding: 0;">
+                <li>Fetches highlights from the Highlightly API for active/recent NFL and NCAA games</li>
+                <li>Posts highlights to relevant team huddles</li>
+                <li>Shares highlights to the Spotlight feed</li>
+                <li>Activates the automatic cron job (runs every 5 minutes during game windows)</li>
+            </ul>
+        </div>
+        
+        <button onclick="triggerHighlights()">Fetch Highlights Now</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function triggerHighlights() {
+            const button = document.querySelector('button');
+            const resultDiv = document.getElementById('result');
+            
+            button.disabled = true;
+            button.textContent = 'Fetching highlights...';
+            
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'loading';
+            resultDiv.innerHTML = `
+                <div class="status-badge status-active">RUNNING</div>
+                <p>Fetching highlights from Highlightly API...</p>
+                <p style="font-size: 13px; color: #856404;">This may take 30-60 seconds depending on the number of active games.</p>
+            `;
+
+            try {
+                const response = await fetch('https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/fetch-highlights', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlanV3eWV5cGlnZ3ZseWZsaWFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5NjU4MDgsImV4cCI6MjA2OTU0MTgwOH0.XHylH6wJuJjSZxU904oCZ33N0swsoRm6Tr2VjwI1Lz0',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ manual: true })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'success';
+                    resultDiv.innerHTML = `
+                        <div class="status-badge status-active">SUCCESS ✓</div>
+                        <h3 style="margin: 10px 0;">Highlights fetch completed!</h3>
+                        <p><strong>Matches processed:</strong> ${data.matchesProcessed || 0}</p>
+                        <p><strong>Highlights found:</strong> ${data.highlightsProcessed || 0}</p>
+                        <p><strong>Posts created:</strong> ${data.postsCreated || 0}</p>
+                        ${data.message ? `<p style="color: #155724; margin-top: 15px;">${data.message}</p>` : ''}
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                        <p style="margin-top: 20px; padding: 15px; background: #fff; border-radius: 6px; border: 1px solid #c3e6cb;">
+                            <strong>✓ Cron job activated!</strong><br>
+                            The fetch-highlights function will now run automatically every 5 minutes during game windows (Thu-Mon, 12pm-12am ET).
+                        </p>
+                    `;
+                } else {
+                    throw new Error(data.error || 'Unknown error occurred');
+                }
+            } catch (error) {
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = `
+                    <div class="status-badge" style="background: #f8d7da; color: #721c24;">ERROR ✗</div>
+                    <h3 style="margin: 10px 0;">Failed to fetch highlights</h3>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <pre>${error.stack || 'No stack trace available'}</pre>
+                    <p style="margin-top: 15px;">
+                        <strong>Troubleshooting tips:</strong><br>
+                        • Check if games are currently active or recently finished<br>
+                        • Verify the Highlightly API key is configured<br>
+                        • Check edge function logs in Supabase dashboard
+                    </p>
+                `;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Fetch Highlights Again';
+            }
+        }
+    </script>
+</body>
+</html>
