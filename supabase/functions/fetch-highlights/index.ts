@@ -126,8 +126,10 @@ serve(async (req) => {
         console.log(`🎥 Processing match ${match.id}: ${match.awayTeam.name} @ ${match.homeTeam.name}`);
         console.log(`🎥 Status: ${match.status}`);
         
+        // Use the match's actual date, not today's date
+        const matchDate = new Date(match.date).toISOString().split("T")[0];
         const highlights = await highlightly.getHighlights({
-          date: today,
+          date: matchDate,
           leagueName: match.league as "NFL" | "NCAA",
           matchId: match.id,
           limit: 10
