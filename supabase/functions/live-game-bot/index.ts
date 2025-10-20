@@ -297,11 +297,15 @@ async function processGame(
         await postPregameInfo(teams, match.startTime, league, supabase, allTeams);
       } else if (match.status === "in_progress") {
         await postGameStart(teams, match.startTime, league, supabase, allTeams);
+        // Update pick'em games when we first discover a live game
+        await updatePickEmGame(match, 'in_progress', supabase);
       } else if (match.status === "finished") {
         await postGameEnd(currentState, league, supabase, allTeams);
+        // Update pick'em games when we first discover a finished game
+        await updatePickEmGame(match, 'final', supabase);
       }
     } else {
-      await detectAndPostChanges(previousState, currentState, league, supabase, allTeams);
+      await detectAndPostChanges(previousState, currentState, league, supabase, allTeams, match);
     }
 
     // Always update game state
@@ -335,7 +339,8 @@ async function detectAndPostChanges(
   current: GameState,
   league: string,
   supabase: any,
-  allTeams: Map<string, any>
+  allTeams: Map<string, any>,
+  match?: any
 ) {
   if (previous.lastStatus === "finished") {
     return; // Game already completed
@@ -344,6 +349,10 @@ async function detectAndPostChanges(
   // Game start
   if (previous.lastStatus === "scheduled" && current.lastStatus === "in_progress") {
     await postGameStart(current.teams, "", league, supabase, allTeams);
+    // Update pick'em games to lock picks
+    if (match) {
+      await updatePickEmGame(match, 'in_progress', supabase);
+    }
   }
 
   // Score change
@@ -359,6 +368,80 @@ async function detectAndPostChanges(
   // Game end
   if (previous.lastStatus !== "finished" && current.lastStatus === "finished") {
     await postGameEnd(current, league, supabase, allTeams);
+    // Update pick'em games and determine winner
+    if (match) {
+      await updatePickEmGame(match, 'final', supabase);
+    }
+  }
+}
+
+// Update pick'em games based on live game data
+async function updatePickEmGame(
+  match: any,
+  status: 'scheduled' | 'in_progress' | 'final',
+  supabase: any
+) {
+  try {
+    const matchId = match.id.toString();
+    
+    // Find pickem_games matching this match_id
+    const { data: pickemGames, error: fetchError } = await supabase
+      .from('pickem_games')
+      .select('id, status, winning_team')
+      .eq('match_id', matchId);
+    
+    if (fetchError) {
+      console.error(`Error fetching pick'em games for match ${matchId}:`, fetchError);
+      return;
+    }
+    
+    if (!pickemGames || pickemGames.length === 0) {
+      return; // No pick'em games for this match
+    }
+    
+    console.log(`🎯 Updating ${pickemGames.length} pick'em game(s) for match ${matchId} to status: ${status}`);
+    
+    // Determine winner if game is final
+    let winningTeam = null;
+    if (status === 'final') {
+      const homeScore = match.homeTeam?.score || 0;
+      const awayScore = match.awayTeam?.score || 0;
+      
+      if (homeScore !== awayScore) {
+        winningTeam = homeScore > awayScore 
+          ? match.homeTeam.name 
+          : match.awayTeam.name;
+        console.log(`🏆 Winner determined: ${winningTeam} (${awayTeam.name} ${awayScore} - ${homeScore} ${homeTeam.name})`);
+      } else {
+        console.log(`🤝 Game ended in a tie: ${awayTeam.name} ${awayScore} - ${homeScore} ${homeTeam.name}`);
+      }
+    }
+    
+    // Update all matching pickem_games
+    for (const game of pickemGames) {
+      // Skip if already updated to avoid unnecessary writes
+      if (game.status === status && (status !== 'final' || game.winning_team === winningTeam)) {
+        console.log(`⏭️ Pick'em game ${game.id} already up to date`);
+        continue;
+      }
+      
+      const { error: updateError } = await supabase
+        .from('pickem_games')
+        .update({
+          status,
+          winning_team: winningTeam,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', game.id);
+      
+      if (updateError) {
+        console.error(`Error updating pick'em game ${game.id}:`, updateError);
+      } else {
+        console.log(`✅ Updated pick'em game ${game.id}: status=${status}, winner=${winningTeam || 'TBD'}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error in updatePickEmGame:', error);
   }
 }
 
