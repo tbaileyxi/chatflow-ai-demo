@@ -126,7 +126,12 @@ serve(async (req) => {
         console.log(`🎥 Processing match ${match.id}: ${match.awayTeam.name} @ ${match.homeTeam.name}`);
         console.log(`🎥 Status: ${match.status}`);
         
-        const highlights = await highlightly.getHighlights(match.id, 10);
+        const highlights = await highlightly.getHighlights({
+          date: today,
+          leagueName: match.league as "NFL" | "NCAA",
+          matchId: match.id,
+          limit: 10
+        });
         console.log(`🎥 API returned highlights:`, highlights ? highlights.length : 'null');
         
         if (!highlights || !Array.isArray(highlights)) {

@@ -497,7 +497,13 @@ async function postScoreUpdate(
   if (matchId) {
     try {
       const highlightly = createHighlightlyClient();
-      const highlights = await highlightly.getHighlights(matchId, 5);
+      const today = new Date().toISOString().split("T")[0];
+      const highlights = await highlightly.getHighlights({
+        date: today,
+        leagueName: league as "NFL" | "NCAA",
+        matchId: matchId,
+        limit: 5
+      });
       
       // Get the most recent highlight (likely the scoring play that just happened)
       if (highlights && highlights.length > 0) {

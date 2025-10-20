@@ -188,9 +188,46 @@ export class HighlightlyClient {
     return this.fetch<HighlightlyMatch>(`/matches/${matchId}`);
   }
 
-  // Get highlights for a match
-  async getHighlights(matchId: number, limit = 10): Promise<HighlightlyHighlight[]> {
-    return this.fetch<HighlightlyHighlight[]>(`/highlights?matchId=${matchId}&limit=${limit}`);
+  // Get highlights for a match - FIXED to use correct API parameters
+  async getHighlights(params: {
+    date?: string;        // YYYY-MM-DD
+    leagueName?: "NFL" | "NCAA";
+    matchId?: number;     // Keep for filtering after fetch
+    limit?: number;
+  }): Promise<HighlightlyHighlight[]> {
+    const queryParams = new URLSearchParams();
+    if (params.date) queryParams.append("date", params.date);
+    if (params.leagueName) queryParams.append("leagueName", params.leagueName);
+    if (params.limit) queryParams.append("limit", params.limit.toString());
+    
+    const url = `/highlights${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    console.log(`🔍 Highlightly Highlights API Request: GET ${url}`);
+    
+    const response = await this.fetch<{ data: any[] }>(url);
+    const rawHighlights = response?.data || [];
+    
+    console.log(`📊 Highlightly Highlights API Response: ${rawHighlights.length} highlights returned`);
+    
+    // Filter by matchId if provided (since API doesn't support matchId param directly)
+    let highlights = rawHighlights;
+    if (params.matchId) {
+      highlights = rawHighlights.filter((h: any) => h.matchId === params.matchId);
+      console.log(`🔍 Filtered to ${highlights.length} highlights for match ${params.matchId}`);
+    }
+    
+    // Map API response to our interface
+    return highlights.map((h: any) => ({
+      id: h.id,
+      matchId: h.matchId,
+      title: h.title || '',
+      description: h.description || '',
+      embedUrl: h.embedUrl || h.url || '',
+      thumbnailUrl: h.thumbnailUrl || h.thumbnail || '',
+      duration: h.duration || 0,
+      timestamp: h.timestamp || h.createdAt || '',
+      period: h.period || 0,
+      clock: h.clock || ''
+    }));
   }
 
   // Get recent highlights for a team
