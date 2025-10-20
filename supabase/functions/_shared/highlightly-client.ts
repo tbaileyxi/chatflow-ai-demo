@@ -208,6 +208,11 @@ export class HighlightlyClient {
     
     console.log(`📊 Highlightly Highlights API Response: ${rawHighlights.length} highlights returned`);
     
+    // DEBUG: Log first highlight to see actual structure
+    if (rawHighlights.length > 0) {
+      console.log(`🔍 SAMPLE HIGHLIGHT STRUCTURE:`, JSON.stringify(rawHighlights[0], null, 2));
+    }
+    
     // Filter by matchId if provided (since API doesn't support matchId param directly)
     let highlights = rawHighlights;
     if (params.matchId) {
