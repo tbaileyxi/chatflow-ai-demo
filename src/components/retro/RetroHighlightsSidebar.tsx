@@ -121,12 +121,13 @@ export const RetroHighlightsSidebar: React.FC<RetroHighlightsSidebarProps> = ({
         })
       );
 
-      // Filter: Include messages with 3+ heat OR special message types (highlight_feed, embed)
+      // Filter: Include messages with 3+ heat OR special message types (highlight_feed, embed, highlight)
       const topHighlights = messagesWithHeat
         .filter(msg => 
           msg.heat_count >= 3 || 
           msg.message_type === 'highlight_feed' || 
-          msg.message_type === 'embed'
+          msg.message_type === 'embed' ||
+          msg.message_type === 'highlight'
         )
         .sort((a, b) => {
           // Priority: highlight_feed/embed messages first, then by heat count

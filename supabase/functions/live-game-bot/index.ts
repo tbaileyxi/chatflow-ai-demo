@@ -489,9 +489,24 @@ async function postToTeamFeeds(
         if (recentMessages.has(cacheKey)) {
           const lastPosted = recentMessages.get(cacheKey)!;
           if (Date.now() - lastPosted < 5 * 60 * 1000) {
-            console.log(`Skipping duplicate message to huddle ${huddle.id}`);
+            console.log(`⏭️ Skipping duplicate message (in-memory cache) for huddle ${huddle.id}`);
             continue;
           }
+        }
+
+        // Database-level deduplication check (prevents duplicates from parallel function instances)
+        const { data: recentMessage } = await supabase
+          .from('huddle_messages')
+          .select('id')
+          .eq('huddle_id', huddle.id)
+          .eq('content', content)
+          .eq('is_bot_message', true)
+          .gte('created_at', new Date(Date.now() - 5000).toISOString()) // Last 5 seconds
+          .maybeSingle();
+
+        if (recentMessage) {
+          console.log(`⏭️ Skipping duplicate message (database check) for huddle ${huddle.id}`);
+          continue;
         }
 
         const { error } = await supabase.from("huddle_messages").insert({

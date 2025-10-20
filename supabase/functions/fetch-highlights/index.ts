@@ -1,5 +1,11 @@
-// Fetch Highlights Function - Deployed 2025-10-19 7:20 PM
-// Runs every 5 minutes during game windows to fetch and post highlights
+/**
+ * Fetch Highlights Function - Automatic Highlight Ingestion
+ * 
+ * Runs every 5 minutes via cron schedule to fetch highlights from Highlightly API
+ * Posts highlights to team huddles and spotlight feed during active games
+ * 
+ * Last Updated: 2025-10-19 9:15 PM
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createHighlightlyClient } from "../_shared/highlightly-client.ts";
