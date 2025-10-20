@@ -363,9 +363,9 @@ async function detectAndPostChanges(
     await postToTeamFeeds(current.teams, content, league, supabase, allTeams, dedupeId);
   }
 
-  // Score change
+  // Score change - pass matchId to fetch highlights
   if (current.lastStatus === "in_progress" && previous.lastScore !== current.lastScore) {
-    await postScoreUpdate(current, league, supabase, allTeams);
+    await postScoreUpdate(current, league, supabase, allTeams, match?.id);
   }
 
   // Period change
@@ -486,12 +486,52 @@ async function postScoreUpdate(
   gameState: GameState,
   league: string,
   supabase: any,
-  allTeams: Map<string, any>
+  allTeams: Map<string, any>,
+  matchId?: number
 ) {
   const { teams, lastPeriod, lastClock } = gameState;
   const periodText = getPeriodText(lastPeriod);
 
-  const content = `🔥 ${teams[1].name} ${teams[1].score} - ${teams[0].score} ${teams[0].name}\n${periodText}${
+  // Try to fetch highlights to get specific scoring play details
+  let scoringPlayContent = null;
+  if (matchId) {
+    try {
+      const highlightly = createHighlightlyClient();
+      const highlights = await highlightly.getHighlights(matchId, 5);
+      
+      // Get the most recent highlight (likely the scoring play that just happened)
+      if (highlights && highlights.length > 0) {
+        const latestHighlight = highlights[0];
+        const title = latestHighlight.title || '';
+        
+        // Determine emoji based on scoring type
+        let emoji = '🔥';
+        if (title.toLowerCase().includes('touchdown') || title.toLowerCase().includes('td')) {
+          emoji = '🏈 TOUCHDOWN!';
+        } else if (title.toLowerCase().includes('field goal') || title.toLowerCase().includes('fg')) {
+          emoji = '⚡ FIELD GOAL!';
+        } else if (title.toLowerCase().includes('safety')) {
+          emoji = '🛡️ SAFETY!';
+        } else if (title.toLowerCase().includes('interception') || title.toLowerCase().includes('int')) {
+          emoji = '🎯 INTERCEPTION!';
+        } else if (title.toLowerCase().includes('fumble')) {
+          emoji = '💨 FUMBLE RECOVERY!';
+        }
+        
+        scoringPlayContent = `${emoji}\n${title}\n\n${teams[1].name} ${teams[1].score} - ${teams[0].score} ${teams[0].name}\n${periodText}${lastClock ? ` | ${lastClock}` : ''}`;
+        
+        // Optionally include video embed
+        if (latestHighlight.embedUrl) {
+          scoringPlayContent += `\n\n🎥 ${latestHighlight.embedUrl}`;
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching highlights for scoring play:', error);
+      // Fall back to generic score update
+    }
+  }
+
+  const content = scoringPlayContent || `🔥 ${teams[1].name} ${teams[1].score} - ${teams[0].score} ${teams[0].name}\n${periodText}${
     lastClock ? ` | ${lastClock}` : ""
   }`;
 
@@ -578,13 +618,14 @@ async function postToTeamFeeds(
           : `${huddle.id}-${content.substring(0, 50)}`;
 
         // Database-level deduplication check FIRST (prevents duplicates from parallel function instances)
+        // Extended lookback window to 15 minutes and use substring matching
         const { data: recentMessage } = await supabase
           .from('huddle_messages')
           .select('id')
           .eq('huddle_id', huddle.id)
-          .eq('content', content)
-          .eq('is_bot_message', true)
-          .gte('created_at', new Date(Date.now() - 5000).toISOString()) // Last 5 seconds
+          .ilike('content', `${content.substring(0, 30)}%`)
+          .gte('created_at', new Date(Date.now() - 15 * 60 * 1000).toISOString())
+          .limit(1)
           .maybeSingle();
 
         if (recentMessage) {
@@ -593,9 +634,10 @@ async function postToTeamFeeds(
         }
 
         // In-memory cache check (fast path for single instance)
+        // Extended to 15 minutes to match database lookback
         if (recentMessages.has(cacheKey)) {
           const lastPosted = recentMessages.get(cacheKey)!;
-          if (Date.now() - lastPosted < 5 * 60 * 1000) {
+          if (Date.now() - lastPosted < 15 * 60 * 1000) {
             console.log(`⏭️ Skipping duplicate message (in-memory cache) for huddle ${huddle.id}`);
             continue;
           }
