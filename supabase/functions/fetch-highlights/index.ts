@@ -43,8 +43,8 @@ serve(async (req) => {
     const allMatches = [];
     
     // Only fetch NFL if game time (with error handling)
-    const nflGameTime = isNFLGameTime();
-    console.log(`🎥 NFL game time check: ${nflGameTime}`);
+    const nflGameTime = true; // TEMPORARY: Force true for testing - was: isNFLGameTime();
+    console.log(`🎥 NFL game time check: ${nflGameTime} (FORCED TRUE FOR TESTING)`);
     
     if (nflGameTime) {
       console.log(`🎥 Fetching NFL matches for ${today}...`);
@@ -69,8 +69,8 @@ serve(async (req) => {
     }
     
     // Only fetch NCAA if game time (with error handling)
-    const ncaaGameTime = isNCAAGameTime();
-    console.log(`🎥 NCAA game time check: ${ncaaGameTime}`);
+    const ncaaGameTime = true; // TEMPORARY: Force true for testing - was: isNCAAGameTime();
+    console.log(`🎥 NCAA game time check: ${ncaaGameTime} (FORCED TRUE FOR TESTING)`);
     
     if (ncaaGameTime) {
       console.log(`🎥 Fetching NCAA matches for ${today}...`);
