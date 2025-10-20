@@ -285,7 +285,7 @@ async function processGame(
       lastScore: `${match.awayTeam.score}-${match.homeTeam.score}`,
       lastPeriod: match.period || 0,
       lastClock: match.clock || "",
-      lastStatus: match.status,
+      lastStatus: match.status === "half time" ? "in_progress" : match.status, // Normalize halftime status
       teams,
     };
 
@@ -353,6 +353,14 @@ async function detectAndPostChanges(
     if (match) {
       await updatePickEmGame(match, 'in_progress', supabase);
     }
+  }
+
+  // Halftime detection (status changes to "half time")
+  if (previous.lastStatus === "in_progress" && 
+      (match?.status === "half time" || match?.status === "halftime")) {
+    const content = `⏰ HALFTIME\n${current.teams[1].name} ${current.teams[1].score} - ${current.teams[0].score} ${current.teams[0].name}`;
+    const dedupeId = `halftime-${current.gameId}`;
+    await postToTeamFeeds(current.teams, content, league, supabase, allTeams, dedupeId);
   }
 
   // Score change
@@ -569,15 +577,7 @@ async function postToTeamFeeds(
           ? `${huddle.id}-${dedupeId}`
           : `${huddle.id}-${content.substring(0, 50)}`;
 
-        if (recentMessages.has(cacheKey)) {
-          const lastPosted = recentMessages.get(cacheKey)!;
-          if (Date.now() - lastPosted < 5 * 60 * 1000) {
-            console.log(`⏭️ Skipping duplicate message (in-memory cache) for huddle ${huddle.id}`);
-            continue;
-          }
-        }
-
-        // Database-level deduplication check (prevents duplicates from parallel function instances)
+        // Database-level deduplication check FIRST (prevents duplicates from parallel function instances)
         const { data: recentMessage } = await supabase
           .from('huddle_messages')
           .select('id')
@@ -590,6 +590,15 @@ async function postToTeamFeeds(
         if (recentMessage) {
           console.log(`⏭️ Skipping duplicate message (database check) for huddle ${huddle.id}`);
           continue;
+        }
+
+        // In-memory cache check (fast path for single instance)
+        if (recentMessages.has(cacheKey)) {
+          const lastPosted = recentMessages.get(cacheKey)!;
+          if (Date.now() - lastPosted < 5 * 60 * 1000) {
+            console.log(`⏭️ Skipping duplicate message (in-memory cache) for huddle ${huddle.id}`);
+            continue;
+          }
         }
 
         const { error } = await supabase.from("huddle_messages").insert({
