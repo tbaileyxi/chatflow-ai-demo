@@ -94,8 +94,8 @@ serve(async (req) => {
       console.log("🎥 Skipping NCAA - outside game window");
     }
     
-    // Filter to recent games only (within 3 hours of finish)
-    const threeHoursAgo = Date.now() - (3 * 60 * 60 * 1000);
+    // TEMPORARY: Expand to 48 hours for testing - was 3 hours
+    const threeHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
     const activeMatches = allMatches.filter(m => {
       if (m.status === 'in_progress') return true;
       if (m.status === 'finished') {
