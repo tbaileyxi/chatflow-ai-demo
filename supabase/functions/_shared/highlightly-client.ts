@@ -216,18 +216,18 @@ export class HighlightlyClient {
     // Filter by matchId if provided (since API doesn't support matchId param directly)
     let highlights = rawHighlights;
     if (params.matchId) {
-      highlights = rawHighlights.filter((h: any) => h.matchId === params.matchId);
+      highlights = rawHighlights.filter((h: any) => h.match?.id === params.matchId);
       console.log(`🔍 Filtered to ${highlights.length} highlights for match ${params.matchId}`);
     }
     
     // Map API response to our interface
     return highlights.map((h: any) => ({
       id: h.id,
-      matchId: h.matchId,
+      matchId: h.match?.id || 0,
       title: h.title || '',
       description: h.description || '',
       embedUrl: h.embedUrl || h.url || '',
-      thumbnailUrl: h.thumbnailUrl || h.thumbnail || '',
+      thumbnailUrl: h.imgUrl || h.thumbnailUrl || h.thumbnail || '',
       duration: h.duration || 0,
       timestamp: h.timestamp || h.createdAt || '',
       period: h.period || 0,
