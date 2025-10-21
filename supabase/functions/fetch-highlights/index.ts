@@ -38,8 +38,11 @@ serve(async (req) => {
     console.log("🎥 Initialized Supabase and Highlightly clients");
     console.log("🎥 Fetching highlights for active and recently finished matches...");
     
-    const today = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    const today = now.toISOString().split("T")[0];
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     console.log(`🎥 Today's date: ${today}`);
+    console.log(`🎥 Yesterday's date: ${yesterday}`);
     const allMatches = [];
     
     // Only fetch NFL if game time (with error handling)
@@ -47,18 +50,30 @@ serve(async (req) => {
     console.log(`🎥 NFL game time check: ${nflGameTime} (FORCED TRUE FOR TESTING)`);
     
     if (nflGameTime) {
-      console.log(`🎥 Fetching NFL matches for ${today}...`);
+      console.log(`🎥 Fetching NFL matches for ${today} and ${yesterday}...`);
       try {
-        const nflMatches = await highlightly.getMatches({
+        // Fetch today's matches
+        const nflMatchesToday = await highlightly.getMatches({
           league: "NFL",
           date: today,
         });
         
-        if (nflMatches && Array.isArray(nflMatches)) {
-          allMatches.push(...nflMatches);
-          console.log(`🎥 Found ${nflMatches.length} NFL matches`);
+        // Fetch yesterday's matches
+        const nflMatchesYesterday = await highlightly.getMatches({
+          league: "NFL",
+          date: yesterday,
+        });
+        
+        const combinedNFL = [
+          ...(Array.isArray(nflMatchesToday) ? nflMatchesToday : []),
+          ...(Array.isArray(nflMatchesYesterday) ? nflMatchesYesterday : [])
+        ];
+        
+        if (combinedNFL.length > 0) {
+          allMatches.push(...combinedNFL);
+          console.log(`🎥 Found ${combinedNFL.length} NFL matches (today: ${nflMatchesToday?.length || 0}, yesterday: ${nflMatchesYesterday?.length || 0})`);
         } else {
-          console.warn("⚠️ NFL API returned invalid data");
+          console.warn("⚠️ NFL API returned no matches");
         }
       } catch (error) {
         console.error("❌ Error fetching NFL highlights:", error);
@@ -73,18 +88,30 @@ serve(async (req) => {
     console.log(`🎥 NCAA game time check: ${ncaaGameTime} (FORCED TRUE FOR TESTING)`);
     
     if (ncaaGameTime) {
-      console.log(`🎥 Fetching NCAA matches for ${today}...`);
+      console.log(`🎥 Fetching NCAA matches for ${today} and ${yesterday}...`);
       try {
-        const ncaaMatches = await highlightly.getMatches({
+        // Fetch today's matches
+        const ncaaMatchesToday = await highlightly.getMatches({
           league: "NCAA",
           date: today,
         });
         
-        if (ncaaMatches && Array.isArray(ncaaMatches)) {
-          allMatches.push(...ncaaMatches);
-          console.log(`🎥 Found ${ncaaMatches.length} NCAA matches`);
+        // Fetch yesterday's matches
+        const ncaaMatchesYesterday = await highlightly.getMatches({
+          league: "NCAA",
+          date: yesterday,
+        });
+        
+        const combinedNCAA = [
+          ...(Array.isArray(ncaaMatchesToday) ? ncaaMatchesToday : []),
+          ...(Array.isArray(ncaaMatchesYesterday) ? ncaaMatchesYesterday : [])
+        ];
+        
+        if (combinedNCAA.length > 0) {
+          allMatches.push(...combinedNCAA);
+          console.log(`🎥 Found ${combinedNCAA.length} NCAA matches (today: ${ncaaMatchesToday?.length || 0}, yesterday: ${ncaaMatchesYesterday?.length || 0})`);
         } else {
-          console.warn("⚠️ NCAA API returned invalid data");
+          console.warn("⚠️ NCAA API returned no matches");
         }
       } catch (error) {
         console.error("❌ Error fetching NCAA highlights:", error);

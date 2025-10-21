@@ -141,25 +141,39 @@ async function pollLeague(
     const now = new Date();
     const etTime = now.toLocaleString("en-US", { timeZone: "America/New_York" });
     const today = now.toISOString().split("T")[0];
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     const currentYear = now.getFullYear();
     
     console.log(`🏈 [${league}] Polling games at ${etTime} ET`);
+    console.log(`🏈 [${league}] Checking dates: ${today} and ${yesterday}`);
 
     let matches: any[] = [];
     let strategyUsed = '';
 
-    // Strategy 1: Query by date + league (most specific)
-    console.log(`🔍 [${league}] Strategy 1: Querying by date (${today})`);
-    const dateMatches = await highlightly.getMatches({ 
+    // Strategy 1: Query by date + league for last 24 hours (most specific)
+    console.log(`🔍 [${league}] Strategy 1: Querying by date (${today} + ${yesterday})`);
+    
+    const dateMatchesToday = await highlightly.getMatches({ 
       league, 
       date: today,
       limit: 100 
     });
     
-    if (dateMatches && dateMatches.length > 0) {
-      matches = dateMatches;
-      strategyUsed = 'date';
-      console.log(`✅ [${league}] Strategy 1 SUCCESS: Found ${matches.length} games`);
+    const dateMatchesYesterday = await highlightly.getMatches({ 
+      league, 
+      date: yesterday,
+      limit: 100 
+    });
+    
+    const combinedDateMatches = [
+      ...(Array.isArray(dateMatchesToday) ? dateMatchesToday : []),
+      ...(Array.isArray(dateMatchesYesterday) ? dateMatchesYesterday : [])
+    ];
+    
+    if (combinedDateMatches.length > 0) {
+      matches = combinedDateMatches;
+      strategyUsed = 'date (24h)';
+      console.log(`✅ [${league}] Strategy 1 SUCCESS: Found ${matches.length} games (today: ${dateMatchesToday?.length || 0}, yesterday: ${dateMatchesYesterday?.length || 0})`);
     } else {
       console.log(`⚠️ [${league}] Strategy 1 FAILED: No games found by date`);
       
