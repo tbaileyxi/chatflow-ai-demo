@@ -292,10 +292,15 @@ async function processGame(
     const previousState = await getGameState(gameId, supabase);
 
     // Detect changes and post updates
+    // Check if game has actually started (non-zero scores)
+    const homeScore = match.homeTeam?.score || 0;
+    const awayScore = match.awayTeam?.score || 0;
+    const hasScore = homeScore > 0 || awayScore > 0;
+    
     if (!previousState) {
-      if (match.status === "scheduled") {
+      if (match.status === "scheduled" && !hasScore) {
         await postPregameInfo(teams, match.startTime, league, supabase, allTeams);
-      } else if (match.status === "in_progress") {
+      } else if (match.status === "in_progress" || hasScore) {
         await postGameStart(teams, match.startTime, league, supabase, allTeams);
         // Update pick'em games when we first discover a live game
         await updatePickEmGame(match, 'in_progress', supabase);

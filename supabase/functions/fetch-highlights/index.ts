@@ -97,7 +97,15 @@ serve(async (req) => {
     // TEMPORARY: Expand to 48 hours for testing - was 3 hours
     const threeHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
     const activeMatches = allMatches.filter(m => {
-      if (m.status === 'in_progress') return true;
+      // Check for non-zero scores (game has actually started)
+      const homeScore = m.homeTeam?.score || 0;
+      const awayScore = m.awayTeam?.score || 0;
+      const hasScore = homeScore > 0 || awayScore > 0;
+      
+      // Game is active if it has a score OR status indicates it's live
+      if (hasScore || m.status === 'in_progress') return true;
+      
+      // Include recently finished games
       if (m.status === 'finished') {
         const finishTime = new Date(m.date).getTime();
         return finishTime > threeHoursAgo;
