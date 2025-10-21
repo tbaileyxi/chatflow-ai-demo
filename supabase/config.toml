@@ -1,5 +1,8 @@
 project_id = "dejuwyeypiggvlyfliap"
 
+[functions.video-proxy]
+verify_jwt = false
+
 [functions.live-game-bot]
 verify_jwt = false
 on_schedule = "*/3 * * * *"

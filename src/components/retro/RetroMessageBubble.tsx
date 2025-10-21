@@ -285,38 +285,15 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                   </div>
                 ))
               ) : (message.embeds as any).type === 'video' && (message.embeds as any).url ? (
-                // Object format (highlights from fetch-highlights)
+                // Object format (highlights from fetch-highlights) - use proxy for ESPN videos
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30 bg-black">
-                  <video
-                    src={(message.embeds as any).url}
-                    poster={(message.embeds as any).thumbnail}
-                    className="absolute inset-0 w-full h-full object-contain"
-                    controls
-                    preload="metadata"
-                    crossOrigin="anonymous"
-                    onError={(e) => {
-                      console.error('[RetroMessageBubble] Video load error, showing thumbnail fallback:', (message.embeds as any).url);
-                      const container = e.currentTarget.parentElement;
-                      if (container) {
-                        e.currentTarget.style.display = 'none';
-                        const fallback = document.createElement('div');
-                        fallback.className = 'absolute inset-0 flex items-center justify-center cursor-pointer group';
-                        fallback.innerHTML = `
-                          <img src="${(message.embeds as any).thumbnail}" class="absolute inset-0 w-full h-full object-contain" />
-                          <div class="relative z-10 w-16 h-16 rounded-full bg-black/60 flex items-center justify-center group-hover:bg-black/80 transition-colors">
-                            <svg class="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                            </svg>
-                          </div>
-                        `;
-                        fallback.onclick = () => {
-                          e.currentTarget.style.display = 'block';
-                          e.currentTarget.load();
-                          fallback.remove();
-                        };
-                        container.appendChild(fallback);
-                      }
-                    }}
+                  <iframe
+                    src={`https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/video-proxy?url=${encodeURIComponent((message.embeds as any).url)}`}
+                    className="absolute inset-0 w-full h-full"
+                    allowFullScreen
+                    sandbox="allow-scripts allow-same-origin"
+                    title="Game Highlight"
+                    style={{ border: 'none' }}
                   />
                 </div>
               ) : null}
@@ -330,35 +307,13 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                 <XPostEmbed embedCode={message.embed_code} />
               ) : message.message_type === 'highlight' && message.embed_code.match(/\.(mp4|mov|webm)(\?|$)/i) ? (
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30 bg-black">
-                  <video
-                    src={message.embed_code}
-                    className="absolute inset-0 w-full h-full object-contain"
-                    controls
-                    preload="metadata"
-                    crossOrigin="anonymous"
-                    onError={(e) => {
-                      console.error('[RetroMessageBubble] Video load error, showing fallback:', message.embed_code);
-                      const container = e.currentTarget.parentElement;
-                      if (container) {
-                        e.currentTarget.style.display = 'none';
-                        const fallback = document.createElement('div');
-                        fallback.className = 'absolute inset-0 flex items-center justify-center bg-muted cursor-pointer';
-                        fallback.innerHTML = `
-                          <div class="w-16 h-16 rounded-full bg-black/60 flex items-center justify-center">
-                            <svg class="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                            </svg>
-                          </div>
-                          <p class="absolute bottom-4 text-xs text-white/80">Tap to retry</p>
-                        `;
-                        fallback.onclick = () => {
-                          e.currentTarget.style.display = 'block';
-                          e.currentTarget.load();
-                          fallback.remove();
-                        };
-                        container.appendChild(fallback);
-                      }
-                    }}
+                  <iframe
+                    src={`https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/video-proxy?url=${encodeURIComponent(message.embed_code)}`}
+                    className="absolute inset-0 w-full h-full"
+                    allowFullScreen
+                    sandbox="allow-scripts allow-same-origin"
+                    title="Game Highlight"
+                    style={{ border: 'none' }}
                   />
                 </div>
               ) : message.message_type === 'highlight' && (message.embed_code.includes('youtube.com') || message.embed_code.includes('youtu.be')) ? (
@@ -527,38 +482,15 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                   </div>
                 ))
               ) : (message.embeds as any).type === 'video' && (message.embeds as any).url ? (
-                // Object format (highlights from fetch-highlights)
+                // Object format (highlights from fetch-highlights) - use proxy for ESPN videos
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30 bg-black">
-                  <video
-                    src={(message.embeds as any).url}
-                    poster={(message.embeds as any).thumbnail}
-                    className="absolute inset-0 w-full h-full object-contain"
-                    controls
-                    preload="metadata"
-                    crossOrigin="anonymous"
-                    onError={(e) => {
-                      console.error('[RetroMessageBubble] Video load error, showing thumbnail fallback:', (message.embeds as any).url);
-                      const container = e.currentTarget.parentElement;
-                      if (container) {
-                        e.currentTarget.style.display = 'none';
-                        const fallback = document.createElement('div');
-                        fallback.className = 'absolute inset-0 flex items-center justify-center cursor-pointer group';
-                        fallback.innerHTML = `
-                          <img src="${(message.embeds as any).thumbnail}" class="absolute inset-0 w-full h-full object-contain" />
-                          <div class="relative z-10 w-16 h-16 rounded-full bg-black/60 flex items-center justify-center group-hover:bg-black/80 transition-colors">
-                            <svg class="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                            </svg>
-                          </div>
-                        `;
-                        fallback.onclick = () => {
-                          e.currentTarget.style.display = 'block';
-                          e.currentTarget.load();
-                          fallback.remove();
-                        };
-                        container.appendChild(fallback);
-                      }
-                    }}
+                  <iframe
+                    src={`https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/video-proxy?url=${encodeURIComponent((message.embeds as any).url)}`}
+                    className="absolute inset-0 w-full h-full"
+                    allowFullScreen
+                    sandbox="allow-scripts allow-same-origin"
+                    title="Game Highlight"
+                    style={{ border: 'none' }}
                   />
                 </div>
               ) : null}
@@ -572,35 +504,13 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                 <XPostEmbed embedCode={message.embed_code} />
               ) : message.message_type === 'highlight' && message.embed_code.match(/\.(mp4|mov|webm)(\?|$)/i) ? (
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30 bg-black">
-                  <video
-                    src={message.embed_code}
-                    className="absolute inset-0 w-full h-full object-contain"
-                    controls
-                    preload="metadata"
-                    crossOrigin="anonymous"
-                    onError={(e) => {
-                      console.error('[RetroMessageBubble] Video load error, showing fallback:', message.embed_code);
-                      const container = e.currentTarget.parentElement;
-                      if (container) {
-                        e.currentTarget.style.display = 'none';
-                        const fallback = document.createElement('div');
-                        fallback.className = 'absolute inset-0 flex items-center justify-center bg-muted cursor-pointer';
-                        fallback.innerHTML = `
-                          <div class="w-16 h-16 rounded-full bg-black/60 flex items-center justify-center">
-                            <svg class="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                            </svg>
-                          </div>
-                          <p class="absolute bottom-4 text-xs text-white/80">Tap to retry</p>
-                        `;
-                        fallback.onclick = () => {
-                          e.currentTarget.style.display = 'block';
-                          e.currentTarget.load();
-                          fallback.remove();
-                        };
-                        container.appendChild(fallback);
-                      }
-                    }}
+                  <iframe
+                    src={`https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/video-proxy?url=${encodeURIComponent(message.embed_code)}`}
+                    className="absolute inset-0 w-full h-full"
+                    allowFullScreen
+                    sandbox="allow-scripts allow-same-origin"
+                    title="Game Highlight"
+                    style={{ border: 'none' }}
                   />
                 </div>
               ) : message.message_type === 'highlight' && (message.embed_code.includes('youtube.com') || message.embed_code.includes('youtu.be')) ? (
