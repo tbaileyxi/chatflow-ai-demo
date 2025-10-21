@@ -12,12 +12,14 @@ export function shouldPollNow(league: 'NFL' | 'NCAA'): boolean {
   const etHour = (utcHours - etOffset + 24) % 24;
   
   if (league === 'NFL') {
-    // Thursday Night Football (7pm-midnight ET) - extended for pregame
-    if (utcDay === 4 && etHour >= 19 && etHour <= 23) return true;
+    // Thursday Night Football (7pm-3am ET) - extended for pregame and late games
+    if (utcDay === 4 && etHour >= 19 && etHour <= 3) return true;
     // Sunday games (8am-midnight ET) - catch pregame shows + London games + all games
     if (utcDay === 0 && etHour >= 8 && etHour <= 23) return true;
-    // Monday Night Football (7pm-midnight ET) - extended for pregame
-    if (utcDay === 1 && etHour >= 19 && etHour <= 23) return true;
+    // Monday Night Football (7pm-3am ET) - extended for pregame and late games
+    if (utcDay === 1 && etHour >= 19 && etHour <= 3) return true;
+    // Tuesday early morning (12am-3am ET) for MNF games that go past midnight
+    if (utcDay === 2 && etHour >= 0 && etHour <= 3) return true;
   }
   
   if (league === 'NCAA') {
@@ -47,11 +49,17 @@ export function isNFLGameTime(): boolean {
   // Sunday games (8am-midnight ET for full coverage)
   if (utcDay === 0 && etHour >= 8 && etHour <= 23) return true;
   
-  // Monday Night Football (7pm-midnight ET)
-  if (utcDay === 1 && etHour >= 19 && etHour <= 23) return true;
+  // Monday Night Football (7pm-3am ET)
+  if (utcDay === 1 && etHour >= 19 && etHour <= 3) return true;
   
-  // Thursday Night Football (7pm-midnight ET)
-  if (utcDay === 4 && etHour >= 19 && etHour <= 23) return true;
+  // Tuesday early morning (12am-3am ET) for MNF games that go past midnight
+  if (utcDay === 2 && etHour >= 0 && etHour <= 3) return true;
+  
+  // Thursday Night Football (7pm-3am ET)
+  if (utcDay === 4 && etHour >= 19 && etHour <= 3) return true;
+  
+  // Friday early morning (12am-3am ET) for TNF games that go past midnight
+  if (utcDay === 5 && etHour >= 0 && etHour <= 3) return true;
   
   // Saturday games (December/January only, 1pm-midnight ET)
   if (utcDay === 6 && month >= 11 && etHour >= 13 && etHour <= 23) return true;
