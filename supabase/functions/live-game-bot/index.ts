@@ -1,5 +1,5 @@
 // Live game bot - monitors active games and posts updates to huddles
-// Updated: Force redeployment for time window and date range fixes
+// Updated: 2025-10-20 8:55 PM - Force redeploy for time window fixes and score updates
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createHighlightlyClient } from "../_shared/highlightly-client.ts";
