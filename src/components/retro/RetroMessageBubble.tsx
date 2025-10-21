@@ -293,6 +293,11 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                     className="absolute inset-0 w-full h-full object-contain bg-black"
                     controls
                     preload="metadata"
+                    crossOrigin="anonymous"
+                    onError={(e) => {
+                      console.error('[RetroMessageBubble] Video load error:', (message.embeds as any).url, e);
+                      e.currentTarget.style.display = 'none';
+                    }}
                   />
                 </div>
               ) : null}
@@ -311,6 +316,11 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                     className="absolute inset-0 w-full h-full object-contain bg-black"
                     controls
                     preload="metadata"
+                    crossOrigin="anonymous"
+                    onError={(e) => {
+                      console.error('[RetroMessageBubble] Video load error:', message.embed_code, e);
+                      e.currentTarget.style.display = 'none';
+                    }}
                   />
                 </div>
               ) : message.message_type === 'highlight' && (message.embed_code.includes('youtube.com') || message.embed_code.includes('youtu.be')) ? (
@@ -487,6 +497,11 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                     className="absolute inset-0 w-full h-full object-contain bg-black"
                     controls
                     preload="metadata"
+                    crossOrigin="anonymous"
+                    onError={(e) => {
+                      console.error('[RetroMessageBubble] Video load error:', (message.embeds as any).url, e);
+                      e.currentTarget.style.display = 'none';
+                    }}
                   />
                 </div>
               ) : null}
@@ -505,6 +520,11 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                     className="absolute inset-0 w-full h-full object-contain bg-black"
                     controls
                     preload="metadata"
+                    crossOrigin="anonymous"
+                    onError={(e) => {
+                      console.error('[RetroMessageBubble] Video load error:', message.embed_code, e);
+                      e.currentTarget.style.display = 'none';
+                    }}
                   />
                 </div>
               ) : message.message_type === 'highlight' && (message.embed_code.includes('youtube.com') || message.embed_code.includes('youtu.be')) ? (

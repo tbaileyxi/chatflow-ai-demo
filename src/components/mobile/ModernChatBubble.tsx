@@ -233,6 +233,11 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
                         className="absolute inset-0 w-full h-full object-contain bg-black"
                         controls
                         preload="metadata"
+                        crossOrigin="anonymous"
+                        onError={(e) => {
+                          console.error('[ModernChatBubble] Video load error:', message.embed_code, e);
+                          e.currentTarget.style.display = 'none';
+                        }}
                       />
                     </div>
                   ) : message.message_type === 'highlight' && (message.embed_code.includes('youtube.com') || message.embed_code.includes('youtu.be')) ? (
@@ -261,6 +266,11 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
                         className="absolute inset-0 w-full h-full object-contain bg-black"
                         controls
                         preload="metadata"
+                        crossOrigin="anonymous"
+                        onError={(e) => {
+                          console.error('[ModernChatBubble] Video load error:', message.embeds.url, e);
+                          e.currentTarget.style.display = 'none';
+                        }}
                       />
                     </div>
                   ) : null}
