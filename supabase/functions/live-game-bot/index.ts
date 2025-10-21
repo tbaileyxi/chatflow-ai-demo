@@ -81,7 +81,9 @@ serve(async (req) => {
 
     const highlightly = createHighlightlyClient();
 
-    console.log("Starting live game bot polling...");
+    const now = new Date();
+    const etTime = now.toLocaleString("en-US", { timeZone: "America/New_York" });
+    console.log(`🚀 Live game bot started at ${etTime} ET - monitoring all active games`);
 
     // Clean up old entries from in-memory cache
     cleanupCache();
@@ -122,9 +124,9 @@ serve(async (req) => {
   }
 });
 
-// Match data cache to reduce API calls
+// Match data cache to reduce API calls - extended cache for better performance
 const matchCache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
+const CACHE_DURATION = 3 * 60 * 1000; // 3 minutes - extended to reduce API load
 
 async function pollLeague(
   league: "NFL" | "NCAA",
