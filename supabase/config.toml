@@ -1,8 +1,5 @@
 project_id = "dejuwyeypiggvlyfliap"
 
-[functions.video-proxy]
-verify_jwt = false
-
 [functions.live-game-bot]
 verify_jwt = false
 on_schedule = "*/3 * * * *"
@@ -36,10 +33,3 @@ on_schedule = "*/10 * * * *"
 [functions.pickem-backfill-week1]
 verify_jwt = false
 
-[functions.sync-highlightly-teams]
-verify_jwt = false
-on_schedule = "0 2 * * *"
-
-[functions.fetch-highlights]
-verify_jwt = false
-on_schedule = "*/5 * * * *"
