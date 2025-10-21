@@ -24,6 +24,7 @@ interface RetroMessageBubbleProps {
     media_url?: string;
     media_type?: string;
     embed_code?: string;
+    message_type?: string;
     poll_data?: {
       question: string;
       options: Array<{
@@ -289,6 +290,15 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             <div className="mt-3">
               {isXEmbed(message.embed_code) ? (
                 <XPostEmbed embedCode={message.embed_code} />
+              ) : message.message_type === 'highlight' && (message.embed_code.includes('youtube.com') || message.embed_code.includes('youtu.be')) ? (
+                <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30">
+                  <iframe
+                    src={message.embed_code}
+                    className="absolute inset-0 w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
               ) : (
                 <div 
                   className="retro-embed"
@@ -451,6 +461,15 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             <div className="mt-2">
               {isXEmbed(message.embed_code) ? (
                 <XPostEmbed embedCode={message.embed_code} />
+              ) : message.message_type === 'highlight' && (message.embed_code.includes('youtube.com') || message.embed_code.includes('youtu.be')) ? (
+                <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30">
+                  <iframe
+                    src={message.embed_code}
+                    className="absolute inset-0 w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
               ) : (
                 <div 
                   className="retro-embed"

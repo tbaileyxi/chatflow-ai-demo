@@ -4,7 +4,7 @@
  * Runs every 5 minutes via cron schedule to fetch highlights from Highlightly API
  * Posts highlights to team huddles and spotlight feed during active games
  * 
- * Last Updated: 2025-10-19 9:15 PM
+ * Last Updated: 2025-10-20 - Force redeployment for video embed rendering
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
