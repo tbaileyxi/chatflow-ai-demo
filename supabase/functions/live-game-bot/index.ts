@@ -2,8 +2,36 @@
 // Updated: 2025-10-20 8:55 PM - Force redeploy for time window fixes and score updates
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { createHighlightlyClient } from "../_shared/highlightly-client.ts";
 import { shouldPollNow } from "../_shared/game-schedule.ts";
+
+// Highlightly API client
+function createHighlightlyClient() {
+  const apiKey = Deno.env.get("HIGHLIGHTLY_API_KEY");
+  const baseUrl = "https://api.highlightly.net";
+
+  return {
+    async getMatches(params: { league?: string; date?: string; season?: number; limit?: number }) {
+      const url = new URL(`${baseUrl}/matches`);
+      if (params.league) url.searchParams.append("league", params.league);
+      if (params.date) url.searchParams.append("date", params.date);
+      if (params.season) url.searchParams.append("season", params.season.toString());
+      if (params.limit) url.searchParams.append("limit", params.limit.toString());
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Highlightly API error: ${response.status}`);
+      }
+
+      return await response.json();
+    },
+  };
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
