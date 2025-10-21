@@ -226,7 +226,44 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
               {/* Embed Content - only render if not Pick 'Em */}
               {message.embed_code && !parsePickEmMessage(message) && (
                 <div className="mt-2 w-full overflow-hidden">
-                  <XPostEmbed embedCode={message.embed_code} />
+                  {message.message_type === 'highlight' && message.embed_code.match(/\.(mp4|mov|webm)(\?|$)/i) ? (
+                    <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-border">
+                      <video
+                        src={message.embed_code}
+                        className="absolute inset-0 w-full h-full object-contain bg-black"
+                        controls
+                        preload="metadata"
+                      />
+                    </div>
+                  ) : message.message_type === 'highlight' && (message.embed_code.includes('youtube.com') || message.embed_code.includes('youtu.be')) ? (
+                    <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-border">
+                      <iframe
+                        src={message.embed_code}
+                        className="absolute inset-0 w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <XPostEmbed embedCode={message.embed_code} />
+                  )}
+                </div>
+              )}
+
+              {/* Also handle embeds object format for highlights */}
+              {message.embeds && !parsePickEmMessage(message) && (
+                <div className="mt-2 w-full overflow-hidden">
+                  {!Array.isArray(message.embeds) && message.embeds.type === 'video' && message.embeds.url ? (
+                    <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-border">
+                      <video
+                        src={message.embeds.url}
+                        poster={message.embeds.thumbnail}
+                        className="absolute inset-0 w-full h-full object-contain bg-black"
+                        controls
+                        preload="metadata"
+                      />
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>

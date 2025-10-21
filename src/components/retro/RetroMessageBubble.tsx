@@ -272,16 +272,30 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             </p>
           </div>
           
-          {/* New embeds array format */}
-          {message.embeds && message.embeds.length > 0 && (
+          {/* New embeds - handle both array and object formats */}
+          {message.embeds && (
             <div className="mt-3 space-y-2">
-              {message.embeds.map((embed, idx) => (
-                <div key={idx}>
-                  {embed.embed_type === 'x' && embed.embed_code && (
-                    <XPostEmbed embedCode={embed.embed_code} />
-                  )}
+              {Array.isArray(message.embeds) ? (
+                // Array format (old style)
+                message.embeds.map((embed, idx) => (
+                  <div key={idx}>
+                    {embed.embed_type === 'x' && embed.embed_code && (
+                      <XPostEmbed embedCode={embed.embed_code} />
+                    )}
+                  </div>
+                ))
+              ) : (message.embeds as any).type === 'video' && (message.embeds as any).url ? (
+                // Object format (highlights from fetch-highlights)
+                <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30">
+                  <video
+                    src={(message.embeds as any).url}
+                    poster={(message.embeds as any).thumbnail}
+                    className="absolute inset-0 w-full h-full object-contain bg-black"
+                    controls
+                    preload="metadata"
+                  />
                 </div>
-              ))}
+              ) : null}
             </div>
           )}
           
@@ -452,16 +466,30 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             </div>
           )}
 
-          {/* Embeds - New embeds array format */}
-          {message.embeds && message.embeds.length > 0 && (
+          {/* Embeds - handle both array and object formats */}
+          {message.embeds && (
             <div className="mt-2 space-y-2">
-              {message.embeds.map((embed, idx) => (
-                <div key={idx}>
-                  {embed.embed_type === 'x' && embed.embed_code && (
-                    <XPostEmbed embedCode={embed.embed_code} />
-                  )}
+              {Array.isArray(message.embeds) ? (
+                // Array format (old style)
+                message.embeds.map((embed, idx) => (
+                  <div key={idx}>
+                    {embed.embed_type === 'x' && embed.embed_code && (
+                      <XPostEmbed embedCode={embed.embed_code} />
+                    )}
+                  </div>
+                ))
+              ) : (message.embeds as any).type === 'video' && (message.embeds as any).url ? (
+                // Object format (highlights from fetch-highlights)
+                <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30">
+                  <video
+                    src={(message.embeds as any).url}
+                    poster={(message.embeds as any).thumbnail}
+                    className="absolute inset-0 w-full h-full object-contain bg-black"
+                    controls
+                    preload="metadata"
+                  />
                 </div>
-              ))}
+              ) : null}
             </div>
           )}
           
