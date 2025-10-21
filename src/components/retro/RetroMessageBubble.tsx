@@ -290,6 +290,15 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             <div className="mt-3">
               {isXEmbed(message.embed_code) ? (
                 <XPostEmbed embedCode={message.embed_code} />
+              ) : message.message_type === 'highlight' && message.embed_code.match(/\.(mp4|mov|webm)(\?|$)/i) ? (
+                <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30">
+                  <video
+                    src={message.embed_code}
+                    className="absolute inset-0 w-full h-full object-contain bg-black"
+                    controls
+                    preload="metadata"
+                  />
+                </div>
               ) : message.message_type === 'highlight' && (message.embed_code.includes('youtube.com') || message.embed_code.includes('youtu.be')) ? (
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30">
                   <iframe
@@ -461,6 +470,15 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             <div className="mt-2">
               {isXEmbed(message.embed_code) ? (
                 <XPostEmbed embedCode={message.embed_code} />
+              ) : message.message_type === 'highlight' && message.embed_code.match(/\.(mp4|mov|webm)(\?|$)/i) ? (
+                <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30">
+                  <video
+                    src={message.embed_code}
+                    className="absolute inset-0 w-full h-full object-contain bg-black"
+                    controls
+                    preload="metadata"
+                  />
+                </div>
               ) : message.message_type === 'highlight' && (message.embed_code.includes('youtube.com') || message.embed_code.includes('youtu.be')) ? (
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30">
                   <iframe
