@@ -139,6 +139,44 @@ export type Database = {
         }
         Relationships: []
       }
+      huddle_chatbot_settings: {
+        Row: {
+          created_at: string | null
+          huddle_id: string
+          id: string
+          is_enabled: boolean
+          personality: string | null
+          response_max_words: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          huddle_id: string
+          id?: string
+          is_enabled?: boolean
+          personality?: string | null
+          response_max_words?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          huddle_id?: string
+          id?: string
+          is_enabled?: boolean
+          personality?: string | null
+          response_max_words?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "huddle_chatbot_settings_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: true
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       huddle_join_requests: {
         Row: {
           created_at: string

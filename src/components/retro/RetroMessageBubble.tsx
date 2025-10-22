@@ -1,6 +1,7 @@
 import React, { memo, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatDistanceToNow } from 'date-fns';
@@ -258,7 +259,9 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-black animate-pulse" />
-              <span className="font-bold text-xs tracking-wider uppercase text-black">Live Update</span>
+              <span className="font-bold text-xs tracking-wider uppercase text-black">
+                {message.message_type === 'coach_response' ? '🤖 Coach' : 'Live Update'}
+              </span>
             </div>
             <div className="flex items-center gap-1 text-sm text-gray-600">
               {formattedTime}

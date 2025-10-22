@@ -4,6 +4,9 @@ project_id = "dejuwyeypiggvlyfliap"
 verify_jwt = false
 on_schedule = "*/3 * * * *"
 
+[functions.team-chatbot]
+verify_jwt = false
+
 [functions.create-huddle-subscription]
 verify_jwt = true
 

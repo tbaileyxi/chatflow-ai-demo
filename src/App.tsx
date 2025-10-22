@@ -24,6 +24,7 @@ import { MobileHome } from "./pages/MobileHome";
 import { MobileSpotlight } from "./pages/MobileSpotlight";
 import { MobileChat } from "./pages/MobileChat";
 import { HuddleSettings } from "./pages/HuddleSettings";
+import { HuddleCoachSettings } from "./pages/HuddleCoachSettings";
 import FAQ from "./pages/FAQ";
 import { RetroDemo } from "./pages/RetroDemo";
 
@@ -56,6 +57,7 @@ const AppContent = () => {
           <Route path="/teams/:teamId" element={<TeamFeed />} />
           <Route path="/huddle/:huddleId" element={<Huddle />} />
           <Route path="/huddle/:huddleId/settings" element={<HuddleSettings />} />
+          <Route path="/huddle/:huddleId/coach-settings" element={<HuddleCoachSettings />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/join-huddle/:huddleId" element={<JoinHuddle />} />
           <Route path="/huddle-search" element={<HuddleSearch />} />

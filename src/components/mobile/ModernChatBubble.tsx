@@ -153,14 +153,21 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
             "flex items-center gap-3 mb-2 flex-wrap",
             isOwnMessage ? "justify-end" : "justify-start"
           )}>
-            <span className="text-sm font-semibold text-foreground">
-              {message.is_bot_message
-                ? 'Game Bot'
-                : message.is_team_agent_message
-                  ? (message.origin_teams?.name || 'Team')
-                  : (message.profiles?.display_name || message.profiles?.username || `User ${message.user_id.slice(0, 8)}`)
-              }
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">
+                {message.is_bot_message
+                  ? 'Game Bot'
+                  : message.is_team_agent_message
+                    ? (message.origin_teams?.name || 'Team')
+                    : (message.profiles?.display_name || message.profiles?.username || `User ${message.user_id.slice(0, 8)}`)
+                }
+              </span>
+              {message.message_type === 'coach_response' && (
+                <Badge className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs">
+                  🤖 Coach
+                </Badge>
+              )}
+            </div>
             <span className="text-xs text-muted-foreground">
               {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
             </span>

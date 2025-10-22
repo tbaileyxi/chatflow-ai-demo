@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, LogOut, Trash2, Shield, Users, Zap } from 'lucide-react';
+import { Settings, LogOut, Trash2, Shield, Users, Zap, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -198,6 +198,11 @@ export const HuddleSettingsDropdown: React.FC<HuddleSettingsDropdownProps> = ({
               <DropdownMenuItem onClick={() => navigate(`/huddle/${huddleId}/settings`)}>
                 <Zap className="mr-2 h-4 w-4" />
                 Pick'Em Settings
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onClick={() => navigate(`/huddle/${huddleId}/coach-settings`)}>
+                <Bot className="mr-2 h-4 w-4" />
+                Coach Settings
               </DropdownMenuItem>
 
               <DropdownMenuSeparator />
