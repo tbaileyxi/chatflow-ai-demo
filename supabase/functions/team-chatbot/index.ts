@@ -6,6 +6,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper: Parse temporal queries like "last night", "yesterday", "last week"
+function parseTemporalQuery(query: string): string {
+  const queryLower = query.toLowerCase();
+  const today = new Date();
+  
+  if (queryLower.includes('last night') || queryLower.includes('yesterday')) {
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday.toISOString().split('T')[0];
+  }
+  
+  if (queryLower.includes('last week')) {
+    const lastWeek = new Date(today);
+    lastWeek.setDate(lastWeek.getDate() - 7);
+    return lastWeek.toISOString().split('T')[0];
+  }
+  
+  // Default to today
+  return today.toISOString().split('T')[0];
+}
+
 // Highlightly API client
 function createHighlightlyClient() {
   const apiKey = Deno.env.get("HIGHLIGHTLY_API_KEY");
@@ -172,11 +193,11 @@ serve(async (req) => {
     const highlightly = createHighlightlyClient();
 
     try {
-      if (queryLower.includes('score') || queryLower.includes('game') || queryLower.includes('live')) {
-        const today = new Date().toISOString().split('T')[0];
-        const matches = await highlightly.getMatches({ team: teamName, date: today, limit: 1 });
+      if (queryLower.includes('score') || queryLower.includes('game') || queryLower.includes('live') || queryLower.includes('won') || queryLower.includes('win')) {
+        const targetDate = parseTemporalQuery(userQuery);
+        const matches = await highlightly.getMatches({ team: teamName, date: targetDate, limit: 1 });
         if (matches?.length > 0) {
-          highlightlyData += `\nLIVE GAME:\n${JSON.stringify(matches[0], null, 2)}`;
+          highlightlyData += `\nGAME DATA:\n${JSON.stringify(matches[0], null, 2)}`;
         }
       }
 
@@ -216,7 +237,14 @@ serve(async (req) => {
       }
     } catch (error) {
       console.error('Highlightly API error:', error);
-      highlightlyData += '\n[Some data unavailable]';
+      
+      // Distinguish network/egress errors from other issues
+      const errorMessage = error instanceof Error ? error.message : '';
+      if (errorMessage.includes('dns') || errorMessage.includes('network') || errorMessage.includes('lookup')) {
+        highlightlyData += '\n[Live data temporarily unavailable - network issue. Operating on cached knowledge.]';
+      } else {
+        highlightlyData += '\n[Some data unavailable]';
+      }
     }
 
     // Build personality-based system prompt
@@ -227,6 +255,14 @@ serve(async (req) => {
     };
 
     const systemPrompt = `${personalityPrompts[settings.personality as keyof typeof personalityPrompts] || personalityPrompts.hype}
+
+**CRITICAL CONTEXT:**
+- You are the dedicated coach for ${teamName} (${league})
+- This is the ${huddle.name} huddle
+- ALL questions should be interpreted as being about ${teamName} unless explicitly stated otherwise
+- When users ask "who won last night?" they mean "${teamName}'s game last night"
+- When users ask "our team", "we", or "us" they mean ${teamName}
+- When users mention just a team name without context, assume they're asking about ${teamName} vs that team
 
 Current Context:
 - Team: ${teamName} (${league})
