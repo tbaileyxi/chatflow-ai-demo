@@ -195,7 +195,7 @@ serve(async (req) => {
     try {
       if (queryLower.includes('score') || queryLower.includes('game') || queryLower.includes('live') || queryLower.includes('won') || queryLower.includes('win')) {
         const targetDate = parseTemporalQuery(userQuery);
-        const matches = await highlightly.getMatches({ team: teamName, date: targetDate, limit: 1 });
+        const matches = await highlightly.getMatches({ team: teamName, league: league, date: targetDate, limit: 1 });
         if (matches?.length > 0) {
           highlightlyData += `\nGAME DATA:\n${JSON.stringify(matches[0], null, 2)}`;
         }
@@ -218,7 +218,7 @@ serve(async (req) => {
 
       if (queryLower.includes('odd') || queryLower.includes('bet') || queryLower.includes('line') || queryLower.includes('spread')) {
         const today = new Date().toISOString().split('T')[0];
-        const matches = await highlightly.getMatches({ team: teamName, date: today, limit: 1 });
+        const matches = await highlightly.getMatches({ team: teamName, league: league, date: today, limit: 1 });
         if (matches?.length > 0 && matches[0].id) {
           const odds = await highlightly.getMatchOdds(matches[0].id);
           if (odds) {
@@ -230,7 +230,7 @@ serve(async (req) => {
       if (queryLower.match(/\d{4}/) || queryLower.includes('history') || queryLower.includes('past')) {
         const yearMatch = userQuery.match(/\d{4}/);
         const season = yearMatch ? parseInt(yearMatch[0]) : new Date().getFullYear() - 1;
-        const matches = await highlightly.getMatches({ team: teamName, season, limit: 10 });
+        const matches = await highlightly.getMatches({ team: teamName, league: league, season, limit: 10 });
         if (matches?.length > 0) {
           highlightlyData += `\nHISTORICAL GAMES (${season}):\n${JSON.stringify(matches, null, 2)}`;
         }
@@ -276,12 +276,13 @@ User Query: "${userQuery}"
 
 Rules:
 1. Answer the question directly in the first sentence (be specific!)
-2. Add 1 fun fact, stat, or insight
-3. End with an engaging question to spark discussion
+2. Add 1 fun fact, stat, or insight if relevant
+3. Keep it conversational and natural - NO forced questions at the end
 4. Use team slang and emojis sparingly (🏈🔥💪)
 5. If data is missing, say "Checking the wires—stand by!" and suggest follow-up
 6. Stay under ${settings.response_max_words} words
 7. If the query is off-topic or unclear, respond playfully: "Huddle alert! Hit me with a real question about ${teamName}. What's up?"
+8. This is FOOTBALL ONLY - ${league} football. Never discuss other sports.
 
 Keep it concise and engaging. Let's coach them up!`;
 
