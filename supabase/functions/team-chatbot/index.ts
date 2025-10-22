@@ -96,7 +96,82 @@ function createHighlightlyClient() {
       });
       if (!response.ok) return null;
       return await response.json();
-    }
+    },
+
+    async getStandings(params: { league?: string; season?: number }) {
+      const url = new URL(`${baseUrl}/standings`);
+      if (params.league) url.searchParams.append("league", params.league);
+      if (params.season) url.searchParams.append("season", params.season.toString());
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    },
+
+    async getLineups(matchId: number) {
+      const response = await fetch(`${baseUrl}/matches/${matchId}/lineups`, {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    },
+
+    async getHighlights(params: { team?: string; match?: number; limit?: number }) {
+      const url = new URL(`${baseUrl}/highlights`);
+      if (params.team) url.searchParams.append("team", params.team);
+      if (params.match) url.searchParams.append("match", params.match.toString());
+      if (params.limit) url.searchParams.append("limit", params.limit.toString());
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    },
+
+    async getPlayerStats(params: { team?: string; player?: string; season?: number; league?: string }) {
+      const url = new URL(`${baseUrl}/players/stats`);
+      if (params.team) url.searchParams.append("team", params.team);
+      if (params.player) url.searchParams.append("player", params.player);
+      if (params.season) url.searchParams.append("season", params.season.toString());
+      if (params.league) url.searchParams.append("league", params.league);
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    },
+
+    async getHeadToHead(team1: string, team2: string, league?: string) {
+      const url = new URL(`${baseUrl}/head-to-head`);
+      url.searchParams.append("team1", team1);
+      url.searchParams.append("team2", team2);
+      if (league) url.searchParams.append("league", league);
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    },
   };
 }
 
@@ -235,6 +310,60 @@ serve(async (req) => {
           highlightlyData += `\nHISTORICAL GAMES (${season}):\n${JSON.stringify(matches, null, 2)}`;
         }
       }
+
+      // Highlights detection
+      if (queryLower.includes('highlight') || queryLower.includes('recap') || queryLower.includes('video') || queryLower.includes('clip')) {
+        const targetDate = parseTemporalQuery(userQuery);
+        const matches = await highlightly.getMatches({ team: teamName, league: league, date: targetDate, limit: 1 });
+        if (matches?.length > 0 && matches[0].id) {
+          const highlights = await highlightly.getHighlights({ match: matches[0].id, limit: 5 });
+          if (highlights) {
+            highlightlyData += `\nHIGHLIGHTS:\n${JSON.stringify(highlights, null, 2)}`;
+          }
+        }
+      }
+
+      // Standings detection
+      if (queryLower.includes('standing') || queryLower.includes('rank') || queryLower.includes('position') || queryLower.includes('place') || queryLower.includes('table')) {
+        const currentYear = new Date().getFullYear();
+        const standings = await highlightly.getStandings({ league: league, season: currentYear });
+        if (standings) {
+          highlightlyData += `\nSTANDINGS:\n${JSON.stringify(standings, null, 2)}`;
+        }
+      }
+
+      // Lineups detection
+      if (queryLower.includes('lineup') || queryLower.includes('starting') || queryLower.includes('roster') || queryLower.includes('who is playing')) {
+        const targetDate = parseTemporalQuery(userQuery);
+        const matches = await highlightly.getMatches({ team: teamName, league: league, date: targetDate, limit: 1 });
+        if (matches?.length > 0 && matches[0].id) {
+          const lineups = await highlightly.getLineups(matches[0].id);
+          if (lineups) {
+            highlightlyData += `\nLINEUPS:\n${JSON.stringify(lineups, null, 2)}`;
+          }
+        }
+      }
+
+      // Player stats detection
+      if (queryLower.includes('player') || queryLower.match(/\b(quarterback|qb|running back|rb|receiver|wr|defense|linebacker|safety|cornerback)\b/)) {
+        const currentYear = new Date().getFullYear();
+        const playerStats = await highlightly.getPlayerStats({ team: teamName, season: currentYear, league: league });
+        if (playerStats) {
+          highlightlyData += `\nPLAYER STATS:\n${JSON.stringify(playerStats, null, 2)}`;
+        }
+      }
+
+      // Head to head detection
+      if (queryLower.includes('vs') || queryLower.includes('versus') || queryLower.includes('against')) {
+        const opponentMatch = userQuery.match(/(?:vs|versus|against)\s+([A-Za-z\s]+)/i);
+        if (opponentMatch) {
+          const opponent = opponentMatch[1].trim();
+          const h2h = await highlightly.getHeadToHead(teamName, opponent, league);
+          if (h2h) {
+            highlightlyData += `\nHEAD-TO-HEAD:\n${JSON.stringify(h2h, null, 2)}`;
+          }
+        }
+      }
     } catch (error) {
       console.error('Highlightly API error:', error);
       
@@ -244,6 +373,43 @@ serve(async (req) => {
         highlightlyData += '\n[Live data temporarily unavailable - network issue. Operating on cached knowledge.]';
       } else {
         highlightlyData += '\n[Some data unavailable]';
+      }
+    }
+
+    // Web search fallback if no Highlightly data found
+    if (!highlightlyData || highlightlyData.trim() === '' || highlightlyData.includes('[Some data unavailable]')) {
+      console.log('📡 No Highlightly data found, attempting web search fallback...');
+      
+      try {
+        const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+        
+        const searchResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${lovableApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              { 
+                role: 'system', 
+                content: `You are a sports data researcher. Search the web for current information about: ${teamName} ${league} football. Focus on facts, stats, and recent news. Return structured data when possible.` 
+              },
+              { role: 'user', content: userQuery }
+            ],
+          }),
+        });
+        
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          const webContent = searchData.choices?.[0]?.message?.content || '';
+          if (webContent) {
+            highlightlyData += `\n\nWEB SEARCH RESULTS:\n${webContent}`;
+          }
+        }
+      } catch (searchError) {
+        console.error('Web search fallback error:', searchError);
       }
     }
 
@@ -263,6 +429,18 @@ serve(async (req) => {
 - When users ask "who won last night?" they mean "${teamName}'s game last night"
 - When users ask "our team", "we", or "us" they mean ${teamName}
 - When users mention just a team name without context, assume they're asking about ${teamName} vs that team
+
+**AVAILABLE DATA SOURCES:**
+- Live scores and game results
+- Team statistics and season data
+- Injury reports
+- Betting odds and spreads
+- Video highlights and game recaps
+- League standings and rankings
+- Player statistics and performance
+- Starting lineups and rosters
+- Head-to-head history
+- Web search for additional context
 
 Current Context:
 - Team: ${teamName} (${league})

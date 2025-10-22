@@ -1406,7 +1406,7 @@ export type Database = {
         Returns: number
       }
       get_current_user_role: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
       get_huddle_subscription_status: {
@@ -1417,10 +1417,7 @@ export type Database = {
           status: string
         }[]
       }
-      get_or_create_system_user: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      get_or_create_system_user: { Args: never; Returns: string }
       get_pickem_leaderboard: {
         Args: { target_instance_id: string }
         Returns: {
