@@ -235,7 +235,7 @@ export const ModernMessageBubble = memo(({
               {showContent && (
                 <div className={cn(
                   "whitespace-pre-wrap break-words leading-relaxed",
-                  (message.is_bot_message || message.is_team_agent_message || message.message_type === 'coach_response') && "font-share-tech text-sm"
+                  (message.is_bot_message || message.is_team_agent_message || message.message_type === 'coach_response') && "font-share-tech text-base"
                 )}>
                   {contentWithoutTags}
                 </div>

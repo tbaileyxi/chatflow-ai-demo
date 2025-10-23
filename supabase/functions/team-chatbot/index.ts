@@ -269,6 +269,32 @@ serve(async (req) => {
     let highlightlyWorking = true;
 
     try {
+      // NEXT GAME / UPCOMING SCHEDULE detection (HIGH PRIORITY)
+      if (queryLower.includes('next game') || queryLower.includes('upcoming') || queryLower.includes('when do') || queryLower.includes('when does')) {
+        console.log('🔍 Detected next game query');
+        const today = new Date().toISOString().split('T')[0];
+        const nextMonth = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        
+        // Try to get upcoming matches from Highlightly
+        const upcomingMatches = await highlightly.getMatches({ 
+          team: teamName, 
+          league: league, 
+          limit: 10
+        });
+        
+        if (upcomingMatches?.length > 0) {
+          // Filter for future games only
+          const futureGames = upcomingMatches.filter((match: any) => {
+            const matchDate = new Date(match.date || match.start_time);
+            return matchDate > new Date();
+          });
+          
+          if (futureGames.length > 0) {
+            highlightlyData += `\nUPCOMING GAMES:\n${JSON.stringify(futureGames.slice(0, 3), null, 2)}`;
+          }
+        }
+      }
+
       if (queryLower.includes('score') || queryLower.includes('game') || queryLower.includes('live') || queryLower.includes('won') || queryLower.includes('win')) {
         const targetDate = parseTemporalQuery(userQuery);
         const matches = await highlightly.getMatches({ team: teamName, league: league, date: targetDate, limit: 1 });
@@ -388,8 +414,13 @@ serve(async (req) => {
         const currentYear = new Date().getFullYear();
         const currentDate = new Date().toISOString().split('T')[0];
         
-        // Create a more specific search query for current roster/game data
-        const searchQuery = `${teamName} ${league} ${currentYear} season roster quarterback starting lineup ${userQuery}`;
+        // Detect if this is a "next game" query
+        const isNextGameQuery = queryLower.includes('next') || queryLower.includes('upcoming') || queryLower.includes('schedule') || queryLower.includes('when');
+        
+        // Create a more specific search query
+        const searchQuery = isNextGameQuery 
+          ? `${teamName} ${league} next scheduled game after October 23 2025 upcoming opponent date time location`
+          : `${teamName} ${league} ${currentYear} season roster quarterback starting lineup ${userQuery}`;
         
         const searchResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
@@ -402,7 +433,13 @@ serve(async (req) => {
             messages: [
               { 
                 role: 'system', 
-                content: `You are a sports data researcher. The current date is ${currentDate}. 
+                content: isNextGameQuery
+                  ? `You are a sports data researcher. TODAY IS OCTOBER 23, 2025.
+Search for the NEXT UPCOMING SCHEDULED GAME for ${teamName} (${league}).
+Find games scheduled AFTER October 23, 2025.
+Return: opponent name, date, time, location.
+DO NOT return past games or games from previous seasons.`
+                  : `You are a sports data researcher. The current date is ${currentDate}. 
 Search for CURRENT ${currentYear} season information about: ${searchQuery}. 
 Focus on: current roster, starting lineup, recent games, and ${currentYear} season stats.
 Return factual data with sources and dates. If data is from a previous season, explicitly state that.
@@ -458,6 +495,7 @@ Prioritize roster information including quarterbacks and key players for the ${c
 
 **AVAILABLE DATA SOURCES:**
 - Live scores and game results
+- Upcoming game schedules
 - Team statistics and season data
 - Injury reports
 - Betting odds and spreads
@@ -481,14 +519,16 @@ User Query: "${userQuery}"
 
 Rules:
 1. Start with the direct factual answer - NO preamble or hype
-2. Current date is ${formattedDate} - use ${currentYear} season data ONLY
-3. If you lack current data, say "I don't have confirmed ${currentYear} data for that" instead of guessing
-4. Keep responses under ${settings.response_max_words} words - prioritize facts over personality
-5. Use minimal emojis (max 1-2 per response)
-6. NO forced questions at the end
-7. NO "Let's go [team]!" or similar rally cries unless naturally relevant
-8. This is ${league} football only - never discuss other sports
-9. If query asks about rosters/players, ALWAYS verify it's ${currentYear} data before answering
+2. TODAY IS OCTOBER 23, 2025 - use 2025 season data ONLY
+3. If asked about "next game" and you don't have schedule data, say: "I don't have the confirmed schedule yet. Check the official ${teamName} schedule page for the latest updates."
+4. If you lack current data, say "I don't have confirmed ${currentYear} data for that" instead of guessing
+5. Keep responses under ${settings.response_max_words} words - prioritize facts over personality
+6. Use minimal emojis (max 1-2 per response)
+7. NO forced questions at the end
+8. NO "Let's go [team]!" or similar rally cries unless naturally relevant
+9. This is ${league} football only - never discuss other sports
+10. NEVER return data from previous seasons without clearly stating the year
+11. If query asks about rosters/players, ALWAYS verify it's ${currentYear} data before answering
 
 If you don't have reliable current data, respond: "I don't have confirmed ${currentYear} info on that yet. Let me check the latest sources."`;
 
