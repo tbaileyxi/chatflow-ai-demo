@@ -266,6 +266,7 @@ serve(async (req) => {
     const queryLower = userQuery.toLowerCase();
     let highlightlyData = '';
     const highlightly = createHighlightlyClient();
+    let highlightlyWorking = true;
 
     try {
       if (queryLower.includes('score') || queryLower.includes('game') || queryLower.includes('live') || queryLower.includes('won') || queryLower.includes('win')) {
@@ -365,23 +366,30 @@ serve(async (req) => {
         }
       }
     } catch (error) {
-      console.error('Highlightly API error:', error);
+      console.error('⚠️ Highlightly API error:', error);
+      highlightlyWorking = false;
       
       // Distinguish network/egress errors from other issues
       const errorMessage = error instanceof Error ? error.message : '';
       if (errorMessage.includes('dns') || errorMessage.includes('network') || errorMessage.includes('lookup')) {
-        highlightlyData += '\n[Live data temporarily unavailable - network issue. Operating on cached knowledge.]';
+        console.warn('⚠️ Highlightly DNS/network failure - will rely on web search');
+        highlightlyData += '\n[Live API data temporarily unavailable - using web search]';
       } else {
         highlightlyData += '\n[Some data unavailable]';
       }
     }
 
-    // Web search fallback if no Highlightly data found
-    if (!highlightlyData || highlightlyData.trim() === '' || highlightlyData.includes('[Some data unavailable]')) {
-      console.log('📡 No Highlightly data found, attempting web search fallback...');
+    // Web search fallback if no Highlightly data found or API is down
+    if (!highlightlyData || highlightlyData.trim() === '' || highlightlyData.includes('[Some data unavailable]') || !highlightlyWorking) {
+      console.log('📡 Attempting enhanced web search for current season data...');
       
       try {
         const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+        const currentYear = new Date().getFullYear();
+        const currentDate = new Date().toISOString().split('T')[0];
+        
+        // Create a more specific search query for current roster/game data
+        const searchQuery = `${teamName} ${league} ${currentYear} season roster quarterback starting lineup ${userQuery}`;
         
         const searchResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
@@ -394,9 +402,13 @@ serve(async (req) => {
             messages: [
               { 
                 role: 'system', 
-                content: `You are a sports data researcher. Search the web for current information about: ${teamName} ${league} football. Focus on facts, stats, and recent news. Return structured data when possible.` 
+                content: `You are a sports data researcher. The current date is ${currentDate}. 
+Search for CURRENT ${currentYear} season information about: ${searchQuery}. 
+Focus on: current roster, starting lineup, recent games, and ${currentYear} season stats.
+Return factual data with sources and dates. If data is from a previous season, explicitly state that.
+Prioritize roster information including quarterbacks and key players for the ${currentYear} season.` 
               },
-              { role: 'user', content: userQuery }
+              { role: 'user', content: searchQuery }
             ],
           }),
         });
@@ -405,7 +417,7 @@ serve(async (req) => {
           const searchData = await searchResponse.json();
           const webContent = searchData.choices?.[0]?.message?.content || '';
           if (webContent) {
-            highlightlyData += `\n\nWEB SEARCH RESULTS:\n${webContent}`;
+            highlightlyData += `\n\nCURRENT ${currentYear} SEASON DATA FROM WEB SEARCH:\n${webContent}`;
           }
         }
       } catch (searchError) {
@@ -415,17 +427,31 @@ serve(async (req) => {
 
     // Build personality-based system prompt
     const personalityPrompts = {
-      hype: `You are Coach, the ultimate hype machine for ${teamName}! You're energetic, passionate, and always pumping up the fans. Use lots of energy and enthusiasm!`,
-      analytical: `You are Coach, a strategic analyst for ${teamName}. You focus on stats, trends, and tactical insights. Be precise and data-driven.`,
-      casual: `You are Coach, the chill sideline buddy for ${teamName} fans. You're laid-back, friendly, and conversational. Keep it relaxed and fun.`
+      hype: `You are Coach for ${teamName}. You're knowledgeable and enthusiastic about the team. Provide accurate information first, then add brief commentary. Keep responses factual and concise.`,
+      analytical: `You are Coach for ${teamName}. You provide data-driven analysis with stats and tactical insights. Be precise, factual, and direct. Skip the fluff.`,
+      casual: `You are Coach for ${teamName}. You're straightforward and conversational. Give clear, factual answers without excessive hype or forced enthusiasm. Be helpful, not cheerleader-ish.`
     };
 
-    const systemPrompt = `${personalityPrompts[settings.personality as keyof typeof personalityPrompts] || personalityPrompts.hype}
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const formattedDate = currentDate.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
 
-**CRITICAL CONTEXT:**
+    const systemPrompt = `${personalityPrompts[settings.personality as keyof typeof personalityPrompts] || personalityPrompts.casual}
+
+**CRITICAL TEMPORAL CONTEXT - READ THIS FIRST:**
+- TODAY'S DATE: ${formattedDate}
+- CURRENT NFL/NCAA SEASON: ${currentYear}
+- You MUST use ${currentYear} season rosters and data
+- If you don't have current ${currentYear} data, explicitly state you need to look it up
+
+**CRITICAL TEAM CONTEXT:**
 - You are the dedicated coach for ${teamName} (${league})
 - This is the ${huddle.name} huddle
-- ALL questions should be interpreted as being about ${teamName} unless explicitly stated otherwise
+- ALL questions are about ${teamName} in the ${currentYear} season unless stated otherwise
 - When users ask "who won last night?" they mean "${teamName}'s game last night"
 - When users ask "our team", "we", or "us" they mean ${teamName}
 - When users mention just a team name without context, assume they're asking about ${teamName} vs that team
@@ -445,6 +471,7 @@ serve(async (req) => {
 Current Context:
 - Team: ${teamName} (${league})
 - Huddle: ${huddle.name}
+- Season: ${currentYear}
 - Recent chat:
 ${conversationContext}
 
@@ -453,16 +480,17 @@ ${highlightlyData ? `Available Data:\n${highlightlyData}` : ''}
 User Query: "${userQuery}"
 
 Rules:
-1. Answer the question directly in the first sentence (be specific!)
-2. Add 1 fun fact, stat, or insight if relevant
-3. Keep it conversational and natural - NO forced questions at the end
-4. Use team slang and emojis sparingly (🏈🔥💪)
-5. If data is missing, say "Checking the wires—stand by!" and suggest follow-up
-6. Stay under ${settings.response_max_words} words
-7. If the query is off-topic or unclear, respond playfully: "Huddle alert! Hit me with a real question about ${teamName}. What's up?"
-8. This is FOOTBALL ONLY - ${league} football. Never discuss other sports.
+1. Start with the direct factual answer - NO preamble or hype
+2. Current date is ${formattedDate} - use ${currentYear} season data ONLY
+3. If you lack current data, say "I don't have confirmed ${currentYear} data for that" instead of guessing
+4. Keep responses under ${settings.response_max_words} words - prioritize facts over personality
+5. Use minimal emojis (max 1-2 per response)
+6. NO forced questions at the end
+7. NO "Let's go [team]!" or similar rally cries unless naturally relevant
+8. This is ${league} football only - never discuss other sports
+9. If query asks about rosters/players, ALWAYS verify it's ${currentYear} data before answering
 
-Keep it concise and engaging. Let's coach them up!`;
+If you don't have reliable current data, respond: "I don't have confirmed ${currentYear} info on that yet. Let me check the latest sources."`;
 
     // Call Lovable AI
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
