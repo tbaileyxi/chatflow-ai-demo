@@ -154,7 +154,10 @@ export const ModernMessageBubble = memo(({
             "flex items-center gap-3 mb-2 flex-wrap",
             isOwnMessage ? "justify-end" : "justify-start"
           )}>
-            <span className="text-sm font-semibold text-foreground">
+            <span className={cn(
+              "text-sm font-semibold text-foreground",
+              (message.is_team_agent_message || message.is_bot_message || message.message_type === 'coach_response') && "font-share-tech"
+            )}>
               {message.is_team_agent_message
                 ? `${message.origin_teams?.name || originTeamName || teamName || 'Team'} Agent`
                 : (message.profiles?.display_name || message.profiles?.username || `User ${message.user_id.slice(0, 8)}`)}
@@ -230,7 +233,10 @@ export const ModernMessageBubble = memo(({
 
               {/* Text Content */}
               {showContent && (
-                <div className="whitespace-pre-wrap break-words leading-relaxed">
+                <div className={cn(
+                  "whitespace-pre-wrap break-words leading-relaxed",
+                  (message.is_bot_message || message.is_team_agent_message || message.message_type === 'coach_response') && "font-share-tech text-sm"
+                )}>
                   {contentWithoutTags}
                 </div>
               )}

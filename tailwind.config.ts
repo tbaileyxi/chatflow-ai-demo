@@ -46,6 +46,7 @@ export default {
 				chat: ['Exo 2', 'Inter', 'sans-serif'],
 				exo2: ['Exo 2', 'Inter', 'sans-serif'],
 				pixel: ['Press Start 2P', 'monospace'],
+				'share-tech': ['Share Tech Mono', 'monospace'],
 			},
 			colors: {
 				border: 'hsl(var(--border))',

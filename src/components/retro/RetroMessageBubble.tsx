@@ -270,7 +270,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
           
           {/* Fixed: Solid background instead of gradient for better readability */}
           <div className="px-3 py-1.5 rounded-lg bg-background border border-team-primary/30">
-            <p className="text-sm font-medium text-foreground">
+            <p className="text-xs font-medium text-foreground font-share-tech">
               {message.content}
             </p>
           </div>
