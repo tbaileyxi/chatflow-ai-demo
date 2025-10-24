@@ -196,7 +196,7 @@ export const ModernMessageBubble = memo(({
             <div
               className={cn(
                 "inline-block max-w-full rounded-2xl px-4 py-3",
-                "text-base cursor-pointer select-text transition-all duration-200",
+                "text-lg cursor-pointer select-text transition-all duration-200",
                 "relative group/bubble",
                 isOwnMessage
                   ? "bg-primary text-primary-foreground shadow-lg"

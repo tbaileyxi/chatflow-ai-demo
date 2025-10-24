@@ -180,7 +180,7 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
             <div
               className={cn(
                 "inline-block w-full max-w-full rounded-2xl px-3 sm:px-4 py-2.5",
-                "text-sm sm:text-base cursor-pointer select-text transition-all duration-200",
+                "text-base sm:text-lg cursor-pointer select-text transition-all duration-200",
                 "relative group/bubble break-words",
                 isOwnMessage
                   ? "bg-primary text-primary-foreground shadow-lg"

@@ -449,7 +449,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             </div>
           )}
 
-          <p className="text-xs sm:text-sm text-foreground whitespace-pre-wrap break-words">
+          <p className="text-sm sm:text-base text-foreground whitespace-pre-wrap break-words">
             {message.content}
           </p>
 
