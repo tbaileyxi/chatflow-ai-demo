@@ -543,50 +543,8 @@ async function postScoreUpdate(
   const { teams, lastPeriod, lastClock } = gameState;
   const periodText = getPeriodText(lastPeriod);
 
-  // Try to fetch highlights to get specific scoring play details
+  // Video highlight fetching disabled - only show score updates
   let scoringPlayContent = null;
-  if (matchId) {
-    try {
-      const highlightly = createHighlightlyClient();
-      const today = new Date().toISOString().split("T")[0];
-      const highlights = await highlightly.getHighlights({
-        date: today,
-        leagueName: league as "NFL" | "NCAA",
-        matchId: matchId,
-        limit: 5
-      });
-      
-      // Get the most recent highlight (likely the scoring play that just happened)
-      if (highlights && highlights.length > 0) {
-        const latestHighlight = highlights[0];
-        const title = latestHighlight.title || '';
-        
-        // Determine emoji based on scoring type
-        let emoji = '🔥';
-        if (title.toLowerCase().includes('touchdown') || title.toLowerCase().includes('td')) {
-          emoji = '🏈 TOUCHDOWN!';
-        } else if (title.toLowerCase().includes('field goal') || title.toLowerCase().includes('fg')) {
-          emoji = '⚡ FIELD GOAL!';
-        } else if (title.toLowerCase().includes('safety')) {
-          emoji = '🛡️ SAFETY!';
-        } else if (title.toLowerCase().includes('interception') || title.toLowerCase().includes('int')) {
-          emoji = '🎯 INTERCEPTION!';
-        } else if (title.toLowerCase().includes('fumble')) {
-          emoji = '💨 FUMBLE RECOVERY!';
-        }
-        
-        scoringPlayContent = `${emoji}\n${title}\n\n${teams[1].name} ${teams[1].score} - ${teams[0].score} ${teams[0].name}\n${periodText}${lastClock ? ` | ${lastClock}` : ''}`;
-        
-        // Optionally include video embed
-        if (latestHighlight.embedUrl) {
-          scoringPlayContent += `\n\n🎥 ${latestHighlight.embedUrl}`;
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching highlights for scoring play:', error);
-      // Fall back to generic score update
-    }
-  }
 
   const content = scoringPlayContent || `🔥 ${teams[1].name} ${teams[1].score} - ${teams[0].score} ${teams[0].name}\n${periodText}${
     lastClock ? ` | ${lastClock}` : ""
