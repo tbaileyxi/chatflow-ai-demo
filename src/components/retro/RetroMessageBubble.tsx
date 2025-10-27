@@ -81,51 +81,9 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
 
   const isBot = message.is_bot_message || message.is_team_agent_message;
 
+  // Heat feature disabled
   useEffect(() => {
-    const fetchHeatData = async () => {
-      if (!currentUser) return;
-      
-      // Get heat count
-      const { count } = await supabase
-        .from('message_heat_reactions')
-        .select('*', { count: 'exact', head: true })
-        .eq('message_id', message.id);
-      
-      setHeatCount(count || 0);
-      
-      // Check if current user has given heat
-      const { data: userHeat } = await supabase
-        .from('message_heat_reactions')
-        .select('id')
-        .eq('message_id', message.id)
-        .eq('user_id', currentUser.id)
-        .maybeSingle();
-      
-      setHasGivenHeat(!!userHeat);
-    };
-    
-    fetchHeatData();
-    
-    // Real-time subscription for heat updates
-    const channel = supabase
-      .channel(`message-heat-${message.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'message_heat_reactions',
-          filter: `message_id=eq.${message.id}`
-        },
-        () => {
-          fetchHeatData();
-        }
-      )
-      .subscribe();
-    
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // No-op: Heat tracking disabled
   }, [message.id, currentUser]);
 
   const formattedTime = useMemo(() => {
@@ -209,43 +167,10 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
     });
   }, [toast]);
 
+  // Heat feature disabled
   const handleGiveHeat = useCallback(async () => {
-    if (!currentUser || isGivingHeat || message.user_id === currentUser.id) return;
-    
-    setIsGivingHeat(true);
-    try {
-      if (hasGivenHeat) {
-        // Remove heat
-        await supabase
-          .from('message_heat_reactions')
-          .delete()
-          .eq('message_id', message.id)
-          .eq('user_id', currentUser.id);
-      } else {
-        // Give heat
-        await supabase
-          .from('message_heat_reactions')
-          .insert({
-            message_id: message.id,
-            user_id: currentUser.id
-          });
-        
-        toast({
-          title: "Heat given! ⚡",
-          description: "You gave this message some heat",
-        });
-      }
-    } catch (error) {
-      console.error('Failed to toggle heat:', error);
-      toast({
-        title: "Error",
-        description: "Failed to give heat. Try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsGivingHeat(false);
-    }
-  }, [currentUser, message.id, message.user_id, hasGivenHeat, isGivingHeat, toast]);
+    // No-op: Heat tracking disabled
+  }, []);
 
   // Bot messages = full-width updates with solid text
   if (isBot) {

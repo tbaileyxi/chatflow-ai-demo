@@ -29,7 +29,8 @@ export const Huddle = () => {
   const [loading, setLoading] = useState(true);
   const [pickEmDialog, setPickEmDialog] = useState<{ open: boolean; instanceId?: string }>({ open: false });
   const [teamName, setTeamName] = useState<string>('');
-  const [showHighlights, setShowHighlights] = useState(false);
+  // Highlights feature disabled
+  // const [showHighlights, setShowHighlights] = useState(false);
   
   // Pagination state
   const [hasMore, setHasMore] = useState(true);
@@ -543,35 +544,8 @@ export const Huddle = () => {
           />
         </div>
 
-        {/* Collapsible highlights sidebar - slide over on mobile */}
-        <div className={cn(
-          "fixed sm:relative inset-y-0 right-0 w-full sm:w-80 max-w-sm",
-          "border-l border-team-primary/20 bg-background/95 backdrop-blur-sm",
-          "transition-transform duration-300 z-30",
-          "safe-area-inset-top safe-area-inset-bottom",
-          showHighlights ? "translate-x-0" : "translate-x-full"
-        )}>
-          <RetroHighlightsSidebar
-            huddleId={huddleId!}
-            onClose={() => setShowHighlights(false)}
-            onJumpToMessage={(messageId) => {
-              const element = document.getElementById(`message-${messageId}`);
-              element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }}
-          />
-        </div>
+        {/* Highlights feature disabled */}
       </div>
-
-      {/* Floating Highlights Button - aligned under back button in upper left */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setShowHighlights(!showHighlights)}
-        className="fixed top-20 left-4 z-50 h-12 w-12 rounded-full bg-team-primary/20 backdrop-blur-sm border border-team-primary/30 hover:bg-team-primary/30 shadow-lg touch-manipulation"
-        aria-label="Toggle Highlights"
-      >
-        <Zap className="h-5 w-5 text-team-primary" />
-      </Button>
 
       {/* Pick 'Em Dialog */}
       {pickEmDialog.instanceId && (
