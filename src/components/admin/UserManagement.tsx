@@ -19,6 +19,7 @@ interface User {
   user_id: string;
   display_name?: string;
   phone_number?: string;
+  email?: string;
   avatar_url?: string;
   role: string;
   status: string;
@@ -93,6 +94,11 @@ export const UserManagement = () => {
 
       setHasAdmin(adminRoles && adminRoles.length > 0);
 
+      // Get all users from auth.users to access email
+      const { data: { users: authUsers }, error: authError } = await supabase.auth.admin.listUsers();
+      
+      if (authError) throw authError;
+
       // Get all users from profiles table with new columns
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
@@ -110,11 +116,15 @@ export const UserManagement = () => {
 
       if (rolesError) throw rolesError;
 
-      // Combine the data
-      const usersWithRoles = profiles?.map(user => ({
-        ...user,
-        role: roles?.find(r => r.user_id === user.user_id)?.role || 'member'
-      })) || [];
+      // Combine all data including email from auth.users
+      const usersWithRoles = profiles?.map(profile => {
+        const authUser = authUsers?.find((u: any) => u.id === profile.user_id);
+        return {
+          ...profile,
+          email: authUser?.email || null,
+          role: roles?.find(r => r.user_id === profile.user_id)?.role || 'member'
+        };
+      }) || [];
       
       setUsers(usersWithRoles);
     } catch (error) {
@@ -136,6 +146,7 @@ export const UserManagement = () => {
       filtered = filtered.filter(user => 
         user.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.phone_number?.includes(searchTerm) ||
+        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.role.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
@@ -657,6 +668,12 @@ export const UserManagement = () => {
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Phone className="w-4 h-4" />
                     {user.phone_number}
+                  </div>
+                )}
+                {user.email && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Mail className="w-4 h-4" />
+                    {user.email}
                   </div>
                 )}
                 <div className="flex items-center gap-2 text-muted-foreground">

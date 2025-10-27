@@ -278,7 +278,8 @@ serve(async (req) => {
         // Try to get upcoming matches from Highlightly
         const upcomingMatches = await highlightly.getMatches({ 
           team: teamName, 
-          league: league, 
+          league: league,
+          season: 2025,
           limit: 10
         });
         
@@ -297,17 +298,16 @@ serve(async (req) => {
 
       if (queryLower.includes('score') || queryLower.includes('game') || queryLower.includes('live') || queryLower.includes('won') || queryLower.includes('win')) {
         const targetDate = parseTemporalQuery(userQuery);
-        const matches = await highlightly.getMatches({ team: teamName, league: league, date: targetDate, limit: 1 });
+        const matches = await highlightly.getMatches({ team: teamName, league: league, date: targetDate, season: 2025, limit: 1 });
         if (matches?.length > 0) {
           highlightlyData += `\nGAME DATA:\n${JSON.stringify(matches[0], null, 2)}`;
         }
       }
 
       if (queryLower.includes('stat') || queryLower.includes('season')) {
-        const currentYear = new Date().getFullYear();
-        const stats = await highlightly.getTeamStats(teamName, currentYear);
+        const stats = await highlightly.getTeamStats(teamName, 2025);
         if (stats) {
-          highlightlyData += `\nSEASON STATS:\n${JSON.stringify(stats, null, 2)}`;
+          highlightlyData += `\nSEASON STATS (2025):\n${JSON.stringify(stats, null, 2)}`;
         }
       }
 
@@ -320,7 +320,7 @@ serve(async (req) => {
 
       if (queryLower.includes('odd') || queryLower.includes('bet') || queryLower.includes('line') || queryLower.includes('spread')) {
         const today = new Date().toISOString().split('T')[0];
-        const matches = await highlightly.getMatches({ team: teamName, league: league, date: today, limit: 1 });
+        const matches = await highlightly.getMatches({ team: teamName, league: league, date: today, season: 2025, limit: 1 });
         if (matches?.length > 0 && matches[0].id) {
           const odds = await highlightly.getMatchOdds(matches[0].id);
           if (odds) {
@@ -341,7 +341,7 @@ serve(async (req) => {
       // Highlights detection
       if (queryLower.includes('highlight') || queryLower.includes('recap') || queryLower.includes('video') || queryLower.includes('clip')) {
         const targetDate = parseTemporalQuery(userQuery);
-        const matches = await highlightly.getMatches({ team: teamName, league: league, date: targetDate, limit: 1 });
+        const matches = await highlightly.getMatches({ team: teamName, league: league, date: targetDate, season: 2025, limit: 1 });
         if (matches?.length > 0 && matches[0].id) {
           const highlights = await highlightly.getHighlights({ match: matches[0].id, limit: 5 });
           if (highlights) {
@@ -352,17 +352,16 @@ serve(async (req) => {
 
       // Standings detection
       if (queryLower.includes('standing') || queryLower.includes('rank') || queryLower.includes('position') || queryLower.includes('place') || queryLower.includes('table')) {
-        const currentYear = new Date().getFullYear();
-        const standings = await highlightly.getStandings({ league: league, season: currentYear });
+        const standings = await highlightly.getStandings({ league: league, season: 2025 });
         if (standings) {
-          highlightlyData += `\nSTANDINGS:\n${JSON.stringify(standings, null, 2)}`;
+          highlightlyData += `\nSTANDINGS (2025):\n${JSON.stringify(standings, null, 2)}`;
         }
       }
 
       // Lineups detection
       if (queryLower.includes('lineup') || queryLower.includes('starting') || queryLower.includes('roster') || queryLower.includes('who is playing')) {
         const targetDate = parseTemporalQuery(userQuery);
-        const matches = await highlightly.getMatches({ team: teamName, league: league, date: targetDate, limit: 1 });
+        const matches = await highlightly.getMatches({ team: teamName, league: league, date: targetDate, season: 2025, limit: 1 });
         if (matches?.length > 0 && matches[0].id) {
           const lineups = await highlightly.getLineups(matches[0].id);
           if (lineups) {
@@ -373,10 +372,9 @@ serve(async (req) => {
 
       // Player stats detection
       if (queryLower.includes('player') || queryLower.match(/\b(quarterback|qb|running back|rb|receiver|wr|defense|linebacker|safety|cornerback)\b/)) {
-        const currentYear = new Date().getFullYear();
-        const playerStats = await highlightly.getPlayerStats({ team: teamName, season: currentYear, league: league });
+        const playerStats = await highlightly.getPlayerStats({ team: teamName, season: 2025, league: league });
         if (playerStats) {
-          highlightlyData += `\nPLAYER STATS:\n${JSON.stringify(playerStats, null, 2)}`;
+          highlightlyData += `\nPLAYER STATS (2025):\n${JSON.stringify(playerStats, null, 2)}`;
         }
       }
 
@@ -434,16 +432,18 @@ serve(async (req) => {
               { 
                 role: 'system', 
                 content: isNextGameQuery
-                  ? `You are a sports data researcher. TODAY IS OCTOBER 23, 2025.
+                  ? `You are a sports data researcher. TODAY IS OCTOBER 23, 2025. CURRENT SEASON: 2025.
 Search for the NEXT UPCOMING SCHEDULED GAME for ${teamName} (${league}).
-Find games scheduled AFTER October 23, 2025.
+Find games scheduled AFTER October 23, 2025 in the 2025 season.
 Return: opponent name, date, time, location.
-DO NOT return past games or games from previous seasons.`
-                  : `You are a sports data researcher. The current date is ${currentDate}. 
-Search for CURRENT ${currentYear} season information about: ${searchQuery}. 
-Focus on: current roster, starting lineup, recent games, and ${currentYear} season stats.
-Return factual data with sources and dates. If data is from a previous season, explicitly state that.
-Prioritize roster information including quarterbacks and key players for the ${currentYear} season.` 
+CRITICAL: DO NOT return past games, historical data, or games from 2024 or earlier seasons.
+Only return 2025 season data.`
+                  : `You are a sports data researcher. TODAY IS OCTOBER 23, 2025. CURRENT SEASON: 2025.
+Search for 2025 SEASON information about: ${searchQuery}. 
+Focus on: 2025 roster, current starting lineup, recent 2025 games, and 2025 season stats.
+Return factual data with sources and dates. 
+CRITICAL: Only provide 2025 season data. Reject any 2024 or earlier data.
+If no 2025 data is available, explicitly state that.`
               },
               { role: 'user', content: searchQuery }
             ],
@@ -479,11 +479,14 @@ Prioritize roster information including quarterbacks and key players for the ${c
 
     const systemPrompt = `${personalityPrompts[settings.personality as keyof typeof personalityPrompts] || personalityPrompts.casual}
 
-**CRITICAL TEMPORAL CONTEXT - READ THIS FIRST:**
+**🚨 CRITICAL TEMPORAL CONTEXT - READ THIS FIRST 🚨**
 - TODAY'S DATE: ${formattedDate}
-- CURRENT NFL/NCAA SEASON: ${currentYear}
-- You MUST use ${currentYear} season rosters and data
-- If you don't have current ${currentYear} data, explicitly state you need to look it up
+- CURRENT SEASON: 2025 (NOT 2024!)
+- WE ARE IN THE 2025 NFL/NCAA SEASON
+- You MUST ONLY use 2025 season rosters, schedules, and data
+- REJECT and DO NOT use any 2024 or earlier data
+- If you don't have current 2025 data, explicitly state you need to look it up
+- When providing game scores or records, verify they are from the 2025 season
 
 **CRITICAL TEAM CONTEXT:**
 - You are the dedicated coach for ${teamName} (${league})

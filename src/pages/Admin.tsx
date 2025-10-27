@@ -1,6 +1,7 @@
 import { useAuth } from '@/hooks/useAuth';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { BroadcastCenter } from '@/components/admin/BroadcastCenter';
 import { TeamManagement } from '@/components/admin/TeamManagement';
@@ -10,10 +11,11 @@ import { ModerationPanel } from '@/components/admin/ModerationPanel';
 import { BearsTrendingManager } from '@/components/admin/BearsTrendingManager';
 import { SocialSourceManager } from '@/components/admin/SocialSourceManager';
 import { CurationQueue } from '@/components/admin/CurationQueue';
-import { BarChart3, Radio, Users, Shield, Flag, TrendingUp, Rss, Filter } from 'lucide-react';
+import { BarChart3, Radio, Users, Shield, Flag, TrendingUp, Rss, Filter, ArrowLeft } from 'lucide-react';
 
 export const Admin = () => {
   const { isAdmin, isContentAdmin, hasAdminAccess, loading, user } = useAuth();
+  const navigate = useNavigate();
 
   if (loading) {
     return (
@@ -38,8 +40,20 @@ export const Admin = () => {
 
       <div className="relative border-b border-border bg-card/50 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold text-foreground font-arcade">ADMIN CONTROL CENTER</h1>
-          <p className="text-muted-foreground font-mono">System Management Interface</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground font-arcade">ADMIN CONTROL CENTER</h1>
+              <p className="text-muted-foreground font-mono">System Management Interface</p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/app')}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Return to App
+            </Button>
+          </div>
         </div>
       </div>
 
