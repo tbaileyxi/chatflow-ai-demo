@@ -53,6 +53,30 @@ export type Database = {
         }
         Relationships: []
       }
+      content_admin_teams: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       content_reports: {
         Row: {
           admin_notes: string | null
@@ -1495,7 +1519,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "member" | "huddle_owner"
+      app_role: "admin" | "member" | "huddle_owner" | "content_admin"
       pickem_league: "nfl" | "ncaaf"
     }
     CompositeTypes: {
@@ -1624,7 +1648,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "member", "huddle_owner"],
+      app_role: ["admin", "member", "huddle_owner", "content_admin"],
       pickem_league: ["nfl", "ncaaf"],
     },
   },

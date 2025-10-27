@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Users, Shield, Crown, Ban, Search, Calendar, Phone, Mail, UserX, UserCheck, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Shield, Crown, Ban, Search, Calendar, Phone, Mail, UserX, UserCheck, AlertTriangle, Radio } from 'lucide-react';
 import { FirstAdminSetup } from './FirstAdminSetup';
 
 interface User {
@@ -30,6 +30,13 @@ interface User {
   banned_reason?: string;
 }
 
+interface Team {
+  id: string;
+  name: string;
+  city: string;
+  league: string;
+}
+
 export const UserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
@@ -40,6 +47,10 @@ export const UserManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [banReason, setBanReason] = useState('');
+  const [grantDialogOpen, setGrantDialogOpen] = useState(false);
+  const [grantEmail, setGrantEmail] = useState('');
+  const [grantTeamId, setGrantTeamId] = useState('');
+  const [teams, setTeams] = useState<Team[]>([]);
   const [formData, setFormData] = useState({
     display_name: '',
     phone_number: '',
@@ -50,11 +61,27 @@ export const UserManagement = () => {
 
   useEffect(() => {
     fetchUsers();
+    fetchTeams();
   }, []);
 
   useEffect(() => {
     filterUsers();
   }, [users, searchTerm, statusFilter]);
+
+  const fetchTeams = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('teams')
+        .select('id, name, city, league')
+        .order('league', { ascending: true })
+        .order('city', { ascending: true });
+      
+      if (error) throw error;
+      setTeams(data || []);
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -245,6 +272,71 @@ export const UserManagement = () => {
     }
   };
 
+  const handleGrantContentAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      // Find user by email (search in auth.users via profile lookup)
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .or(`phone_number.eq.${grantEmail}`);
+      
+      if (profileError) throw profileError;
+      
+      if (!profiles || profiles.length === 0) {
+        toast({
+          title: "Error",
+          description: "User not found with that email/phone",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const userId = profiles[0].user_id;
+      
+      // Grant content_admin role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .upsert({
+          user_id: userId,
+          role: 'content_admin'
+        });
+      
+      if (roleError) throw roleError;
+      
+      // Assign team
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const { error: teamError } = await supabase
+        .from('content_admin_teams')
+        .insert({
+          user_id: userId,
+          team_id: grantTeamId,
+          created_by: currentUser?.id
+        });
+      
+      if (teamError) throw teamError;
+      
+      toast({
+        title: "Success",
+        description: "Content admin access granted successfully",
+      });
+      
+      setGrantDialogOpen(false);
+      setGrantEmail('');
+      setGrantTeamId('');
+      fetchUsers();
+      
+    } catch (error) {
+      console.error('Error granting access:', error);
+      toast({
+        title: "Error",
+        description: "Failed to grant content admin access",
+        variant: "destructive"
+      });
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'active':
@@ -275,6 +367,8 @@ export const UserManagement = () => {
     switch (role) {
       case 'admin':
         return <Crown className="w-4 h-4 text-yellow-500" />;
+      case 'content_admin':
+        return <Radio className="w-4 h-4 text-purple-500" />;
       case 'huddle_owner':
         return <Shield className="w-4 h-4 text-blue-500" />;
       default:
@@ -286,6 +380,8 @@ export const UserManagement = () => {
     switch (role) {
       case 'admin':
         return 'default';
+      case 'content_admin':
+        return 'secondary';
       case 'huddle_owner':
         return 'secondary';
       default:
@@ -357,6 +453,70 @@ export const UserManagement = () => {
         </div>
       </div>
 
+      {/* Grant Content Admin Access Card */}
+      <Card className="mb-6 bg-card/50 border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Radio className="w-5 h-5 text-purple-500" />
+            Grant Content Admin Access
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Give users access to the Broadcast section and assign them to a team
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Dialog open={grantDialogOpen} onOpenChange={setGrantDialogOpen}>
+            <Button onClick={() => setGrantDialogOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Content Admin
+            </Button>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Grant Content Admin Access</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleGrantContentAdmin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">User Email/Phone</Label>
+                  <Input
+                    id="email"
+                    type="text"
+                    placeholder="user@example.com or phone number"
+                    value={grantEmail}
+                    onChange={(e) => setGrantEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="team">Assign Team</Label>
+                  <Select value={grantTeamId} onValueChange={setGrantTeamId} required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a team" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teams.map(team => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.city} {team.name} ({team.league.toUpperCase()})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setGrantDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">
+                    Grant Access
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </CardContent>
+      </Card>
+
       {/* Search and Filter */}
       <div className="flex gap-4 mb-6">
         <div className="flex-1">
@@ -423,6 +583,7 @@ export const UserManagement = () => {
                   <SelectContent>
                     <SelectItem value="member">Member</SelectItem>
                     <SelectItem value="huddle_owner">Huddle Owner</SelectItem>
+                    <SelectItem value="content_admin">Content Admin</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
@@ -593,16 +754,17 @@ export const UserManagement = () => {
                 {/* Role Actions */}
                 <div>
                   <Label className="text-xs text-muted-foreground">Change Role:</Label>
-                  <div className="flex gap-1 mt-1">
-                    {['member', 'huddle_owner', 'admin'].map(role => (
+                  <div className="flex gap-1 mt-1 flex-wrap">
+                    {['member', 'huddle_owner', 'content_admin', 'admin'].map(role => (
                       <Button
                         key={role}
                         variant={user.role === role ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => handleRoleChange(user.user_id, role)}
                         disabled={user.role === role}
+                        className="text-xs"
                       >
-                        {role === 'huddle_owner' ? 'Owner' : role}
+                        {role === 'huddle_owner' ? 'Owner' : role === 'content_admin' ? 'Content Admin' : role}
                       </Button>
                     ))}
                   </div>

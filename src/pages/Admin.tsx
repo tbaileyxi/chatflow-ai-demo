@@ -13,7 +13,7 @@ import { CurationQueue } from '@/components/admin/CurationQueue';
 import { BarChart3, Radio, Users, Shield, Flag, TrendingUp, Rss, Filter } from 'lucide-react';
 
 export const Admin = () => {
-  const { isAdmin, loading, user } = useAuth();
+  const { isAdmin, isContentAdmin, hasAdminAccess, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -44,76 +44,90 @@ export const Admin = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6 relative">
-        {!isAdmin ? (
+        {!hasAdminAccess ? (
           <FirstAdminSetup />
         ) : (
-          <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="grid grid-cols-8 w-full max-w-6xl bg-card/80 backdrop-blur-sm border border-primary/20">
-              <TabsTrigger value="dashboard" className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4" />
-                Dashboard
-              </TabsTrigger>
+          <Tabs defaultValue={isContentAdmin ? "broadcast" : "dashboard"} className="space-y-6">
+            <TabsList className={`grid ${isContentAdmin ? 'grid-cols-1' : 'grid-cols-8'} w-full max-w-6xl bg-card/80 backdrop-blur-sm border border-primary/20`}>
+              {isAdmin && (
+                <TabsTrigger value="dashboard" className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  Dashboard
+                </TabsTrigger>
+              )}
+              
               <TabsTrigger value="broadcast" className="flex items-center gap-2">
                 <Radio className="w-4 h-4" />
                 Broadcast
               </TabsTrigger>
-              <TabsTrigger value="teams" className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                Teams
-              </TabsTrigger>
-              <TabsTrigger value="users" className="flex items-center gap-2">
-                <Shield className="w-4 h-4" />
-                Users
-              </TabsTrigger>
-              <TabsTrigger value="moderation" className="flex items-center gap-2">
-                <Flag className="w-4 h-4" />
-                Moderation
-              </TabsTrigger>
-              <TabsTrigger value="trending" className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" />
-                Trending
-              </TabsTrigger>
-              <TabsTrigger value="sources" className="flex items-center gap-2">
-                <Rss className="w-4 h-4" />
-                Sources
-              </TabsTrigger>
-              <TabsTrigger value="curation" className="flex items-center gap-2">
-                <Filter className="w-4 h-4" />
-                Curation
-              </TabsTrigger>
+              
+              {isAdmin && (
+                <>
+                  <TabsTrigger value="teams" className="flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Teams
+                  </TabsTrigger>
+                  <TabsTrigger value="users" className="flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    Users
+                  </TabsTrigger>
+                  <TabsTrigger value="moderation" className="flex items-center gap-2">
+                    <Flag className="w-4 h-4" />
+                    Moderation
+                  </TabsTrigger>
+                  <TabsTrigger value="trending" className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" />
+                    Trending
+                  </TabsTrigger>
+                  <TabsTrigger value="sources" className="flex items-center gap-2">
+                    <Rss className="w-4 h-4" />
+                    Sources
+                  </TabsTrigger>
+                  <TabsTrigger value="curation" className="flex items-center gap-2">
+                    <Filter className="w-4 h-4" />
+                    Curation
+                  </TabsTrigger>
+                </>
+              )}
             </TabsList>
 
-            <TabsContent value="dashboard">
-              <AdminDashboard />
-            </TabsContent>
+            {isAdmin && (
+              <TabsContent value="dashboard">
+                <AdminDashboard />
+              </TabsContent>
+            )}
 
             <TabsContent value="broadcast">
               <BroadcastCenter />
             </TabsContent>
 
-            <TabsContent value="teams">
-              <TeamManagement />
-            </TabsContent>
+            {isAdmin && (
+              <>
+                <TabsContent value="teams">
+                  <TeamManagement />
+                </TabsContent>
 
-            <TabsContent value="users">
-              <UserManagement />
-            </TabsContent>
+                <TabsContent value="users">
+                  <UserManagement />
+                </TabsContent>
 
-            <TabsContent value="moderation">
-              <ModerationPanel />
-            </TabsContent>
+                <TabsContent value="moderation">
+                  <ModerationPanel />
+                </TabsContent>
 
-            <TabsContent value="trending">
-              <BearsTrendingManager />
-            </TabsContent>
+                <TabsContent value="trending">
+                  <BearsTrendingManager />
+                </TabsContent>
 
-            <TabsContent value="sources">
-              <SocialSourceManager />
-            </TabsContent>
+                <TabsContent value="sources">
+                  <SocialSourceManager />
+                </TabsContent>
 
-            <TabsContent value="curation">
-              <CurationQueue />
-            </TabsContent>
+                <TabsContent value="curation">
+                  <CurationQueue />
+                </TabsContent>
+              </>
+            )}
           </Tabs>
         )}
       </div>

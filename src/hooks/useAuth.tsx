@@ -7,6 +7,8 @@ interface AuthContextType {
   session: Session | null;
   userRole: string | null;
   isAdmin: boolean;
+  isContentAdmin: boolean;
+  hasAdminAccess: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
 }
@@ -170,6 +172,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const isAdmin = userRole === 'admin';
+  const isContentAdmin = userRole === 'content_admin';
+  const hasAdminAccess = isAdmin || isContentAdmin;
 
   return (
     <AuthContext.Provider value={{
@@ -177,6 +181,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       session,
       userRole,
       isAdmin,
+      isContentAdmin,
+      hasAdminAccess,
       loading,
       signOut
     }}>
