@@ -119,16 +119,20 @@ serve(async (req) => {
     // Build system prompt for Grok
     const systemPrompt = `You are Coach, the AI assistant for ${teamName} fans in the ${league}.
 
-TODAY'S DATE: ${formattedDate}
-CURRENT TIME: ${formattedTime} ET
-CURRENT SEASON: 2025
+🗓️ TODAY'S DATE: ${formattedDate}
+⏰ CURRENT TIME: ${formattedTime} ET
+🏈 CURRENT SEASON: 2025
 
 PERSONALITY: ${personalityPrompt}
 
-You have access to:
-- Real-time X/Twitter sports updates and breaking news
-- Live web search for current information
-- Team rosters, schedules, scores, and stats
+🔍 CRITICAL SEARCH REQUIREMENTS:
+- You have real-time web search enabled - USE IT for all current sports data
+- Search for "${teamName} 2025 schedule" for game questions
+- Search for "${teamName} 2025 roster starting lineup" for player questions
+- Search for "${teamName} game ${formattedDate}" for today's game info
+- Search for "2025 ${league} ${teamName} record standings" for record questions
+- NEVER use training data for current season info
+- If you can't find 2025 data, explicitly say "I couldn't find current 2025 information"
 
 CRITICAL RULES:
 1. ALWAYS use your real-time search to get CURRENT 2025 season data
@@ -137,9 +141,7 @@ CRITICAL RULES:
 4. Keep responses concise (2-4 paragraphs max)
 5. Use team emojis and match the personality tone
 6. Focus on FACTS from credible sources, not speculation
-7. For roster questions, search for "2025 ${teamName} ${league} starting lineup roster"
-8. For schedule questions, search for "2025 ${teamName} ${league} schedule upcoming game"
-9. Always mention sources when providing stats or breaking news
+7. Always cite sources when providing stats or breaking news
 
 Example searches you should use:
 - "2025 ${teamName} starting quarterback"
@@ -165,7 +167,11 @@ Current user question about ${teamName}: ${userQuery}`;
           { role: 'user', content: userQuery }
         ],
         temperature: 0.7,
-        max_tokens: 500,
+        max_tokens: 600,
+        search_parameters: {
+          mode: 'auto',              // Automatically decides when to search
+          return_citations: true     // Include sources in response
+        }
       }),
     });
 
@@ -185,6 +191,14 @@ Current user question about ${teamName}: ${userQuery}`;
 
     const grokData = await grokResponse.json();
     const aiResponse = grokData.choices?.[0]?.message?.content;
+
+    // Log if citations were returned (indicates search was used)
+    if (grokData.citations && grokData.citations.length > 0) {
+      console.log(`✅ Grok used web search. Citations: ${grokData.citations.length}`);
+      console.log(`📚 Sources:`, grokData.citations.slice(0, 3).map((c: any) => c.url));
+    } else {
+      console.log(`⚠️ No citations returned - search may not have been triggered`);
+    }
 
     if (!aiResponse) {
       throw new Error('No response from Grok API');
