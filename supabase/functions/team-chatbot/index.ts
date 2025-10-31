@@ -90,13 +90,13 @@ serve(async (req) => {
     console.log(`🎯 Query: "${userQuery}"`);
 
     // Build current date/time context
-    const now = new Date();
-    const formattedDate = now.toLocaleDateString('en-US', { 
+    const currentDate = new Date();
+    const formattedDate = currentDate.toLocaleDateString('en-US', { 
       month: 'long', 
       day: 'numeric', 
       year: 'numeric' 
     });
-    const formattedTime = now.toLocaleTimeString('en-US', { 
+    const formattedTime = currentDate.toLocaleTimeString('en-US', { 
       hour: 'numeric', 
       minute: '2-digit',
       timeZone: 'America/New_York'
