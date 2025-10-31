@@ -85,9 +85,18 @@ serve(async (req) => {
     const coachMention = content.match(/@coach\s+(.+)/i);
     const userQuery = coachMention ? coachMention[1].trim() : '';
 
+    // Provide context for empty queries or enhance betting queries
+    let finalQuery = userQuery || `What are the latest news and updates about the ${teamName}? Keep it brief.`;
+
+    // Enhance betting-related queries
+    if (finalQuery.toLowerCase().match(/spread|line|odds|betting|over.under|moneyline/)) {
+      finalQuery += ` Search for current betting odds from ESPN BET, DraftKings, or FanDuel.`;
+      console.log(`🎰 Betting query detected - enhanced prompt`);
+    }
+
     console.log(`🎯 Team: ${teamName} (${league})`);
     console.log(`🎯 Personality: ${personality}`);
-    console.log(`🎯 Query: "${userQuery}"`);
+    console.log(`🎯 Final query: "${finalQuery}"`);
 
     // Build current date/time context
     const currentDate = new Date();
@@ -131,25 +140,22 @@ PERSONALITY: ${personalityPrompt}
 - Search for "${teamName} 2025 roster starting lineup" for player questions
 - Search for "${teamName} game ${formattedDate}" for today's game info
 - Search for "2025 ${league} ${teamName} record standings" for record questions
+- For betting questions, search "2025 ${teamName} betting odds spread moneyline"
 - NEVER use training data for current season info
-- If you can't find 2025 data, explicitly say "I couldn't find current 2025 information"
+- If you can't find 2025 data, say "I couldn't find current 2025 information"
 
-CRITICAL RULES:
-1. ALWAYS use your real-time search to get CURRENT 2025 season data
-2. When asked about games, check X/Twitter and web for TODAY's date (${formattedDate})
-3. If you can't find current info, say so clearly - NEVER make up data
-4. Keep responses concise (2-4 paragraphs max)
-5. Use team emojis and match the personality tone
-6. Focus on FACTS from credible sources, not speculation
-7. Always cite sources when providing stats or breaking news
+CRITICAL RESPONSE RULES:
+1. Keep responses SHORT: 2-3 sentences maximum
+2. Do NOT mention sources, citations, or where you found the info
+3. Be conversational and direct - pretend you just know the facts
+4. Use emojis sparingly (1-2 max)
+5. Focus on the most important info only
 
-Example searches you should use:
-- "2025 ${teamName} starting quarterback"
-- "2025 ${teamName} next game schedule"
-- "${teamName} game today ${formattedDate}"
-- "2025 ${teamName} standings record"
+${personality === 'hype' ? '⚡ Be enthusiastic but concise!' : ''}
+${personality === 'analytical' ? '📊 Give key stats only.' : ''}
+${personality === 'casual' ? '💬 Keep it chill and brief.' : ''}
 
-Current user question about ${teamName}: ${userQuery}`;
+User question: ${finalQuery}`;
 
     console.log(`🤖 Calling Grok API with model: grok-4-fast`);
 
@@ -164,10 +170,10 @@ Current user question about ${teamName}: ${userQuery}`;
         model: 'grok-4-fast',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userQuery }
+          { role: 'user', content: finalQuery }
         ],
         temperature: 0.7,
-        max_tokens: 600,
+        max_tokens: 300,
         search_parameters: {
           mode: 'auto',              // Automatically decides when to search
           return_citations: true     // Include sources in response
@@ -190,7 +196,7 @@ Current user question about ${teamName}: ${userQuery}`;
     }
 
     const grokData = await grokResponse.json();
-    const aiResponse = grokData.choices?.[0]?.message?.content;
+    let aiResponse = grokData.choices?.[0]?.message?.content;
 
     // Log if citations were returned (indicates search was used)
     if (grokData.citations && grokData.citations.length > 0) {
@@ -203,6 +209,15 @@ Current user question about ${teamName}: ${userQuery}`;
     if (!aiResponse) {
       throw new Error('No response from Grok API');
     }
+
+    // Remove any source citations that Grok might include
+    aiResponse = aiResponse
+      .replace(/Sources?:.*$/i, '') // Remove "Sources: ..." at end
+      .replace(/\(.*?\.(com|net|org|io)\)/g, '') // Remove (website.com) patterns
+      .replace(/According to .+?,/gi, '') // Remove "According to X,"
+      .replace(/per .+? reports?,/gi, '') // Remove "per ESPN reports,"
+      .replace(/\[.*?\]\(.*?\)/g, '') // Remove markdown links
+      .trim();
 
     console.log(`✅ Grok response received (${aiResponse.length} chars)`);
 
