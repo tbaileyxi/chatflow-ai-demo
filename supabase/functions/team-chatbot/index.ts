@@ -6,175 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper: Parse temporal queries like "last night", "yesterday", "last week"
-function parseTemporalQuery(query: string): string {
-  const queryLower = query.toLowerCase();
-  const today = new Date();
-  
-  if (queryLower.includes('last night') || queryLower.includes('yesterday')) {
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    return yesterday.toISOString().split('T')[0];
-  }
-  
-  if (queryLower.includes('last week')) {
-    const lastWeek = new Date(today);
-    lastWeek.setDate(lastWeek.getDate() - 7);
-    return lastWeek.toISOString().split('T')[0];
-  }
-  
-  // Default to today
-  return today.toISOString().split('T')[0];
-}
-
-// Highlightly API client
-function createHighlightlyClient() {
-  const apiKey = Deno.env.get("HIGHLIGHTLY_API_KEY");
-  const baseUrl = "https://api.highlightly.net";
-
-  return {
-    async getTeamInfo(teamName: string) {
-      const response = await fetch(`${baseUrl}/teams/${encodeURIComponent(teamName)}`, {
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) return null;
-      return await response.json();
-    },
-    
-    async getMatches(params: { team?: string; league?: string; date?: string; season?: number; limit?: number }) {
-      const url = new URL(`${baseUrl}/matches`);
-      if (params.team) url.searchParams.append("team", params.team);
-      if (params.league) url.searchParams.append("league", params.league);
-      if (params.date) url.searchParams.append("date", params.date);
-      if (params.season) url.searchParams.append("season", params.season.toString());
-      if (params.limit) url.searchParams.append("limit", params.limit.toString());
-
-      const response = await fetch(url.toString(), {
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) return null;
-      return await response.json();
-    },
-
-    async getTeamStats(teamName: string, season?: number) {
-      const url = new URL(`${baseUrl}/teams/${encodeURIComponent(teamName)}/stats`);
-      if (season) url.searchParams.append("season", season.toString());
-      
-      const response = await fetch(url.toString(), {
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) return null;
-      return await response.json();
-    },
-
-    async getInjuries(teamName: string) {
-      const response = await fetch(`${baseUrl}/teams/${encodeURIComponent(teamName)}/injuries`, {
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) return null;
-      return await response.json();
-    },
-
-    async getMatchOdds(matchId: number) {
-      const response = await fetch(`${baseUrl}/matches/${matchId}/odds`, {
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) return null;
-      return await response.json();
-    },
-
-    async getStandings(params: { league?: string; season?: number }) {
-      const url = new URL(`${baseUrl}/standings`);
-      if (params.league) url.searchParams.append("league", params.league);
-      if (params.season) url.searchParams.append("season", params.season.toString());
-      
-      const response = await fetch(url.toString(), {
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) return null;
-      return await response.json();
-    },
-
-    async getLineups(matchId: number) {
-      const response = await fetch(`${baseUrl}/matches/${matchId}/lineups`, {
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) return null;
-      return await response.json();
-    },
-
-    async getHighlights(params: { team?: string; match?: number; limit?: number }) {
-      const url = new URL(`${baseUrl}/highlights`);
-      if (params.team) url.searchParams.append("team", params.team);
-      if (params.match) url.searchParams.append("match", params.match.toString());
-      if (params.limit) url.searchParams.append("limit", params.limit.toString());
-      
-      const response = await fetch(url.toString(), {
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) return null;
-      return await response.json();
-    },
-
-    async getPlayerStats(params: { team?: string; player?: string; season?: number; league?: string }) {
-      const url = new URL(`${baseUrl}/players/stats`);
-      if (params.team) url.searchParams.append("team", params.team);
-      if (params.player) url.searchParams.append("player", params.player);
-      if (params.season) url.searchParams.append("season", params.season.toString());
-      if (params.league) url.searchParams.append("league", params.league);
-      
-      const response = await fetch(url.toString(), {
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) return null;
-      return await response.json();
-    },
-
-    async getHeadToHead(team1: string, team2: string, league?: string) {
-      const url = new URL(`${baseUrl}/head-to-head`);
-      url.searchParams.append("team1", team1);
-      url.searchParams.append("team2", team2);
-      if (league) url.searchParams.append("league", league);
-      
-      const response = await fetch(url.toString(), {
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) return null;
-      return await response.json();
-    },
-  };
-}
-
 // Rate limiting map: huddleId -> last response timestamp
 const rateLimitMap = new Map<string, number>();
 const RATE_LIMIT_MS = 10000; // 10 seconds between responses
@@ -203,12 +34,18 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const xaiApiKey = Deno.env.get('XAI_API_KEY');
+    
+    if (!xaiApiKey) {
+      throw new Error('XAI_API_KEY not configured');
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Check if bot is enabled for this huddle
     const { data: settings } = await supabase
       .from('huddle_chatbot_settings')
-      .select('is_enabled, personality, response_max_words')
+      .select('is_enabled, personality')
       .eq('huddle_id', huddle_id)
       .single();
 
@@ -242,392 +79,168 @@ serve(async (req) => {
 
     const teamName = huddle.team.highlightly_display_name || huddle.team.name;
     const league = huddle.team.league;
+    const personality = settings.personality || 'hype';
 
     // Extract query after @coach
     const coachMention = content.match(/@coach\s+(.+)/i);
     const userQuery = coachMention ? coachMention[1].trim() : '';
 
+    console.log(`🎯 Team: ${teamName} (${league})`);
+    console.log(`🎯 Personality: ${personality}`);
     console.log(`🎯 Query: "${userQuery}"`);
 
-    // Get recent messages for context
-    const { data: recentMessages } = await supabase
-      .from('huddle_messages')
-      .select('content, created_at, profiles:user_id (display_name)')
-      .eq('huddle_id', huddle_id)
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    const conversationContext = recentMessages
-      ?.reverse()
-      .map(m => `${m.profiles?.display_name || 'User'}: ${m.content}`)
-      .join('\n') || '';
-
-    // Determine query intent and fetch relevant data
-    const queryLower = userQuery.toLowerCase();
-    let highlightlyData = '';
-    const highlightly = createHighlightlyClient();
-    let highlightlyWorking = true;
-
-    try {
-      // NEXT GAME / UPCOMING SCHEDULE detection (HIGH PRIORITY)
-      if (queryLower.includes('next game') || queryLower.includes('upcoming') || queryLower.includes('when do') || queryLower.includes('when does')) {
-        console.log('🔍 Detected next game query');
-        const today = new Date().toISOString().split('T')[0];
-        const nextMonth = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        
-        // Try to get upcoming matches from Highlightly
-        const upcomingMatches = await highlightly.getMatches({ 
-          team: teamName, 
-          league: league,
-          season: 2025,
-          limit: 10
-        });
-        
-        if (upcomingMatches?.length > 0) {
-          // Filter for future games only
-          const futureGames = upcomingMatches.filter((match: any) => {
-            const matchDate = new Date(match.date || match.start_time);
-            return matchDate > new Date();
-          });
-          
-          if (futureGames.length > 0) {
-            highlightlyData += `\nUPCOMING GAMES:\n${JSON.stringify(futureGames.slice(0, 3), null, 2)}`;
-          }
-        }
-      }
-
-      if (queryLower.includes('score') || queryLower.includes('game') || queryLower.includes('live') || queryLower.includes('won') || queryLower.includes('win')) {
-        const targetDate = parseTemporalQuery(userQuery);
-        const matches = await highlightly.getMatches({ team: teamName, league: league, date: targetDate, season: 2025, limit: 1 });
-        if (matches?.length > 0) {
-          highlightlyData += `\nGAME DATA:\n${JSON.stringify(matches[0], null, 2)}`;
-        }
-      }
-
-      if (queryLower.includes('stat') || queryLower.includes('season')) {
-        const stats = await highlightly.getTeamStats(teamName, 2025);
-        if (stats) {
-          highlightlyData += `\nSEASON STATS (2025):\n${JSON.stringify(stats, null, 2)}`;
-        }
-      }
-
-      if (queryLower.includes('injur') || queryLower.includes('hurt') || queryLower.includes('out')) {
-        const injuries = await highlightly.getInjuries(teamName);
-        if (injuries) {
-          highlightlyData += `\nINJURY REPORT:\n${JSON.stringify(injuries, null, 2)}`;
-        }
-      }
-
-      if (queryLower.includes('odd') || queryLower.includes('bet') || queryLower.includes('line') || queryLower.includes('spread')) {
-        const today = new Date().toISOString().split('T')[0];
-        const matches = await highlightly.getMatches({ team: teamName, league: league, date: today, season: 2025, limit: 1 });
-        if (matches?.length > 0 && matches[0].id) {
-          const odds = await highlightly.getMatchOdds(matches[0].id);
-          if (odds) {
-            highlightlyData += `\nBETTING ODDS:\n${JSON.stringify(odds, null, 2)}`;
-          }
-        }
-      }
-
-      if (queryLower.match(/\d{4}/) || queryLower.includes('history') || queryLower.includes('past')) {
-        const yearMatch = userQuery.match(/\d{4}/);
-        const season = yearMatch ? parseInt(yearMatch[0]) : new Date().getFullYear() - 1;
-        const matches = await highlightly.getMatches({ team: teamName, league: league, season, limit: 10 });
-        if (matches?.length > 0) {
-          highlightlyData += `\nHISTORICAL GAMES (${season}):\n${JSON.stringify(matches, null, 2)}`;
-        }
-      }
-
-      // Highlights detection
-      if (queryLower.includes('highlight') || queryLower.includes('recap') || queryLower.includes('video') || queryLower.includes('clip')) {
-        const targetDate = parseTemporalQuery(userQuery);
-        const matches = await highlightly.getMatches({ team: teamName, league: league, date: targetDate, season: 2025, limit: 1 });
-        if (matches?.length > 0 && matches[0].id) {
-          const highlights = await highlightly.getHighlights({ match: matches[0].id, limit: 5 });
-          if (highlights) {
-            highlightlyData += `\nHIGHLIGHTS:\n${JSON.stringify(highlights, null, 2)}`;
-          }
-        }
-      }
-
-      // Standings detection
-      if (queryLower.includes('standing') || queryLower.includes('rank') || queryLower.includes('position') || queryLower.includes('place') || queryLower.includes('table')) {
-        const standings = await highlightly.getStandings({ league: league, season: 2025 });
-        if (standings) {
-          highlightlyData += `\nSTANDINGS (2025):\n${JSON.stringify(standings, null, 2)}`;
-        }
-      }
-
-      // Lineups detection
-      if (queryLower.includes('lineup') || queryLower.includes('starting') || queryLower.includes('roster') || queryLower.includes('who is playing')) {
-        const targetDate = parseTemporalQuery(userQuery);
-        const matches = await highlightly.getMatches({ team: teamName, league: league, date: targetDate, season: 2025, limit: 1 });
-        if (matches?.length > 0 && matches[0].id) {
-          const lineups = await highlightly.getLineups(matches[0].id);
-          if (lineups) {
-            highlightlyData += `\nLINEUPS:\n${JSON.stringify(lineups, null, 2)}`;
-          }
-        }
-      }
-
-      // Player stats detection
-      if (queryLower.includes('player') || queryLower.match(/\b(quarterback|qb|running back|rb|receiver|wr|defense|linebacker|safety|cornerback)\b/)) {
-        const playerStats = await highlightly.getPlayerStats({ team: teamName, season: 2025, league: league });
-        if (playerStats) {
-          highlightlyData += `\nPLAYER STATS (2025):\n${JSON.stringify(playerStats, null, 2)}`;
-        }
-      }
-
-      // Head to head detection
-      if (queryLower.includes('vs') || queryLower.includes('versus') || queryLower.includes('against')) {
-        const opponentMatch = userQuery.match(/(?:vs|versus|against)\s+([A-Za-z\s]+)/i);
-        if (opponentMatch) {
-          const opponent = opponentMatch[1].trim();
-          const h2h = await highlightly.getHeadToHead(teamName, opponent, league);
-          if (h2h) {
-            highlightlyData += `\nHEAD-TO-HEAD:\n${JSON.stringify(h2h, null, 2)}`;
-          }
-        }
-      }
-    } catch (error) {
-      console.error('⚠️ Highlightly API error:', error);
-      highlightlyWorking = false;
-      
-      // Distinguish network/egress errors from other issues
-      const errorMessage = error instanceof Error ? error.message : '';
-      if (errorMessage.includes('dns') || errorMessage.includes('network') || errorMessage.includes('lookup')) {
-        console.warn('⚠️ Highlightly DNS/network failure - will rely on web search');
-        highlightlyData += '\n[Live API data temporarily unavailable - using web search]';
-      } else {
-        highlightlyData += '\n[Some data unavailable]';
-      }
-    }
-
-    // Web search fallback if no Highlightly data found or API is down
-    if (!highlightlyData || highlightlyData.trim() === '' || highlightlyData.includes('[Some data unavailable]') || !highlightlyWorking) {
-      console.log('📡 Attempting enhanced web search for current season data...');
-      
-      try {
-        const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-        const currentYear = new Date().getFullYear();
-        const currentDate = new Date().toISOString().split('T')[0];
-        
-        // Detect if this is a "next game" query
-        const isNextGameQuery = queryLower.includes('next') || queryLower.includes('upcoming') || queryLower.includes('schedule') || queryLower.includes('when');
-        
-        // Create a more specific search query
-        const searchQuery = isNextGameQuery 
-          ? `${teamName} ${league} next scheduled game after October 23 2025 upcoming opponent date time location`
-          : `${teamName} ${league} ${currentYear} season roster quarterback starting lineup ${userQuery}`;
-        
-        const searchResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${lovableApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
-            messages: [
-              { 
-                role: 'system', 
-                content: isNextGameQuery
-                  ? `You are a sports data researcher. TODAY IS OCTOBER 23, 2025. CURRENT SEASON: 2025.
-Search for the NEXT UPCOMING SCHEDULED GAME for ${teamName} (${league}).
-Find games scheduled AFTER October 23, 2025 in the 2025 season.
-Return: opponent name, date, time, location.
-CRITICAL: DO NOT return past games, historical data, or games from 2024 or earlier seasons.
-Only return 2025 season data.`
-                  : `You are a sports data researcher. TODAY IS OCTOBER 23, 2025. CURRENT SEASON: 2025.
-Search for 2025 SEASON information about: ${searchQuery}. 
-Focus on: 2025 roster, current starting lineup, recent 2025 games, and 2025 season stats.
-Return factual data with sources and dates. 
-CRITICAL: Only provide 2025 season data. Reject any 2024 or earlier data.
-If no 2025 data is available, explicitly state that.`
-              },
-              { role: 'user', content: searchQuery }
-            ],
-          }),
-        });
-        
-        if (searchResponse.ok) {
-          const searchData = await searchResponse.json();
-          const webContent = searchData.choices?.[0]?.message?.content || '';
-          if (webContent) {
-            highlightlyData += `\n\nCURRENT ${currentYear} SEASON DATA FROM WEB SEARCH:\n${webContent}`;
-          }
-        }
-      } catch (searchError) {
-        console.error('Web search fallback error:', searchError);
-      }
-    }
-
-    // Build personality-based system prompt
-    const personalityPrompts = {
-      hype: `You are Coach for ${teamName}. You're knowledgeable and enthusiastic about the team. Provide accurate information first, then add brief commentary. Keep responses factual and concise.`,
-      analytical: `You are Coach for ${teamName}. You provide data-driven analysis with stats and tactical insights. Be precise, factual, and direct. Skip the fluff.`,
-      casual: `You are Coach for ${teamName}. You're straightforward and conversational. Give clear, factual answers without excessive hype or forced enthusiasm. Be helpful, not cheerleader-ish.`
-    };
-
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const formattedDate = currentDate.toLocaleDateString('en-US', { 
-      year: 'numeric', 
+    // Build current date/time context
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString('en-US', { 
       month: 'long', 
-      day: 'numeric' 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+    const formattedTime = now.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      timeZone: 'America/New_York'
     });
 
-    const systemPrompt = `${personalityPrompts[settings.personality as keyof typeof personalityPrompts] || personalityPrompts.casual}
-
-**🚨 CRITICAL TEMPORAL CONTEXT - READ THIS FIRST 🚨**
-- TODAY'S DATE: ${formattedDate}
-- CURRENT SEASON: 2025 (NOT 2024!)
-- WE ARE IN THE 2025 NFL/NCAA SEASON
-- You MUST ONLY use 2025 season rosters, schedules, and data
-- REJECT and DO NOT use any 2024 or earlier data
-- If you don't have current 2025 data, explicitly state you need to look it up
-- When providing game scores or records, verify they are from the 2025 season
-
-**CRITICAL TEAM CONTEXT:**
-- You are the dedicated coach for ${teamName} (${league})
-- This is the ${huddle.name} huddle
-- ALL questions are about ${teamName} in the ${currentYear} season unless stated otherwise
-- When users ask "who won last night?" they mean "${teamName}'s game last night"
-- When users ask "our team", "we", or "us" they mean ${teamName}
-- When users mention just a team name without context, assume they're asking about ${teamName} vs that team
-
-**AVAILABLE DATA SOURCES:**
-- Live scores and game results
-- Upcoming game schedules
-- Team statistics and season data
-- Injury reports
-- Betting odds and spreads
-- Video highlights and game recaps
-- League standings and rankings
-- Player statistics and performance
-- Starting lineups and rosters
-- Head-to-head history
-- Web search for additional context
-
-Current Context:
-- Team: ${teamName} (${league})
-- Huddle: ${huddle.name}
-- Season: ${currentYear}
-- Recent chat:
-${conversationContext}
-
-${highlightlyData ? `Available Data:\n${highlightlyData}` : ''}
-
-User Query: "${userQuery}"
-
-Rules:
-1. Start with the direct factual answer - NO preamble or hype
-2. TODAY IS OCTOBER 23, 2025 - use 2025 season data ONLY
-3. If asked about "next game" and you don't have schedule data, say: "I don't have the confirmed schedule yet. Check the official ${teamName} schedule page for the latest updates."
-4. If you lack current data, say "I don't have confirmed ${currentYear} data for that" instead of guessing
-5. Keep responses under ${settings.response_max_words} words - prioritize facts over personality
-6. Use minimal emojis (max 1-2 per response)
-7. NO forced questions at the end
-8. NO "Let's go [team]!" or similar rally cries unless naturally relevant
-9. This is ${league} football only - never discuss other sports
-10. NEVER return data from previous seasons without clearly stating the year
-11. If query asks about rosters/players, ALWAYS verify it's ${currentYear} data before answering
-
-If you don't have reliable current data, respond: "I don't have confirmed ${currentYear} info on that yet. Let me check the latest sources."`;
-
-    // Call Lovable AI
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    // Build personality-specific tone instructions
+    let personalityPrompt = '';
+    switch (personality) {
+      case 'hype':
+        personalityPrompt = `You're SUPER ENTHUSIASTIC and ENERGETIC! Use emojis, caps, and get fans PUMPED UP! 🔥🏈 But stay accurate with facts.`;
+        break;
+      case 'analytical':
+        personalityPrompt = `You're DATA-DRIVEN and PRECISE. Focus on statistics, numbers, performance metrics, and detailed analysis. Be professional and thorough.`;
+        break;
+      case 'casual':
+        personalityPrompt = `You're CONVERSATIONAL and FRIENDLY. Talk like you're chatting with friends at a game. Keep it real, relaxed, and easy-going.`;
+        break;
     }
 
-    console.log('🤖 Calling Lovable AI...');
+    // Build system prompt for Grok
+    const systemPrompt = `You are Coach, the AI assistant for ${teamName} fans in the ${league}.
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+TODAY'S DATE: ${formattedDate}
+CURRENT TIME: ${formattedTime} ET
+CURRENT SEASON: 2025
+
+PERSONALITY: ${personalityPrompt}
+
+You have access to:
+- Real-time X/Twitter sports updates and breaking news
+- Live web search for current information
+- Team rosters, schedules, scores, and stats
+
+CRITICAL RULES:
+1. ALWAYS use your real-time search to get CURRENT 2025 season data
+2. When asked about games, check X/Twitter and web for TODAY's date (${formattedDate})
+3. If you can't find current info, say so clearly - NEVER make up data
+4. Keep responses concise (2-4 paragraphs max)
+5. Use team emojis and match the personality tone
+6. Focus on FACTS from credible sources, not speculation
+7. For roster questions, search for "2025 ${teamName} ${league} starting lineup roster"
+8. For schedule questions, search for "2025 ${teamName} ${league} schedule upcoming game"
+9. Always mention sources when providing stats or breaking news
+
+Example searches you should use:
+- "2025 ${teamName} starting quarterback"
+- "2025 ${teamName} next game schedule"
+- "${teamName} game today ${formattedDate}"
+- "2025 ${teamName} standings record"
+
+Current user question about ${teamName}: ${userQuery}`;
+
+    console.log(`🤖 Calling Grok API with model: grok-4-fast`);
+
+    // Call Grok API
+    const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'Authorization': `Bearer ${xaiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'grok-4-fast',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userQuery || 'Hi coach!' }
+          { role: 'user', content: userQuery }
         ],
+        temperature: 0.7,
         max_tokens: 500,
       }),
     });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI API error:', aiResponse.status, errorText);
+    if (!grokResponse.ok) {
+      const errorText = await grokResponse.text();
+      console.error(`❌ Grok API error (${grokResponse.status}):`, errorText);
       
-      if (aiResponse.status === 429) {
-        throw new Error('RATE_LIMITED');
+      // Handle specific error cases
+      if (grokResponse.status === 401) {
+        throw new Error('Invalid XAI API key');
+      } else if (grokResponse.status === 429) {
+        throw new Error('Rate limit exceeded for Grok API');
+      } else {
+        throw new Error(`Grok API error: ${grokResponse.status} - ${errorText}`);
       }
-      if (aiResponse.status === 402) {
-        throw new Error('PAYMENT_REQUIRED');
-      }
-      throw new Error(`AI API error: ${aiResponse.status}`);
     }
 
-    const aiData = await aiResponse.json();
-    const botResponse = aiData.choices?.[0]?.message?.content || 'Coach is taking a timeout—try again in a sec! 🏈';
+    const grokData = await grokResponse.json();
+    const aiResponse = grokData.choices?.[0]?.message?.content;
 
-    console.log('✅ Generated response:', botResponse);
+    if (!aiResponse) {
+      throw new Error('No response from Grok API');
+    }
 
-    // Get system user for posting
-    const { data: systemUser } = await supabase.rpc('get_or_create_system_user');
+    console.log(`✅ Grok response received (${aiResponse.length} chars)`);
+
+    // Get or create system user for posting
+    const { data: systemUserData } = await supabase.rpc('get_or_create_system_user');
+    const systemUserId = systemUserData;
 
     // Post response to huddle
     const { error: postError } = await supabase
       .from('huddle_messages')
       .insert({
         huddle_id: huddle_id,
-        user_id: systemUser,
-        content: `🤖 ${botResponse}`,
+        user_id: systemUserId,
+        content: `🤖 ${aiResponse}`,
         is_bot_message: true,
-        message_type: 'coach_response'
       });
 
     if (postError) {
       console.error('Error posting message:', postError);
-      throw postError;
+      throw new Error(`Failed to post message: ${postError.message}`);
     }
 
     // Update rate limit
     rateLimitMap.set(huddle_id, now);
 
-    console.log('✅ Coach response posted successfully');
-
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
-
-  } catch (error) {
-    console.error('team-chatbot error:', error);
-
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
-    if (errorMessage === 'RATE_LIMITED') {
-      return new Response(
-        JSON.stringify({ error: 'Coach is catching his breath—try again in a minute! 💪' }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (errorMessage === 'PAYMENT_REQUIRED') {
-      return new Response(
-        JSON.stringify({ error: 'Coach needs a refill—contact support!' }),
-        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    console.log(`✅ Coach response posted to huddle ${huddle_id}`);
 
     return new Response(
-      JSON.stringify({ error: 'The stat sheet\'s smudged—give me a sec! 📊' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        success: true, 
+        message: 'Response posted',
+        preview: aiResponse.substring(0, 100) + '...'
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
+  } catch (error) {
+    console.error('❌ Team chatbot error:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    return new Response(
+      JSON.stringify({ 
+        error: errorMessage,
+        details: error instanceof Error ? error.stack : undefined
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      }
     );
   }
 });
