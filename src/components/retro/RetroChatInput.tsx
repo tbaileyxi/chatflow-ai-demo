@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Send, Plus, Smile, Camera, Image, Trophy, Video } from 'lucide-react';
+import { Send, Plus, Smile, Camera, Image, Trophy, Video, Bot } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -279,6 +279,29 @@ export const RetroChatInput = ({
     e.target.value = '';
   }, [handleFileUpload]);
 
+  const handleCoachClick = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    
+    // Insert @coach at cursor position (or beginning if empty)
+    const newMessage = message.slice(0, start) + '@coach ' + message.slice(end);
+    setMessage(newMessage);
+    
+    // Focus textarea and set cursor after @coach 
+    setTimeout(() => {
+      textarea.focus();
+      const newPosition = start + 7; // "@coach " is 7 chars
+      textarea.setSelectionRange(newPosition, newPosition);
+      
+      // Trigger resize
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 100)}px`;
+    }, 0);
+  }, [message]);
+
   useEffect(() => {
     return () => onTyping?.(false);
   }, [onTyping]);
@@ -443,6 +466,18 @@ export const RetroChatInput = ({
               </PopoverContent>
             </Popover>
           </div>
+          
+          {/* Coach button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-10 w-10 p-0 bg-team-primary/20 border border-team-primary/40 hover:bg-team-primary/30 rounded-full retro-button-glow"
+            disabled={disabled || sending}
+            onClick={handleCoachClick}
+            aria-label="Ask Coach"
+          >
+            <Bot className="w-5 h-5 text-team-primary" />
+          </Button>
           
           {/* Send button */}
           <Button
