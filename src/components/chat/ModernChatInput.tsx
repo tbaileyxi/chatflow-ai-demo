@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Send, Plus, Smile, Camera, Image, Trophy, Video } from 'lucide-react';
+import { Send, Plus, Smile, Camera, Image, Trophy, Video, Bot } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -182,6 +182,29 @@ export const ModernChatInput = ({
     // Reset input value
     e.target.value = '';
   }, [handleFileUpload]);
+
+  const handleCoachClick = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    
+    // Insert @coach at cursor position (or beginning if empty)
+    const newMessage = message.slice(0, start) + '@coach ' + message.slice(end);
+    setMessage(newMessage);
+    
+    // Focus textarea and set cursor after @coach 
+    setTimeout(() => {
+      textarea.focus();
+      const newPosition = start + 7; // "@coach " is 7 chars
+      textarea.setSelectionRange(newPosition, newPosition);
+      
+      // Trigger resize
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
+    }, 0);
+  }, [message]);
 
   const handleSlashCommand = useCallback(async (command: string) => {
     if (!huddleId || !userId) {
@@ -471,6 +494,19 @@ export const ModernChatInput = ({
                 </div>
               </PopoverContent>
             </Popover>
+            
+            {/* Coach button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-12 w-12 p-0 hover:bg-muted rounded-full"
+              disabled={disabled || sending}
+              onClick={handleCoachClick}
+              aria-label="Ask Coach"
+            >
+              <Bot className="w-5 h-5 text-primary" />
+            </Button>
+            
             <Button
               onClick={handleSend}
               disabled={!message.trim() || sending || disabled}
