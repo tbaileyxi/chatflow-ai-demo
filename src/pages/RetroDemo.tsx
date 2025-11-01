@@ -133,8 +133,8 @@ export const RetroDemo = () => {
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder="Share your thoughts..."
-              className="flex-1 bg-muted/30 border border-team-primary/40 rounded-lg px-3 py-2 text-sm font-chat 
+              placeholder="Chat here..."
+              className="flex-1 bg-muted/30 border border-team-primary/40 rounded-lg px-3 py-2 text-sm font-chat
                        focus:outline-none focus:ring-2 focus:ring-team-primary/50 
                        placeholder:text-muted-foreground contrast-text"
             />

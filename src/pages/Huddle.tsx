@@ -526,7 +526,7 @@ export const Huddle = () => {
           <RetroChatInput
             onSendMessage={sendMessage}
             onSendMedia={sendMediaMessage}
-            placeholder="Share your thoughts..."
+            placeholder="Chat here..."
             disabled={loading}
             huddleId={huddleId!}
             teamName={teamName}

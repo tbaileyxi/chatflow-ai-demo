@@ -33,7 +33,7 @@ export const RetroChatInput = ({
   onSendMessage, 
   onSendMedia, 
   onTyping,
-  placeholder = "Drop your take...",
+  placeholder = "Chat here...",
   disabled = false,
   huddleId,
   userId,
