@@ -120,11 +120,75 @@ Deno.serve(async (req) => {
         const listResults = [];
         for (const tweet of twitterData.data) {
           const user = usersMap.get(tweet.author_id);
-          // Normalize embed URL to twitter.com for better compatibility
-          const embedUrl = `https://twitter.com/${user?.username || 'user'}/status/${tweet.id}`;
+          
+          // Phase A: Generate blockquote embed code for inline video playback
+          const embedUrl = `<blockquote class="twitter-tweet"><a href="https://twitter.com/${user?.username || 'user'}/status/${tweet.id}"></a></blockquote><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>`;
           
           const metrics = tweet.public_metrics || {};
           const rankScore = calculateRankScore(metrics, tweet.created_at);
+
+          // Phase B: Detect media attachments
+          const hasMedia = tweet.attachments?.media_keys?.length > 0;
+          let mediaType = null;
+          if (hasMedia && twitterData.includes?.media) {
+            const media = twitterData.includes.media.find((m: any) => 
+              tweet.attachments.media_keys.includes(m.media_key)
+            );
+            mediaType = media?.type || 'unknown'; // 'video', 'photo', 'animated_gif'
+          }
+
+          // Phase B: Call Grok AI for content analysis
+          let grokAnalysis = null;
+          let qualityScore = 30; // Default low score
+          let topics: string[] = [];
+          let highlightWorthy = false;
+          let autoApprove = false;
+
+          try {
+            const grokResponse = await fetch(
+              `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-x-content-grok`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`
+                },
+                body: JSON.stringify({
+                  tweetContent: tweet.text,
+                  tweetUrl: `https://twitter.com/${user?.username}/status/${tweet.id}`,
+                  authorUsername: user?.username || 'unknown',
+                  hasMedia,
+                  mediaType,
+                  metrics: {
+                    likes: metrics.like_count || 0,
+                    retweets: metrics.retweet_count || 0,
+                    replies: metrics.reply_count || 0
+                  },
+                  createdAt: tweet.created_at
+                })
+              }
+            );
+
+            if (grokResponse.ok) {
+              grokAnalysis = await grokResponse.json();
+              qualityScore = grokAnalysis.quality_score || 30;
+              topics = grokAnalysis.topics || [];
+              highlightWorthy = grokAnalysis.highlight_worthy || false;
+              
+              // Auto-approve high-quality content (70+)
+              autoApprove = qualityScore >= 70;
+              
+              console.log(`[Tweet ${tweet.id}] Grok score: ${qualityScore}, highlight: ${highlightWorthy}, auto-approve: ${autoApprove}`);
+            }
+          } catch (grokError) {
+            console.error(`[Tweet ${tweet.id}] Grok analysis failed:`, grokError);
+          }
+
+          // Phase B: Filter out low-quality content (<50)
+          if (qualityScore < 50) {
+            console.log(`[Tweet ${tweet.id}] Filtered out (quality ${qualityScore} < 50)`);
+            continue; // Skip this tweet
+          }
 
           const trendingData = {
             team_id: source.team_id,
@@ -136,9 +200,16 @@ Deno.serve(async (req) => {
             retweets: metrics.retweet_count || 0,
             replies: metrics.reply_count || 0,
             rank_score: rankScore,
-            status: 'pending',
+            status: autoApprove ? 'approved' : 'pending',
             created_at: tweet.created_at || new Date().toISOString(),
-            fetched_at: new Date().toISOString()
+            fetched_at: new Date().toISOString(),
+            // Phase B: Grok metadata
+            grok_analysis: grokAnalysis,
+            quality_score: qualityScore,
+            has_media: hasMedia,
+            media_type: mediaType,
+            topics,
+            highlight_worthy: highlightWorthy
           };
 
           // Insert with upsert to avoid duplicates

@@ -7,6 +7,12 @@ on_schedule = "*/3 * * * *"
 [functions.team-chatbot]
 verify_jwt = false
 
+[functions.analyze-x-content-grok]
+verify_jwt = false
+
+[functions.ingest-x-sources]
+verify_jwt = false
+
 [functions.create-huddle-subscription]
 verify_jwt = true
 

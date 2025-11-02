@@ -1230,9 +1230,14 @@ export type Database = {
           created_at: string
           embed_url: string
           fetched_at: string
+          grok_analysis: Json | null
+          has_media: boolean | null
+          highlight_worthy: boolean | null
           id: string
           likes: number
+          media_type: string | null
           post_id: string
+          quality_score: number | null
           rank_score: number
           replies: number
           retweets: number
@@ -1240,6 +1245,7 @@ export type Database = {
           reviewed_by: string | null
           status: string
           team_id: string | null
+          topics: string[] | null
         }
         Insert: {
           author_username?: string | null
@@ -1247,9 +1253,14 @@ export type Database = {
           created_at?: string
           embed_url: string
           fetched_at?: string
+          grok_analysis?: Json | null
+          has_media?: boolean | null
+          highlight_worthy?: boolean | null
           id?: string
           likes?: number
+          media_type?: string | null
           post_id: string
+          quality_score?: number | null
           rank_score?: number
           replies?: number
           retweets?: number
@@ -1257,6 +1268,7 @@ export type Database = {
           reviewed_by?: string | null
           status?: string
           team_id?: string | null
+          topics?: string[] | null
         }
         Update: {
           author_username?: string | null
@@ -1264,9 +1276,14 @@ export type Database = {
           created_at?: string
           embed_url?: string
           fetched_at?: string
+          grok_analysis?: Json | null
+          has_media?: boolean | null
+          highlight_worthy?: boolean | null
           id?: string
           likes?: number
+          media_type?: string | null
           post_id?: string
+          quality_score?: number | null
           rank_score?: number
           replies?: number
           retweets?: number
@@ -1274,6 +1291,7 @@ export type Database = {
           reviewed_by?: string | null
           status?: string
           team_id?: string | null
+          topics?: string[] | null
         }
         Relationships: [
           {

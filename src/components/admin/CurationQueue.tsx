@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle, XCircle, Send, Star, ExternalLink } from 'lucide-react';
+import { CheckCircle, XCircle, Send, Star, ExternalLink, Video, Image as ImageIcon, Zap, Filter } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { XPostEmbed } from '@/components/embeds/XPostEmbed';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -28,6 +28,13 @@ interface TeamTrending {
     name: string;
     city: string;
   };
+  // Phase B: Grok AI metadata
+  quality_score?: number;
+  has_media?: boolean;
+  media_type?: string;
+  topics?: string[];
+  highlight_worthy?: boolean;
+  grok_analysis?: any;
 }
 
 export const CurationQueue = () => {
@@ -42,7 +49,41 @@ export const CurationQueue = () => {
     teamFeed: true,
     huddles: [] as string[]
   });
+  const [showHighlightsOnly, setShowHighlightsOnly] = useState(false);
+  const [minQualityScore, setMinQualityScore] = useState(0);
   const { toast } = useToast();
+
+  // Quick Broadcast using Grok recommendations
+  const handleQuickBroadcast = async (item: TeamTrending) => {
+    if (item.grok_analysis?.broadcast_to) {
+      const destinations = {
+        spotlight: item.grok_analysis.broadcast_to.includes('spotlight'),
+        teamFeed: item.grok_analysis.broadcast_to.includes('team_feed'),
+        huddles: item.highlight_worthy 
+          ? huddles.filter(h => h.team_id === item.team_id).map(h => h.id)
+          : []
+      };
+      
+      // Temporarily set destinations
+      const prevDestinations = selectedDestinations;
+      setSelectedDestinations(destinations);
+      
+      await handleBroadcast(item);
+      
+      // Restore previous destinations
+      setSelectedDestinations(prevDestinations);
+    } else {
+      await handleBroadcast(item);
+    }
+  };
+
+  // Get quality score color
+  const getQualityColor = (score?: number) => {
+    if (!score) return 'secondary';
+    if (score >= 85) return 'default'; // Green
+    if (score >= 70) return 'secondary'; // Yellow
+    return 'outline'; // Red
+  };
 
   useEffect(() => {
     fetchData();
@@ -87,6 +128,7 @@ export const CurationQueue = () => {
         .from('team_trending')
         .select('*, teams(id, name, city)')
         .eq('status', activeTab)
+        .order('quality_score', { ascending: false })
         .order('rank_score', { ascending: false })
         .limit(50);
 
@@ -97,7 +139,16 @@ export const CurationQueue = () => {
       const { data, error } = await query;
       if (error) throw error;
       
-      setTrending(data || []);
+      // Client-side filtering for highlights and quality
+      let filteredData = data || [];
+      if (showHighlightsOnly) {
+        filteredData = filteredData.filter(item => item.highlight_worthy);
+      }
+      if (minQualityScore > 0) {
+        filteredData = filteredData.filter(item => (item.quality_score || 0) >= minQualityScore);
+      }
+      
+      setTrending(filteredData);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -261,7 +312,7 @@ export const CurationQueue = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4 mb-6">
+          <div className="flex gap-4 mb-6 flex-wrap">
             <Select value={selectedTeam} onValueChange={setSelectedTeam}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="All Teams" />
@@ -273,6 +324,29 @@ export const CurationQueue = () => {
                     {team.city} {team.name}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="highlights-only"
+                checked={showHighlightsOnly}
+                onCheckedChange={(checked) => setShowHighlightsOnly(!!checked)}
+              />
+              <label htmlFor="highlights-only" className="text-sm flex items-center gap-1">
+                <Star className="h-3 w-3 text-yellow-500" />
+                Highlights Only
+              </label>
+            </div>
+
+            <Select value={minQualityScore.toString()} onValueChange={(val) => setMinQualityScore(parseInt(val))}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Quality Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">All Quality Scores</SelectItem>
+                <SelectItem value="70">Good (70+)</SelectItem>
+                <SelectItem value="85">Excellent (85+)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -291,14 +365,48 @@ export const CurationQueue = () => {
                   <Card key={item.id} className="overflow-hidden">
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline">
                             {item.teams?.city} {item.teams?.name}
                           </Badge>
-                          <Badge variant="secondary">
-                            <Star className="h-3 w-3 mr-1" />
-                            {item.rank_score}
-                          </Badge>
+                          
+                          {/* Quality Score Badge */}
+                          {item.quality_score !== undefined && (
+                            <Badge variant={getQualityColor(item.quality_score)}>
+                              <Filter className="h-3 w-3 mr-1" />
+                              {item.quality_score}
+                            </Badge>
+                          )}
+
+                          {/* Media Badges */}
+                          {item.has_media && item.media_type === 'video' && (
+                            <Badge variant="secondary" className="bg-purple-500/10 text-purple-700 dark:text-purple-300">
+                              <Video className="h-3 w-3 mr-1" />
+                              Video
+                            </Badge>
+                          )}
+                          {item.has_media && item.media_type === 'photo' && (
+                            <Badge variant="secondary" className="bg-blue-500/10 text-blue-700 dark:text-blue-300">
+                              <ImageIcon className="h-3 w-3 mr-1" />
+                              Image
+                            </Badge>
+                          )}
+
+                          {/* Highlight Badge */}
+                          {item.highlight_worthy && (
+                            <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">
+                              <Star className="h-3 w-3 mr-1" />
+                              Highlight
+                            </Badge>
+                          )}
+
+                          {/* Topics */}
+                          {item.topics && item.topics.length > 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              {item.topics[0]}
+                            </Badge>
+                          )}
+                          
                           <span className="text-sm text-muted-foreground">
                             @{item.author_username}
                           </span>
@@ -372,7 +480,19 @@ export const CurationQueue = () => {
                             </div>
                           </div>
 
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 flex-wrap">
+                            {/* Quick Broadcast using Grok AI recommendations */}
+                            {item.grok_analysis && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleQuickBroadcast(item)}
+                                className="bg-gradient-to-r from-purple-600 to-pink-600"
+                              >
+                                <Zap className="h-4 w-4 mr-2" />
+                                Quick Broadcast
+                              </Button>
+                            )}
+                            
                             <Button
                               size="sm"
                               onClick={() => handleBroadcast(item)}
@@ -399,6 +519,13 @@ export const CurationQueue = () => {
                               Reject
                             </Button>
                           </div>
+                          
+                          {/* Show Grok reasoning */}
+                          {item.grok_analysis?.reasoning && (
+                            <div className="mt-2 text-xs text-muted-foreground italic border-l-2 border-purple-500/50 pl-2">
+                              AI: {item.grok_analysis.reasoning}
+                            </div>
+                          )}
                         </div>
                       )}
                     </CardContent>
