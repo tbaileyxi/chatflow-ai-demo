@@ -121,32 +121,34 @@ serve(async (req) => {
     const personality = settings.personality || 'hype';
 
     // Build current date/time context - ALL IN EASTERN TIME
-    const nowUTC = new Date();
-    const etDateString = nowUTC.toLocaleString('en-US', { timeZone: 'America/New_York' });
-    const currentDate = new Date(etDateString); // Now represents ET, not UTC
-    
-    const formattedDate = currentDate.toLocaleDateString('en-US', { 
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString('en-US', { 
       month: 'long', 
       day: 'numeric', 
       year: 'numeric',
       timeZone: 'America/New_York'
     });
-    const formattedTime = currentDate.toLocaleTimeString('en-US', { 
+    const formattedTime = now.toLocaleTimeString('en-US', { 
       hour: 'numeric', 
       minute: '2-digit',
       timeZone: 'America/New_York'
     });
 
     // Calculate current season based on ET date
-    const currentMonth = currentDate.getMonth(); // 0-11 (0=Jan, 11=Dec)
-    const currentYear = currentDate.getFullYear();
+    const etMonth = parseInt(now.toLocaleDateString('en-US', { 
+      month: 'numeric',
+      timeZone: 'America/New_York'
+    }));
+    const etYear = parseInt(now.toLocaleDateString('en-US', { 
+      year: 'numeric',
+      timeZone: 'America/New_York'
+    }));
 
     // NCAA/NFL seasons start in August/September and end the following year
-    // If we're in Jan-July, we're in the previous year's season (e.g., Jan 2026 = 2025-2026 season)
-    // If we're in Aug-Dec, we're in the current year's season (e.g., Nov 2025 = 2025-2026 season)
-    const seasonStartYear = currentMonth >= 7 ? currentYear : currentYear - 1; // 7 = August
+    const seasonStartYear = etMonth >= 8 ? etYear : etYear - 1; // 8 = August (1-based month)
     const seasonEndYear = seasonStartYear + 1;
     const seasonString = `${seasonStartYear}-${seasonEndYear}`;
+    const currentDate = now; // Keep reference for date calculations below
 
     console.log(`📅 ET Date: ${formattedDate} | Season: ${seasonString} (start year: ${seasonStartYear})`);
 
