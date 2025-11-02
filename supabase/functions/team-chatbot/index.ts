@@ -315,8 +315,7 @@ User question: ${finalQuery}`;
         max_tokens: 300,
         search_parameters: {
           mode: 'on',                // FORCE web search for every query
-          return_citations: true,    // Include sources in response
-          sources: ['web']           // Explicitly use web search (not X posts)
+          return_citations: true     // Include sources in response
         }
       }),
     });
