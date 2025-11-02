@@ -246,22 +246,32 @@ serve(async (req) => {
 ⏰ CURRENT TIME: ${formattedTime} ET
 🏈 CURRENT SEASON: ${seasonString}
 
-🎯 CRITICAL INSTRUCTION: FACTUAL ACCURACY FIRST
+🎯 CRITICAL INSTRUCTION: STRUCTURED DATA EXTRACTION
 
-You MUST follow this two-step process:
+When the user asks about scores or game status, you MUST respond in this exact format:
 
-STEP 1: EXTRACT FACTS from web search
-- What is the actual score? (e.g., Giants 7, 49ers 17)
-- What quarter/time remaining? (e.g., Q3, 13:24)
-- What actually happened? (e.g., 49ers scored 2 TDs in 1st half)
+**For live/finished games:**
+\`\`\`
+Current Score: [Away Team] [Score] - [Home Team] [Score]
+Status: [Quarter/Period] ([Time Remaining] or FINAL)
+Last Update: [Most recent play or scoring event]
+[Then add 1-2 sentences in your personality style]
+\`\`\`
 
-STEP 2: FORMAT FACTS in personality style
-- Take the REAL information from Step 1
-- Add personality tone (hype/analytical/casual)
-- DO NOT fabricate events that didn't happen
-- DO NOT make up scores or plays
+**For scheduled games:**
+\`\`\`
+Game Status: Not started
+Kickoff: [Time] ET vs [Opponent]
+[Then add 1-2 sentences in your personality style]
+\`\`\`
 
-NEVER prioritize excitement over accuracy. If the ${teamName} are losing 7-17, say they're losing 7-17 (then add hype about comeback potential).
+EXAMPLE (if ${teamName} trailing 10-20 in Q3):
+"Current Score: ${teamName} 10 - 49ers 20
+Status: 3rd Quarter (6:42 remaining)
+Last Update: 49ers WR Jauan Jennings 11-yard TD
+🤖 We're down but NOT out! 10 points is nothing - we've come back from worse! Defense needs to step up and our offense needs to capitalize. LET'S GO! 🔥"
+
+DO NOT write long narratives without stating the score clearly first. The score MUST be in the first line.
 
 PERSONALITY: ${personalityPrompt}
 
@@ -359,6 +369,9 @@ User question: ${finalQuery}`;
         search_parameters: {
           mode: 'on',                // FORCE web search for every query
           return_citations: true     // Include sources in response
+        },
+        response_format: {
+          type: "text"              // Ensure structured text response
         }
       }),
     });
@@ -390,6 +403,17 @@ User question: ${finalQuery}`;
 
     if (!aiResponse) {
       throw new Error('No response from Grok API');
+    }
+
+    // Validate that response contains score information for score queries
+    const isScoreQuery = finalQuery.toLowerCase().match(/score|game|playing|winning|losing/);
+    const hasScoreFormat = aiResponse.match(/\d+\s*-\s*\d+/);
+    const hasNotStarted = aiResponse.toLowerCase().includes('not started') || 
+                         aiResponse.toLowerCase().includes('kickoff');
+    
+    if (isScoreQuery && !hasScoreFormat && !hasNotStarted) {
+      console.warn('⚠️ Score query but no score found in response');
+      console.warn('Response:', aiResponse.substring(0, 200));
     }
 
     // Remove any source citations that Grok might include
