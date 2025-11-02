@@ -229,13 +229,13 @@ serve(async (req) => {
     let personalityPrompt = '';
     switch (personality) {
       case 'hype':
-        personalityPrompt = `You're SUPER ENTHUSIASTIC and ENERGETIC! Use emojis, caps, and get fans PUMPED UP! 🔥🏈 But stay accurate with facts.`;
+        personalityPrompt = `You're SUPER ENTHUSIASTIC and ENERGETIC! Use emojis, caps, and get fans PUMPED UP! 🔥🏈 BUT: Always report REAL scores and facts first, then add the hype. Never fabricate plays or scores.`;
         break;
       case 'analytical':
-        personalityPrompt = `You're DATA-DRIVEN and PRECISE. Focus on statistics, numbers, performance metrics, and detailed analysis. Be professional and thorough.`;
+        personalityPrompt = `You're DATA-DRIVEN and PRECISE. Focus on statistics, numbers, performance metrics, and detailed analysis. Be professional and thorough. Always cite real stats.`;
         break;
       case 'casual':
-        personalityPrompt = `You're CONVERSATIONAL and FRIENDLY. Talk like you're chatting with friends at a game. Keep it real, relaxed, and easy-going.`;
+        personalityPrompt = `You're CONVERSATIONAL and FRIENDLY. Talk like you're chatting with friends at a game. Keep it real, relaxed, and easy-going. Stick to the facts but keep it fun.`;
         break;
     }
 
@@ -245,6 +245,23 @@ serve(async (req) => {
 🗓️ TODAY'S DATE: ${formattedDate}
 ⏰ CURRENT TIME: ${formattedTime} ET
 🏈 CURRENT SEASON: ${seasonString}
+
+🎯 CRITICAL INSTRUCTION: FACTUAL ACCURACY FIRST
+
+You MUST follow this two-step process:
+
+STEP 1: EXTRACT FACTS from web search
+- What is the actual score? (e.g., Giants 7, 49ers 17)
+- What quarter/time remaining? (e.g., Q3, 13:24)
+- What actually happened? (e.g., 49ers scored 2 TDs in 1st half)
+
+STEP 2: FORMAT FACTS in personality style
+- Take the REAL information from Step 1
+- Add personality tone (hype/analytical/casual)
+- DO NOT fabricate events that didn't happen
+- DO NOT make up scores or plays
+
+NEVER prioritize excitement over accuracy. If the ${teamName} are losing 7-17, say they're losing 7-17 (then add hype about comeback potential).
 
 PERSONALITY: ${personalityPrompt}
 
@@ -331,9 +348,13 @@ User question: ${finalQuery}`;
         model: 'grok-4-fast',
         messages: [
           { role: 'system', content: systemPrompt },
+          { 
+            role: 'system', 
+            content: `CRITICAL: Before responding, verify you are using REAL information from your web search, not fabricated scenarios. If the search shows ${teamName} losing 7-17, report that score exactly. Do not make up exciting plays that didn't happen.` 
+          },
           { role: 'user', content: finalQuery }
         ],
-        temperature: 0.7,
+        temperature: 0.3,
         max_tokens: 300,
         search_parameters: {
           mode: 'on',                // FORCE web search for every query
