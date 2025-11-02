@@ -187,13 +187,6 @@ export const HuddleSettingsDropdown: React.FC<HuddleSettingsDropdownProps> = ({
                 <Users className="mr-2 h-4 w-4" />
                 Manage Members
               </DropdownMenuItem>
-              
-              {!isVerified && (
-                <DropdownMenuItem onClick={() => navigate(`/huddle/${huddleId}/settings`)}>
-                  <Shield className="mr-2 h-4 w-4" />
-                  Verify Huddle
-                </DropdownMenuItem>
-              )}
 
               <DropdownMenuItem onClick={() => navigate(`/huddle/${huddleId}/settings`)}>
                 <Zap className="mr-2 h-4 w-4" />

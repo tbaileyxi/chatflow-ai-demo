@@ -31,6 +31,10 @@ interface Huddle {
     display_name?: string;
     username?: string;
   };
+  pricing?: {
+    is_enabled: boolean;
+    price_per_month: number;
+  };
 }
 
 export const HuddleSearch = () => {
@@ -59,6 +63,10 @@ export const HuddleSearch = () => {
           teams:team_id (
             name,
             logo_url
+          ),
+          huddle_pricing!left (
+            is_enabled,
+            price_per_month
           )
         `)
         .eq("is_private", false)
@@ -77,7 +85,8 @@ export const HuddleSearch = () => {
       const formattedHuddles = data?.map(huddle => ({
         ...huddle,
         team: huddle.teams || { name: "Unknown Team" },
-        owner_profile: ownerProfiles?.find(p => p.user_id === huddle.owner_id)
+        owner_profile: ownerProfiles?.find(p => p.user_id === huddle.owner_id),
+        pricing: huddle.huddle_pricing?.[0] || null
       })) || [];
 
       setVerifiedHuddles(formattedHuddles);
@@ -124,7 +133,12 @@ export const HuddleSearch = () => {
               </p>
             </div>
           </div>
-          <HuddleJoinButton huddle={huddle} onJoinSuccess={fetchHuddles} />
+          <HuddleJoinButton 
+            huddle={huddle} 
+            onJoinSuccess={fetchHuddles}
+            membershipRequired={huddle.pricing?.is_enabled || false}
+            membershipPrice={huddle.pricing?.price_per_month || 0}
+          />
         </div>
       </CardHeader>
       <CardContent className="pt-0">
@@ -137,6 +151,15 @@ export const HuddleSearch = () => {
             <Badge variant="secondary" className="text-xs">
               <Shield className="w-3 h-3 mr-1" />
               Official
+            </Badge>
+          )}
+          {huddle.pricing?.is_enabled ? (
+            <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-700 dark:text-green-400">
+              ${(huddle.pricing.price_per_month / 100).toFixed(2)}/mo
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-400">
+              FREE
             </Badge>
           )}
         </div>

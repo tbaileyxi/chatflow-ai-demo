@@ -212,20 +212,17 @@ export const HuddleSettings = () => {
           {isOwner && (
             <div className="bg-card/50 backdrop-blur-sm border border-white/10 rounded-xl p-4">
               <h3 className="text-lg font-semibold mb-4 text-foreground">Huddle Verification</h3>
-              <HuddleVerificationDialog
-                huddleId={huddle.id}
-                isVerified={subscriptionStatus?.is_verified || false}
-                trigger={
-                  <div className="w-full">
-                    {subscriptionStatus?.is_verified ? (
-                      <div className="flex items-center gap-2 text-verified-primary">
-                        <div className="w-2 h-2 bg-verified-primary rounded-full"></div>
-                        <span className="text-sm font-medium">This huddle is verified</span>
-                      </div>
-                    ) : null}
-                  </div>
-                }
-              />
+              {subscriptionStatus?.is_verified ? (
+                <div className="flex items-center gap-2 text-verified-primary">
+                  <div className="w-2 h-2 bg-verified-primary rounded-full"></div>
+                  <span className="text-sm font-medium">This huddle is verified</span>
+                </div>
+              ) : (
+                <HuddleVerificationDialog
+                  huddleId={huddle.id}
+                  isVerified={false}
+                />
+              )}
             </div>
           )}
 

@@ -268,11 +268,11 @@ export const CreateVerifiedHuddleDialog = ({ onHuddleCreated, trigger }: CreateV
                 <div className="text-sm">
                   <p className="font-medium mb-1 text-verified-primary">What is a Verified Huddle?</p>
                   <ul className="text-muted-foreground space-y-1 text-xs">
+                    <li>• Set subscription rates and earn. Members pay to join. Or make it free!</li>
                     <li>• Official verification badge</li>
                     <li>• Discoverable in public search</li>
                     <li>• Member approval system</li>
                     <li>• Enhanced credibility</li>
-                    <li>• Priority in listings</li>
                   </ul>
                 </div>
               </div>
