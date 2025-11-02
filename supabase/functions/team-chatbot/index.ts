@@ -377,7 +377,7 @@ User question: ${finalQuery}`;
         ],
         stream: false,
         search_parameters: {
-          mode: 'auto',
+          mode: 'always',
           return_citations: true,
           sources: [
             { type: 'web' }
