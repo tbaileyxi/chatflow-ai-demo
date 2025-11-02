@@ -1,6 +1,45 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Import Highlightly client
+async function createHighlightlyClient() {
+  const apiKey = Deno.env.get('HIGHLIGHTLY_API_KEY');
+  const baseUrl = 'https://american-football.highlightly.net';
+
+  async function fetchWithRetry(url: string, maxRetries = 3) {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'x-rapidapi-key': apiKey || '',
+            'Accept': 'application/json',
+          },
+        });
+        if (response.ok) {
+          return await response.json();
+        }
+      } catch (error) {
+        if (i === maxRetries - 1) throw error;
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      }
+    }
+    return null;
+  }
+
+  return {
+    async getMatches(params: { team?: string; league?: string; date?: string; limit?: number; status?: string }) {
+      const searchParams = new URLSearchParams();
+      if (params.team) searchParams.set('team', params.team);
+      if (params.league) searchParams.set('league', params.league);
+      if (params.date) searchParams.set('date', params.date);
+      if (params.limit) searchParams.set('limit', params.limit.toString());
+      if (params.status) searchParams.set('status', params.status);
+      
+      return fetchWithRetry(`${baseUrl}/matches?${searchParams.toString()}`);
+    },
+  };
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -111,6 +150,76 @@ serve(async (req) => {
       timeZone: 'America/New_York'
     });
 
+    // Calculate current season based on date
+    const currentMonth = currentDate.getMonth(); // 0-11 (0=Jan, 11=Dec)
+    const currentYear = currentDate.getFullYear();
+
+    // NCAA/NFL seasons start in August/September and end the following year
+    // If we're in Jan-July, we're in the previous year's season (e.g., Jan 2026 = 2025-2026 season)
+    // If we're in Aug-Dec, we're in the current year's season (e.g., Nov 2025 = 2025-2026 season)
+    const seasonStartYear = currentMonth >= 7 ? currentYear : currentYear - 1; // 7 = August
+    const seasonEndYear = seasonStartYear + 1;
+    const seasonString = `${seasonStartYear}-${seasonEndYear}`;
+
+    console.log(`📅 Season: ${seasonString} (start year: ${seasonStartYear})`);
+
+    // Query Highlightly for recent game data
+    let liveGameContext = '';
+    try {
+      const highlightly = await createHighlightlyClient();
+      const today = currentDate.toISOString().split('T')[0];
+      const yesterday = new Date(currentDate);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+      // Try to get recent games (today and yesterday)
+      const [todayGames, yesterdayGames] = await Promise.all([
+        highlightly.getMatches({ team: teamName, league, date: today, limit: 5 }),
+        highlightly.getMatches({ team: teamName, league, date: yesterdayStr, limit: 5 })
+      ]);
+
+      const recentGames = [
+        ...(todayGames?.data || []),
+        ...(yesterdayGames?.data || [])
+      ].filter(Boolean);
+
+      if (recentGames.length > 0) {
+        console.log(`🏈 Found ${recentGames.length} recent game(s) from Highlightly`);
+        
+        // Find live or most recent game
+        const liveGame = recentGames.find((g: any) => g.status === 'live');
+        const recentGame = liveGame || recentGames[0];
+
+        if (recentGame) {
+          const homeTeam = recentGame.homeTeam?.name || 'Home';
+          const awayTeam = recentGame.awayTeam?.name || 'Away';
+          const homeScore = recentGame.homeTeam?.score || 0;
+          const awayScore = recentGame.awayTeam?.score || 0;
+          const status = recentGame.status || 'scheduled';
+          const period = recentGame.period || '';
+
+          liveGameContext = `\n\n🏈 LIVE GAME DATA FROM HIGHLIGHTLY API:\n`;
+          
+          if (status === 'live') {
+            liveGameContext += `${awayTeam} @ ${homeTeam} - LIVE ${period}\nScore: ${awayTeam} ${awayScore}, ${homeTeam} ${homeScore}\n`;
+            liveGameContext += `This is FACTUAL real-time data. Use this if the user asks about today's game or current score.`;
+          } else if (status === 'finished') {
+            liveGameContext += `${awayTeam} @ ${homeTeam} - FINAL\nScore: ${awayTeam} ${awayScore}, ${homeTeam} ${homeScore}\n`;
+            liveGameContext += `This is the most recent completed game. Use this if asked about the last game.`;
+          } else {
+            liveGameContext += `Upcoming: ${awayTeam} @ ${homeTeam}\nStatus: ${status}\n`;
+          }
+
+          console.log(`✅ Live game context added: ${status}`);
+        }
+      } else {
+        console.log(`⚠️ No recent games found in Highlightly`);
+      }
+    } catch (error) {
+      console.error('⚠️ Failed to fetch Highlightly data:', error);
+      // Continue without game data - not critical
+    }
+
     // Build personality-specific tone instructions
     let personalityPrompt = '';
     switch (personality) {
@@ -130,19 +239,29 @@ serve(async (req) => {
 
 🗓️ TODAY'S DATE: ${formattedDate}
 ⏰ CURRENT TIME: ${formattedTime} ET
-🏈 CURRENT SEASON: 2025
+🏈 CURRENT SEASON: ${seasonString} (search for "${seasonStartYear}" or "${seasonEndYear}")
+${liveGameContext}
 
 PERSONALITY: ${personalityPrompt}
 
 🔍 CRITICAL SEARCH REQUIREMENTS:
 - You have real-time web search enabled - USE IT for all current sports data
-- Search for "${teamName} 2025 schedule" for game questions
-- Search for "${teamName} 2025 roster starting lineup" for player questions
-- Search for "${teamName} game ${formattedDate}" for today's game info
-- Search for "2025 ${league} ${teamName} record standings" for record questions
-- For betting questions, search "2025 ${teamName} betting odds spread moneyline"
-- NEVER use training data for current season info
-- If you can't find 2025 data, say "I couldn't find current 2025 information"
+- TODAY IS ${formattedDate} - we are in the ${seasonString} season
+- Search for "${teamName} ${seasonStartYear} schedule" or "${teamName} schedule" for game questions
+- Search for "${teamName} ${seasonStartYear} roster" for player questions  
+- Search for "${teamName} game ${formattedDate}" or "${teamName} next game" for game info
+- Search for "${seasonStartYear} ${league} ${teamName} record standings" for record questions
+- For betting questions, search "${teamName} betting odds" (current games)
+- ALWAYS prioritize most recent/current information
+- If asked about "today's game" or "this week", search for current date context
+- NEVER use training data - ONLY use web search results
+- If you can't find current information, say "I couldn't find current game information"
+
+📅 CONTEXT FOR YOU:
+- If someone asks about "today" or "this week", they mean ${formattedDate}
+- Recent games would be from the past few days/weeks
+- Upcoming games are in the near future
+- When searching, try both "${teamName}" and "${league} ${teamName}"
 
 CRITICAL RESPONSE RULES:
 1. Keep responses SHORT: 2-3 sentences maximum
