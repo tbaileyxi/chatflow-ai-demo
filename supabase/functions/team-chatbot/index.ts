@@ -73,10 +73,10 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const xaiApiKey = Deno.env.get('XAI_API_KEY');
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     
-    if (!xaiApiKey) {
-      throw new Error('XAI_API_KEY not configured');
+    if (!lovableApiKey) {
+      throw new Error('LOVABLE_API_KEY not configured');
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -316,15 +316,15 @@ CRITICAL: Use the CURRENT TIME (${formattedTime}) to decide whether to look for:
 SEARCH INSTRUCTIONS FOR DIFFERENT QUERIES:
 
 📊 LIVE SCORES / GAME STATUS:
-CRITICAL: You MUST search these exact URLs for live data:
-- "site:espn.com ${teamName} live score"
-- "site:nfl.com ${teamName} gamecast"
-- "site:cbssports.com ${teamName} live updates"
+CRITICAL FOR GEMINI: Use your real-time search grounding to find LIVE data:
+1. Search Google for: "${teamName} live score" OR "${teamName} game today"
+2. Prioritize ESPN.com, NFL.com, CBS Sports live trackers
+3. Look for pages with "Live", "Gamecast", "Game Tracker" in title
+4. Current time is ${formattedTime} ET - find the MOST RECENT update from the last 5 minutes
+5. DO NOT use game preview articles or cached data from hours ago
+6. If multiple sources conflict, use the one with the latest timestamp
 
-DO NOT use cached data. DO NOT use game preview articles.
-Search for pages with "Live" or "Gamecast" or "Game Tracker" in the title.
-Current time is ${formattedTime} ET - find the MOST RECENT update.
-Return: Current score, current quarter/time, most recent play
+Return: Current score, current quarter/time, most recent play/scoring event
 
 📰 GAME RECAPS / RESULTS:
 - Search: "${teamName} game recap ${formattedDate}"
@@ -360,64 +360,58 @@ RESPONSE RULES:
 
 User question: ${finalQuery}`;
 
-    console.log(`🤖 Calling Grok API with model: grok-4-fast`);
+    console.log(`🤖 Calling Lovable AI (Google Gemini 2.5 Flash) for real-time search`);
 
-    // Call Grok API
-    const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+    // Call Lovable AI with Google Gemini 2.5 Flash
+    const aiApiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${xaiApiKey}`,
+        'Authorization': `Bearer ${lovableApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'grok-4-fast',
+        model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: systemPrompt },
           { 
             role: 'system', 
-            content: `CRITICAL: Before responding, verify you are using REAL information from your web search, not fabricated scenarios. If the search shows ${teamName} losing 7-17, report that score exactly. Do not make up exciting plays that didn't happen.` 
+            content: `CRITICAL: Before responding, verify you are using REAL information from your web search with grounding, not fabricated scenarios. If the search shows ${teamName} losing 7-17, report that score exactly. Do not make up exciting plays that didn't happen. Use Google Search to find the MOST RECENT game data.` 
           },
           { role: 'user', content: finalQuery }
         ],
         temperature: 0.3,
-        max_tokens: 300,
-        search_parameters: {
-          mode: 'on',                // FORCE web search for every query
-          return_citations: true     // Include sources in response
-        },
-        response_format: {
-          type: "text"              // Ensure structured text response
-        }
+        max_tokens: 300
+        // Gemini 2.5 Flash has built-in real-time search grounding
       }),
     });
 
-    if (!grokResponse.ok) {
-      const errorText = await grokResponse.text();
-      console.error(`❌ Grok API error (${grokResponse.status}):`, errorText);
+    if (!aiApiResponse.ok) {
+      const errorText = await aiApiResponse.text();
+      console.error(`❌ Lovable AI (Gemini) error (${aiApiResponse.status}):`, errorText);
       
       // Handle specific error cases
-      if (grokResponse.status === 401) {
-        throw new Error('Invalid XAI API key');
-      } else if (grokResponse.status === 429) {
-        throw new Error('Rate limit exceeded for Grok API');
+      if (aiApiResponse.status === 401) {
+        throw new Error('Invalid LOVABLE_API_KEY');
+      } else if (aiApiResponse.status === 429) {
+        throw new Error('Rate limit exceeded for Lovable AI - please wait before trying again');
+      } else if (aiApiResponse.status === 402) {
+        throw new Error('Payment required - please add credits to your Lovable AI workspace');
       } else {
-        throw new Error(`Grok API error: ${grokResponse.status} - ${errorText}`);
+        throw new Error(`Lovable AI error: ${aiApiResponse.status} - ${errorText}`);
       }
     }
 
-    const grokData = await grokResponse.json();
-    let aiResponse = grokData.choices?.[0]?.message?.content;
+    const geminiData = await aiApiResponse.json();
+    let aiResponse = geminiData.choices?.[0]?.message?.content;
 
-    // Log if citations were returned (indicates search was used)
-    if (grokData.citations && grokData.citations.length > 0) {
-      console.log(`✅ Grok used web search. Citations: ${grokData.citations.length}`);
-      console.log(`📚 Sources:`, grokData.citations.slice(0, 3).map((c: any) => c.url));
-    } else {
-      console.log(`⚠️ No citations returned - search may not have been triggered`);
+    // Log response metadata
+    console.log(`✅ Gemini 2.5 Flash response received`);
+    if (geminiData.usage) {
+      console.log(`📊 Tokens used:`, geminiData.usage);
     }
 
     if (!aiResponse) {
-      throw new Error('No response from Grok API');
+      throw new Error('No response from Lovable AI (Gemini)');
     }
 
     // Validate that response contains score information for score queries
