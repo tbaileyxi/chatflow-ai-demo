@@ -5,7 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { shouldPollNow } from "../_shared/game-schedule.ts";
 
 // Helper function for retrying API calls with exponential backoff
-async function fetchWithRetry(url: string, options: any, maxRetries = 3): Promise<Response> {
+async function fetchWithRetry(url: string, options: any, maxRetries = 1): Promise<Response> {
   let lastError;
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -182,7 +182,7 @@ serve(async (req) => {
 
 // Match data cache to reduce API calls - extended cache for better performance
 const matchCache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_DURATION = 3 * 60 * 1000; // 3 minutes - extended to reduce API load
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes - matches polling frequency
 
 async function pollLeague(
   league: "NFL" | "NCAA",
@@ -207,11 +207,9 @@ async function pollLeague(
     console.log(`🏈 [${league}] Polling games at ${etTime} ET`);
     console.log(`🏈 [${league}] Checking dates: ${today} and ${yesterday}`);
 
-    let matches: any[] = [];
-    let strategyUsed = '';
-
-    // Strategy 1: Query by date + league for last 24 hours (most specific)
-    console.log(`🔍 [${league}] Strategy 1: Querying by date (${today} + ${yesterday})`);
+    // Smart polling: ONLY use date-based queries during game times
+    // This drastically reduces API calls while maintaining coverage
+    console.log(`🔍 [${league}] Querying games by date (${today} + ${yesterday})`);
     
     const dateMatchesToday = await highlightly.getMatches({ 
       league, 
@@ -225,68 +223,20 @@ async function pollLeague(
       limit: 100 
     });
     
-    const combinedDateMatches = [
+    const matches = [
       ...(Array.isArray(dateMatchesToday) ? dateMatchesToday : []),
       ...(Array.isArray(dateMatchesYesterday) ? dateMatchesYesterday : [])
     ];
     
-    if (combinedDateMatches.length > 0) {
-      matches = combinedDateMatches;
-      strategyUsed = 'date (24h)';
-      console.log(`✅ [${league}] Strategy 1 SUCCESS: Found ${matches.length} games (today: ${dateMatchesToday?.length || 0}, yesterday: ${dateMatchesYesterday?.length || 0})`);
-    } else {
-      console.log(`⚠️ [${league}] Strategy 1 FAILED: No games found by date`);
-      
-      // Strategy 2: Query by season + league
-      console.log(`🔍 [${league}] Strategy 2: Querying by season (${currentYear})`);
-      const seasonMatches = await highlightly.getMatches({ 
-        league,
-        season: currentYear,
-        limit: 100
-      });
-      
-      if (seasonMatches && seasonMatches.length > 0) {
-        // Filter to today's games manually
-        matches = seasonMatches.filter(m => {
-          const matchDate = new Date(m.startTime || m.date).toISOString().split("T")[0];
-          return matchDate === today;
-        });
-        strategyUsed = 'season+filter';
-        console.log(`✅ [${league}] Strategy 2 SUCCESS: Found ${matches.length} games for today`);
-      } else {
-        console.log(`⚠️ [${league}] Strategy 2 FAILED: No games found by season`);
-        
-        // Strategy 3: Get all league games (last resort)
-        console.log(`🔍 [${league}] Strategy 3: Querying all ${league} games`);
-        const allMatches = await highlightly.getMatches({ 
-          league,
-          limit: 100
-        });
-        
-        if (allMatches && allMatches.length > 0) {
-          // Filter to live or today's games
-          const todayOrLive = allMatches.filter(m => {
-            if (m.status === 'in_progress') return true;
-            const matchDate = new Date(m.startTime || m.date).toISOString().split("T")[0];
-            return matchDate === today;
-          });
-          matches = todayOrLive;
-          strategyUsed = 'all+filter';
-          console.log(`✅ [${league}] Strategy 3 SUCCESS: Found ${matches.length} relevant games`);
-        } else {
-          console.error(`❌ [${league}] All strategies FAILED - API returned no data`);
-          return;
-        }
-      }
-    }
+    console.log(`✅ [${league}] Found ${matches.length} games (today: ${dateMatchesToday?.length || 0}, yesterday: ${dateMatchesYesterday?.length || 0})`)
 
     // Final validation
     if (!matches || !Array.isArray(matches) || matches.length === 0) {
-      console.warn(`⚠️ [${league}] No relevant matches found after all strategies`);
+      console.warn(`⚠️ [${league}] No matches found by date - likely no games scheduled`);
       return;
     }
 
-    console.log(`📊 [${league}] Processing ${matches.length} games (strategy: ${strategyUsed})`);
+    console.log(`📊 [${league}] Processing ${matches.length} games`);
     
     // Log game details for debugging
     matches.forEach(match => {

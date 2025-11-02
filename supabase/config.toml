@@ -2,7 +2,7 @@ project_id = "dejuwyeypiggvlyfliap"
 
 [functions.live-game-bot]
 verify_jwt = false
-on_schedule = "*/3 * * * *"
+on_schedule = "*/5 * * * *"
 
 [functions.team-chatbot]
 verify_jwt = false
