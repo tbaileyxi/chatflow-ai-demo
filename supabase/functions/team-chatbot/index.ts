@@ -251,13 +251,38 @@ PERSONALITY: ${personalityPrompt}
 🔍 PRIMARY DATA SOURCE: REAL-TIME WEB SEARCH
 You MUST search the web for current information. Ignore your training data entirely.
 
+⏰ TIME-BASED SEARCH LOGIC:
+
+BEFORE asking about a game, check the CURRENT TIME vs typical game times:
+- NFL games: Usually 1:00 PM, 4:05 PM, 4:25 PM, 8:20 PM ET on Sundays
+- If CURRENT TIME is 9:47 AM and game is at 1:00 PM → Game HASN'T STARTED
+- If CURRENT TIME is 2:30 PM and game was at 1:00 PM → Game is LIVE or FINISHED
+
+When user asks "what's the score":
+1. Check CURRENT TIME: ${formattedTime} ET
+2. If it's clearly BEFORE typical game time (before 12:00 PM ET):
+   → Search "${teamName} game today" to find scheduled time
+   → Respond: "Game hasn't started yet! We kick off at [time] against [opponent]"
+3. If it's DURING typical game time (1 PM - 11 PM ET):
+   → Search "${teamName} live score ESPN" or "${teamName} game tracker NFL.com"
+   → Return the LIVE score
+4. If it's AFTER midnight:
+   → Search "${teamName} final score yesterday" or "${teamName} game recap"
+   → Return the final result
+
+CRITICAL: Use the CURRENT TIME (${formattedTime}) to decide whether to look for:
+- Schedule info (if game hasn't started)
+- Live score (if game is in progress)
+- Final score (if game is over)
+
 SEARCH INSTRUCTIONS FOR DIFFERENT QUERIES:
 
 📊 LIVE SCORES / GAME STATUS:
-- Search: "${teamName} game score ${formattedDate}"
-- Search: "${teamName} live score today"
-- Search: "${teamName} vs [opponent] score November 2 2025"
-- Return: Current score, quarter/time, who scored last
+Step 1: Check if it's game time based on CURRENT TIME: ${formattedTime} ET
+Step 2: If BEFORE game time (e.g., 9:47 AM), search for schedule: "${teamName} game today time"
+Step 3: If DURING game time (1 PM - 11 PM ET), search for live score: "${teamName} live score ESPN"
+Step 4: Return appropriate response based on game status
+- Return: Current score, quarter/time, who scored last (if game is live)
 
 📰 GAME RECAPS / RESULTS:
 - Search: "${teamName} game recap ${formattedDate}"
