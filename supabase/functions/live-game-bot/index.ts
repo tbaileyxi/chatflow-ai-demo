@@ -29,7 +29,7 @@ async function fetchWithRetry(url: string, options: any, maxRetries = 3): Promis
 // Highlightly API client
 function createHighlightlyClient() {
   const apiKey = Deno.env.get("HIGHLIGHTLY_API_KEY");
-  const baseUrl = "https://api.highlightly.net";
+  const baseUrl = "https://american-football.highlightly.net";
 
   console.log(`🔑 Highlightly API Key present: ${!!apiKey}`);
   console.log(`🌐 Base URL: ${baseUrl}`);
@@ -44,7 +44,7 @@ function createHighlightlyClient() {
 
       const response = await fetchWithRetry(url.toString(), {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "x-rapidapi-key": apiKey || "",
           "Content-Type": "application/json",
         },
       });

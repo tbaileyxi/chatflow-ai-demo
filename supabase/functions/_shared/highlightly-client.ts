@@ -1,14 +1,14 @@
 // Shared Highlightly API client for all edge functions
 export function createHighlightlyClient() {
   const apiKey = Deno.env.get("HIGHLIGHTLY_API_KEY");
-  const baseUrl = "https://api.highlightly.net";
+  const baseUrl = "https://american-football.highlightly.net";
 
   return {
     // Get single match by ID
     async getMatch(matchId: number) {
       const response = await fetch(`${baseUrl}/matches/${matchId}`, {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "x-rapidapi-key": apiKey || "",
           "Content-Type": "application/json",
         },
       });
@@ -29,7 +29,7 @@ export function createHighlightlyClient() {
 
       const response = await fetch(url.toString(), {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "x-rapidapi-key": apiKey || "",
           "Content-Type": "application/json",
         },
       });
@@ -41,7 +41,7 @@ export function createHighlightlyClient() {
     async getTeams(league: string) {
       const response = await fetch(`${baseUrl}/teams?league=${encodeURIComponent(league)}`, {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "x-rapidapi-key": apiKey || "",
           "Content-Type": "application/json",
         },
       });
@@ -53,7 +53,7 @@ export function createHighlightlyClient() {
     async getTeamInfo(teamName: string) {
       const response = await fetch(`${baseUrl}/teams/${encodeURIComponent(teamName)}`, {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "x-rapidapi-key": apiKey || "",
           "Content-Type": "application/json",
         },
       });
@@ -68,7 +68,7 @@ export function createHighlightlyClient() {
       
       const response = await fetch(url.toString(), {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "x-rapidapi-key": apiKey || "",
           "Content-Type": "application/json",
         },
       });
@@ -80,7 +80,7 @@ export function createHighlightlyClient() {
     async getInjuries(teamName: string) {
       const response = await fetch(`${baseUrl}/teams/${encodeURIComponent(teamName)}/injuries`, {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "x-rapidapi-key": apiKey || "",
           "Content-Type": "application/json",
         },
       });
@@ -92,7 +92,7 @@ export function createHighlightlyClient() {
     async getMatchOdds(matchId: number) {
       const response = await fetch(`${baseUrl}/matches/${matchId}/odds`, {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "x-rapidapi-key": apiKey || "",
           "Content-Type": "application/json",
         },
       });
@@ -108,7 +108,7 @@ export function createHighlightlyClient() {
       
       const response = await fetch(url.toString(), {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "x-rapidapi-key": apiKey || "",
           "Content-Type": "application/json",
         },
       });
@@ -120,7 +120,7 @@ export function createHighlightlyClient() {
     async getLineups(matchId: number) {
       const response = await fetch(`${baseUrl}/matches/${matchId}/lineups`, {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "x-rapidapi-key": apiKey || "",
           "Content-Type": "application/json",
         },
       });
@@ -137,7 +137,7 @@ export function createHighlightlyClient() {
       
       const response = await fetch(url.toString(), {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "x-rapidapi-key": apiKey || "",
           "Content-Type": "application/json",
         },
       });
@@ -155,7 +155,7 @@ export function createHighlightlyClient() {
       
       const response = await fetch(url.toString(), {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "x-rapidapi-key": apiKey || "",
           "Content-Type": "application/json",
         },
       });
@@ -172,7 +172,7 @@ export function createHighlightlyClient() {
       
       const response = await fetch(url.toString(), {
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "x-rapidapi-key": apiKey || "",
           "Content-Type": "application/json",
         },
       });

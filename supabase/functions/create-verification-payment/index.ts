@@ -24,7 +24,7 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
 
-    const { huddleId } = await req.json();
+    const { huddleId, promoCode } = await req.json();
     if (!huddleId) throw new Error("Huddle ID is required");
 
     // Verify user owns the huddle
@@ -43,6 +43,78 @@ serve(async (req) => {
       apiVersion: "2023-10-16" 
     });
 
+    // Validate promo code if provided
+    let finalAmount = 4999; // $49.99 in cents
+    let promoData = null;
+
+    if (promoCode) {
+      const { data: promo, error: promoError } = await supabaseClient
+        .from("promo_codes")
+        .select("*")
+        .eq("code", promoCode.toUpperCase())
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (promo) {
+        // Check expiration
+        if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
+          throw new Error("Promo code has expired");
+        }
+
+        // Check usage limit
+        if (promo.max_uses && promo.current_uses >= promo.max_uses) {
+          throw new Error("Promo code usage limit reached");
+        }
+
+        promoData = promo;
+
+        // Calculate discount
+        if (promo.discount_type === 'free') {
+          finalAmount = 0;
+        } else if (promo.discount_type === 'percentage') {
+          finalAmount = Math.round(4999 * (1 - promo.discount_value / 100));
+        } else if (promo.discount_type === 'fixed') {
+          finalAmount = Math.max(0, 4999 - promo.discount_value);
+        }
+      }
+    }
+
+    // If promo code gives 100% discount, verify immediately without payment
+    if (finalAmount === 0 && promoData) {
+      const expiresAt = new Date();
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1); // 1 year from now
+
+      // Update huddle as verified
+      await supabaseClient
+        .from("huddles")
+        .update({ 
+          is_verified: true,
+          verification_expires_at: expiresAt.toISOString()
+        })
+        .eq("id", huddleId);
+
+      // Create subscription record
+      await supabaseClient
+        .from("huddle_subscriptions")
+        .insert({
+          huddle_id: huddleId,
+          owner_id: user.id,
+          status: "active",
+          expires_at: expiresAt.toISOString()
+        });
+
+      // Increment promo code usage
+      await supabaseClient
+        .from("promo_codes")
+        .update({ current_uses: (promoData.current_uses || 0) + 1 })
+        .eq("id", promoData.id);
+
+      return new Response(JSON.stringify({ success: true, message: "Huddle verified with promo code!" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
     // Check if customer exists
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId;
@@ -60,9 +132,9 @@ serve(async (req) => {
             currency: "usd",
             product_data: { 
               name: `Huddle Verification - ${huddle.name}`,
-              description: "One-time payment to verify your huddle"
+              description: promoData ? `One-time payment (${promoCode} applied)` : "One-time payment to verify your huddle"
             },
-            unit_amount: 4999, // $49.99 in cents
+            unit_amount: finalAmount,
           },
           quantity: 1,
         },
@@ -73,7 +145,9 @@ serve(async (req) => {
       metadata: {
         huddle_id: huddleId,
         owner_id: user.id,
-        type: "huddle_verification"
+        type: "huddle_verification",
+        promo_code: promoCode || "",
+        promo_id: promoData?.id || ""
       }
     });
 

@@ -15,6 +15,7 @@ import { HuddleJoinButton } from "@/components/HuddleJoinButton";
 import { MobileLayout } from "@/components/mobile/MobileLayout";
 import { GlassHeader } from "@/components/mobile/GlassHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
+import { CreateVerifiedHuddleDialog } from "@/components/CreateVerifiedHuddleDialog";
 
 interface Huddle {
   id: string;
@@ -156,6 +157,31 @@ export const HuddleSearch = () => {
         />
         <div className="flex-1 overflow-auto font-arcade">
         <div className="container mx-auto p-4 max-w-4xl">
+          <Card className="mb-4 bg-verified-background border-verified-border">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Shield className="w-5 h-5 text-verified-primary" />
+                    <h3 className="font-semibold text-verified-primary">Own a Team?</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Create your own verified huddle and become discoverable to fans
+                  </p>
+                </div>
+                <CreateVerifiedHuddleDialog 
+                  onHuddleCreated={fetchHuddles}
+                  trigger={
+                    <Button className="bg-verified-primary hover:bg-verified-primary/90 shrink-0">
+                      <Shield className="w-4 h-4 mr-2" />
+                      Create Verified
+                    </Button>
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="mb-4">
             <p className="text-muted-foreground text-sm">
               Join official team huddles with curated membership and enhanced features
