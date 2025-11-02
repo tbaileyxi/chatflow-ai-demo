@@ -61,8 +61,8 @@ serve(async (req) => {
 
     // Rate limiting check
     const lastResponse = rateLimitMap.get(huddle_id) || 0;
-    const now = Date.now();
-    if (now - lastResponse < RATE_LIMIT_MS) {
+    const rateLimitTimestamp = Date.now();
+    if (rateLimitTimestamp - lastResponse < RATE_LIMIT_MS) {
       console.log(`⏱️ Rate limit hit for huddle ${huddle_id}`);
       return new Response(JSON.stringify({ message: 'Rate limited' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -449,7 +449,7 @@ User question: ${finalQuery}`;
     }
 
     // Update rate limit
-    rateLimitMap.set(huddle_id, now);
+    rateLimitMap.set(huddle_id, rateLimitTimestamp);
 
     console.log(`✅ Coach response posted to huddle ${huddle_id}`);
 
