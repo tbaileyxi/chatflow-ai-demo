@@ -40,6 +40,60 @@ async function createHighlightlyClient() {
   };
 }
 
+// Fetch live scores from ESPN API
+async function fetchESPNScores(league: 'NFL' | 'NCAA', teamName: string) {
+  try {
+    const leagueCode = league === 'NFL' ? 'nfl' : 'college-football';
+    const url = `http://site.api.espn.com/apis/site/v2/sports/football/${leagueCode}/scoreboard`;
+    
+    console.log(`📡 Fetching ESPN API: ${url}`);
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.error(`❌ ESPN API error: ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    const games = data.events || [];
+    
+    // Find the game with our team
+    const game = games.find((event: any) => {
+      const competitors = event.competitions?.[0]?.competitors || [];
+      return competitors.some((comp: any) => 
+        comp.team.displayName.includes(teamName) || 
+        comp.team.name.includes(teamName) ||
+        comp.team.shortDisplayName?.includes(teamName)
+      );
+    });
+    
+    if (!game) {
+      console.log(`⚠️ No game found for ${teamName} on ESPN`);
+      return null;
+    }
+    
+    const competition = game.competitions[0];
+    const homeTeam = competition.competitors.find((c: any) => c.homeAway === 'home');
+    const awayTeam = competition.competitors.find((c: any) => c.homeAway === 'away');
+    const status = competition.status;
+    
+    return {
+      awayTeam: awayTeam.team.displayName,
+      awayScore: parseInt(awayTeam.score),
+      homeTeam: homeTeam.team.displayName,
+      homeScore: parseInt(homeTeam.score),
+      status: status.type.name, // 'STATUS_IN_PROGRESS', 'STATUS_FINAL', 'STATUS_SCHEDULED'
+      period: status.period,
+      clock: status.displayClock,
+      detail: status.type.detail, // e.g., "4th Quarter", "Final"
+      lastPlay: competition.situation?.lastPlay?.text || null
+    };
+  } catch (error) {
+    console.error('❌ Error fetching ESPN API:', error);
+    return null;
+  }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -184,56 +238,23 @@ serve(async (req) => {
     console.log(`🎯 Personality: ${personality}`);
     console.log(`🎯 Final query: "${finalQuery}"`);
 
-    // Query Highlightly for SUPPLEMENTAL data (odds, detailed stats)
-    let liveGameContext = '';
+    // Fetch REAL-TIME data from ESPN API
+    let espnGameData = null;
     try {
-      console.log(`📊 Attempting to fetch supplemental data from Highlightly...`);
-      const highlightly = await createHighlightlyClient();
+      console.log(`📊 Fetching real-time data from ESPN API...`);
+      espnGameData = await fetchESPNScores(league as 'NFL' | 'NCAA', teamName);
       
-      const today = currentDate.toISOString().split('T')[0];
-      const yesterday = new Date(currentDate);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-      const [todayGames, yesterdayGames] = await Promise.all([
-        highlightly.getMatches({ team: teamName, league, date: today, limit: 5 }),
-        highlightly.getMatches({ team: teamName, league, date: yesterdayStr, limit: 5 })
-      ]);
-
-      const recentGames = [
-        ...(todayGames?.data || []),
-        ...(yesterdayGames?.data || [])
-      ].filter(Boolean);
-
-      if (recentGames.length > 0) {
-        console.log(`✅ Highlightly: Found ${recentGames.length} game(s) as backup data`);
-        
-        const liveGame = recentGames.find((g: any) => g.status === 'live');
-        const recentGame = liveGame || recentGames[0];
-
-        if (recentGame) {
-          const homeTeam = recentGame.homeTeam?.name || 'Home';
-          const awayTeam = recentGame.awayTeam?.name || 'Away';
-          const homeScore = recentGame.homeTeam?.score || 0;
-          const awayScore = recentGame.awayTeam?.score || 0;
-          const status = recentGame.status || 'scheduled';
-          const period = recentGame.period || '';
-
-          liveGameContext = `\n📊 SUPPLEMENTAL DATA (Highlightly API):\n`;
-          
-          if (status === 'live') {
-            liveGameContext += `${awayTeam} @ ${homeTeam} - LIVE ${period}\nScore: ${awayTeam} ${awayScore}, ${homeTeam} ${homeScore}\n`;
-            liveGameContext += `Use as fallback if web search fails.`;
-          } else if (status === 'finished') {
-            liveGameContext += `${awayTeam} @ ${homeTeam} - FINAL\nScore: ${awayTeam} ${awayScore}, ${homeTeam} ${homeScore}\n`;
-          }
-        }
+      if (espnGameData) {
+        console.log(`✅ ESPN API: Game found`, {
+          score: `${espnGameData.awayTeam} ${espnGameData.awayScore} - ${espnGameData.homeTeam} ${espnGameData.homeScore}`,
+          status: espnGameData.detail,
+          clock: espnGameData.clock
+        });
       } else {
-        console.log(`⚠️ Highlightly: No games found (may be rate-limited)`);
+        console.log(`⚠️ ESPN API: No active game found for ${teamName}`);
       }
     } catch (error) {
-      console.error('⚠️ Highlightly unavailable (not critical - using web search):', error);
-      // Continue without Highlightly - Grok web search is primary
+      console.error('⚠️ ESPN API error:', error);
     }
 
     // Build personality-specific tone instructions
@@ -248,6 +269,27 @@ serve(async (req) => {
       case 'casual':
         personalityPrompt = `You're CONVERSATIONAL and FRIENDLY. Talk like you're chatting with friends at a game. Keep it real, relaxed, and easy-going. Stick to the facts but keep it fun.`;
         break;
+    }
+
+    // Build game context from ESPN data
+    let gameContext = '';
+    if (espnGameData) {
+      if (espnGameData.status === 'STATUS_IN_PROGRESS') {
+        gameContext = `\n🏈 LIVE GAME DATA (ESPN API - REAL-TIME):\n`;
+        gameContext += `${espnGameData.awayTeam} ${espnGameData.awayScore} @ ${espnGameData.homeTeam} ${espnGameData.homeScore}\n`;
+        gameContext += `Status: ${espnGameData.detail} (${espnGameData.clock} remaining)\n`;
+        if (espnGameData.lastPlay) {
+          gameContext += `Last Play: ${espnGameData.lastPlay}\n`;
+        }
+        gameContext += `\nIMPORTANT: Use this EXACT score in your response. This is live ESPN data updated in real-time.\n`;
+      } else if (espnGameData.status === 'STATUS_FINAL') {
+        gameContext = `\n🏈 FINAL SCORE (ESPN API):\n`;
+        gameContext += `${espnGameData.awayTeam} ${espnGameData.awayScore} @ ${espnGameData.homeTeam} ${espnGameData.homeScore} - FINAL\n`;
+      } else if (espnGameData.status === 'STATUS_SCHEDULED') {
+        gameContext = `\n🏈 UPCOMING GAME (ESPN API):\n`;
+        gameContext += `${espnGameData.awayTeam} @ ${espnGameData.homeTeam}\n`;
+        gameContext += `Status: Scheduled - Game has not started yet\n`;
+      }
     }
 
     // Build system prompt for Grok
@@ -351,7 +393,10 @@ Return: Current score, current quarter/time, most recent play/scoring event
 - Search: "${teamName} spread line over under"
 - Return: Current spread, moneyline, over/under from ESPN BET/DraftKings
 
-${liveGameContext ? `${liveGameContext}\nUse this ONLY if web search fails or for additional context like odds.\n` : ''}
+${gameContext}
+
+🎯 CRITICAL: If ESPN data is provided above, you MUST use those exact scores and status.
+The ESPN API data is REAL-TIME and authoritative. Do not search the web for scores if ESPN data exists.
 
 RESPONSE RULES:
 1. Answer in YOUR PERSONALITY STYLE (${personality})
@@ -375,14 +420,8 @@ User question: ${finalQuery}`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: finalQuery }
         ],
-        stream: false,
-        search_parameters: {
-          mode: 'on',
-          return_citations: true,
-          sources: [
-            { type: 'web' }
-          ]
-        }
+        stream: false
+        // ESPN data is provided in system prompt - no need for web search
       }),
     });
 
