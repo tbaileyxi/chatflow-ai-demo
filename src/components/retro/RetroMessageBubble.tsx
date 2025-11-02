@@ -22,6 +22,13 @@ interface RetroMessageBubbleProps {
     user_id: string;
     is_bot_message?: boolean;
     is_team_agent_message?: boolean;
+    origin_team_id?: string;
+    origin_teams?: {
+      id: string;
+      name: string;
+      city?: string;
+      logo_url?: string;
+    };
     media_url?: string;
     media_type?: string;
     embed_code?: string;
@@ -260,7 +267,11 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-black animate-pulse" />
               <span className="font-bold text-xs tracking-wider uppercase text-black">
-                {message.message_type === 'coach_response' ? '🤖 Coach' : 'Live Update'}
+                {message.message_type === 'coach_response' 
+                  ? '🤖 Coach' 
+                  : message.is_team_agent_message && message.origin_teams?.name
+                    ? `${message.origin_teams.name} Bot`
+                    : 'Live Update'}
               </span>
             </div>
             <div className="flex items-center gap-1 text-sm text-gray-600">

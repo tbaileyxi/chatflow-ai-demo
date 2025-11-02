@@ -88,7 +88,12 @@ export const Huddle = () => {
 
         const { data: rawMessages } = await supabase
           .from('huddle_messages')
-          .select('*, poll_data, message_type')
+          .select(`
+            *, 
+            poll_data, 
+            message_type,
+            origin_teams:teams!origin_team_id(id, name, city, logo_url)
+          `)
           .eq('huddle_id', huddleId)
           .order('created_at', { ascending: false })
           .limit(50);
@@ -157,7 +162,12 @@ export const Huddle = () => {
     try {
       const { data: olderMessages } = await supabase
         .from('huddle_messages')
-        .select('*, poll_data, message_type')
+        .select(`
+          *, 
+          poll_data, 
+          message_type,
+          origin_teams:teams!origin_team_id(id, name, city, logo_url)
+        `)
         .eq('huddle_id', huddleId)
         .lt('created_at', oldestCreatedAt)
         .order('created_at', { ascending: false })

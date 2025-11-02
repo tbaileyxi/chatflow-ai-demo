@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
                   'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`
                 },
                 body: JSON.stringify({
-                  tweetContent: tweet.text,
+                  tweetContent: tweet.text.replace(/https?:\/\/t\.co\/\w+/gi, '').trim(),
                   tweetUrl: `https://twitter.com/${user?.username}/status/${tweet.id}`,
                   authorUsername: user?.username || 'unknown',
                   hasMedia,
@@ -190,11 +190,14 @@ Deno.serve(async (req) => {
             continue; // Skip this tweet
           }
 
+          // Strip t.co URLs from content since we're using embed codes
+          const cleanContent = tweet.text.replace(/https?:\/\/t\.co\/\w+/gi, '').trim();
+
           const trendingData = {
             team_id: source.team_id,
             post_id: tweet.id,
             embed_url: embedUrl,
-            content: tweet.text,
+            content: cleanContent,
             author_username: user?.username || null,
             likes: metrics.like_count || 0,
             retweets: metrics.retweet_count || 0,
