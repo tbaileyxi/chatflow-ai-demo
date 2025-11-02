@@ -159,10 +159,19 @@ serve(async (req) => {
     // Provide context for empty queries
     let finalQuery = userQuery || `What are the latest news and updates about the ${teamName}? Keep it brief.`;
 
-    // Enhance score/game queries to force real-time search
+    // Enhance score/game queries to force real-time search from live trackers
     if (finalQuery.toLowerCase().match(/score|game|playing|final|result|recap/)) {
-      finalQuery += ` Search for live score or final score for ${teamName} on ${formattedDate}.`;
-      console.log(`🏈 Live score query detected - enhanced for web search`);
+      const currentHour = now.getHours();
+      const isLikelyLive = currentHour >= 13 && currentHour <= 23; // 1 PM - 11 PM ET
+      
+      if (isLikelyLive) {
+        // Force search of live score pages with specific sites
+        finalQuery += ` Search ESPN.com, NFL.com, or CBS Sports for LIVE CURRENT score and game status for ${teamName} vs their opponent RIGHT NOW on ${formattedDate}. Include the current quarter and time remaining. [Current time: ${formattedTime} ET - search for MOST RECENT update posted within the last 5 minutes]`;
+      } else {
+        // Search for final score
+        finalQuery += ` Search ESPN.com or NFL.com for FINAL score for ${teamName} game on ${formattedDate}.`;
+      }
+      console.log(`🏈 Live score query enhanced with specific sites (likely live: ${isLikelyLive})`);
     }
 
     // Enhance betting-related queries
@@ -307,11 +316,15 @@ CRITICAL: Use the CURRENT TIME (${formattedTime}) to decide whether to look for:
 SEARCH INSTRUCTIONS FOR DIFFERENT QUERIES:
 
 📊 LIVE SCORES / GAME STATUS:
-Step 1: Check if it's game time based on CURRENT TIME: ${formattedTime} ET
-Step 2: If BEFORE game time (e.g., 9:47 AM), search for schedule: "${teamName} game today time"
-Step 3: If DURING game time (1 PM - 11 PM ET), search for live score: "${teamName} live score ESPN"
-Step 4: Return appropriate response based on game status
-- Return: Current score, quarter/time, who scored last (if game is live)
+CRITICAL: You MUST search these exact URLs for live data:
+- "site:espn.com ${teamName} live score"
+- "site:nfl.com ${teamName} gamecast"
+- "site:cbssports.com ${teamName} live updates"
+
+DO NOT use cached data. DO NOT use game preview articles.
+Search for pages with "Live" or "Gamecast" or "Game Tracker" in the title.
+Current time is ${formattedTime} ET - find the MOST RECENT update.
+Return: Current score, current quarter/time, most recent play
 
 📰 GAME RECAPS / RESULTS:
 - Search: "${teamName} game recap ${formattedDate}"
