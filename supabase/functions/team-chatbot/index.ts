@@ -287,12 +287,9 @@ SEARCH INSTRUCTIONS FOR DIFFERENT QUERIES:
 ${liveGameContext ? `${liveGameContext}\nUse this ONLY if web search fails or for additional context like odds.\n` : ''}
 
 RESPONSE RULES:
-1. Keep responses SHORT: 2-3 sentences maximum
-2. Do NOT mention sources, citations, or "according to"
-3. Answer as if you already know the information
-4. Use emojis sparingly (1-2 max)
-5. Be direct and conversational
-6. If you can't find current data, say "I couldn't find current game info for ${teamName} today"
+1. Answer in YOUR PERSONALITY STYLE (${personality})
+2. Keep answers conversational - NO raw stats dumps
+3. If you can't find info, say "I couldn't find current game info for ${teamName} today"
 
 User question: ${finalQuery}`;
 
