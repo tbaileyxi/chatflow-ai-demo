@@ -124,13 +124,19 @@ serve(async (req) => {
     const coachMention = content.match(/@coach\s+(.+)/i);
     const userQuery = coachMention ? coachMention[1].trim() : '';
 
-    // Provide context for empty queries or enhance betting queries
+    // Provide context for empty queries
     let finalQuery = userQuery || `What are the latest news and updates about the ${teamName}? Keep it brief.`;
+
+    // Enhance score/game queries to force real-time search
+    if (finalQuery.toLowerCase().match(/score|game|playing|final|result|recap/)) {
+      finalQuery += ` Search for live score or final score for ${teamName} on ${formattedDate}.`;
+      console.log(`🏈 Live score query detected - enhanced for web search`);
+    }
 
     // Enhance betting-related queries
     if (finalQuery.toLowerCase().match(/spread|line|odds|betting|over.under|moneyline/)) {
       finalQuery += ` Search for current betting odds from ESPN BET, DraftKings, or FanDuel.`;
-      console.log(`🎰 Betting query detected - enhanced prompt`);
+      console.log(`🎰 Betting query detected - enhanced for web search`);
     }
 
     console.log(`🎯 Team: ${teamName} (${league})`);
@@ -167,18 +173,17 @@ serve(async (req) => {
 
     console.log(`📅 ET Date: ${formattedDate} | Season: ${seasonString} (start year: ${seasonStartYear})`);
 
-    // Query Highlightly for recent game data using ET dates
+    // Query Highlightly for SUPPLEMENTAL data (odds, detailed stats)
     let liveGameContext = '';
     try {
+      console.log(`📊 Attempting to fetch supplemental data from Highlightly...`);
       const highlightly = await createHighlightlyClient();
       
-      // Get today/yesterday in ET, not UTC
-      const today = currentDate.toISOString().split('T')[0]; // ET date
+      const today = currentDate.toISOString().split('T')[0];
       const yesterday = new Date(currentDate);
       yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0]; // ET date
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-      // Try to get recent games (today and yesterday)
       const [todayGames, yesterdayGames] = await Promise.all([
         highlightly.getMatches({ team: teamName, league, date: today, limit: 5 }),
         highlightly.getMatches({ team: teamName, league, date: yesterdayStr, limit: 5 })
@@ -190,9 +195,8 @@ serve(async (req) => {
       ].filter(Boolean);
 
       if (recentGames.length > 0) {
-        console.log(`🏈 Found ${recentGames.length} recent game(s) from Highlightly`);
+        console.log(`✅ Highlightly: Found ${recentGames.length} game(s) as backup data`);
         
-        // Find live or most recent game
         const liveGame = recentGames.find((g: any) => g.status === 'live');
         const recentGame = liveGame || recentGames[0];
 
@@ -204,26 +208,21 @@ serve(async (req) => {
           const status = recentGame.status || 'scheduled';
           const period = recentGame.period || '';
 
-          liveGameContext = `\n\n🏈 LIVE GAME DATA FROM HIGHLIGHTLY API:\n`;
+          liveGameContext = `\n📊 SUPPLEMENTAL DATA (Highlightly API):\n`;
           
           if (status === 'live') {
             liveGameContext += `${awayTeam} @ ${homeTeam} - LIVE ${period}\nScore: ${awayTeam} ${awayScore}, ${homeTeam} ${homeScore}\n`;
-            liveGameContext += `This is FACTUAL real-time data. Use this if the user asks about today's game or current score.`;
+            liveGameContext += `Use as fallback if web search fails.`;
           } else if (status === 'finished') {
             liveGameContext += `${awayTeam} @ ${homeTeam} - FINAL\nScore: ${awayTeam} ${awayScore}, ${homeTeam} ${homeScore}\n`;
-            liveGameContext += `This is the most recent completed game. Use this if asked about the last game.`;
-          } else {
-            liveGameContext += `Upcoming: ${awayTeam} @ ${homeTeam}\nStatus: ${status}\n`;
           }
-
-          console.log(`✅ Live game context added: ${status}`);
         }
       } else {
-        console.log(`⚠️ No recent games found in Highlightly`);
+        console.log(`⚠️ Highlightly: No games found (may be rate-limited)`);
       }
     } catch (error) {
-      console.error('⚠️ Failed to fetch Highlightly data:', error);
-      // Continue without game data - not critical
+      console.error('⚠️ Highlightly unavailable (not critical - using web search):', error);
+      // Continue without Highlightly - Grok web search is primary
     }
 
     // Build personality-specific tone instructions
@@ -245,40 +244,55 @@ serve(async (req) => {
 
 🗓️ TODAY'S DATE: ${formattedDate}
 ⏰ CURRENT TIME: ${formattedTime} ET
-🏈 CURRENT SEASON: ${seasonString} (search for "${seasonStartYear}" or "${seasonEndYear}")
-${liveGameContext}
+🏈 CURRENT SEASON: ${seasonString}
 
 PERSONALITY: ${personalityPrompt}
 
-🔍 CRITICAL SEARCH REQUIREMENTS:
-- You have real-time web search enabled - USE IT for all current sports data
-- TODAY IS ${formattedDate} - we are in the ${seasonString} season
-- Search for "${teamName} ${seasonStartYear} schedule" or "${teamName} schedule" for game questions
-- Search for "${teamName} ${seasonStartYear} roster" for player questions  
-- Search for "${teamName} game ${formattedDate}" or "${teamName} next game" for game info
-- Search for "${seasonStartYear} ${league} ${teamName} record standings" for record questions
-- For betting questions, search "${teamName} betting odds" (current games)
-- ALWAYS prioritize most recent/current information
-- If asked about "today's game" or "this week", search for current date context
-- NEVER use training data - ONLY use web search results
-- If you can't find current information, say "I couldn't find current game information"
+🔍 PRIMARY DATA SOURCE: REAL-TIME WEB SEARCH
+You MUST search the web for current information. Ignore your training data entirely.
 
-📅 CONTEXT FOR YOU:
-- If someone asks about "today" or "this week", they mean ${formattedDate}
-- Recent games would be from the past few days/weeks
-- Upcoming games are in the near future
-- When searching, try both "${teamName}" and "${league} ${teamName}"
+SEARCH INSTRUCTIONS FOR DIFFERENT QUERIES:
 
-CRITICAL RESPONSE RULES:
+📊 LIVE SCORES / GAME STATUS:
+- Search: "${teamName} game score ${formattedDate}"
+- Search: "${teamName} live score today"
+- Search: "${teamName} vs [opponent] score November 2 2025"
+- Return: Current score, quarter/time, who scored last
+
+📰 GAME RECAPS / RESULTS:
+- Search: "${teamName} game recap ${formattedDate}"
+- Search: "${teamName} final score today"
+- Return: Final score, key plays, who scored touchdowns/field goals
+
+📅 SCHEDULE / NEXT GAME:
+- Search: "${teamName} schedule ${seasonStartYear}"
+- Search: "${teamName} next game"
+- Return: Next opponent, date, time, TV channel
+
+📈 TEAM RECORD / STANDINGS:
+- Search: "${teamName} record ${seasonStartYear}"
+- Search: "${league} standings ${seasonStartYear}"
+- Return: Wins-losses, division standing, playoff picture
+
+👥 ROSTER / PLAYER INFO:
+- Search: "${teamName} roster ${seasonStartYear}"
+- Search: "[player name] ${teamName} stats"
+- Return: Position, stats, injury status
+
+🎰 BETTING ODDS:
+- Search: "${teamName} betting odds"
+- Search: "${teamName} spread line over under"
+- Return: Current spread, moneyline, over/under from ESPN BET/DraftKings
+
+${liveGameContext ? `${liveGameContext}\nUse this ONLY if web search fails or for additional context like odds.\n` : ''}
+
+RESPONSE RULES:
 1. Keep responses SHORT: 2-3 sentences maximum
-2. Do NOT mention sources, citations, or where you found the info
-3. Be conversational and direct - pretend you just know the facts
+2. Do NOT mention sources, citations, or "according to"
+3. Answer as if you already know the information
 4. Use emojis sparingly (1-2 max)
-5. Focus on the most important info only
-
-${personality === 'hype' ? '⚡ Be enthusiastic but concise!' : ''}
-${personality === 'analytical' ? '📊 Give key stats only.' : ''}
-${personality === 'casual' ? '💬 Keep it chill and brief.' : ''}
+5. Be direct and conversational
+6. If you can't find current data, say "I couldn't find current game info for ${teamName} today"
 
 User question: ${finalQuery}`;
 
@@ -300,8 +314,9 @@ User question: ${finalQuery}`;
         temperature: 0.7,
         max_tokens: 300,
         search_parameters: {
-          mode: 'auto',              // Automatically decides when to search
-          return_citations: true     // Include sources in response
+          mode: 'on',                // FORCE web search for every query
+          return_citations: true,    // Include sources in response
+          sources: ['web']           // Explicitly use web search (not X posts)
         }
       }),
     });
