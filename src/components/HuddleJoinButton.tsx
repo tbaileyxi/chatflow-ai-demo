@@ -63,69 +63,44 @@ export const HuddleJoinButton = ({
         window.open(data.url, '_blank');
         setOpen(false);
         return;
-      } else if (huddle.is_verified) {
-        // Check if request already exists
-        const { data: existingRequest } = await supabase
-          .from("huddle_join_requests")
-          .select("id, status")
-          .eq("huddle_id", huddle.id)
-          .eq("user_id", user.id)
-          .single();
+      }
 
-        if (existingRequest) {
-          if (existingRequest.status === "pending") {
-            toast({
-              title: "Request already sent",
-              description: "Your join request is pending review.",
-            });
-          } else {
-            toast({
-              title: "Request already processed",
-              description: `Your join request was ${existingRequest.status}.`,
-            });
-          }
+      // For all huddles (verified or not, free or will-be-paid), allow direct join
+      // Paid verified huddles already went through Stripe checkout above
+      const { error } = await supabase.from("huddle_members").insert({
+        huddle_id: huddle.id,
+        user_id: user.id,
+      });
+
+      if (error) {
+        if (error.code === '23505') {
+          toast({
+            title: "Already a member",
+            description: "You're already in this huddle!",
+          });
           setOpen(false);
           return;
         }
-
-        // Create join request for verified huddles
-        const { error } = await supabase.from("huddle_join_requests").insert({
-          huddle_id: huddle.id,
-          user_id: user.id,
-          message: message.trim() || null,
-        });
-
-        if (error) throw error;
-
-        setJoinType('request');
-        setShowSuccessDialog(true);
-      } else {
-        // Direct join for non-verified huddles
-        const { error } = await supabase.from("huddle_members").insert({
-          huddle_id: huddle.id,
-          user_id: user.id,
-        });
-
-        if (error) throw error;
-
-        // Update member count
-        const { data: currentHuddle } = await supabase
-          .from("huddles")
-          .select("member_count")
-          .eq("id", huddle.id)
-          .single();
-        
-        await supabase
-          .from("huddles")
-          .update({ 
-            member_count: (currentHuddle?.member_count || 0) + 1,
-            last_message_at: new Date().toISOString()
-          })
-          .eq("id", huddle.id);
-
-        setJoinType('direct');
-        setShowSuccessDialog(true);
+        throw error;
       }
+
+      // Update member count
+      const { data: currentHuddle } = await supabase
+        .from("huddles")
+        .select("member_count")
+        .eq("id", huddle.id)
+        .single();
+      
+      await supabase
+        .from("huddles")
+        .update({ 
+          member_count: (currentHuddle?.member_count || 0) + 1,
+          last_message_at: new Date().toISOString()
+        })
+        .eq("id", huddle.id);
+
+      setJoinType('direct');
+      setShowSuccessDialog(true);
 
       setOpen(false);
       setMessage("");
@@ -159,12 +134,12 @@ export const HuddleJoinButton = ({
           {compact ? (
             <>
               {membershipRequired ? <DollarSign className="w-3 h-3 mr-1" /> : <UserPlus className="w-3 h-3 mr-1" />}
-              {membershipRequired ? "Subscribe" : huddle.is_verified ? "Request" : "Join"}
+              {membershipRequired ? `$${(membershipPrice / 100).toFixed(2)}/mo` : "Join"}
             </>
           ) : (
             <>
               {membershipRequired ? <DollarSign className="w-4 h-4 mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
-              {membershipRequired ? `Subscribe ($${(membershipPrice / 100).toFixed(2)}/mo)` : huddle.is_verified ? "Request to Join" : "Join Huddle"}
+              {membershipRequired ? `Join for $${(membershipPrice / 100).toFixed(2)}/mo` : "Join Huddle"}
             </>
           )}
         </Button>
@@ -175,7 +150,7 @@ export const HuddleJoinButton = ({
           <DialogTitle className="flex items-center gap-2">
             {membershipRequired && <DollarSign className="w-5 h-5 text-primary" />}
             {huddle.is_verified && <Shield className="w-5 h-5 text-verified-primary" />}
-            {membershipRequired ? "Subscribe to" : huddle.is_verified ? "Request to Join" : "Join"} {huddle.name}
+            {membershipRequired ? "Subscribe to" : "Join"} {huddle.name}
           </DialogTitle>
         </DialogHeader>
         
@@ -187,8 +162,8 @@ export const HuddleJoinButton = ({
                 <span className="font-medium text-primary">Premium Membership Required</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                This huddle requires a monthly subscription of ${(membershipPrice / 100).toFixed(2)} to join.
-                You'll be redirected to complete your payment.
+                This verified huddle requires a <strong>${(membershipPrice / 100).toFixed(2)}/month</strong> subscription.
+                You'll get <strong>instant access</strong> after payment is confirmed.
               </p>
             </div>
           )}
@@ -197,25 +172,18 @@ export const HuddleJoinButton = ({
             <div className="p-4 bg-verified-background border border-verified-border rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <Shield className="w-4 h-4 text-verified-primary" />
-                <span className="font-medium text-verified-primary">Verified Huddle</span>
+                <span className="font-medium text-verified-primary">Free Verified Huddle</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                This is an official verified huddle. Your join request will be reviewed by the huddle owner.
+                This is a free verified huddle. You'll get <strong>instant access</strong> when you join.
               </p>
             </div>
           )}
           
-          {huddle.is_verified && !membershipRequired && (
-            <div className="space-y-2">
-              <Label htmlFor="message">Message (optional)</Label>
-              <Textarea
-                id="message"
-                placeholder="Tell the owner why you'd like to join..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={3}
-              />
-            </div>
+          {!huddle.is_verified && (
+            <p className="text-sm text-muted-foreground">
+              Join this huddle to start chatting with other fans and participate in the community.
+            </p>
           )}
           
           <div className="flex gap-2 justify-end">
@@ -227,7 +195,7 @@ export const HuddleJoinButton = ({
               disabled={loading}
               className="bg-huddle-primary hover:bg-huddle-primary/90 text-white"
             >
-              {loading ? (membershipRequired ? "Redirecting..." : "Sending...") : (membershipRequired ? `Pay $${(membershipPrice / 100).toFixed(2)}/mo` : huddle.is_verified ? "Send Request" : "Join")}
+              {loading ? (membershipRequired ? "Redirecting..." : "Joining...") : (membershipRequired ? `Pay $${(membershipPrice / 100).toFixed(2)}/mo` : "Join Huddle")}
             </Button>
           </div>
         </div>
@@ -240,39 +208,30 @@ export const HuddleJoinButton = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle className="w-5 h-5 text-green-500" />
-            {joinType === 'request' ? 'Join Request Sent!' : 'Welcome to the Huddle!'}
+            Welcome to the Huddle!
           </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4">
           <div className="text-center">
-            {joinType === 'request' ? (
-              <p className="text-muted-foreground">
-                Your request to join "{huddle.name}" has been sent to the huddle owner for review.
-                You'll be notified when they respond.
-              </p>
-            ) : (
-              <p className="text-muted-foreground">
-                You're now a member of "{huddle.name}"! 
-                Start chatting with your fellow fans.
-              </p>
-            )}
+            <p className="text-muted-foreground">
+              You're now a member of "{huddle.name}"! 
+              Start chatting with your fellow fans.
+            </p>
           </div>
           
           <div className="flex flex-col gap-2">
-            {joinType === 'direct' && (
-              <Button 
-                onClick={() => {
-                  navigate(`/huddle/${huddle.id}`);
-                  setShowSuccessDialog(false);
-                  onJoinSuccess?.();
-                }}
-                className="bg-huddle-primary hover:bg-huddle-primary/90 text-white"
-              >
-                <ArrowRight className="w-4 h-4 mr-2" />
-                Go to Huddle
-              </Button>
-            )}
+            <Button 
+              onClick={() => {
+                navigate(`/huddle/${huddle.id}`);
+                setShowSuccessDialog(false);
+                onJoinSuccess?.();
+              }}
+              className="bg-huddle-primary hover:bg-huddle-primary/90 text-white"
+            >
+              <ArrowRight className="w-4 h-4 mr-2" />
+              Go to Huddle
+            </Button>
             <Button 
               variant="outline"
               onClick={() => {

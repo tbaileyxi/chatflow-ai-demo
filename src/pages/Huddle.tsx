@@ -43,116 +43,163 @@ export const Huddle = () => {
   // Check if current user is owner
   const isOwner = user?.id === huddle?.owner_id;
 
-  // Load huddle data with comprehensive error handling
-  useEffect(() => {
+  // Load huddle function (extracted so we can call it after payment)
+  const loadHuddle = useCallback(async () => {
     if (!huddleId) return;
     
-    const loadHuddle = async () => {
-      console.log('🔄 Starting huddle load for ID:', huddleId);
-      
-      // Set timeout to prevent infinite loading
-      const timeoutId = setTimeout(() => {
-        console.error('⏱️ Huddle loading timeout after 10 seconds');
-        setLoading(false);
-        toast({
-          title: "Timeout",
-          description: "Loading took too long. Please refresh the page.",
-          variant: "destructive",
-        });
-      }, 10000);
+    console.log('🔄 Starting huddle load for ID:', huddleId);
+    
+    // Set timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.error('⏱️ Huddle loading timeout after 10 seconds');
+      setLoading(false);
+      toast({
+        title: "Timeout",
+        description: "Loading took too long. Please refresh the page.",
+        variant: "destructive",
+      });
+    }, 10000);
 
-      try {
-        // Step 1: Load huddle
-        console.log('📍 Step 1: Fetching huddle data...');
-        const { data: huddle, error: huddleError } = await supabase
-          .from('huddles')
-          .select('*')
-          .eq('id', huddleId)
-          .maybeSingle();
+    try {
+      // Step 1: Load huddle
+      console.log('📍 Step 1: Fetching huddle data...');
+      const { data: huddle, error: huddleError } = await supabase
+        .from('huddles')
+        .select('*')
+        .eq('id', huddleId)
+        .maybeSingle();
 
-        if (huddleError || !huddle) {
-          clearTimeout(timeoutId);
-          setLoading(false);
-          navigate('/not-found');
-          return;
-        }
-
-        const { data: team } = await supabase
-          .from('teams')
-          .select('*')
-          .eq('id', huddle.team_id)
-          .maybeSingle();
-
-        setHuddle({ ...huddle, team });
-        setTeamName(team?.name || 'Team');
-
-        const { data: rawMessages } = await supabase
-          .from('huddle_messages')
-          .select(`
-            *, 
-            poll_data, 
-            message_type,
-            origin_teams:teams!origin_team_id(id, name, city, logo_url)
-          `)
-          .eq('huddle_id', huddleId)
-          .order('created_at', { ascending: false })
-          .limit(50);
-
-        if (rawMessages && rawMessages.length > 0) {
-          const messageUserIds = [...new Set(rawMessages.map((m: any) => m.user_id))];
-          const { data: profiles } = await supabase
-            .from('profiles')
-            .select('user_id, display_name, username, avatar_url')
-            .in('user_id', messageUserIds);
-
-          const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-          const messagesWithProfiles = rawMessages.map((m: any) => ({
-            ...m,
-            profile: profilesMap.get(m.user_id) || {
-              user_id: m.user_id,
-              display_name: 'User',
-              username: 'user'
-            }
-          }));
-
-          setMessages(messagesWithProfiles.reverse());
-          setOldestCreatedAt(rawMessages[rawMessages.length - 1]?.created_at || null);
-          setHasMore(rawMessages.length === 50);
-        }
-
-        const { data: membersData } = await supabase
-          .from('huddle_members')
-          .select('user_id')
-          .eq('huddle_id', huddleId)
-          .limit(20);
-
-        if (membersData && membersData.length > 0) {
-          const memberIds = membersData.map(m => m.user_id);
-          const { data: profilesData } = await supabase
-            .from('profiles')
-            .select('user_id, display_name, username, avatar_url')
-            .in('user_id', memberIds);
-
-          setMembers(profilesData || []);
-        }
-        
+      if (huddleError || !huddle) {
         clearTimeout(timeoutId);
         setLoading(false);
-        
-        // Auto-scroll to bottom after loading
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
-        }, 100);
-        
-      } catch (error) {
-        console.error('❌ Critical error loading huddle:', error);
-        clearTimeout(timeoutId);
-        setLoading(false);
+        navigate('/not-found');
+        return;
       }
-    };
 
-    loadHuddle();
+      const { data: team } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('id', huddle.team_id)
+        .maybeSingle();
+
+      setHuddle({ ...huddle, team });
+      setTeamName(team?.name || 'Team');
+
+      const { data: rawMessages } = await supabase
+        .from('huddle_messages')
+        .select(`
+          *, 
+          poll_data, 
+          message_type,
+          origin_teams:teams!origin_team_id(id, name, city, logo_url)
+        `)
+        .eq('huddle_id', huddleId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (rawMessages && rawMessages.length > 0) {
+        const messageUserIds = [...new Set(rawMessages.map((m: any) => m.user_id))];
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, display_name, username, avatar_url')
+          .in('user_id', messageUserIds);
+
+        const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+        const messagesWithProfiles = rawMessages.map((m: any) => ({
+          ...m,
+          profile: profilesMap.get(m.user_id) || {
+            user_id: m.user_id,
+            display_name: 'User',
+            username: 'user'
+          }
+        }));
+
+        setMessages(messagesWithProfiles.reverse());
+        setOldestCreatedAt(rawMessages[rawMessages.length - 1]?.created_at || null);
+        setHasMore(rawMessages.length === 50);
+      }
+
+      const { data: membersData } = await supabase
+        .from('huddle_members')
+        .select('user_id')
+        .eq('huddle_id', huddleId)
+        .limit(20);
+
+      if (membersData && membersData.length > 0) {
+        const memberIds = membersData.map(m => m.user_id);
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('user_id, display_name, username, avatar_url')
+          .in('user_id', memberIds);
+
+        setMembers(profilesData || []);
+      }
+      
+      clearTimeout(timeoutId);
+      setLoading(false);
+      
+      // Auto-scroll to bottom after loading
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+      }, 100);
+      
+    } catch (error) {
+      console.error('❌ Critical error loading huddle:', error);
+      clearTimeout(timeoutId);
+      setLoading(false);
+    }
   }, [huddleId, navigate, toast]);
+
+  // Handle membership payment success callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const membershipStatus = urlParams.get('membership');
+    const sessionId = urlParams.get('session_id');
+
+    if (membershipStatus === 'success' && sessionId && user) {
+      const finalizeMembership = async () => {
+        try {
+          console.log('💳 Finalizing membership payment...');
+          const { error } = await supabase.functions.invoke('check-huddle-membership', {
+            body: { sessionId, huddleId }
+          });
+
+          if (error) throw error;
+
+          toast({
+            title: "Welcome to the huddle! 🎉",
+            description: "Your membership is now active.",
+          });
+
+          // Clean up URL params
+          window.history.replaceState({}, '', `/huddle/${huddleId}`);
+          
+          // Reload huddle data to show user as member
+          loadHuddle();
+        } catch (error) {
+          console.error('❌ Error finalizing membership:', error);
+          toast({
+            title: "Membership Error",
+            description: "Payment processed but membership not activated. Please contact support.",
+            variant: "destructive",
+          });
+        }
+      };
+
+      finalizeMembership();
+    } else if (membershipStatus === 'cancelled') {
+      toast({
+        title: "Payment Cancelled",
+        description: "Your membership payment was cancelled.",
+      });
+      window.history.replaceState({}, '', `/huddle/${huddleId}`);
+    }
+  }, [huddleId, user, toast, loadHuddle]);
+
+  // Load huddle data on mount
+  useEffect(() => {
+    loadHuddle();
+  }, [loadHuddle]);
 
   // Load older messages function
   const loadMoreMessages = useCallback(async () => {

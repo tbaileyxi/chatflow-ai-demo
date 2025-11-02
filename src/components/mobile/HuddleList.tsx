@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { StartHuddleDialog } from '@/components/StartHuddleDialog';
 import { useToast } from '@/hooks/use-toast';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 
 interface Huddle {
   id: string;
@@ -17,6 +18,7 @@ interface Huddle {
   team_name: string;
   team_logo_url: string;
   participant_count: number;
+  is_verified?: boolean;
   latest_message?: {
     content: string;
     created_at: string;
@@ -62,6 +64,7 @@ export const HuddleList = () => {
           name,
           member_count,
           last_message_at,
+          is_verified,
           teams (
             name,
             city,
@@ -141,6 +144,7 @@ export const HuddleList = () => {
           team_name: `${huddle.teams?.city} ${huddle.teams?.name}`,
           team_logo_url: huddle.teams?.logo_url || '/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png',
           participant_count: actualMemberCount,
+          is_verified: huddle.is_verified,
           latest_message: latestMessage ? {
             content: latestMessage.content,
             created_at: latestMessage.created_at,
@@ -292,7 +296,10 @@ export const HuddleList = () => {
                             <span className="font-medium text-foreground text-sm">
                               {huddle.name}
                             </span>
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            {huddle.is_verified && (
+                              <VerifiedBadge size="sm" />
+                            )}
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
                               <Users className="h-3 w-3" />
                               <span>{huddle.participant_count}</span>
                             </div>
