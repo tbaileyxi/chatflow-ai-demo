@@ -431,7 +431,7 @@ export const CurationQueue = () => {
                         </div>
                       </div>
                       
-                      {activeTab === 'pending' && (
+                      {activeTab !== 'broadcasted' && (
                         <div className="space-y-4">
                           {/* Broadcast Destinations */}
                           <div className="border rounded-lg p-4 bg-muted/50">
