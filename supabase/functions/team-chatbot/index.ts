@@ -137,12 +137,16 @@ serve(async (req) => {
     console.log(`🎯 Personality: ${personality}`);
     console.log(`🎯 Final query: "${finalQuery}"`);
 
-    // Build current date/time context
-    const currentDate = new Date();
+    // Build current date/time context - ALL IN EASTERN TIME
+    const nowUTC = new Date();
+    const etDateString = nowUTC.toLocaleString('en-US', { timeZone: 'America/New_York' });
+    const currentDate = new Date(etDateString); // Now represents ET, not UTC
+    
     const formattedDate = currentDate.toLocaleDateString('en-US', { 
       month: 'long', 
       day: 'numeric', 
-      year: 'numeric' 
+      year: 'numeric',
+      timeZone: 'America/New_York'
     });
     const formattedTime = currentDate.toLocaleTimeString('en-US', { 
       hour: 'numeric', 
@@ -150,7 +154,7 @@ serve(async (req) => {
       timeZone: 'America/New_York'
     });
 
-    // Calculate current season based on date
+    // Calculate current season based on ET date
     const currentMonth = currentDate.getMonth(); // 0-11 (0=Jan, 11=Dec)
     const currentYear = currentDate.getFullYear();
 
@@ -161,16 +165,18 @@ serve(async (req) => {
     const seasonEndYear = seasonStartYear + 1;
     const seasonString = `${seasonStartYear}-${seasonEndYear}`;
 
-    console.log(`📅 Season: ${seasonString} (start year: ${seasonStartYear})`);
+    console.log(`📅 ET Date: ${formattedDate} | Season: ${seasonString} (start year: ${seasonStartYear})`);
 
-    // Query Highlightly for recent game data
+    // Query Highlightly for recent game data using ET dates
     let liveGameContext = '';
     try {
       const highlightly = await createHighlightlyClient();
-      const today = currentDate.toISOString().split('T')[0];
+      
+      // Get today/yesterday in ET, not UTC
+      const today = currentDate.toISOString().split('T')[0]; // ET date
       const yesterday = new Date(currentDate);
       yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const yesterdayStr = yesterday.toISOString().split('T')[0]; // ET date
 
       // Try to get recent games (today and yesterday)
       const [todayGames, yesterdayGames] = await Promise.all([
