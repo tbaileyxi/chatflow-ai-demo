@@ -73,10 +73,10 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
     
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    if (!XAI_API_KEY) {
+      throw new Error('XAI_API_KEY not configured');
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -360,58 +360,57 @@ RESPONSE RULES:
 
 User question: ${finalQuery}`;
 
-    console.log(`🤖 Calling Lovable AI (Google Gemini 2.5 Flash) for real-time search`);
+    console.log(`🤖 Calling Grok API with Live Search enabled`);
 
-    // Call Lovable AI with Google Gemini 2.5 Flash
-    const aiApiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    // Call Grok API with correct search_parameters for Live Search
+    const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'Authorization': `Bearer ${XAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'grok-2-1212',
         messages: [
           { role: 'system', content: systemPrompt },
-          { 
-            role: 'system', 
-            content: `CRITICAL: Before responding, verify you are using REAL information from your web search with grounding, not fabricated scenarios. If the search shows ${teamName} losing 7-17, report that score exactly. Do not make up exciting plays that didn't happen. Use Google Search to find the MOST RECENT game data.` 
-          },
           { role: 'user', content: finalQuery }
         ],
-        temperature: 0.3,
-        max_tokens: 300
-        // Gemini 2.5 Flash has built-in real-time search grounding
+        stream: false,
+        search_parameters: {
+          mode: 'auto',
+          return_citations: true,
+          sources: [
+            { type: 'web' }
+          ]
+        }
       }),
     });
 
-    if (!aiApiResponse.ok) {
-      const errorText = await aiApiResponse.text();
-      console.error(`❌ Lovable AI (Gemini) error (${aiApiResponse.status}):`, errorText);
+    if (!grokResponse.ok) {
+      const errorText = await grokResponse.text();
+      console.error(`❌ Grok API error (${grokResponse.status}):`, errorText);
       
       // Handle specific error cases
-      if (aiApiResponse.status === 401) {
-        throw new Error('Invalid LOVABLE_API_KEY');
-      } else if (aiApiResponse.status === 429) {
-        throw new Error('Rate limit exceeded for Lovable AI - please wait before trying again');
-      } else if (aiApiResponse.status === 402) {
-        throw new Error('Payment required - please add credits to your Lovable AI workspace');
+      if (grokResponse.status === 401) {
+        throw new Error('Invalid XAI_API_KEY');
+      } else if (grokResponse.status === 429) {
+        throw new Error('Rate limit exceeded for Grok - please wait before trying again');
       } else {
-        throw new Error(`Lovable AI error: ${aiApiResponse.status} - ${errorText}`);
+        throw new Error(`Grok API error: ${grokResponse.status} - ${errorText}`);
       }
     }
 
-    const geminiData = await aiApiResponse.json();
-    let aiResponse = geminiData.choices?.[0]?.message?.content;
+    const grokData = await grokResponse.json();
+    let aiResponse = grokData.choices?.[0]?.message?.content;
 
     // Log response metadata
-    console.log(`✅ Gemini 2.5 Flash response received`);
-    if (geminiData.usage) {
-      console.log(`📊 Tokens used:`, geminiData.usage);
+    console.log(`✅ Grok response with Live Search received`);
+    if (grokData.usage) {
+      console.log(`📊 Tokens used:`, grokData.usage);
     }
 
     if (!aiResponse) {
-      throw new Error('No response from Lovable AI (Gemini)');
+      throw new Error('No response from Grok API');
     }
 
     // Validate that response contains score information for score queries
