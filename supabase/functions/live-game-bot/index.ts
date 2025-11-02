@@ -4,10 +4,35 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { shouldPollNow } from "../_shared/game-schedule.ts";
 
+// Helper function for retrying API calls with exponential backoff
+async function fetchWithRetry(url: string, options: any, maxRetries = 3): Promise<Response> {
+  let lastError;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      console.log(`🔍 Attempting API call (attempt ${i + 1}/${maxRetries}): ${url}`);
+      const response = await fetch(url, options);
+      console.log(`✅ API call successful: ${response.status}`);
+      return response;
+    } catch (error) {
+      lastError = error;
+      console.error(`❌ API call failed (attempt ${i + 1}/${maxRetries}):`, error.message);
+      if (i < maxRetries - 1) {
+        const waitTime = Math.pow(2, i) * 1000;
+        console.log(`🔄 Retrying in ${waitTime / 1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+  throw lastError;
+}
+
 // Highlightly API client
 function createHighlightlyClient() {
   const apiKey = Deno.env.get("HIGHLIGHTLY_API_KEY");
   const baseUrl = "https://api.highlightly.net";
+
+  console.log(`🔑 Highlightly API Key present: ${!!apiKey}`);
+  console.log(`🌐 Base URL: ${baseUrl}`);
 
   return {
     async getMatches(params: { league?: string; date?: string; season?: number; limit?: number }) {
@@ -17,7 +42,7 @@ function createHighlightlyClient() {
       if (params.season) url.searchParams.append("season", params.season.toString());
       if (params.limit) url.searchParams.append("limit", params.limit.toString());
 
-      const response = await fetch(url.toString(), {
+      const response = await fetchWithRetry(url.toString(), {
         headers: {
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
@@ -25,7 +50,10 @@ function createHighlightlyClient() {
       });
 
       if (!response.ok) {
-        throw new Error(`Highlightly API error: ${response.status}`);
+        const errorText = await response.text();
+        console.error(`❌ Highlightly API error: ${response.status} - ${errorText}`);
+        console.error(`❌ URL attempted: ${url.toString()}`);
+        throw new Error(`Highlightly API error: ${response.status} - ${errorText}`);
       }
 
       return await response.json();

@@ -23,10 +23,26 @@ export function shouldPollNow(league: 'NFL' | 'NCAA'): boolean {
   }
   
   if (league === 'NCAA') {
+    // NCAA season: August through January (includes bowl season)
+    const isBowlSeason = month === 11 || month === 0; // December or January
+    
+    // Thursday games (especially MAC, C-USA) - 6pm-midnight ET
+    if (utcDay === 4 && etHour >= 18 && etHour <= 23) return true;
+    
     // Friday night games (6pm-midnight ET) - extended for pregame
     if (utcDay === 5 && etHour >= 18 && etHour <= 23) return true;
-    // Saturday games (9am-midnight ET) - catch College GameDay + early games + late games
+    
+    // Saturday games (9am-midnight ET) - Primary game day - catch College GameDay + early games + late games
     if (utcDay === 6 && etHour >= 9 && etHour <= 23) return true;
+    
+    // Sunday games (12pm-midnight ET) - Rare but happens (bowl games, makeups)
+    if (utcDay === 0 && etHour >= 12 && etHour <= 23) return true;
+    
+    // Bowl season coverage (mid-December through early January)
+    if (isBowlSeason) {
+      // Weekday bowl games (Monday, Tuesday, Wednesday) - 12pm-midnight ET
+      if ((utcDay === 1 || utcDay === 2 || utcDay === 3) && etHour >= 12 && etHour <= 23) return true;
+    }
   }
   
   return false; // Off-peak, skip intensive polling
@@ -81,11 +97,25 @@ export function isNCAAGameTime(): boolean {
   const etOffset = isDST ? 4 : 5;
   const etHour = (utcHours - etOffset + 24) % 24;
   
+  const isBowlSeason = month === 11 || month === 0; // December or January
+  
+  // Thursday games (especially MAC, C-USA) - 6pm-midnight ET
+  if (utcDay === 4 && etHour >= 18 && etHour <= 23) return true;
+  
   // Friday night games (6pm-midnight ET)
   if (utcDay === 5 && etHour >= 18 && etHour <= 23) return true;
   
   // Saturday games (9am-midnight ET for full coverage)
   if (utcDay === 6 && etHour >= 9 && etHour <= 23) return true;
+  
+  // Sunday games (12pm-midnight ET) - Rare but happens (bowl games, makeups)
+  if (utcDay === 0 && etHour >= 12 && etHour <= 23) return true;
+  
+  // Bowl season coverage (mid-December through early January)
+  if (isBowlSeason) {
+    // Weekday bowl games (Monday, Tuesday, Wednesday) - 12pm-midnight ET
+    if ((utcDay === 1 || utcDay === 2 || utcDay === 3) && etHour >= 12 && etHour <= 23) return true;
+  }
   
   return false;
 }
