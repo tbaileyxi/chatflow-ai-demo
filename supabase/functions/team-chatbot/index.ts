@@ -120,29 +120,6 @@ serve(async (req) => {
     const league = huddle.team.league;
     const personality = settings.personality || 'hype';
 
-    // Extract query after @coach
-    const coachMention = content.match(/@coach\s+(.+)/i);
-    const userQuery = coachMention ? coachMention[1].trim() : '';
-
-    // Provide context for empty queries
-    let finalQuery = userQuery || `What are the latest news and updates about the ${teamName}? Keep it brief.`;
-
-    // Enhance score/game queries to force real-time search
-    if (finalQuery.toLowerCase().match(/score|game|playing|final|result|recap/)) {
-      finalQuery += ` Search for live score or final score for ${teamName} on ${formattedDate}.`;
-      console.log(`🏈 Live score query detected - enhanced for web search`);
-    }
-
-    // Enhance betting-related queries
-    if (finalQuery.toLowerCase().match(/spread|line|odds|betting|over.under|moneyline/)) {
-      finalQuery += ` Search for current betting odds from ESPN BET, DraftKings, or FanDuel.`;
-      console.log(`🎰 Betting query detected - enhanced for web search`);
-    }
-
-    console.log(`🎯 Team: ${teamName} (${league})`);
-    console.log(`🎯 Personality: ${personality}`);
-    console.log(`🎯 Final query: "${finalQuery}"`);
-
     // Build current date/time context - ALL IN EASTERN TIME
     const nowUTC = new Date();
     const etDateString = nowUTC.toLocaleString('en-US', { timeZone: 'America/New_York' });
@@ -172,6 +149,29 @@ serve(async (req) => {
     const seasonString = `${seasonStartYear}-${seasonEndYear}`;
 
     console.log(`📅 ET Date: ${formattedDate} | Season: ${seasonString} (start year: ${seasonStartYear})`);
+
+    // Extract query after @coach
+    const coachMention = content.match(/@coach\s+(.+)/i);
+    const userQuery = coachMention ? coachMention[1].trim() : '';
+
+    // Provide context for empty queries
+    let finalQuery = userQuery || `What are the latest news and updates about the ${teamName}? Keep it brief.`;
+
+    // Enhance score/game queries to force real-time search
+    if (finalQuery.toLowerCase().match(/score|game|playing|final|result|recap/)) {
+      finalQuery += ` Search for live score or final score for ${teamName} on ${formattedDate}.`;
+      console.log(`🏈 Live score query detected - enhanced for web search`);
+    }
+
+    // Enhance betting-related queries
+    if (finalQuery.toLowerCase().match(/spread|line|odds|betting|over.under|moneyline/)) {
+      finalQuery += ` Search for current betting odds from ESPN BET, DraftKings, or FanDuel.`;
+      console.log(`🎰 Betting query detected - enhanced for web search`);
+    }
+
+    console.log(`🎯 Team: ${teamName} (${league})`);
+    console.log(`🎯 Personality: ${personality}`);
+    console.log(`🎯 Final query: "${finalQuery}"`);
 
     // Query Highlightly for SUPPLEMENTAL data (odds, detailed stats)
     let liveGameContext = '';
