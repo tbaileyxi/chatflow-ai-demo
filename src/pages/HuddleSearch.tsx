@@ -168,18 +168,18 @@ export const HuddleSearch = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background crt-effect">
+    <div className="min-h-screen bg-background crt-effect flex flex-col">
       <div className="fixed inset-0 pointer-events-none opacity-10">
         <div className="absolute inset-0 retro-grid"></div>
         <div className="absolute inset-0 retro-scanlines"></div>
       </div>
-      <div className="relative">
+      <div className="relative flex flex-col h-screen">
         <GlassHeader 
           title="Discover Verified Huddles"
           onBack={() => window.history.back()}
         />
-        <div className="flex-1 overflow-auto font-arcade">
-        <div className="container mx-auto p-4 max-w-4xl">
+        <div className="flex-1 overflow-auto font-arcade pb-20">
+          <div className="container mx-auto p-4 max-w-4xl">
           <Card className="mb-4 bg-verified-background border-verified-border">
             <CardContent className="p-4">
               <div className="flex items-center justify-between gap-4">
@@ -244,9 +244,9 @@ export const HuddleSearch = () => {
               )}
             </div>
           )}
+          </div>
         </div>
-      </div>
-      <BottomNav />
+        <BottomNav />
       </div>
     </div>
   );

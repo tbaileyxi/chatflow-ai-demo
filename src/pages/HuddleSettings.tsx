@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useHuddleSubscription } from '@/hooks/useHuddleSubscription';
 import { useJoinRequestNotifications } from '@/hooks/useJoinRequestNotifications';
 import { useToast } from '@/hooks/use-toast';
+import { Shield } from 'lucide-react';
 
 interface HuddleData {
   id: string;
@@ -213,9 +214,14 @@ export const HuddleSettings = () => {
             <div className="bg-card/50 backdrop-blur-sm border border-white/10 rounded-xl p-4">
               <h3 className="text-lg font-semibold mb-4 text-foreground">Huddle Verification</h3>
               {subscriptionStatus?.is_verified ? (
-                <div className="flex items-center gap-2 text-verified-primary">
-                  <div className="w-2 h-2 bg-verified-primary rounded-full"></div>
-                  <span className="text-sm font-medium">This huddle is verified</span>
+                <div className="flex items-center gap-3 p-3 bg-verified-background border border-verified-border rounded-lg">
+                  <Shield className="w-5 h-5 text-verified-primary shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium text-verified-primary">Verified Huddle</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Status: Active | Expires: {subscriptionStatus.expires_at ? new Date(subscriptionStatus.expires_at).toLocaleDateString() : 'N/A'}
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <HuddleVerificationDialog

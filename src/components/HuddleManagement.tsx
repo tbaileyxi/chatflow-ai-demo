@@ -4,8 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreVertical, LogOut, Trash2 } from 'lucide-react';
+import { LogOut, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface HuddleManagementProps {
@@ -138,20 +137,13 @@ export const HuddleManagement = ({ huddleId, ownerId, huddle }: HuddleManagement
   if (!user) return null;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <MoreVertical className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Leave Huddle
-            </DropdownMenuItem>
-          </AlertDialogTrigger>
+    <div className="flex items-center gap-2">
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <LogOut className="h-4 w-4 text-orange-500" />
+          </Button>
+        </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Leave Huddle</AlertDialogTitle>
@@ -178,10 +170,9 @@ export const HuddleManagement = ({ huddleId, ownerId, huddle }: HuddleManagement
         {isOwner && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Huddle
-              </DropdownMenuItem>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
@@ -203,7 +194,6 @@ export const HuddleManagement = ({ huddleId, ownerId, huddle }: HuddleManagement
             </AlertDialogContent>
           </AlertDialog>
         )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    </div>
   );
 };

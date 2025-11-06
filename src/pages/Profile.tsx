@@ -123,6 +123,15 @@ export const Profile = () => {
 
     setSaving(true);
     try {
+      // Fetch current profile to check if username changed
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('user_id', user.id)
+        .single();
+
+      const usernameChanged = currentProfile?.username !== profile.username;
+
       const { error } = await supabase
         .from('profiles')
         .upsert(
@@ -140,7 +149,7 @@ export const Profile = () => {
         );
 
       if (error) {
-        if (error.message?.includes('username') && error.message?.includes('unique')) {
+        if (usernameChanged && error.message?.includes('username') && error.message?.includes('unique')) {
           throw new Error('Username is already taken. Please choose a different one.');
         }
         throw error;
