@@ -118,8 +118,11 @@ export const HuddleMembershipPricing = ({ huddleId, isOwner }: HuddleMembershipP
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-foreground">
           <DollarSign className="w-5 h-5" />
-          Membership Pricing
+          Member Subscription Pricing
         </CardTitle>
+        <p className="text-xs text-muted-foreground mt-1">
+          Set how much members pay to join your verified huddle (separate from verification cost)
+        </p>
       </CardHeader>
       <CardContent className="space-y-4">
         {!isOwner && (
@@ -132,10 +135,10 @@ export const HuddleMembershipPricing = ({ huddleId, isOwner }: HuddleMembershipP
           <div className="flex items-center justify-between">
             <div>
               <Label htmlFor="pricing-enabled" className="text-sm font-medium">
-                Enable Paid Membership
+                Require Paid Membership
               </Label>
               <p className="text-xs text-muted-foreground">
-                Require monthly subscription for new members
+                Toggle OFF for free member access, or ON to charge monthly subscriptions
               </p>
             </div>
             <Switch

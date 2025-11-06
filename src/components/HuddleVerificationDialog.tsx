@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Shield, Star, Users, Search } from "lucide-react";
@@ -19,26 +21,42 @@ export const HuddleVerificationDialog = ({
 }: HuddleVerificationDialogProps) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
   const { toast } = useToast();
 
   const handleUpgrade = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-verification-payment', {
-        body: { huddleId }
+        body: { 
+          huddleId,
+          promoCode: promoCode.trim() || undefined
+        }
       });
 
       if (error) throw error;
 
-      // Open Stripe checkout in new tab
-      if (data.url) {
-        window.open(data.url, '_blank');
+      // Check if promo code gave free verification (no URL returned)
+      if (data.success && !data.url) {
+        toast({
+          title: "Huddle Verified! 🎉",
+          description: data.message || "Your huddle is now verified.",
+        });
         setOpen(false);
+        
+        // Reload page to refresh subscription status
+        window.location.reload();
+        return;
+      }
+
+      // Redirect to Stripe checkout for paid verification
+      if (data.url) {
+        window.location.href = data.url;
       }
     } catch (error: any) {
       console.error("Error creating verification payment:", error);
       toast({
-        title: "Payment setup failed",
+        title: "Verification failed",
         description: error.message || "Something went wrong",
         variant: "destructive",
       });
@@ -109,6 +127,23 @@ export const HuddleVerificationDialog = ({
           <div className="text-center p-4 bg-verified-background rounded-lg">
             <div className="text-2xl font-bold text-verified-primary">$49.99</div>
             <div className="text-sm text-muted-foreground">One-time payment</div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="promo-code" className="text-sm font-medium">
+              Promo Code (Optional)
+            </Label>
+            <Input
+              id="promo-code"
+              type="text"
+              placeholder="Enter promo code"
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+              className="uppercase"
+            />
+            <p className="text-xs text-muted-foreground">
+              Have a promo code? Enter it for discounts or free verification.
+            </p>
           </div>
           
           <div className="flex gap-2 justify-end">

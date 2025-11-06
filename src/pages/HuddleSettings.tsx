@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MobileLayout } from '@/components/mobile/MobileLayout';
 import { GlassHeader } from '@/components/mobile/GlassHeader';
+import { Button } from '@/components/ui/button';
 import { HuddleManagement } from '@/components/HuddleManagement';
 import { HuddleMembersManager } from '@/components/HuddleMembersManager';
 import { HuddleVerificationDialog } from '@/components/HuddleVerificationDialog';
@@ -13,7 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useHuddleSubscription } from '@/hooks/useHuddleSubscription';
 import { useJoinRequestNotifications } from '@/hooks/useJoinRequestNotifications';
 import { useToast } from '@/hooks/use-toast';
-import { Shield } from 'lucide-react';
+import { Shield, RefreshCw } from 'lucide-react';
 
 interface HuddleData {
   id: string;
@@ -212,7 +213,20 @@ export const HuddleSettings = () => {
           {/* Verification Section - Only for owners */}
           {isOwner && (
             <div className="bg-card/50 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-              <h3 className="text-lg font-semibold mb-4 text-foreground">Huddle Verification</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-foreground">Huddle Verification</h3>
+                {!subscriptionStatus?.is_verified && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => refreshSubscriptionStatus()}
+                    className="text-xs"
+                  >
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    Refresh
+                  </Button>
+                )}
+              </div>
               {subscriptionStatus?.is_verified ? (
                 <div className="flex items-center gap-3 p-3 bg-verified-background border border-verified-border rounded-lg">
                   <Shield className="w-5 h-5 text-verified-primary shrink-0" />
