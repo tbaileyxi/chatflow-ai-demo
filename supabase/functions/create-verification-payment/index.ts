@@ -17,6 +17,11 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_ANON_KEY") ?? ""
   );
 
+  const supabaseServiceRole = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  );
+
   try {
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
@@ -81,11 +86,13 @@ serve(async (req) => {
 
     // If promo code gives 100% discount, verify immediately without payment
     if (finalAmount === 0 && promoData) {
+      console.log(`Processing free verification with promo ${promoCode} for huddle ${huddleId}`);
       const expiresAt = new Date();
       expiresAt.setFullYear(expiresAt.getFullYear() + 1); // 1 year from now
 
-      // Update huddle as verified
-      await supabaseClient
+      console.log("Updating huddle to verified...");
+      // Update huddle as verified (use service role to bypass RLS)
+      const { error: huddleError } = await supabaseServiceRole
         .from("huddles")
         .update({ 
           is_verified: true,
@@ -93,8 +100,14 @@ serve(async (req) => {
         })
         .eq("id", huddleId);
 
-      // Create subscription record
-      await supabaseClient
+      if (huddleError) {
+        console.error("Error updating huddle:", huddleError);
+        throw new Error(`Failed to verify huddle: ${huddleError.message}`);
+      }
+
+      console.log("Creating subscription record...");
+      // Create subscription record (use service role to bypass RLS)
+      const { error: subscriptionError } = await supabaseServiceRole
         .from("huddle_subscriptions")
         .insert({
           huddle_id: huddleId,
@@ -103,12 +116,19 @@ serve(async (req) => {
           expires_at: expiresAt.toISOString()
         });
 
+      if (subscriptionError) {
+        console.error("Error creating subscription:", subscriptionError);
+        throw new Error(`Failed to create subscription: ${subscriptionError.message}`);
+      }
+
+      console.log("Incrementing promo usage...");
       // Increment promo code usage
-      await supabaseClient
+      await supabaseServiceRole
         .from("promo_codes")
         .update({ current_uses: (promoData.current_uses || 0) + 1 })
         .eq("id", promoData.id);
 
+      console.log("Promo verification complete!");
       return new Response(JSON.stringify({ success: true, message: "Huddle verified with promo code!" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
