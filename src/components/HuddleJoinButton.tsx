@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,10 +29,8 @@ export const HuddleJoinButton = ({
   membershipPrice = 0
 }: HuddleJoinButtonProps) => {
   const [open, setOpen] = useState(false);
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [joinType, setJoinType] = useState<'request' | 'direct'>('direct');
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -59,9 +55,8 @@ export const HuddleJoinButton = ({
 
         if (error) throw error;
 
-        // Open Stripe checkout in a new tab
-        window.open(data.url, '_blank');
-        setOpen(false);
+        // Redirect to Stripe checkout
+        window.location.href = data.url;
         return;
       }
 
@@ -99,11 +94,9 @@ export const HuddleJoinButton = ({
         })
         .eq("id", huddle.id);
 
-      setJoinType('direct');
       setShowSuccessDialog(true);
-
       setOpen(false);
-      setMessage("");
+      onJoinSuccess?.();
     } catch (error: any) {
       console.error("Error joining huddle:", error);
       toast({
