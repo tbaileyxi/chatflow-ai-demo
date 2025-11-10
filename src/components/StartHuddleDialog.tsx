@@ -9,7 +9,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Users, Trophy } from 'lucide-react';
+import { Plus, Users, Trophy, Shield, ArrowRight } from 'lucide-react';
+import { CreateVerifiedHuddleDialog } from '@/components/CreateVerifiedHuddleDialog';
 
 interface Team {
   id: string;
@@ -219,6 +220,21 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
               </div>
             </CardContent>
           </Card>
+
+          <CreateVerifiedHuddleDialog 
+            onHuddleCreated={onHuddleCreated}
+            trigger={
+              <Button 
+                type="button"
+                variant="link" 
+                className="w-full text-verified-primary hover:text-verified-primary/80 gap-1 p-0 h-auto"
+              >
+                <Shield className="w-4 h-4" />
+                Get verified? 
+                <ArrowRight className="w-3 h-3" />
+              </Button>
+            }
+          />
 
           <div className="flex justify-end gap-2 pt-2">
             <Button 

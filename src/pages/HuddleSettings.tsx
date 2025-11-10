@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { MobileLayout } from '@/components/mobile/MobileLayout';
 import { GlassHeader } from '@/components/mobile/GlassHeader';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { HuddleManagement } from '@/components/HuddleManagement';
 import { HuddleMembersManager } from '@/components/HuddleMembersManager';
 import { HuddleVerificationDialog } from '@/components/HuddleVerificationDialog';
@@ -14,12 +15,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useHuddleSubscription } from '@/hooks/useHuddleSubscription';
 import { useJoinRequestNotifications } from '@/hooks/useJoinRequestNotifications';
 import { useToast } from '@/hooks/use-toast';
-import { Shield, RefreshCw } from 'lucide-react';
+import { Shield, RefreshCw, Save } from 'lucide-react';
 
 interface HuddleData {
   id: string;
   name: string;
   owner_id: string;
+  bio?: string;
   team: {
     name: string;
     logo_url?: string;
@@ -34,6 +36,8 @@ export const HuddleSettings = () => {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [bio, setBio] = useState('');
+  const [bioSaving, setBioSaving] = useState(false);
   
   // Subscription status for verification
   const { subscriptionStatus, refreshSubscriptionStatus } = useHuddleSubscription(huddleId || '');
@@ -54,6 +58,7 @@ export const HuddleSettings = () => {
             id,
             name,
             owner_id,
+            bio,
             team:teams(name, logo_url)
           `)
           .eq('id', huddleId)
@@ -61,6 +66,7 @@ export const HuddleSettings = () => {
 
         if (error) throw error;
         setHuddle(data);
+        setBio(data.bio || '');
 
         // Check if user is admin
         if (user) {
@@ -177,6 +183,34 @@ export const HuddleSettings = () => {
     }
   }, [isOwner, refreshSubscriptionStatus, toast]);
 
+  const handleSaveBio = async () => {
+    if (!isOwner || !huddleId) return;
+    
+    setBioSaving(true);
+    try {
+      const { error } = await supabase
+        .from('huddles')
+        .update({ bio: bio.trim() || null })
+        .eq('id', huddleId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Bio Updated",
+        description: "Your huddle bio has been saved successfully.",
+      });
+    } catch (error: any) {
+      console.error('Error updating bio:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update bio",
+        variant: "destructive",
+      });
+    } finally {
+      setBioSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <MobileLayout hasBottomNav={false}>
@@ -210,6 +244,49 @@ export const HuddleSettings = () => {
       
       <div className="flex-1 p-4">
         <div className="space-y-6">
+          {/* Huddle Information - Only for owners */}
+          {isOwner && (
+            <div className="bg-card/50 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+              <h3 className="text-lg font-semibold text-foreground mb-4">Huddle Information</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm text-muted-foreground mb-2 block">
+                    Bio ({bio.length}/280)
+                  </label>
+                  <Textarea
+                    value={bio}
+                    onChange={(e) => {
+                      if (e.target.value.length <= 280) {
+                        setBio(e.target.value);
+                      }
+                    }}
+                    placeholder="Describe your huddle to attract new members..."
+                    className="min-h-[100px] resize-none"
+                    maxLength={280}
+                  />
+                </div>
+                <Button 
+                  onClick={handleSaveBio}
+                  disabled={bioSaving}
+                  size="sm"
+                  className="w-full"
+                >
+                  {bioSaving ? (
+                    <>
+                      <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Verification Section - Only for owners */}
           {isOwner && (
             <div className="bg-card/50 backdrop-blur-sm border border-white/10 rounded-xl p-4">

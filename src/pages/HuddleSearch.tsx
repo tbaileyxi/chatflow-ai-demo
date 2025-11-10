@@ -23,6 +23,7 @@ interface Huddle {
   member_count: number;
   is_verified: boolean;
   owner_id: string;
+  bio?: string;
   team: {
     name: string;
     logo_url?: string;
@@ -60,6 +61,7 @@ export const HuddleSearch = () => {
           member_count,
           is_verified,
           owner_id,
+          bio,
           teams:team_id (
             name,
             logo_url
@@ -128,7 +130,12 @@ export const HuddleSearch = () => {
                 {huddle.is_verified && <VerifiedBadge size="sm" />}
               </div>
               <p className="text-sm text-muted-foreground">{huddle.team.name}</p>
-              <p className="text-xs text-muted-foreground">
+              {huddle.bio && (
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                  {huddle.bio}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">
                 Owner: {huddle.owner_profile?.display_name || huddle.owner_profile?.username || "Unknown"}
               </p>
             </div>
