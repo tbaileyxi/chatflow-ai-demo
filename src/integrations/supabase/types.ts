@@ -624,6 +624,111 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          browser_push_enabled: boolean | null
+          created_at: string | null
+          game_end_enabled: boolean | null
+          game_start_enabled: boolean | null
+          id: string
+          in_app_notifications: boolean | null
+          only_followed_teams: boolean | null
+          only_huddle_teams: boolean | null
+          score_update_enabled: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          browser_push_enabled?: boolean | null
+          created_at?: string | null
+          game_end_enabled?: boolean | null
+          game_start_enabled?: boolean | null
+          id?: string
+          in_app_notifications?: boolean | null
+          only_followed_teams?: boolean | null
+          only_huddle_teams?: boolean | null
+          score_update_enabled?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          browser_push_enabled?: boolean | null
+          created_at?: string | null
+          game_end_enabled?: boolean | null
+          game_start_enabled?: boolean | null
+          id?: string
+          in_app_notifications?: boolean | null
+          only_followed_teams?: boolean | null
+          only_huddle_teams?: boolean | null
+          score_update_enabled?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string
+          clicked_at: string | null
+          created_at: string | null
+          data: Json | null
+          delivered_at: string | null
+          game_id: string | null
+          huddle_id: string | null
+          id: string
+          read_at: string | null
+          team_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          clicked_at?: string | null
+          created_at?: string | null
+          data?: Json | null
+          delivered_at?: string | null
+          game_id?: string | null
+          huddle_id?: string | null
+          id?: string
+          read_at?: string | null
+          team_id?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          clicked_at?: string | null
+          created_at?: string | null
+          data?: Json | null
+          delivered_at?: string | null
+          game_id?: string | null
+          huddle_id?: string | null
+          id?: string
+          read_at?: string | null
+          team_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pickem_entries: {
         Row: {
           created_at: string

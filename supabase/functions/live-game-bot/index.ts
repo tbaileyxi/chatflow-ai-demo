@@ -517,6 +517,16 @@ async function postGameStart(
   const content = `🏈 KICKOFF! ${teams[1].name} vs ${teams[0].name} - Game is LIVE!`;
 
   await postToTeamFeeds(teams, content, league, supabase, allTeams, `kickoff-${teams[0].id}-${teams[1].id}`);
+  
+  // Create notifications for game start
+  await createGameNotification(
+    'game_start',
+    teams,
+    `${teams[0].id}-${teams[1].id}`,
+    { period: 1, clock: '', status: 'in_progress' },
+    supabase,
+    allTeams
+  );
 }
 
 async function postScoreUpdate(
@@ -526,7 +536,7 @@ async function postScoreUpdate(
   allTeams: Map<string, any>,
   matchId?: number
 ) {
-  const { teams, lastPeriod, lastClock } = gameState;
+  const { teams, lastPeriod, lastClock, gameId } = gameState;
   const periodText = getPeriodText(lastPeriod);
 
   // Video highlight fetching disabled - only show score updates
@@ -537,6 +547,16 @@ async function postScoreUpdate(
   }`;
 
   await postToTeamFeeds(teams, content, league, supabase, allTeams);
+  
+  // Create notifications for score update
+  await createGameNotification(
+    'score_update',
+    teams,
+    gameId,
+    { period: lastPeriod, clock: lastClock, status: 'in_progress' },
+    supabase,
+    allTeams
+  );
 }
 
 async function postPeriodChange(
@@ -556,7 +576,7 @@ async function postPeriodChange(
 }
 
 async function postGameEnd(gameState: GameState, league: string, supabase: any, allTeams: Map<string, any>) {
-  const { teams } = gameState;
+  const { teams, gameId } = gameState;
   const winner = teams[0].score > teams[1].score ? teams[0] : teams[1];
 
   const content = `🏆 FINAL: ${winner.name.toUpperCase()} WIN!\n${teams[1].name} ${teams[1].score} - ${
@@ -564,6 +584,16 @@ async function postGameEnd(gameState: GameState, league: string, supabase: any, 
   } ${teams[0].name}`;
 
   await postToTeamFeeds(teams, content, league, supabase, allTeams);
+  
+  // Create notifications for game end
+  await createGameNotification(
+    'game_end',
+    teams,
+    gameId,
+    { period: 4, clock: '0:00', status: 'finished' },
+    supabase,
+    allTeams
+  );
 }
 
 const recentMessages = new Map<string, number>();
@@ -576,6 +606,168 @@ function cleanupCache() {
     if (timestamp < tenMinAgo) {
       recentMessages.delete(key);
     }
+  }
+}
+
+// Helper function to create notifications for game events
+async function createGameNotification(
+  type: 'game_start' | 'score_update' | 'game_end',
+  teams: any[],
+  gameId: string,
+  gameData: any,
+  supabaseAdmin: any,
+  allTeams: Map<string, any>
+) {
+  try {
+    // Get team IDs from our database
+    const teamIds = teams
+      .map(t => {
+        const found = Array.from(allTeams.values()).find(
+          dbTeam => dbTeam.highlightly_id === t.id
+        );
+        return found?.id;
+      })
+      .filter(Boolean);
+
+    if (teamIds.length === 0) {
+      console.log(`⚠️ No matching team IDs found for notification`);
+      return;
+    }
+
+    console.log(`📬 Creating ${type} notifications for teams:`, teamIds);
+
+    // Find users who should be notified
+    const { data: usersToNotify, error: prefError } = await supabaseAdmin
+      .from('notification_preferences')
+      .select(`
+        user_id,
+        ${type}_enabled,
+        in_app_notifications,
+        only_followed_teams,
+        only_huddle_teams
+      `)
+      .eq(`${type}_enabled`, true)
+      .eq('in_app_notifications', true);
+
+    if (prefError) {
+      console.error('Error fetching notification preferences:', prefError);
+      return;
+    }
+
+    if (!usersToNotify || usersToNotify.length === 0) {
+      console.log(`ℹ️ No users have ${type} notifications enabled`);
+      return;
+    }
+
+    console.log(`👥 Found ${usersToNotify.length} users with ${type} enabled`);
+
+    // Filter users based on their preferences and build notifications
+    const notifications = [];
+    
+    for (const pref of usersToNotify) {
+      let shouldNotify = true;
+
+      // Check if user follows these teams (if filter enabled)
+      if (pref.only_followed_teams) {
+        const { data: follows } = await supabaseAdmin
+          .from('user_follows')
+          .select('team_id')
+          .eq('user_id', pref.user_id)
+          .in('team_id', teamIds);
+        
+        if (!follows || follows.length === 0) {
+          shouldNotify = false;
+        }
+      }
+
+      // Check if user is in huddles with these teams (if filter enabled)
+      if (shouldNotify && pref.only_huddle_teams) {
+        const { data: memberHuddles } = await supabaseAdmin
+          .from('huddle_members')
+          .select('huddle_id')
+          .eq('user_id', pref.user_id);
+
+        if (memberHuddles && memberHuddles.length > 0) {
+          const huddleIds = memberHuddles.map(h => h.huddle_id);
+          const { data: huddles } = await supabaseAdmin
+            .from('huddles')
+            .select('team_id, id')
+            .in('id', huddleIds)
+            .in('team_id', teamIds);
+          
+          if (!huddles || huddles.length === 0) {
+            shouldNotify = false;
+          } else {
+            // Use first matching huddle for context
+            const huddleId = huddles[0].id;
+            notifications.push({
+              user_id: pref.user_id,
+              type,
+              title: type === 'game_start' 
+                ? `🏈 Game Starting!`
+                : type === 'score_update'
+                ? `📊 Score Update`
+                : `🏁 Final Score`,
+              body: type === 'game_start'
+                ? `${teams[1]?.name || 'Away'} @ ${teams[0]?.name || 'Home'} is starting!`
+                : `${teams[1]?.name || 'Away'} ${teams[1]?.score || 0} - ${teams[0]?.score || 0} ${teams[0]?.name || 'Home'}`,
+              game_id: gameId,
+              team_id: teamIds[0],
+              huddle_id: huddleId,
+              data: {
+                teams: teams.map(t => ({ name: t.name, score: t.score })),
+                period: gameData.period,
+                clock: gameData.clock,
+                status: gameData.status
+              }
+            });
+            continue; // Skip further processing for this user
+          }
+        } else {
+          shouldNotify = false;
+        }
+      }
+
+      if (shouldNotify) {
+        notifications.push({
+          user_id: pref.user_id,
+          type,
+          title: type === 'game_start' 
+            ? `🏈 Game Starting!`
+            : type === 'score_update'
+            ? `📊 Score Update`
+            : `🏁 Final Score`,
+          body: type === 'game_start'
+            ? `${teams[1]?.name || 'Away'} @ ${teams[0]?.name || 'Home'} is starting!`
+            : `${teams[1]?.name || 'Away'} ${teams[1]?.score || 0} - ${teams[0]?.score || 0} ${teams[0]?.name || 'Home'}`,
+          game_id: gameId,
+          team_id: teamIds[0],
+          data: {
+            teams: teams.map(t => ({ name: t.name, score: t.score })),
+            period: gameData.period,
+            clock: gameData.clock,
+            status: gameData.status
+          }
+        });
+      }
+    }
+
+    // Batch insert notifications
+    if (notifications.length > 0) {
+      const { error: insertError } = await supabaseAdmin
+        .from('notifications')
+        .insert(notifications);
+
+      if (insertError) {
+        console.error('Error inserting notifications:', insertError);
+      } else {
+        console.log(`✉️ Created ${notifications.length} notifications for game ${gameId}`);
+      }
+    } else {
+      console.log(`ℹ️ No users matched notification criteria for ${type}`);
+    }
+  } catch (error) {
+    console.error('Error in createGameNotification:', error);
   }
 }
 
