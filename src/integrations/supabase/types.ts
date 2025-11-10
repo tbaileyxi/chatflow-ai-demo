@@ -544,6 +544,7 @@ export type Database = {
       }
       huddles: {
         Row: {
+          bio: string | null
           created_at: string
           id: string
           is_private: boolean | null
@@ -557,6 +558,7 @@ export type Database = {
           verification_expires_at: string | null
         }
         Insert: {
+          bio?: string | null
           created_at?: string
           id?: string
           is_private?: boolean | null
@@ -570,6 +572,7 @@ export type Database = {
           verification_expires_at?: string | null
         }
         Update: {
+          bio?: string | null
           created_at?: string
           id?: string
           is_private?: boolean | null

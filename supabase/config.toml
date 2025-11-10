@@ -1,1 +1,43 @@
 project_id = "dejuwyeypiggvlyfliap"
+
+[functions.live-game-bot]
+verify_jwt = false
+on_schedule = "*/5 * * * *"
+
+[functions.team-chatbot]
+verify_jwt = false
+
+[functions.analyze-x-content-grok]
+verify_jwt = false
+
+[functions.ingest-x-sources]
+verify_jwt = false
+
+[functions.create-huddle-subscription]
+verify_jwt = true
+
+[functions.check-huddle-subscription]
+verify_jwt = true
+
+[functions.ncaa-live-updates]
+verify_jwt = false
+
+[functions.sports-stats]
+verify_jwt = true
+
+[functions.pickem-autocreate]
+verify_jwt = false
+
+[functions.pickem-sync-season]
+verify_jwt = false
+on_schedule = "0 2,14 * * 2,3,5"
+
+[functions.pickem-create-week]
+verify_jwt = false
+
+[functions.pickem-scoring]
+verify_jwt = false
+on_schedule = "*/10 * * * *"
+
+[functions.pickem-backfill-week1]
+verify_jwt = false
