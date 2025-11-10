@@ -128,22 +128,6 @@ export function createHighlightlyClient() {
       return await response.json();
     },
 
-    // Get highlights
-    async getHighlights(params: { team?: string; match?: number; limit?: number }) {
-      const url = new URL(`${baseUrl}/highlights`);
-      if (params.team) url.searchParams.append("team", params.team);
-      if (params.match) url.searchParams.append("match", params.match.toString());
-      if (params.limit) url.searchParams.append("limit", params.limit.toString());
-      
-      const response = await fetch(url.toString(), {
-        headers: {
-          "x-rapidapi-key": apiKey || "",
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) return null;
-      return await response.json();
-    },
 
     // Get player stats
     async getPlayerStats(params: { team?: string; player?: string; season?: number; league?: string }) {

@@ -49,10 +49,8 @@ serve(async (req) => {
       responseMessage = await getScoreUpdate(finalTeamName, supabase, highlightly);
     } else if (command === "/stats") {
       responseMessage = await getTeamStats(finalTeamName, supabase, highlightly);
-    } else if (command === "/highlights") {
-      responseMessage = await getTeamHighlights(finalTeamName, supabase, highlightly);
     } else {
-      responseMessage = `Unknown command: ${command}. Available commands: /score, /stats, /highlights`;
+      responseMessage = `Unknown command: ${command}. Available commands: /score, /stats`;
     }
 
     console.log(`Response message: ${responseMessage.substring(0, 100)}...`);
@@ -222,43 +220,6 @@ async function getTeamStats(teamName: string, supabase: any, highlightly: any): 
   }
 }
 
-async function getTeamHighlights(teamName: string, supabase: any, highlightly: any): Promise<string> {
-  if (!teamName) {
-    return `🎥 Please specify a team name. Usage: /highlights [team name] or just /highlights if you're in a team huddle.`;
-  }
-
-  try {
-    // Find team in database
-    const { data: team } = await supabase
-      .from("teams")
-      .select("highlightly_id, name")
-      .ilike("name", `%${teamName}%`)
-      .not("highlightly_id", "is", null)
-      .limit(1)
-      .single();
-
-    if (!team || !team.highlightly_id) {
-      return `🎥 No team found for "${teamName}".`;
-    }
-
-    const highlights = await highlightly.getTeamHighlights(team.highlightly_id, 5);
-
-    if (highlights.length === 0) {
-      return `🎥 No recent highlights available for ${team.name}. Check back during or after their next game!`;
-    }
-
-    let response = `🎥 **Recent Highlights for ${team.name}**\n\n`;
-
-    highlights.slice(0, 3).forEach((h: any, i: number) => {
-      response += `${i + 1}. ${h.title}\n   ${h.description}\n   🔗 ${h.embedUrl}\n\n`;
-    });
-
-    return response;
-  } catch (error) {
-    console.error("Error fetching highlights:", error);
-    return `🚨 Unable to fetch highlights right now. Please try again later.`;
-  }
-}
 
 function formatScoreUpdate(match: any): string {
   let statusText = "";

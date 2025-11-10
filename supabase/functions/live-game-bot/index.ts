@@ -400,9 +400,9 @@ async function detectAndPostChanges(
     await postToTeamFeeds(current.teams, content, league, supabase, allTeams, dedupeId);
   }
 
-  // Score change - pass matchId to fetch highlights
+  // Score change - post score update
   if (current.lastStatus === "in_progress" && previous.lastScore !== current.lastScore) {
-    await postScoreUpdate(current, league, supabase, allTeams, match?.id);
+    await postScoreUpdate(current, league, supabase, allTeams);
   }
 
   // Period change
@@ -533,16 +533,12 @@ async function postScoreUpdate(
   gameState: GameState,
   league: string,
   supabase: any,
-  allTeams: Map<string, any>,
-  matchId?: number
+  allTeams: Map<string, any>
 ) {
   const { teams, lastPeriod, lastClock, gameId } = gameState;
   const periodText = getPeriodText(lastPeriod);
 
-  // Video highlight fetching disabled - only show score updates
-  let scoringPlayContent = null;
-
-  const content = scoringPlayContent || `🔥 ${teams[1].name} ${teams[1].score} - ${teams[0].score} ${teams[0].name}\n${periodText}${
+  const content = `🔥 ${teams[1].name} ${teams[1].score} - ${teams[0].score} ${teams[0].name}\n${periodText}${
     lastClock ? ` | ${lastClock}` : ""
   }`;
 
