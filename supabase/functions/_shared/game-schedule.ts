@@ -4,6 +4,7 @@ export function shouldPollNow(league: 'NFL' | 'NCAA'): boolean {
   const utcHours = now.getUTCHours();
   const utcDay = now.getUTCDay(); // 0=Sun, 6=Sat
   const month = now.getMonth();
+  const date = now.getUTCDate();
   
   // Proper DST handling for Eastern Time
   // DST: Second Sunday in March to First Sunday in November (approximately months 2-10)
@@ -11,38 +12,71 @@ export function shouldPollNow(league: 'NFL' | 'NCAA'): boolean {
   const etOffset = isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
   const etHour = (utcHours - etOffset + 24) % 24;
   
+  console.log(`📅 [${league}] Time check - UTC: ${now.toISOString()}, Month: ${month}, Day: ${utcDay}, UTC Hour: ${utcHours}`);
+  console.log(`🕐 [${league}] ET Hour: ${etHour}, DST: ${isDST}, Offset: UTC-${etOffset}`);
+  
   if (league === 'NFL') {
     // Thursday Night Football (7pm-3am ET) - extended for pregame and late games
-    if (utcDay === 4 && (etHour >= 19 || etHour <= 3)) return true;
+    if (utcDay === 4 && (etHour >= 19 || etHour <= 3)) {
+      console.log(`✅ [NFL] Polling - Thursday Night Football window (ET Hour: ${etHour})`);
+      return true;
+    }
     // Sunday games (8am-midnight ET) - catch pregame shows + London games + all games
-    if (utcDay === 0 && etHour >= 8 && etHour <= 23) return true;
+    if (utcDay === 0 && etHour >= 8 && etHour <= 23) {
+      console.log(`✅ [NFL] Polling - Sunday games window (ET Hour: ${etHour})`);
+      return true;
+    }
     // Monday Night Football (7pm-3am ET) - extended for pregame and late games
-    if (utcDay === 1 && (etHour >= 19 || etHour <= 3)) return true;
+    if (utcDay === 1 && (etHour >= 19 || etHour <= 3)) {
+      console.log(`✅ [NFL] Polling - Monday Night Football window (ET Hour: ${etHour})`);
+      return true;
+    }
     // Tuesday early morning (12am-3am ET) for MNF games that go past midnight
-    if (utcDay === 2 && etHour >= 0 && etHour <= 3) return true;
+    if (utcDay === 2 && etHour >= 0 && etHour <= 3) {
+      console.log(`✅ [NFL] Polling - Tuesday early morning (MNF overflow, ET Hour: ${etHour})`);
+      return true;
+    }
+    console.log(`❌ [NFL] Not polling - outside game windows (Day: ${utcDay}, ET Hour: ${etHour})`);
   }
   
   if (league === 'NCAA') {
     // NCAA season: August through January (includes bowl season)
     const isBowlSeason = month === 11 || month === 0; // December or January
+    console.log(`🏈 [NCAA] Bowl season: ${isBowlSeason}`);
     
     // Thursday games (especially MAC, C-USA) - 6pm-midnight ET
-    if (utcDay === 4 && etHour >= 18 && etHour <= 23) return true;
+    if (utcDay === 4 && etHour >= 18 && etHour <= 23) {
+      console.log(`✅ [NCAA] Polling - Thursday games window (ET Hour: ${etHour})`);
+      return true;
+    }
     
     // Friday night games (6pm-midnight ET) - extended for pregame
-    if (utcDay === 5 && etHour >= 18 && etHour <= 23) return true;
+    if (utcDay === 5 && etHour >= 18 && etHour <= 23) {
+      console.log(`✅ [NCAA] Polling - Friday night games window (ET Hour: ${etHour})`);
+      return true;
+    }
     
     // Saturday games (9am-midnight ET) - Primary game day - catch College GameDay + early games + late games
-    if (utcDay === 6 && etHour >= 9 && etHour <= 23) return true;
+    if (utcDay === 6 && etHour >= 9 && etHour <= 23) {
+      console.log(`✅ [NCAA] Polling - Saturday games window (ET Hour: ${etHour})`);
+      return true;
+    }
     
     // Sunday games (12pm-midnight ET) - Rare but happens (bowl games, makeups)
-    if (utcDay === 0 && etHour >= 12 && etHour <= 23) return true;
+    if (utcDay === 0 && etHour >= 12 && etHour <= 23) {
+      console.log(`✅ [NCAA] Polling - Sunday games window (ET Hour: ${etHour})`);
+      return true;
+    }
     
     // Bowl season coverage (mid-December through early January)
     if (isBowlSeason) {
       // Weekday bowl games (Monday, Tuesday, Wednesday) - 12pm-midnight ET
-      if ((utcDay === 1 || utcDay === 2 || utcDay === 3) && etHour >= 12 && etHour <= 23) return true;
+      if ((utcDay === 1 || utcDay === 2 || utcDay === 3) && etHour >= 12 && etHour <= 23) {
+        console.log(`✅ [NCAA] Polling - Bowl season weekday games (ET Hour: ${etHour})`);
+        return true;
+      }
     }
+    console.log(`❌ [NCAA] Not polling - outside game windows (Day: ${utcDay}, ET Hour: ${etHour})`);
   }
   
   return false; // Off-peak, skip intensive polling

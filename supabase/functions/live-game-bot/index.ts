@@ -199,12 +199,13 @@ async function pollLeague(
     }
 
     const now = new Date();
+    const utcTime = now.toISOString();
     const etTime = now.toLocaleString("en-US", { timeZone: "America/New_York" });
     const today = now.toISOString().split("T")[0];
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     const currentYear = now.getFullYear();
     
-    console.log(`🏈 [${league}] Polling games at ${etTime} ET`);
+    console.log(`🏈 [${league}] Polling games at ${etTime} ET (UTC: ${utcTime})`);
     console.log(`🏈 [${league}] Checking dates: ${today} and ${yesterday}`);
 
     // Smart polling: ONLY use date-based queries during game times
@@ -217,18 +218,25 @@ async function pollLeague(
       limit: 100 
     });
     
+    console.log(`📊 [${league}] Raw API response for today (${today}):`, JSON.stringify(dateMatchesToday, null, 2).slice(0, 500));
+    
     const dateMatchesYesterday = await highlightly.getMatches({ 
       league, 
       date: yesterday,
       limit: 100 
     });
     
+    console.log(`📊 [${league}] Raw API response for yesterday (${yesterday}):`, JSON.stringify(dateMatchesYesterday, null, 2).slice(0, 500));
+    
     const matches = [
       ...(Array.isArray(dateMatchesToday) ? dateMatchesToday : []),
       ...(Array.isArray(dateMatchesYesterday) ? dateMatchesYesterday : [])
     ];
     
-    console.log(`✅ [${league}] Found ${matches.length} games (today: ${dateMatchesToday?.length || 0}, yesterday: ${dateMatchesYesterday?.length || 0})`)
+    console.log(`✅ [${league}] Found ${matches.length} games (today: ${dateMatchesToday?.length || 0}, yesterday: ${dateMatchesYesterday?.length || 0})`);
+    
+    // Log team IDs we're monitoring
+    console.log(`🎯 [${league}] Monitoring ${teamIds.size} team IDs:`, Array.from(teamIds).slice(0, 10));
 
     // Final validation
     if (!matches || !Array.isArray(matches) || matches.length === 0) {

@@ -404,6 +404,9 @@ const { data: messagesData, error: messagesError } = await supabase
         .update({ last_read_at: new Date().toISOString() })
         .eq('huddle_id', huddleId)
         .eq('user_id', currentUser.id);
+      
+      // Dispatch event to notify other components that huddle was read
+      window.dispatchEvent(new CustomEvent('huddleRead'));
     };
 
     updateLastRead();

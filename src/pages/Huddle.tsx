@@ -201,6 +201,24 @@ export const Huddle = () => {
     loadHuddle();
   }, [loadHuddle]);
 
+  // Update last read when user opens the huddle
+  useEffect(() => {
+    if (!huddleId || !user) return;
+    
+    const updateLastRead = async () => {
+      await supabase
+        .from('huddle_members')
+        .update({ last_read_at: new Date().toISOString() })
+        .eq('huddle_id', huddleId)
+        .eq('user_id', user.id);
+      
+      // Dispatch event to notify other components that huddle was read
+      window.dispatchEvent(new CustomEvent('huddleRead'));
+    };
+
+    updateLastRead();
+  }, [huddleId, user]);
+
   // Load older messages function
   const loadMoreMessages = useCallback(async () => {
     if (!hasMore || loadingMore || !oldestCreatedAt || !huddleId) return;
