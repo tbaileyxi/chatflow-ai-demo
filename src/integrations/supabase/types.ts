@@ -547,12 +547,14 @@ export type Database = {
           bio: string | null
           created_at: string
           id: string
+          is_official_team_huddle: boolean | null
           is_private: boolean | null
           is_verified: boolean | null
           last_message_at: string | null
           member_count: number | null
           name: string
           owner_id: string
+          parent_team_id: string | null
           team_id: string
           updated_at: string
           verification_expires_at: string | null
@@ -561,12 +563,14 @@ export type Database = {
           bio?: string | null
           created_at?: string
           id?: string
+          is_official_team_huddle?: boolean | null
           is_private?: boolean | null
           is_verified?: boolean | null
           last_message_at?: string | null
           member_count?: number | null
           name: string
           owner_id: string
+          parent_team_id?: string | null
           team_id: string
           updated_at?: string
           verification_expires_at?: string | null
@@ -575,17 +579,26 @@ export type Database = {
           bio?: string | null
           created_at?: string
           id?: string
+          is_official_team_huddle?: boolean | null
           is_private?: boolean | null
           is_verified?: boolean | null
           last_message_at?: string | null
           member_count?: number | null
           name?: string
           owner_id?: string
+          parent_team_id?: string | null
           team_id?: string
           updated_at?: string
           verification_expires_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "huddles_parent_team_id_fkey"
+            columns: ["parent_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "huddles_team_id_fkey"
             columns: ["team_id"]
