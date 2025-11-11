@@ -59,7 +59,7 @@ export const HuddleSearchSidebar = ({ isExpanded }: HuddleSearchSidebarProps) =>
           member_count,
           is_verified,
           owner_id,
-          teams:team_id (
+          teams!team_id (
             name,
             logo_url
           )

@@ -118,47 +118,23 @@ const ProfileSetupScreen = ({ onNext, onBack }: { onNext: () => void; onBack: ()
 
 const TeamSelectionScreen = ({ onNext, onBack }: { onNext: (teamIds: string[]) => void; onBack: () => void }) => {
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
-  const [creating, setCreating] = useState(false);
+  const [joining, setJoining] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const handleCreateHuddle = async () => {
+  const handleFollowTeams = async () => {
     if (selectedTeams.length === 0) {
       toast({
         title: "Select a team",
-        description: "Please select at least one team to create your huddle",
+        description: "Please select at least one team to join their community",
         variant: "destructive"
       });
       return;
     }
 
-    setCreating(true);
+    setJoining(true);
     try {
-      // Get team info for the first selected team
-      const { data: team } = await supabase
-        .from('teams')
-        .select('*')
-        .eq('id', selectedTeams[0])
-        .single();
-
-      if (!team) throw new Error('Team not found');
-
-      // Create huddle for the first team
-      const { data: huddle, error: huddleError } = await supabase
-        .from('huddles')
-        .insert({
-          name: `${team.city} ${team.name} Core`,
-          owner_id: user?.id,
-          team_id: team.id,
-          is_private: true,
-          member_count: 1
-        })
-        .select()
-        .single();
-
-      if (huddleError) throw huddleError;
-
-      // Follow the selected teams
+      // Follow the selected teams - the database trigger will automatically add to official huddles
       const followInserts = selectedTeams.map(teamId => ({
         user_id: user?.id,
         team_id: teamId
@@ -172,14 +148,14 @@ const TeamSelectionScreen = ({ onNext, onBack }: { onNext: (teamIds: string[]) =
 
       onNext(selectedTeams);
     } catch (error) {
-      console.error('Error creating huddle:', error);
+      console.error('Error following teams:', error);
       toast({
         title: "Error",
-        description: "Failed to create huddle. Please try again.",
+        description: "Failed to join team communities. Please try again.",
         variant: "destructive"
       });
     } finally {
-      setCreating(false);
+      setJoining(false);
     }
   };
 
@@ -189,19 +165,19 @@ const TeamSelectionScreen = ({ onNext, onBack }: { onNext: (teamIds: string[]) =
         <div className="mx-auto w-16 h-16 bg-glass-accent rounded-full flex items-center justify-center">
           <Users className="w-8 h-8 text-accent" />
         </div>
-        <h2 className="text-2xl font-bold text-foreground">Choose Your Team</h2>
-        <p className="text-muted-foreground">Select your favorite teams to follow and create your first huddle</p>
+        <h2 className="text-2xl font-bold text-foreground">Join Team Communities</h2>
+        <p className="text-muted-foreground">Select your favorite teams to automatically join their public communities</p>
       </div>
 
       <TeamSelector onTeamsUpdated={setSelectedTeams} />
 
       <div className="space-y-3">
         <Button 
-          onClick={handleCreateHuddle}
-          disabled={creating || selectedTeams.length === 0}
+          onClick={handleFollowTeams}
+          disabled={joining || selectedTeams.length === 0}
           className="w-full glass-button"
         >
-          {creating ? "Creating Huddle..." : `Create My ${selectedTeams.length > 0 ? 'Core ' : ''}Huddle`}
+          {joining ? "Joining Communities..." : "Join Team Communities"}
           <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
         
@@ -224,7 +200,7 @@ const WelcomeScreen = ({ onComplete }: { onComplete: () => void }) => (
         <CheckCircle className="w-8 h-8 text-accent" />
       </div>
       <h2 className="text-2xl font-bold text-foreground">You're All Set!</h2>
-      <p className="text-muted-foreground">Start chatting with fellow fans and stay updated with the latest from your teams</p>
+      <p className="text-muted-foreground">You've been added to your team communities! Start chatting with thousands of fans.</p>
     </div>
 
     <div className="grid gap-4">

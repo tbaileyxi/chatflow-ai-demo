@@ -52,7 +52,7 @@ export const JoinHuddle = () => {
           team_id,
           member_count,
           owner_id,
-          teams(name, city, league, logo_url)
+          teams!team_id(name, city, league, logo_url)
         `)
         .eq('id', huddleId)
         .single();

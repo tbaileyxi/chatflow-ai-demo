@@ -62,7 +62,7 @@ export const HuddleSearch = () => {
           is_verified,
           owner_id,
           bio,
-          teams:team_id (
+          teams!team_id (
             name,
             logo_url
           ),

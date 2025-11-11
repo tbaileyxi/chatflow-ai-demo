@@ -11,11 +11,12 @@ import { PickEmView } from '@/components/pickem/PickEmView';
 import { useToast } from '@/hooks/use-toast';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { JumpToLatest } from '@/components/JumpToLatest';
-import { Zap, ArrowLeft } from 'lucide-react';
+import { Zap, ArrowLeft, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { HuddleSettingsDropdown } from '@/components/HuddleSettingsDropdown';
 import { InviteButton } from '@/components/InviteButton';
+import { StartHuddleDialog } from '@/components/StartHuddleDialog';
 
 export const Huddle = () => {
   const { huddleId } = useParams<{ huddleId: string }>();
@@ -65,7 +66,7 @@ export const Huddle = () => {
       console.log('📍 Step 1: Fetching huddle data...');
       const { data: huddle, error: huddleError } = await supabase
         .from('huddles')
-        .select('*')
+        .select('*, teams!team_id(*)')
         .eq('id', huddleId)
         .maybeSingle();
 
@@ -76,12 +77,7 @@ export const Huddle = () => {
         return;
       }
 
-      const { data: team } = await supabase
-        .from('teams')
-        .select('*')
-        .eq('id', huddle.team_id)
-        .maybeSingle();
-
+      const team = huddle.teams;
       setHuddle({ ...huddle, team });
       setTeamName(team?.name || 'Team');
 
@@ -512,26 +508,50 @@ export const Huddle = () => {
             </p>
           </div>
           
-          {/* Action buttons - touch-friendly on mobile */}
-          <div className="flex items-center gap-1 sm:gap-2">
-            {/* Invite button */}
-            <InviteButton 
-              huddleId={huddleId!} 
-              ownerDisplayName={huddle?.owner?.display_name}
-              teamName={teamName}
-              className="h-8 w-8 sm:h-9 sm:w-9"
-            />
-            
+            {/* Action buttons - touch-friendly on mobile */}
+            <div className="flex items-center gap-1 sm:gap-2">
+              {/* Create Side Huddle button for official huddles */}
+              {huddle?.is_official_team_huddle && (
+                <StartHuddleDialog
+                  onHuddleCreated={() => {
+                    toast({
+                      title: "Side Huddle Created!",
+                      description: "Your private huddle has been created",
+                    });
+                  }}
+                  parentTeamId={huddle.team_id}
+                  isCreatingSideHuddle={true}
+                  trigger={
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs h-8"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      <span className="hidden sm:inline">Create Side Huddle</span>
+                    </Button>
+                  }
+                />
+              )}
+              
+              {/* Invite button */}
+              <InviteButton 
+                huddleId={huddleId!} 
+                ownerDisplayName={huddle?.owner?.display_name}
+                teamName={teamName}
+                className="h-8 w-8 sm:h-9 sm:w-9"
+              />
+              
 
-            {/* Settings dropdown */}
-            <HuddleSettingsDropdown
-              huddleId={huddleId!}
-              ownerId={huddle.owner_id}
-              isOwner={isOwner}
-              isVerified={huddle?.is_verified}
-              huddle={huddle}
-            />
-          </div>
+              {/* Settings dropdown */}
+              <HuddleSettingsDropdown
+                huddleId={huddleId!}
+                ownerId={huddle.owner_id}
+                isOwner={isOwner}
+                isVerified={huddle?.is_verified}
+                huddle={huddle}
+              />
+            </div>
         </div>
       </div>
 

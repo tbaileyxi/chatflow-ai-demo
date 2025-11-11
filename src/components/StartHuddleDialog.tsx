@@ -23,9 +23,11 @@ interface Team {
 interface StartHuddleDialogProps {
   onHuddleCreated?: () => void;
   trigger?: React.ReactNode;
+  parentTeamId?: string;
+  isCreatingSideHuddle?: boolean;
 }
 
-export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialogProps) => {
+export const StartHuddleDialog = ({ onHuddleCreated, trigger, parentTeamId, isCreatingSideHuddle = false }: StartHuddleDialogProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -66,6 +68,10 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
     setOpen(newOpen);
     if (newOpen) {
       fetchTeams();
+      // Pre-populate team if creating a side huddle
+      if (parentTeamId) {
+        setFormData(prev => ({ ...prev, team_id: parentTeamId }));
+      }
     }
   };
 
@@ -117,7 +123,9 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
           owner_id: user.id,
           team_id: formData.team_id,
           is_private: true,
-          member_count: 1
+          member_count: 1,
+          parent_team_id: parentTeamId || null,
+          is_official_team_huddle: false
         })
         .select()
         .single();
@@ -161,7 +169,7 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="w-5 h-5" />
-            Start a New Side Huddle
+            {isCreatingSideHuddle ? "Create a Side Huddle" : "Start a New Side Huddle"}
           </DialogTitle>
         </DialogHeader>
         
@@ -183,6 +191,7 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
               value={formData.team_id} 
               onValueChange={(value) => setFormData(prev => ({ ...prev, team_id: value }))}
               required
+              disabled={isCreatingSideHuddle && !!parentTeamId}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Choose a team for this huddle" />
@@ -213,8 +222,10 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger }: StartHuddleDialo
                 <div className="text-sm">
                   <p className="font-medium mb-1">What is a Side Huddle?</p>
                   <p className="text-muted-foreground">
-                    A private chat room with your friends centered around your favorite team. 
-                    Get team agent updates and chat with fellow fans!
+                    {isCreatingSideHuddle 
+                      ? "Create a private chat that branches from the main team community. Perfect for your closest fans!"
+                      : "A private chat room with your friends centered around your favorite team. Get team agent updates and chat with fellow fans!"
+                    }
                   </p>
                 </div>
               </div>

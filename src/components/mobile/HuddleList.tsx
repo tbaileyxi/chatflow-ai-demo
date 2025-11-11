@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ChevronDown, ChevronRight, Bot, Users, Settings } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, Bot, Users, Settings, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,6 +19,8 @@ interface Huddle {
   team_logo_url: string;
   participant_count: number;
   is_verified?: boolean;
+  is_official_team_huddle?: boolean;
+  parent_team_id?: string;
   latest_message?: {
     content: string;
     created_at: string;
@@ -65,7 +67,9 @@ export const HuddleList = () => {
           member_count,
           last_message_at,
           is_verified,
-          teams (
+          is_official_team_huddle,
+          parent_team_id,
+          teams!team_id (
             name,
             city,
             logo_url
@@ -145,6 +149,8 @@ export const HuddleList = () => {
           team_logo_url: huddle.teams?.logo_url || '/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png',
           participant_count: actualMemberCount,
           is_verified: huddle.is_verified,
+          is_official_team_huddle: huddle.is_official_team_huddle,
+          parent_team_id: huddle.parent_team_id,
           latest_message: latestMessage ? {
             content: latestMessage.content,
             created_at: latestMessage.created_at,
@@ -154,7 +160,7 @@ export const HuddleList = () => {
         };
       });
 
-      // Group by team
+      // Group by team and sort huddles (official first)
       const grouped = transformedHuddles.reduce((acc, huddle) => {
         const existing = acc.find(g => g.team_name === huddle.team_name);
         if (existing) {
@@ -169,6 +175,15 @@ export const HuddleList = () => {
         }
         return acc;
       }, [] as TeamGroup[]);
+
+      // Sort huddles within each group: official first
+      grouped.forEach(group => {
+        group.huddles.sort((a, b) => {
+          if (a.is_official_team_huddle && !b.is_official_team_huddle) return -1;
+          if (!a.is_official_team_huddle && b.is_official_team_huddle) return 1;
+          return 0;
+        });
+      });
 
       setTeamGroups(grouped);
     } catch (error) {
@@ -289,14 +304,27 @@ export const HuddleList = () => {
                       <button
                         key={huddle.id}
                         onClick={() => handleHuddlePress(huddle)}
-                        className="w-full px-4 pl-16 py-3 flex items-center gap-3 hover:bg-white/5 transition-colors group"
+                        className={cn(
+                          "w-full px-4 py-3 flex items-center gap-3 hover:bg-white/5 transition-colors group",
+                          huddle.is_official_team_huddle 
+                            ? "bg-primary/5 border-l-2 border-primary pl-4" 
+                            : "pl-16"
+                        )}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
+                            {huddle.is_official_team_huddle && (
+                              <Globe className="h-4 w-4 text-primary shrink-0" />
+                            )}
                             <span className="font-medium text-foreground text-sm">
                               {huddle.name}
                             </span>
-                            {huddle.is_verified && (
+                            {huddle.is_official_team_huddle && (
+                              <Badge variant="outline" className="text-xs">
+                                Official Community
+                              </Badge>
+                            )}
+                            {huddle.is_verified && !huddle.is_official_team_huddle && (
                               <VerifiedBadge size="sm" />
                             )}
                             <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">

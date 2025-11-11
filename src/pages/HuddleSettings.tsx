@@ -59,7 +59,7 @@ export const HuddleSettings = () => {
             name,
             owner_id,
             bio,
-            team:teams(name, logo_url)
+            team:teams!team_id(name, logo_url)
           `)
           .eq('id', huddleId)
           .single();

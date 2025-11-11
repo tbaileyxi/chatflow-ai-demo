@@ -23,6 +23,7 @@ import { PickEmLeaderboardCard } from "@/components/pickem/PickEmLeaderboardCard
 import { PickEmStatusBanner } from "@/components/PickEmStatusBanner";
 import { useHuddleSubscription } from "@/hooks/useHuddleSubscription";
 import { useToast } from "@/hooks/use-toast";
+import { StartHuddleDialog } from '@/components/StartHuddleDialog';
 
 interface Message {
   id: string;
@@ -56,6 +57,7 @@ interface HuddleData {
   owner_display_name?: string;
   participant_count: number;
   is_verified?: boolean;
+  is_official_team_huddle?: boolean;
 }
 
 export const MobileChat = () => {
@@ -128,9 +130,10 @@ export const MobileChat = () => {
             name,
             member_count,
             is_verified,
+            is_official_team_huddle,
             team_id,
             owner_id,
-            team:teams(name, logo_url)
+            team:teams!team_id(name, logo_url)
           `)
           .eq('id', huddleId)
           .single();
@@ -236,7 +239,8 @@ const { data: messagesData, error: messagesError } = await supabase
           owner_id: huddleData.owner_id,
           owner_display_name: ownerDisplayName,
           participant_count: huddleData.member_count || 1,
-          is_verified: huddleData.is_verified
+          is_verified: huddleData.is_verified,
+          is_official_team_huddle: huddleData.is_official_team_huddle
         });
 
         setMessages(enrichedMessages.reverse());
@@ -689,6 +693,29 @@ const { data: messagesData, error: messagesError } = await supabase
               <Badge variant="secondary" className="text-xs bg-verified-background text-verified-primary border-verified-border">
                 Verified
               </Badge>
+            )}
+            {/* Create Side Huddle button for official huddles */}
+            {huddle.is_official_team_huddle && (
+              <StartHuddleDialog
+                onHuddleCreated={() => {
+                  toast({
+                    title: "Side Huddle Created!",
+                    description: "Your private huddle has been created",
+                  });
+                }}
+                parentTeamId={huddle.team_id}
+                isCreatingSideHuddle={true}
+                trigger={
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs h-8"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    <span className="hidden sm:inline">Side Huddle</span>
+                  </Button>
+                }
+              />
             )}
             <InviteButton 
               huddleId={huddle.id}
