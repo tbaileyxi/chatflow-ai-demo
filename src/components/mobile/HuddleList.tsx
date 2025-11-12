@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ChevronDown, ChevronRight, Bot, Users, Settings, Globe } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, Bot, Users, Settings, Globe, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -290,25 +290,37 @@ export const HuddleList = () => {
                         key={huddle.id}
                         onClick={() => handleHuddlePress(huddle)}
                         className={cn(
-                          "w-full px-4 py-3 flex items-center gap-3 hover:bg-white/5 transition-colors group",
+                          "w-full px-4 py-3 flex items-center gap-3 transition-colors group relative",
                           huddle.is_official_team_huddle 
-                            ? "bg-primary/5 border-l-2 border-primary pl-4" 
-                            : "pl-16"
+                            ? "bg-primary/5 border-l-2 border-primary hover:bg-primary/10" 
+                            : huddle.parent_team_id
+                            ? "ml-8 border-l-2 border-muted-foreground/20 bg-muted/5 hover:bg-muted/10"
+                            : "hover:bg-white/5"
                         )}
                       >
+                        {/* Visual tree connector for side huddles */}
+                        {huddle.parent_team_id && !huddle.is_official_team_huddle && (
+                          <div className="absolute left-2 top-1/2 w-6 h-px bg-muted-foreground/20" />
+                        )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            {huddle.is_official_team_huddle && (
+                            {huddle.is_official_team_huddle ? (
                               <Globe className="h-4 w-4 text-primary shrink-0" />
-                            )}
+                            ) : huddle.parent_team_id ? (
+                              <MessageSquare className="h-4 w-4 text-muted-foreground shrink-0" />
+                            ) : null}
                             <span className="font-medium text-foreground text-sm">
                               {huddle.name}
                             </span>
-                            {huddle.is_official_team_huddle && (
-                              <Badge variant="outline" className="text-xs">
+                            {huddle.is_official_team_huddle ? (
+                              <Badge variant="outline" className="text-xs border-primary text-primary">
                                 Official Community
                               </Badge>
-                            )}
+                            ) : huddle.parent_team_id ? (
+                              <Badge variant="secondary" className="text-xs">
+                                Side Huddle
+                              </Badge>
+                            ) : null}
                             {huddle.is_verified && !huddle.is_official_team_huddle && (
                               <VerifiedBadge size="sm" />
                             )}
