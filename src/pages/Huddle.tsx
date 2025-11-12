@@ -462,10 +462,20 @@ export const Huddle = () => {
 
   if (!huddle) {
     return (
-      <div className="min-h-screen-dynamic bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h3 className="text-xl font-semibold mb-2">Huddle not found</h3>
-          <p className="text-muted-foreground">This huddle may not exist or you don't have access to it.</p>
+      <div className="min-h-screen-dynamic bg-background flex flex-col items-center justify-center gap-4 p-8">
+        <div className="text-center space-y-2">
+          <h2 className="text-xl font-semibold text-foreground">Failed to Load Huddle</h2>
+          <p className="text-muted-foreground">
+            We couldn't load this huddle. It may not exist or you may not have access to it.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="default" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/')}>
+            Go Home
+          </Button>
         </div>
       </div>
     );

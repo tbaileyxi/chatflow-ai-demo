@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { StartHuddleDialog } from '@/components/StartHuddleDialog';
+
 import { useToast } from '@/hooks/use-toast';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 
@@ -235,17 +235,6 @@ export const HuddleList = () => {
                 <Settings className="h-4 w-4" />
               </Button>
             )}
-            <StartHuddleDialog 
-              onHuddleCreated={fetchHuddles}
-              trigger={
-                <Button
-                  size="sm"
-                  className="bg-primary hover:bg-primary/90 rounded-full h-8 w-8 p-0"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              }
-            />
           </div>
         </div>
       </div>
@@ -258,16 +247,12 @@ export const HuddleList = () => {
               <Users className="h-8 w-8 text-muted-foreground" />
             </div>
             <h3 className="text-lg font-medium text-foreground mb-2">No huddles yet</h3>
-            <p className="text-muted-foreground mb-4">Create your first huddle to start chatting with friends</p>
-            <StartHuddleDialog 
-              onHuddleCreated={fetchHuddles}
-              trigger={
-                <Button className="bg-primary hover:bg-primary/90">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Huddle
-                </Button>
-              }
-            />
+            <p className="text-muted-foreground mb-4">
+              Follow your favorite teams from the Team Directory to automatically join their official communities
+            </p>
+            <Button onClick={() => navigate('/teams')} className="bg-primary hover:bg-primary/90">
+              Browse Teams
+            </Button>
           </div>
         ) : (
           <div className="space-y-1">

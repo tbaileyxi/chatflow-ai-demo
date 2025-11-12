@@ -354,6 +354,8 @@ export const TeamDirectory = () => {
                           )}
                         </Button>
                         <StartHuddleDialog 
+                          parentTeamId={team.id}
+                          isCreatingSideHuddle={true}
                           trigger={
                             <Button
                               variant="secondary"
