@@ -1,12 +1,16 @@
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Users, MessageCircle, Trophy } from 'lucide-react';
+import { ArrowRight, Globe, BadgeCheck, Lock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { HuddlePreviewCard } from '@/components/HuddlePreviewCard';
 
 export const Landing = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const [publicHuddles, setPublicHuddles] = useState<any[]>([]);
+  const [huddlesLoading, setHuddlesLoading] = useState(true);
 
   // Redirect logged-in users to their feed
   useEffect(() => {
@@ -14,6 +18,36 @@ export const Landing = () => {
       navigate('/app');
     }
   }, [user, loading, navigate]);
+
+  // Fetch top public huddles for preview
+  useEffect(() => {
+    const fetchPublicHuddles = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('huddles')
+          .select(`
+            id,
+            name,
+            member_count,
+            is_verified,
+            is_official_team_huddle,
+            team:teams(logo_url, name)
+          `)
+          .or('is_private.eq.false,is_official_team_huddle.eq.true')
+          .order('member_count', { ascending: false })
+          .limit(6);
+
+        if (error) throw error;
+        setPublicHuddles(data || []);
+      } catch (error) {
+        console.error('Error fetching public huddles:', error);
+      } finally {
+        setHuddlesLoading(false);
+      }
+    };
+
+    fetchPublicHuddles();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background overflow-hidden relative">
@@ -83,52 +117,93 @@ export const Landing = () => {
 
             {/* Updated Subheadline */}
             <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto font-medium leading-relaxed" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.2)' }}>
-              Finally: Private group chats enhanced with your team news. 
-              Curated social media posts + your friends in one place.
+              Join public team chats, discover verified fan communities, or create private huddles with your crew. 
+              All your sports conversations in one place.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Features Section */}
+      {/* Features Section - Three Huddle Types */}
       <div className="py-20 bg-gradient-to-r from-muted/20 via-muted/30 to-muted/20 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4">
           <div className="grid md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
+            {/* Feature 1 - Public Huddles */}
             <div className="text-center space-y-4 p-8 bg-card/90 backdrop-blur-sm rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 border-2 border-primary/20 hover:border-primary/40 group">
               <div className="w-16 h-16 bg-primary/30 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                <Users className="h-8 w-8 text-primary" />
+                <Globe className="h-8 w-8 text-primary" />
               </div>
-              <h3 className="text-xl font-bold text-card-foreground">Team Feeds</h3>
+              <h3 className="text-xl font-bold text-card-foreground">Public Huddles</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Get curated content from your favorite teams and players in one clean feed.
+                Open team chats for every fan. Browse and join the conversation without signing up. Sign in to participate.
               </p>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/huddle-search')}
+                className="mt-2"
+              >
+                Browse Communities
+              </Button>
             </div>
 
-            {/* Feature 2 - Fixed contrast and design for Private Chats */}
+            {/* Feature 2 - Verified Communities */}
             <div className="text-center space-y-4 p-8 bg-card backdrop-blur-sm rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 border-2 border-primary/30 hover:border-primary/50 group">
               <div className="w-16 h-16 bg-primary/40 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300 shadow-lg border border-primary/20">
-                <MessageCircle className="h-8 w-8 text-primary" />
+                <BadgeCheck className="h-8 w-8 text-primary" />
               </div>
-              <h3 className="text-xl font-bold text-foreground">Private Chats</h3>
+              <h3 className="text-xl font-bold text-foreground">Verified Communities</h3>
               <p className="text-foreground/80 leading-relaxed font-medium">
-                Create invite-only group chats with your friends, family, and fellow fans.
+                Official fan communities run by notable creators and organizations. Trusted spaces for die-hard fans.
               </p>
             </div>
 
-            {/* Feature 3 */}
+            {/* Feature 3 - Private Huddles */}
             <div className="text-center space-y-4 p-8 bg-card/90 backdrop-blur-sm rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 border-2 border-primary/20 hover:border-primary/40 group">
               <div className="w-16 h-16 bg-primary/30 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                <Trophy className="h-8 w-8 text-primary" />
+                <Lock className="h-8 w-8 text-primary" />
               </div>
-              <h3 className="text-xl font-bold text-card-foreground">Game Ready</h3>
+              <h3 className="text-xl font-bold text-card-foreground">Private Huddles</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Your gameday group chat starts here. Stay connected during every play.
+                Create invite-only group chats with your friends, family, and fellow fans. Your crew, your rules.
               </p>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Live Public Huddles Preview Section */}
+      {!huddlesLoading && publicHuddles.length > 0 && (
+        <div className="py-20 bg-background">
+          <div className="max-w-6xl mx-auto px-4">
+            <div className="text-center mb-12 space-y-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-foreground">
+                🏈 Active Fan Communities
+              </h2>
+              <p className="text-lg text-muted-foreground">
+                See what fans are talking about right now
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
+              {publicHuddles.map((huddle) => (
+                <HuddlePreviewCard key={huddle.id} huddle={huddle} />
+              ))}
+            </div>
+
+            <div className="text-center">
+              <Button 
+                size="lg"
+                onClick={() => navigate('/huddle-search')}
+                className="gap-2"
+              >
+                Browse All Communities
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer CTA */}
       <div className="py-16 bg-primary text-primary-foreground relative overflow-hidden shadow-2xl">
