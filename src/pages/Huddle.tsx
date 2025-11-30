@@ -62,7 +62,7 @@ export const Huddle = () => {
     }, 10000);
 
     try {
-      // Step 1: Load huddle
+      // Step 1: Load huddle - Allow anonymous viewing of public huddles
       console.log('📍 Step 1: Fetching huddle data...');
       const { data: huddle, error: huddleError } = await supabase
         .from('huddles')
@@ -74,6 +74,19 @@ export const Huddle = () => {
         clearTimeout(timeoutId);
         setLoading(false);
         navigate('/not-found');
+        return;
+      }
+
+      // Check if it's a private huddle and user is not authenticated
+      if (huddle.is_private && !user) {
+        clearTimeout(timeoutId);
+        setLoading(false);
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to view this private huddle.",
+          variant: "destructive",
+        });
+        navigate('/auth');
         return;
       }
 
@@ -265,7 +278,7 @@ export const Huddle = () => {
     }
   }, [hasMore, loadingMore, oldestCreatedAt, huddleId]);
 
-  // Real-time subscriptions
+  // Real-time subscriptions (only for authenticated users)
   useEffect(() => {
     if (!huddleId || !user) return;
 
@@ -331,9 +344,18 @@ export const Huddle = () => {
     }
   }, [messages.length]);
 
-  // Send message
+  // Send message (requires authentication)
   const sendMessage = useCallback(async (content: string) => {
-    if (!huddleId || !user || !content.trim()) return;
+    if (!huddleId || !content.trim()) return;
+    
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to participate in this huddle.",
+      });
+      navigate('/auth');
+      return;
+    }
 
     try {
       // Fetch current user's profile from database
@@ -392,9 +414,18 @@ export const Huddle = () => {
     }
   }, [huddleId, user, toast]);
 
-  // Send media message
+  // Send media message (requires authentication)
   const sendMediaMessage = useCallback(async (url: string, type: 'image' | 'video') => {
-    if (!huddleId || !user) return;
+    if (!huddleId) return;
+    
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to participate in this huddle.",
+      });
+      navigate('/auth');
+      return;
+    }
 
     try {
       // Fetch current user's profile from database
@@ -627,25 +658,41 @@ export const Huddle = () => {
           {/* Jump to latest button */}
           <JumpToLatest visible={showJumpToLatest} onClick={jumpToLatest} />
 
-          {/* Chat input - sticky at bottom */}
-          <RetroChatInput
-            onSendMessage={sendMessage}
-            onSendMedia={sendMediaMessage}
-            placeholder="Chat here..."
-            disabled={loading}
-            huddleId={huddleId!}
-            teamName={teamName}
-            isAdmin={isAdmin}
-            onTyping={(isTyping) => {
-              if (isTyping && user?.id) {
-                supabase.channel(`typing:${huddleId}`).send({
-                  type: 'broadcast',
-                  event: 'typing',
-                  payload: { userId: user.id, isTyping: true }
-                });
-              }
-            }}
-          />
+          {/* Chat input - sticky at bottom OR sign-in prompt for anonymous users */}
+          {user ? (
+            <RetroChatInput
+              onSendMessage={sendMessage}
+              onSendMedia={sendMediaMessage}
+              placeholder="Chat here..."
+              disabled={loading}
+              huddleId={huddleId!}
+              teamName={teamName}
+              isAdmin={isAdmin}
+              onTyping={(isTyping) => {
+                if (isTyping && user?.id) {
+                  supabase.channel(`typing:${huddleId}`).send({
+                    type: 'broadcast',
+                    event: 'typing',
+                    payload: { userId: user.id, isTyping: true }
+                  });
+                }
+              }}
+            />
+          ) : (
+            <div className="border-t border-team-primary/30 bg-background/95 backdrop-blur-sm p-4 safe-area-inset-bottom">
+              <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 bg-primary/10 border border-primary/30 rounded-lg p-4">
+                <p className="text-sm text-foreground text-center sm:text-left">
+                  <span className="font-semibold text-primary">Sign in</span> to join the conversation and participate in this huddle
+                </p>
+                <Button 
+                  onClick={() => navigate('/auth')}
+                  className="bg-primary hover:bg-primary/90 shrink-0 w-full sm:w-auto"
+                >
+                  Sign In
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Collapsible highlights sidebar - slide over on mobile */}
