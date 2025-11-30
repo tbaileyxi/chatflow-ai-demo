@@ -43,7 +43,7 @@ export const HuddleSearch = () => {
   const [verifiedHuddles, setVerifiedHuddles] = useState<Huddle[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user } = useAuth(); // Optional - for showing join status
 
   useEffect(() => {
     fetchHuddles();
@@ -182,9 +182,28 @@ export const HuddleSearch = () => {
       </div>
       <div className="relative flex flex-col h-screen">
         <GlassHeader 
-          title="Discover Verified Huddles"
+          title="Discover Official Huddles"
           onBack={() => window.history.back()}
         />
+        
+        {/* Sign in prompt for anonymous users */}
+        {!user && (
+          <div className="bg-primary/10 border-b border-primary/30 p-3">
+            <div className="container mx-auto max-w-4xl flex items-center justify-between gap-3">
+              <p className="text-sm text-foreground">
+                <span className="font-semibold text-primary">Sign in</span> to join and participate in huddles
+              </p>
+              <Button 
+                size="sm"
+                onClick={() => window.location.href = '/auth'}
+                className="bg-primary hover:bg-primary/90 shrink-0"
+              >
+                Sign In
+              </Button>
+            </div>
+          </div>
+        )}
+        
         <div className="flex-1 overflow-auto font-arcade pb-20">
           <div className="container mx-auto p-4 max-w-4xl">
           <Card className="mb-4 bg-verified-background border-verified-border">
@@ -214,7 +233,7 @@ export const HuddleSearch = () => {
 
           <div className="mb-4">
             <p className="text-muted-foreground text-sm">
-              Join official team huddles with curated membership and enhanced features
+              Browse official team huddles. {!user && "Sign in to join and participate in conversations."}
             </p>
           </div>
 

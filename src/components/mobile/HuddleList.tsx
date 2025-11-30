@@ -55,11 +55,10 @@ export const HuddleList = () => {
   };
 
   const fetchHuddles = async () => {
-    if (!user) return;
-
+    // Show all public and official team huddles, even without auth
     try {
-      // Fetch user's huddles from database with latest message and member counts
-      const { data: huddles, error } = await supabase
+      // Fetch all public huddles and official team huddles
+      const query = supabase
         .from('huddles')
         .select(`
           id,
@@ -68,22 +67,33 @@ export const HuddleList = () => {
           last_message_at,
           is_verified,
           is_official_team_huddle,
+          is_private,
           parent_team_id,
+          owner_id,
           teams!team_id (
             name,
             city,
             logo_url
           )
         `)
-        .or(`owner_id.eq.${user.id},id.in.(${
-          // Subquery to get huddles where user is a member
-          await supabase
-            .from('huddle_members')
-            .select('huddle_id')
-            .eq('user_id', user.id)
-            .then(({ data }) => data?.map(m => m.huddle_id).join(',') || 'null')
-        })`)
+        .or('is_official_team_huddle.eq.true,is_private.eq.false')
         .order('last_message_at', { ascending: false, nullsFirst: false });
+
+      // If user is authenticated, also include their private huddles
+      if (user) {
+        const { data: membershipHuddles } = await supabase
+          .from('huddle_members')
+          .select('huddle_id')
+          .eq('user_id', user.id);
+        
+        const memberHuddleIds = membershipHuddles?.map(m => m.huddle_id) || [];
+        
+        if (memberHuddleIds.length > 0) {
+          query.or(`id.in.(${memberHuddleIds.join(',')})`);
+        }
+      }
+
+      const { data: huddles, error } = await query;
 
       if (error) throw error;
 
@@ -108,30 +118,32 @@ export const HuddleList = () => {
         .select('huddle_id')
         .in('huddle_id', huddleIds);
 
-      // Get unread counts for user
-      const { data: unreadData } = await supabase
-        .from('huddle_members')
-        .select('huddle_id, last_read_at')
-        .eq('user_id', user.id)
-        .in('huddle_id', huddleIds);
-
-      const { data: unreadMessages } = await supabase
-        .from('huddle_messages')
-        .select('huddle_id, created_at')
-        .in('huddle_id', huddleIds);
-
-      // Calculate unread counts
-      const unreadCounts: Record<string, number> = {};
+      // Get unread counts for user (only if authenticated)
+      let unreadCounts: Record<string, number> = {};
       
-      if (unreadData && unreadMessages) {
-        unreadData.forEach(member => {
-          const lastReadTime = member.last_read_at ? new Date(member.last_read_at) : new Date(0);
-          const unreadCount = unreadMessages.filter(msg => 
-            msg.huddle_id === member.huddle_id && 
-            new Date(msg.created_at) > lastReadTime
-          ).length;
-          unreadCounts[member.huddle_id] = unreadCount;
-        });
+      if (user) {
+        const { data: unreadData } = await supabase
+          .from('huddle_members')
+          .select('huddle_id, last_read_at')
+          .eq('user_id', user.id)
+          .in('huddle_id', huddleIds);
+
+        const { data: unreadMessages } = await supabase
+          .from('huddle_messages')
+          .select('huddle_id, created_at')
+          .in('huddle_id', huddleIds);
+
+        // Calculate unread counts
+        if (unreadData && unreadMessages) {
+          unreadData.forEach(member => {
+            const lastReadTime = member.last_read_at ? new Date(member.last_read_at) : new Date(0);
+            const unreadCount = unreadMessages.filter(msg => 
+              msg.huddle_id === member.huddle_id && 
+              new Date(msg.created_at) > lastReadTime
+            ).length;
+            unreadCounts[member.huddle_id] = unreadCount;
+          });
+        }
       }
 
       // Transform data to match our interface
@@ -200,7 +212,7 @@ export const HuddleList = () => {
 
   useEffect(() => {
     fetchHuddles();
-  }, [user]);
+  }, [user]); // Still update when user changes
 
   const handleHuddlePress = (huddle: Huddle) => {
     navigate(`/huddle/${huddle.id}`);
@@ -223,9 +235,11 @@ export const HuddleList = () => {
       {/* Header with create button and settings */}
       <div className="px-4 py-3 border-b border-white/10">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">Your Huddles</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            {user ? 'Your Huddles' : 'Public Huddles'}
+          </h2>
           <div className="flex items-center gap-2">
-            {userRole === 'admin' && (
+            {user && userRole === 'admin' && (
               <Button
                 size="sm"
                 variant="ghost"
@@ -235,8 +249,22 @@ export const HuddleList = () => {
                 <Settings className="h-4 w-4" />
               </Button>
             )}
+            {!user && (
+              <Button
+                size="sm"
+                onClick={() => navigate('/auth')}
+                className="bg-primary hover:bg-primary/90"
+              >
+                Sign In
+              </Button>
+            )}
           </div>
         </div>
+        {!user && (
+          <p className="text-xs text-muted-foreground mt-2">
+            Sign in to join huddles and participate in conversations
+          </p>
+        )}
       </div>
 
       {/* Huddle list */}
@@ -248,10 +276,13 @@ export const HuddleList = () => {
             </div>
             <h3 className="text-lg font-medium text-foreground mb-2">No huddles yet</h3>
             <p className="text-muted-foreground mb-4">
-              Follow your favorite teams from the Team Directory to automatically join their official communities
+              {user 
+                ? "Follow your favorite teams from the Team Directory to automatically join their official communities"
+                : "Sign in to join official team huddles and start chatting with fellow fans"
+              }
             </p>
-            <Button onClick={() => navigate('/teams')} className="bg-primary hover:bg-primary/90">
-              Browse Teams
+            <Button onClick={() => navigate(user ? '/teams' : '/auth')} className="bg-primary hover:bg-primary/90">
+              {user ? 'Browse Teams' : 'Sign In'}
             </Button>
           </div>
         ) : (
