@@ -8,7 +8,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { HelmetProvider } from "react-helmet-async";
 import { useJoinRequestNotifications } from "@/hooks/useJoinRequestNotifications";
 import Index from "./pages/Index";
-import { Landing } from "./pages/Landing";
+import Home from "./pages/Home";
 import { Admin } from "./pages/Admin";
 import { Auth } from "./pages/Auth";
 import { BillsChatDemo } from "./components/BillsChatDemo";
@@ -45,7 +45,7 @@ const AppContent = () => {
       
       <div className="relative flex-1 overflow-hidden">
         <Routes>
-          <Route path="/" element={<Landing />} />
+          <Route path="/" element={<Home />} />
           <Route path="/bills-demo" element={<BillsChatDemo />} />
           <Route path="/retro-demo" element={<RetroDemo />} />
           <Route path="/onboard" element={<MobileHome />} />
