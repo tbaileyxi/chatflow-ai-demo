@@ -217,6 +217,15 @@ serve(async (req) => {
     // Provide context for empty queries
     let finalQuery = userQuery || `What are the latest news and updates about the ${teamName}? Keep it brief.`;
 
+    // Enhance ranking/standings/news queries for live search
+    if (finalQuery.toLowerCase().match(/rank|cfp|playoff|standings|seeding|bowl|selection|committee|news|latest|update|injury|injuries|transfer|portal/)) {
+      const rankingContext = league === 'NCAA' 
+        ? 'College Football Playoff CFP rankings standings' 
+        : 'NFL Playoff standings wild card';
+      finalQuery += ` Search X and the web for CURRENT ${rankingContext} information about ${teamName} as of ${formattedDate}. Include the team's current rank, record, and playoff picture.`;
+      console.log(`📊 Rankings/news query detected - enhanced for live search`);
+    }
+
     // Enhance score/game queries to force real-time search from live trackers
     if (finalQuery.toLowerCase().match(/score|game|playing|final|result|recap/)) {
       const currentHour = now.getHours();
@@ -249,11 +258,21 @@ serve(async (req) => {
       espnGameData = await fetchESPNScores(league as 'NFL' | 'NCAA', teamName);
       
       if (espnGameData) {
-        console.log(`✅ ESPN API: Game found`, {
-          score: `${espnGameData.awayTeam} ${espnGameData.awayScore} - ${espnGameData.homeTeam} ${espnGameData.homeScore}`,
-          status: espnGameData.detail,
-          clock: espnGameData.clock
-        });
+        // Validate ESPN game is actually TODAY
+        const gameDate = new Date(espnGameData.detail);
+        const today = new Date();
+        const isToday = gameDate.toDateString() === today.toDateString();
+        
+        if (!isToday && espnGameData.status === 'STATUS_SCHEDULED') {
+          console.log(`⚠️ ESPN returned future game (${espnGameData.detail}), not today - ignoring`);
+          espnGameData = null;  // Clear stale/future game data
+        } else {
+          console.log(`✅ ESPN API: Game found`, {
+            score: `${espnGameData.awayTeam} ${espnGameData.awayScore} - ${espnGameData.homeTeam} ${espnGameData.homeScore}`,
+            status: espnGameData.detail,
+            clock: espnGameData.clock
+          });
+        }
       } else {
         console.log(`⚠️ ESPN API: No active game found for ${teamName}`);
       }
@@ -302,6 +321,16 @@ serve(async (req) => {
 🗓️ TODAY'S DATE: ${formattedDate}
 ⏰ CURRENT TIME: ${formattedTime} ET
 🏈 CURRENT SEASON: ${seasonString}
+
+🔍 LIVE SEARCH ENABLED: You have access to:
+- Web Search: ESPN, NFL.com, CBS Sports, news sites
+- X Search: Real-time tweets about ${teamName}
+
+For ANY question about rankings, standings, CFP, news, injuries, trades, or transfers:
+→ USE YOUR SEARCH TOOLS FIRST
+→ DO NOT say "I'll check" or "let me look" - just search and provide the answer
+→ Cite specific recent information you found (e.g., "According to latest CFP rankings...")
+→ Search X for breaking news and fan discussions about ${teamName}
 
 🎯 CRITICAL INSTRUCTION: STRUCTURED DATA EXTRACTION
 
@@ -419,13 +448,21 @@ User question: ${finalQuery}`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'grok-2-1212',
+        model: 'grok-3-latest',  // Upgraded model with better search capabilities
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: finalQuery }
         ],
-        stream: false
-        // ESPN data is provided in system prompt - no need for web search
+        stream: false,
+        search_parameters: {
+          mode: "auto",  // Let Grok decide when to search (smarter than "on")
+          sources: [
+            { type: "web" },   // Search the internet (ESPN, NFL.com, etc.)
+            { type: "x" }      // Search X/Twitter for real-time sports discussion
+          ],
+          return_citations: false,  // Keep response clean without source links
+          max_search_results: 10    // Get enough results for comprehensive answers
+        }
       }),
     });
 
@@ -454,6 +491,16 @@ User question: ${finalQuery}`;
 
     if (!aiResponse) {
       throw new Error('No response from Grok API');
+    }
+
+    // Detect if Grok didn't actually search (gave vague response)
+    const vagueResponse = aiResponse.toLowerCase().includes("i'll need to check") || 
+                          aiResponse.toLowerCase().includes("let me look") ||
+                          aiResponse.toLowerCase().includes("i couldn't find");
+
+    if (vagueResponse && !espnGameData) {
+      console.warn('⚠️ Grok gave vague response - search may have failed');
+      aiResponse += `\n\n💡 *Tip: Try asking something more specific like "What is ${teamName}'s CFP ranking?" or "When is ${teamName}'s next game?"*`;
     }
 
     // Validate that response contains score information for score queries
