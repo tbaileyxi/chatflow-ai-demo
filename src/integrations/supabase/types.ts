@@ -1497,6 +1497,7 @@ export type Database = {
           created_at: string
           description: string | null
           division: string | null
+          featured_order: number | null
           highlightly_display_name: string | null
           highlightly_id: number | null
           id: string
@@ -1515,6 +1516,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           division?: string | null
+          featured_order?: number | null
           highlightly_display_name?: string | null
           highlightly_id?: number | null
           id?: string
@@ -1533,6 +1535,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           division?: string | null
+          featured_order?: number | null
           highlightly_display_name?: string | null
           highlightly_id?: number | null
           id?: string

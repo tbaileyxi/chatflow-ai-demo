@@ -44,7 +44,8 @@ export const TeamManagement = () => {
     logo_url: '',
     status: 'active',
     sponsor: '',
-    sponsor_url: ''
+    sponsor_url: '',
+    featured_order: 999
   });
   const { toast } = useToast();
 
@@ -159,7 +160,8 @@ export const TeamManagement = () => {
         logo_url: '',
         status: 'active',
         sponsor: '',
-        sponsor_url: ''
+        sponsor_url: '',
+        featured_order: 999
       });
       setIsAddDialogOpen(false);
       setEditingTeam(null);
@@ -186,7 +188,8 @@ export const TeamManagement = () => {
       logo_url: team.logo_url || '',
       status: team.status || 'active',
       sponsor: team.sponsor || '',
-      sponsor_url: team.sponsor_url || ''
+      sponsor_url: team.sponsor_url || '',
+      featured_order: (team as any).featured_order || 999
     });
     setIsAddDialogOpen(true);
   };
@@ -229,7 +232,8 @@ export const TeamManagement = () => {
       logo_url: '',
       status: 'active',
       sponsor: '',
-      sponsor_url: ''
+      sponsor_url: '',
+      featured_order: 999
     });
     setEditingTeam(null);
   };
@@ -387,6 +391,24 @@ export const TeamManagement = () => {
                   </Select>
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="featured_order">Trending Priority</Label>
+                  <Input
+                    id="featured_order"
+                    type="number"
+                    min="1"
+                    max="999"
+                    value={formData.featured_order}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      featured_order: parseInt(e.target.value) || 999 
+                    }))}
+                    placeholder="1-999"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Lower = higher priority in Trending. Set 1-10 for featured teams. Default 999 = not featured.
+                  </p>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="conference">Conference</Label>
                   <Input
                     id="conference"
@@ -531,7 +553,7 @@ export const TeamManagement = () => {
                   )}
                   <div>
                     <CardTitle className="text-lg">{team.city} {team.name}</CardTitle>
-                    <div className="flex gap-2 mt-1">
+                     <div className="flex gap-2 mt-1">
                       <Badge variant="secondary">{team.league}</Badge>
                       {team.conference && (
                         <Badge variant="outline">{team.conference}</Badge>
@@ -539,6 +561,11 @@ export const TeamManagement = () => {
                       <Badge variant={team.status === 'active' ? 'default' : team.status === 'coming_soon' ? 'secondary' : 'destructive'}>
                         {team.status === 'active' ? 'Active' : team.status === 'coming_soon' ? 'Coming Soon' : 'Inactive'}
                       </Badge>
+                      {(team as any).featured_order && (team as any).featured_order < 100 && (
+                        <Badge variant="outline" className="border-orange-500 text-orange-500">
+                          🔥 Featured #{(team as any).featured_order}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
