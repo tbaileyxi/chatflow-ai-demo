@@ -157,7 +157,7 @@ export const HuddleSearch = () => {
           {huddle.is_verified && (
             <Badge variant="secondary" className="text-xs">
               <Shield className="w-3 h-3 mr-1" />
-              Official
+              Verified
             </Badge>
           )}
           {huddle.pricing?.is_enabled ? (
@@ -182,7 +182,7 @@ export const HuddleSearch = () => {
       </div>
       <div className="relative flex flex-col h-screen">
         <GlassHeader 
-          title="Discover Official Huddles"
+          title="Discover Verified Huddles"
           onBack={() => window.history.back()}
         />
         
@@ -250,7 +250,7 @@ export const HuddleSearch = () => {
           <div className="mb-4 p-3 bg-verified-background border border-verified-border rounded-lg">
             <div className="flex items-center gap-2 mb-1">
               <Shield className="w-4 h-4 text-verified-primary" />
-              <span className="font-medium text-verified-primary text-sm">Official Huddles Only</span>
+              <span className="font-medium text-verified-primary text-sm">Verified Huddles Only</span>
             </div>
             <p className="text-xs text-muted-foreground">
               These huddles have been verified and are open for join requests. All other huddles are invite-only.

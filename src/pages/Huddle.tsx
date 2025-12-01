@@ -11,12 +11,13 @@ import { PickEmView } from '@/components/pickem/PickEmView';
 import { useToast } from '@/hooks/use-toast';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { JumpToLatest } from '@/components/JumpToLatest';
-import { Zap, ArrowLeft, Plus } from 'lucide-react';
+import { Zap, ArrowLeft, Plus, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { HuddleSettingsDropdown } from '@/components/HuddleSettingsDropdown';
 import { InviteButton } from '@/components/InviteButton';
 import { StartHuddleDialog } from '@/components/StartHuddleDialog';
+import { SignupPromptModal } from '@/components/SignupPromptModal';
 
 export const Huddle = () => {
   const { huddleId } = useParams<{ huddleId: string }>();
@@ -31,6 +32,7 @@ export const Huddle = () => {
   const [pickEmDialog, setPickEmDialog] = useState<{ open: boolean; instanceId?: string }>({ open: false });
   const [teamName, setTeamName] = useState<string>('');
   const [showHighlights, setShowHighlights] = useState(false);
+  const [showSignupModal, setShowSignupModal] = useState(false);
   
   // Pagination state
   const [hasMore, setHasMore] = useState(true);
@@ -349,11 +351,7 @@ export const Huddle = () => {
     if (!huddleId || !content.trim()) return;
     
     if (!user) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to participate in this huddle.",
-      });
-      navigate('/auth');
+      setShowSignupModal(true);
       return;
     }
 
@@ -419,11 +417,7 @@ export const Huddle = () => {
     if (!huddleId) return;
     
     if (!user) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to participate in this huddle.",
-      });
-      navigate('/auth');
+      setShowSignupModal(true);
       return;
     }
 
@@ -739,6 +733,13 @@ export const Huddle = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Signup Prompt Modal */}
+      <SignupPromptModal 
+        open={showSignupModal}
+        onOpenChange={setShowSignupModal}
+        huddleId={huddleId}
+      />
     </div>
   );
 };

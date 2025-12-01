@@ -46,6 +46,22 @@ export const Auth = () => {
         localStorage.removeItem('pendingHuddleJoin');
       }
     }
+    
+    // Check for intended huddle after signup
+    const intendedHuddleId = localStorage.getItem('intended_huddle_id');
+    if (intendedHuddleId) {
+      localStorage.removeItem('intended_huddle_id');
+      
+      // Auto-join the public huddle - the trigger will update member count
+      setTimeout(async () => {
+        await supabase
+          .from('huddle_members')
+          .insert({ huddle_id: intendedHuddleId, user_id: user.id });
+      }, 0);
+      
+      return <Navigate to={`/huddle/${intendedHuddleId}`} replace />;
+    }
+    
     return <Navigate to="/app" replace />;
   }
 
