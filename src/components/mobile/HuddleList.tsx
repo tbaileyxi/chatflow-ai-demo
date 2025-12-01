@@ -2,15 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ChevronDown, ChevronRight, Bot, Users, Settings, Globe, MessageSquare } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Plus, ChevronDown, Bot, Users, Settings, Globe, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { formatDistanceToNow } from 'date-fns';
-
 import { useToast } from '@/hooks/use-toast';
-import { VerifiedBadge } from '@/components/VerifiedBadge';
 
 interface Huddle {
   id: string;
@@ -33,29 +30,16 @@ interface TeamGroup {
   team_name: string;
   team_logo_url: string;
   huddles: Huddle[];
-  isExpanded: boolean;
 }
 
 export const HuddleList = () => {
   const [teamGroups, setTeamGroups] = useState<TeamGroup[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { user, userRole } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const toggleTeamExpansion = (teamName: string) => {
-    setTeamGroups(prev => 
-      prev.map(group => 
-        group.team_name === teamName 
-          ? { ...group, isExpanded: !group.isExpanded }
-          : group
-      )
-    );
-  };
-
   const fetchHuddles = async () => {
-    // Show all public and official team huddles, even without auth
     try {
       // Fetch all public huddles and official team huddles
       const query = supabase
@@ -106,8 +90,7 @@ export const HuddleList = () => {
           content,
           created_at,
           is_bot_message,
-          is_team_agent_message,
-          origin_teams:teams!origin_team_id(name)
+          is_team_agent_message
         `)
         .in('huddle_id', huddleIds)
         .order('created_at', { ascending: false });
@@ -148,10 +131,7 @@ export const HuddleList = () => {
 
       // Transform data to match our interface
       const transformedHuddles: Huddle[] = (huddles || []).map(huddle => {
-        // Get actual member count from database
         const actualMemberCount = memberCounts?.filter(mc => mc.huddle_id === huddle.id).length || 1;
-        
-        // Get latest message for this huddle
         const latestMessage = latestMessages?.find(msg => msg.huddle_id === huddle.id);
         
         return {
@@ -172,7 +152,7 @@ export const HuddleList = () => {
         };
       });
 
-      // Group by team and sort huddles (official first)
+      // Group by team
       const grouped = transformedHuddles.reduce((acc, huddle) => {
         const existing = acc.find(g => g.team_name === huddle.team_name);
         if (existing) {
@@ -181,14 +161,13 @@ export const HuddleList = () => {
           acc.push({
             team_name: huddle.team_name,
             team_logo_url: huddle.team_logo_url,
-            huddles: [huddle],
-            isExpanded: true
+            huddles: [huddle]
           });
         }
         return acc;
       }, [] as TeamGroup[]);
 
-      // Sort huddles within each group: official first
+      // Sort huddles within each group: official first, then private
       grouped.forEach(group => {
         group.huddles.sort((a, b) => {
           if (a.is_official_team_huddle && !b.is_official_team_huddle) return -1;
@@ -212,14 +191,10 @@ export const HuddleList = () => {
 
   useEffect(() => {
     fetchHuddles();
-  }, [user]); // Still update when user changes
+  }, [user]);
 
   const handleHuddlePress = (huddle: Huddle) => {
     navigate(`/huddle/${huddle.id}`);
-  };
-
-  const handleCreateHuddle = () => {
-    setShowCreateDialog(true);
   };
 
   if (loading) {
@@ -232,12 +207,13 @@ export const HuddleList = () => {
 
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
-      {/* Header with create button and settings */}
-      <div className="px-4 py-3 border-b border-white/10">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">
-            {user ? 'Your Huddles' : 'Public Huddles'}
-          </h2>
+      {/* Sticky header with title + create button */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border/50">
+        <div className="px-4 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-foreground">My Huddles</h1>
+            <p className="text-sm text-muted-foreground">Your team chats — public and private</p>
+          </div>
           <div className="flex items-center gap-2">
             {user && userRole === 'admin' && (
               <Button
@@ -249,22 +225,18 @@ export const HuddleList = () => {
                 <Settings className="h-4 w-4" />
               </Button>
             )}
-            {!user && (
-              <Button
-                size="sm"
-                onClick={() => navigate('/auth')}
-                className="bg-primary hover:bg-primary/90"
-              >
+            {user ? (
+              <Button size="sm" onClick={() => navigate('/teams')} className="gap-1">
+                <Plus className="h-4 w-4" />
+                New Huddle
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => navigate('/auth')}>
                 Sign In
               </Button>
             )}
           </div>
         </div>
-        {!user && (
-          <p className="text-xs text-muted-foreground mt-2">
-            Sign in to join huddles and participate in conversations
-          </p>
-        )}
       </div>
 
       {/* Huddle list */}
@@ -281,113 +253,109 @@ export const HuddleList = () => {
                 : "Sign in to join official team huddles and start chatting with fellow fans"
               }
             </p>
-            <Button onClick={() => navigate(user ? '/teams' : '/auth')} className="bg-primary hover:bg-primary/90">
+            <Button onClick={() => navigate(user ? '/teams' : '/auth')}>
               {user ? 'Browse Teams' : 'Sign In'}
             </Button>
           </div>
         ) : (
-          <div className="space-y-1">
-            {teamGroups.map((group) => (
-              <div key={group.team_name}>
-                {/* Team header */}
-                <button
-                  onClick={() => toggleTeamExpansion(group.team_name)}
-                  className="w-full px-4 py-3 flex items-center gap-3 hover:bg-white/5 transition-colors"
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={group.team_logo_url} alt={group.team_name} />
-                    <AvatarFallback className="bg-muted text-xs">
-                      {group.team_name.substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="font-medium text-foreground flex-1 text-left">
-                    {group.team_name}
-                  </span>
-                  <Badge variant="secondary" className="text-xs">
-                    {group.huddles.length}
-                  </Badge>
-                  {group.isExpanded ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </button>
-
-                {/* Huddles for this team */}
-                {group.isExpanded && (
-                  <div className="space-y-1">
-                    {group.huddles.map((huddle) => (
-                      <button
-                        key={huddle.id}
-                        onClick={() => handleHuddlePress(huddle)}
-                        className={cn(
-                          "w-full px-4 py-3 flex items-center gap-3 transition-colors group relative",
-                          huddle.is_official_team_huddle 
-                            ? "bg-primary/5 border-l-2 border-primary hover:bg-primary/10" 
-                            : huddle.parent_team_id
-                            ? "ml-8 border-l-2 border-muted-foreground/20 bg-muted/5 hover:bg-muted/10"
-                            : "hover:bg-white/5"
-                        )}
-                      >
-                        {/* Visual tree connector for side huddles */}
-                        {huddle.parent_team_id && !huddle.is_official_team_huddle && (
-                          <div className="absolute left-2 top-1/2 w-6 h-px bg-muted-foreground/20" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            {huddle.is_official_team_huddle ? (
-                              <Globe className="h-4 w-4 text-primary shrink-0" />
-                            ) : huddle.parent_team_id ? (
-                              <MessageSquare className="h-4 w-4 text-muted-foreground shrink-0" />
-                            ) : null}
-                            <span className="font-medium text-foreground text-sm">
-                              {huddle.name}
-                            </span>
-                            {huddle.is_official_team_huddle ? (
-                              <Badge variant="outline" className="text-xs border-primary text-primary">
-                                Official Community
-                              </Badge>
-                            ) : huddle.parent_team_id ? (
-                              <Badge variant="secondary" className="text-xs">
-                                Side Huddle
-                              </Badge>
-                            ) : null}
-                            {huddle.is_verified && !huddle.is_official_team_huddle && (
-                              <VerifiedBadge size="sm" />
-                            )}
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
+          <div className="space-y-0">
+            {teamGroups.map((group) => {
+              // Separate public vs private huddles
+              const publicHuddle = group.huddles.find(h => h.is_official_team_huddle);
+              const privateHuddles = group.huddles.filter(h => !h.is_official_team_huddle);
+              
+              return (
+                <Collapsible key={group.team_name} defaultOpen className="border-b border-border/30">
+                  <CollapsibleTrigger className="w-full px-4 py-3 flex items-center gap-3 hover:bg-muted/5 transition-colors">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={group.team_logo_url} alt={group.team_name} />
+                      <AvatarFallback className="bg-muted text-xs">
+                        {group.team_name.substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="font-semibold text-foreground flex-1 text-left">
+                      {group.team_name}
+                    </span>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
+                  </CollapsibleTrigger>
+                  
+                  <CollapsibleContent className="pb-3">
+                    {/* PUBLIC HUDDLE BLOCK */}
+                    {publicHuddle && (
+                      <div className="px-4 py-2">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 ml-1">
+                          Public Team Huddle
+                        </p>
+                        <div 
+                          onClick={() => handleHuddlePress(publicHuddle)}
+                          className="bg-primary/5 border border-primary/20 rounded-xl p-4 cursor-pointer hover:bg-primary/10 transition-all"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-primary/15 flex items-center justify-center">
+                              <Globe className="h-5 w-5 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-foreground">{publicHuddle.name}</p>
+                              <p className="text-xs text-muted-foreground">AI-curated team updates + public chat</p>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
                               <Users className="h-3 w-3" />
-                              <span>{huddle.participant_count}</span>
+                              {publicHuddle.participant_count}
                             </div>
                           </div>
-                          {huddle.latest_message && (
-                            <div className="flex items-center gap-2">
-                              {huddle.latest_message.is_bot_message && (
-                                <Bot className="h-3 w-3 text-accent shrink-0" />
-                              )}
-                              <p className="text-xs text-muted-foreground truncate">
-                                {huddle.latest_message.content}
-                              </p>
-                              <span className="text-xs text-muted-foreground shrink-0">
-                                {formatDistanceToNow(new Date(huddle.latest_message.created_at), { addSuffix: true })}
-                              </span>
-                            </div>
-                          )}
                         </div>
-                        {huddle.unread_count && huddle.unread_count > 0 && (
-                          <Badge 
-                            variant="destructive" 
-                            className="h-5 w-5 p-0 text-xs flex items-center justify-center"
-                          >
-                            {huddle.unread_count > 99 ? '99+' : huddle.unread_count}
-                          </Badge>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+                      </div>
+                    )}
+                    
+                    {/* PRIVATE HUDDLES BLOCK */}
+                    {privateHuddles.length > 0 && (
+                      <div className="px-4 py-2">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 ml-1">
+                          Your Private Huddles
+                        </p>
+                        <div className="space-y-2">
+                          {privateHuddles.map(huddle => (
+                            <div 
+                              key={huddle.id}
+                              onClick={() => handleHuddlePress(huddle)}
+                              className="bg-muted/5 border border-border/40 rounded-xl p-4 cursor-pointer hover:bg-muted/10 transition-all"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-muted/20 flex items-center justify-center">
+                                  <Lock className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium text-foreground">{huddle.name}</p>
+                                    {huddle.unread_count > 0 && (
+                                      <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
+                                        {huddle.unread_count > 99 ? '99+' : huddle.unread_count}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {huddle.latest_message && (
+                                    <p className="text-xs text-muted-foreground truncate">
+                                      {huddle.latest_message.is_bot_message && (
+                                        <span className="text-accent">@coach: </span>
+                                      )}
+                                      {huddle.latest_message.content}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Users className="h-3 w-3" />
+                                  {huddle.participant_count}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
           </div>
         )}
       </div>
