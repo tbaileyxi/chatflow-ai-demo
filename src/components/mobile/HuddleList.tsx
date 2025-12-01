@@ -41,43 +41,45 @@ export const HuddleList = () => {
 
   const fetchHuddles = async () => {
     try {
-      // Fetch all public huddles and official team huddles
-      const query = supabase
-        .from('huddles')
-        .select(`
-          id,
-          name,
-          member_count,
-          last_message_at,
-          is_verified,
-          is_official_team_huddle,
-          is_private,
-          parent_team_id,
-          owner_id,
-          teams!team_id (
-            name,
-            city,
-            logo_url
-          )
-        `)
-        .or('is_official_team_huddle.eq.true,is_private.eq.false')
-        .order('last_message_at', { ascending: false, nullsFirst: false });
-
-      // If user is authenticated, also include their private huddles
-      if (user) {
-        const { data: membershipHuddles } = await supabase
-          .from('huddle_members')
-          .select('huddle_id')
-          .eq('user_id', user.id);
-        
-        const memberHuddleIds = membershipHuddles?.map(m => m.huddle_id) || [];
-        
-        if (memberHuddleIds.length > 0) {
-          query.or(`id.in.(${memberHuddleIds.join(',')})`);
-        }
+      // Only show huddles where the user is a member
+      if (!user) {
+        setTeamGroups([]);
+        setLoading(false);
+        return;
       }
 
-      const { data: huddles, error } = await query;
+      // Get only huddles where user is an actual member
+      const { data: membershipData, error: membershipError } = await supabase
+        .from('huddle_members')
+        .select(`
+          huddle_id,
+          huddles (
+            id,
+            name,
+            member_count,
+            last_message_at,
+            is_verified,
+            is_official_team_huddle,
+            is_private,
+            parent_team_id,
+            owner_id,
+            teams!team_id (
+              name,
+              city,
+              logo_url
+            )
+          )
+        `)
+        .eq('user_id', user.id);
+
+      if (membershipError) throw membershipError;
+
+      // Extract huddles from membership data
+      const huddles = membershipData
+        ?.map(m => m.huddles)
+        .filter(Boolean) || [];
+
+      const error = null;
 
       if (error) throw error;
 
