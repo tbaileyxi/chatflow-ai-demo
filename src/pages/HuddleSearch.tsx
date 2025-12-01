@@ -42,6 +42,7 @@ export const HuddleSearch = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [verifiedHuddles, setVerifiedHuddles] = useState<Huddle[]>([]);
   const [loading, setLoading] = useState(false);
+  const [expandedBio, setExpandedBio] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth(); // Optional - for showing join status
 
@@ -130,14 +131,24 @@ export const HuddleSearch = () => {
                 {huddle.is_verified && <VerifiedBadge size="sm" />}
               </div>
               <p className="text-sm text-muted-foreground">{huddle.team.name}</p>
-              {huddle.bio && (
-                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                  {huddle.bio}
-                </p>
-              )}
               <p className="text-xs text-muted-foreground mt-1">
-                Owner: {huddle.owner_profile?.display_name || huddle.owner_profile?.username || "Unknown"}
+                by {huddle.owner_profile?.display_name || huddle.owner_profile?.username || "Unknown"}
               </p>
+              {huddle.bio && (
+                <div className="mt-2">
+                  <p className={`text-xs text-muted-foreground ${expandedBio !== huddle.id ? 'line-clamp-2' : ''}`}>
+                    {huddle.bio}
+                  </p>
+                  {huddle.bio.length > 100 && (
+                    <button 
+                      onClick={() => setExpandedBio(expandedBio === huddle.id ? null : huddle.id)}
+                      className="text-xs text-primary hover:underline mt-1 font-medium"
+                    >
+                      {expandedBio === huddle.id ? 'Show less' : 'About this huddle...'}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <HuddleJoinButton 
