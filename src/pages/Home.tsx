@@ -8,6 +8,7 @@ import { TrendingTeamsSection } from '@/components/TrendingTeamsSection';
 import { TeamDirectoryGrid } from '@/components/TeamDirectoryGrid';
 import { Button } from '@/components/ui/button';
 import { LogIn } from 'lucide-react';
+import logo from '@/assets/sh-logo-updated.png';
 
 export default function Home() {
   const { user } = useAuth();
@@ -30,14 +31,14 @@ export default function Home() {
         {/* Hero Section */}
         <div className="relative bg-gradient-to-b from-primary/10 to-transparent border-b border-primary/20 px-4 py-6">
           <div className="max-w-4xl mx-auto text-center space-y-3">
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-              Jump Into Any Team's Huddle
-            </h1>
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <img src={logo} alt="Side Huddle" className="w-12 h-12 md:w-16 md:h-16" />
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+                Your Team. Your Crew. Your Huddle.
+              </h1>
+            </div>
             <p className="text-sm md:text-base text-muted-foreground">
-              Curated social media for your team. Start private AI-enhanced chat groups.
-            </p>
-            <p className="text-sm md:text-base text-primary font-semibold">
-              Pick your team. Watch the chat. Join when you're ready.
+              Private AI-powered chats + curated team updates.
             </p>
             
             {!user && (
