@@ -150,28 +150,32 @@ serve(async (req) => {
       });
     }
 
-    // Get huddle and team info
-    const { data: huddle } = await supabase
+    // Get huddle info with team_id
+    const { data: huddle, error: huddleError } = await supabase
       .from('huddles')
-      .select(`
-        id,
-        name,
-        team:teams (
-          id,
-          name,
-          league,
-          highlightly_display_name
-        )
-      `)
+      .select('id, name, team_id')
       .eq('id', huddle_id)
       .single();
 
-    if (!huddle || !huddle.team) {
-      throw new Error('Huddle or team not found');
+    if (!huddle || !huddle.team_id) {
+      console.error('Huddle not found or has no team:', huddleError);
+      throw new Error('Huddle not found or has no team associated');
     }
 
-    const teamName = huddle.team.highlightly_display_name || huddle.team.name;
-    const league = huddle.team.league;
+    // Get team data separately
+    const { data: team, error: teamError } = await supabase
+      .from('teams')
+      .select('id, name, league, highlightly_display_name')
+      .eq('id', huddle.team_id)
+      .single();
+
+    if (!team) {
+      console.error('Team not found:', teamError);
+      throw new Error('Team not found');
+    }
+
+    const teamName = team.highlightly_display_name || team.name;
+    const league = team.league;
     const personality = settings.personality || 'hype';
 
     // Build current date/time context - ALL IN EASTERN TIME
