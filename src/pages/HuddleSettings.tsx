@@ -293,7 +293,9 @@ export const HuddleSettings = () => {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Shield className="w-6 h-6 text-verified-primary" />
-                  <h3 className="text-lg font-bold text-verified-primary">Huddle Verification</h3>
+                  <h3 className="text-lg font-bold text-verified-primary">
+                    {subscriptionStatus?.is_verified ? 'VERIFIED' : 'Huddle Verification'}
+                  </h3>
                 </div>
                 {!subscriptionStatus?.is_verified && (
                   <Button 
