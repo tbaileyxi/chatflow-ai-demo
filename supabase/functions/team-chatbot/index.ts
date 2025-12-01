@@ -284,13 +284,13 @@ serve(async (req) => {
     let personalityPrompt = '';
     switch (personality) {
       case 'hype':
-        personalityPrompt = `You're SUPER ENTHUSIASTIC and ENERGETIC! Use emojis, caps, and get fans PUMPED UP! 🔥🏈 BUT: Always report REAL scores and facts first, then add the hype. Never fabricate plays or scores.`;
+        personalityPrompt = `You're ENTHUSIASTIC! Use emojis sparingly. Report facts first, then add 1-2 sentences of hype. Keep responses under 3 sentences.`;
         break;
       case 'analytical':
-        personalityPrompt = `You're DATA-DRIVEN and PRECISE. Focus on statistics, numbers, performance metrics, and detailed analysis. Be professional and thorough. Always cite real stats.`;
+        personalityPrompt = `You're DATA-DRIVEN and PRECISE. Focus on key stats and metrics. Keep it professional and concise - under 3 sentences.`;
         break;
       case 'casual':
-        personalityPrompt = `You're CONVERSATIONAL and FRIENDLY. Talk like you're chatting with friends at a game. Keep it real, relaxed, and easy-going. Stick to the facts but keep it fun.`;
+        personalityPrompt = `You're CONVERSATIONAL and FRIENDLY. Chat like you're at the game. Keep it real and brief - under 3 sentences.`;
         break;
     }
 
@@ -332,32 +332,12 @@ For ANY question about rankings, standings, CFP, news, injuries, trades, or tran
 → Cite specific recent information you found (e.g., "According to latest CFP rankings...")
 → Search X for breaking news and fan discussions about ${teamName}
 
-🎯 CRITICAL INSTRUCTION: STRUCTURED DATA EXTRACTION
+🎯 RESPONSE FORMAT:
 
-When the user asks about scores or game status, you MUST respond in this exact format:
+For game scores: Report the score in ONE line, then add 1-2 sentences max.
+Example: "Bills 27 - Chiefs 24 (4th Q, 2:15 left) 🔥 We're ahead! Defense needs to hold!"
 
-**For live/finished games:**
-\`\`\`
-Current Score: [Away Team] [Score] - [Home Team] [Score]
-Status: [Quarter/Period] ([Time Remaining] or FINAL)
-Last Update: [Most recent play or scoring event]
-[Then add 1-2 sentences in your personality style]
-\`\`\`
-
-**For scheduled games:**
-\`\`\`
-Game Status: Not started
-Kickoff: [Time] ET vs [Opponent]
-[Then add 1-2 sentences in your personality style]
-\`\`\`
-
-EXAMPLE (if ${teamName} trailing 10-20 in Q3):
-"Current Score: ${teamName} 10 - 49ers 20
-Status: 3rd Quarter (6:42 remaining)
-Last Update: 49ers WR Jauan Jennings 11-yard TD
-🤖 We're down but NOT out! 10 points is nothing - we've come back from worse! Defense needs to step up and our offense needs to capitalize. LET'S GO! 🔥"
-
-DO NOT write long narratives without stating the score clearly first. The score MUST be in the first line.
+Keep ALL responses under 3 sentences total. Be concise and punchy.
 
 PERSONALITY: ${personalityPrompt}
 
@@ -432,9 +412,10 @@ ${gameContext}
 The ESPN API data is REAL-TIME and authoritative. Do not search the web for scores if ESPN data exists.
 
 RESPONSE RULES:
-1. Answer in YOUR PERSONALITY STYLE (${personality})
-2. Keep answers conversational - NO raw stats dumps
-3. If you can't find info, say "I couldn't find current game info for ${teamName} today"
+1. MAXIMUM 3 sentences per response - BE CONCISE
+2. Answer in YOUR PERSONALITY STYLE (${personality})
+3. Get to the point quickly - no long narratives
+4. If you can't find info, say "No game info found for ${teamName} right now"
 
 User question: ${finalQuery}`;
 
@@ -454,6 +435,7 @@ User question: ${finalQuery}`;
           { role: 'user', content: finalQuery }
         ],
         stream: false,
+        max_tokens: 300,  // Limit response to ~150-200 words for conciseness
         search_parameters: {
           mode: "auto",  // Let Grok decide when to search (smarter than "on")
           sources: [
