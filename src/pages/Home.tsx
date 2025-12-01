@@ -8,7 +8,7 @@ import { TrendingTeamsSection } from '@/components/TrendingTeamsSection';
 import { TeamDirectoryGrid } from '@/components/TeamDirectoryGrid';
 import { Button } from '@/components/ui/button';
 import { LogIn } from 'lucide-react';
-import logo from '@/assets/sh-logo-updated.png';
+import logo from '@/assets/sh-logo.png';
 
 export default function Home() {
   const { user } = useAuth();
