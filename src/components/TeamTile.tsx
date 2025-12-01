@@ -46,6 +46,7 @@ export const TeamTile: React.FC<TeamTileProps> = ({ team, huddle, size = 'defaul
         "relative bg-card border border-border rounded-xl cursor-pointer",
         "hover:border-primary/50 hover:shadow-lg transition-all duration-200",
         "flex flex-col items-center justify-center gap-2",
+        "overflow-hidden",
         sizeClasses
       )}
     >
@@ -63,9 +64,12 @@ export const TeamTile: React.FC<TeamTileProps> = ({ team, huddle, size = 'defaul
         </AvatarFallback>
       </Avatar>
 
-      <div className="text-center">
-        <p className="font-bold text-sm text-foreground truncate max-w-full px-1">
-          {team.city} {team.name}
+      <div className="text-center w-full px-2 overflow-hidden">
+        <p className="text-xs text-muted-foreground truncate">
+          {team.city}
+        </p>
+        <p className="font-bold text-sm text-foreground truncate">
+          {team.name}
         </p>
         {huddle && (
           <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground mt-1">
