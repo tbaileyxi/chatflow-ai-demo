@@ -116,12 +116,12 @@ export const HuddleMembershipPricing = ({ huddleId, isOwner }: HuddleMembershipP
   return (
     <Card className="bg-card/50 backdrop-blur-sm border border-white/10">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-foreground">
-          <DollarSign className="w-5 h-5" />
-          Member Subscription Pricing
-        </CardTitle>
-        <p className="text-xs text-muted-foreground mt-1">
-          Set how much members pay to join your verified huddle (separate from verification cost)
+        <div className="flex items-center gap-2 mb-2">
+          <DollarSign className="w-5 h-5 text-primary" />
+          <CardTitle className="text-foreground">Member Access Pricing</CardTitle>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Your huddle is verified! Configure how members join (free or paid)
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -132,32 +132,47 @@ export const HuddleMembershipPricing = ({ huddleId, isOwner }: HuddleMembershipP
         )}
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="pricing-enabled" className="text-sm font-medium">
-                Require Paid Membership
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Toggle OFF for free member access, or ON to charge monthly subscriptions
-              </p>
+          {/* FREE / PAID Toggle */}
+          <div className="p-4 bg-muted/30 rounded-lg border border-border">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="pricing-enabled" className="text-sm font-semibold">
+                  Member Access
+                </Label>
+                {settings.is_enabled ? (
+                  <span className="px-2 py-0.5 text-xs font-medium bg-green-500/20 text-green-700 dark:text-green-400 rounded-full">
+                    PAID
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-xs font-medium bg-blue-500/20 text-blue-700 dark:text-blue-400 rounded-full">
+                    FREE
+                  </span>
+                )}
+              </div>
+              <Switch
+                id="pricing-enabled"
+                checked={settings.is_enabled}
+                onCheckedChange={(checked) => 
+                  setSettings(prev => ({ ...prev, is_enabled: checked }))
+                }
+                disabled={!isOwner}
+              />
             </div>
-            <Switch
-              id="pricing-enabled"
-              checked={settings.is_enabled}
-              onCheckedChange={(checked) => 
-                setSettings(prev => ({ ...prev, is_enabled: checked }))
-              }
-              disabled={!isOwner}
-            />
+            <p className="text-xs text-muted-foreground">
+              {settings.is_enabled 
+                ? "Members pay a monthly subscription to join" 
+                : "Anyone can join for free"}
+            </p>
           </div>
 
+          {/* Price Input - Only show when enabled */}
           {settings.is_enabled && (
-            <div className="space-y-2">
+            <div className="space-y-2 p-4 border border-border rounded-lg">
               <Label htmlFor="monthly-price" className="text-sm font-medium">
-                Monthly Price (USD)
+                Monthly Subscription Price
               </Label>
               <div className="relative">
-                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground font-medium">
                   $
                 </div>
                 <Input
@@ -168,17 +183,43 @@ export const HuddleMembershipPricing = ({ huddleId, isOwner }: HuddleMembershipP
                   max="99.99"
                   value={formatPrice(settings.price_per_month)}
                   onChange={(e) => handlePriceChange(e.target.value)}
-                  className="pl-8"
+                  className="pl-8 text-lg font-semibold"
                   disabled={!isOwner}
                   placeholder="1.99"
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Minimum $0.99, maximum $99.99 per month
+                Set between $0.99 - $99.99 per month
               </p>
             </div>
           )}
 
+          {/* Info Box */}
+          <div className={`p-3 rounded-lg border ${
+            settings.is_enabled 
+              ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800' 
+              : 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800'
+          }`}>
+            <p className={`text-sm ${
+              settings.is_enabled 
+                ? 'text-amber-800 dark:text-amber-200' 
+                : 'text-blue-800 dark:text-blue-200'
+            }`}>
+              {settings.is_enabled ? (
+                <>
+                  <strong>💳 Paid Membership:</strong> New members will pay ${formatPrice(settings.price_per_month)}/month via Stripe. 
+                  They can use promo codes during checkout. Current members are not affected.
+                </>
+              ) : (
+                <>
+                  <strong>🎉 Free Access:</strong> Anyone can join your verified huddle without payment. 
+                  You can switch to paid membership anytime.
+                </>
+              )}
+            </p>
+          </div>
+
+          {/* Save Button */}
           {isOwner && (
             <Button 
               onClick={saveSettings} 
@@ -186,17 +227,8 @@ export const HuddleMembershipPricing = ({ huddleId, isOwner }: HuddleMembershipP
               className="w-full bg-primary hover:bg-primary/90"
             >
               <Save className="w-4 h-4 mr-2" />
-              {saving ? "Saving..." : "Save Settings"}
+              {saving ? "Saving..." : "Save Pricing Settings"}
             </Button>
-          )}
-
-          {settings.is_enabled && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Note:</strong> New members will need to pay ${formatPrice(settings.price_per_month)}/month to join this huddle. 
-                Existing members are not affected.
-              </p>
-            </div>
           )}
         </div>
       </CardContent>

@@ -289,9 +289,12 @@ export const HuddleSettings = () => {
 
           {/* Verification Section - Only for owners */}
           {isOwner && (
-            <div className="bg-card/50 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-foreground">Huddle Verification</h3>
+            <div className="bg-verified-background border border-verified-border rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-6 h-6 text-verified-primary" />
+                  <h3 className="text-lg font-bold text-verified-primary">Huddle Verification</h3>
+                </div>
                 {!subscriptionStatus?.is_verified && (
                   <Button 
                     variant="ghost" 
@@ -304,21 +307,49 @@ export const HuddleSettings = () => {
                   </Button>
                 )}
               </div>
+              
               {subscriptionStatus?.is_verified ? (
-                <div className="flex items-center gap-3 p-3 bg-verified-background border border-verified-border rounded-lg">
-                  <Shield className="w-5 h-5 text-verified-primary shrink-0" />
+                <div className="flex items-center gap-3 p-4 bg-verified-primary/10 border border-verified-primary/30 rounded-lg">
+                  <Shield className="w-6 h-6 text-verified-primary shrink-0" />
                   <div className="flex-1">
-                    <p className="font-medium text-verified-primary">Verified Huddle</p>
+                    <p className="font-semibold text-verified-primary">✓ Verified Huddle</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Status: Active | Expires: {subscriptionStatus.expires_at ? new Date(subscriptionStatus.expires_at).toLocaleDateString() : 'N/A'}
+                      Active until {subscriptionStatus.expires_at ? new Date(subscriptionStatus.expires_at).toLocaleDateString() : 'N/A'}
                     </p>
                   </div>
                 </div>
               ) : (
-                <HuddleVerificationDialog
-                  huddleId={huddle.id}
-                  isVerified={false}
-                />
+                <div className="space-y-4">
+                  <div className="p-4 bg-muted/30 rounded-lg space-y-3">
+                    <p className="text-sm font-medium text-foreground">What you get with verification:</p>
+                    <ul className="space-y-2 text-xs text-muted-foreground">
+                      <li className="flex items-start gap-2">
+                        <span className="text-verified-primary">✓</span>
+                        <span>Verified badge on your huddle</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-verified-primary">✓</span>
+                        <span>Discoverable in huddle search</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-verified-primary">✓</span>
+                        <span>Manage join requests from users</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-verified-primary">✓</span>
+                        <span>Option to charge membership fees</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-verified-primary">✓</span>
+                        <span>Advanced huddle features</span>
+                      </li>
+                    </ul>
+                  </div>
+                  <HuddleVerificationDialog
+                    huddleId={huddle.id}
+                    isVerified={false}
+                  />
+                </div>
               )}
             </div>
           )}

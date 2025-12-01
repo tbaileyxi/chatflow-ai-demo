@@ -53,7 +53,7 @@ serve(async (req) => {
       customerId = customers.data[0].id;
     }
 
-    // Create a subscription checkout session
+    // Create a subscription checkout session with Stripe promotion codes enabled
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
@@ -72,6 +72,7 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
+      allow_promotion_codes: true, // Enable Stripe native promo codes
       success_url: `${req.headers.get("origin")}/huddle/${huddleId}?membership=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get("origin")}/huddle/${huddleId}?membership=cancelled`,
       metadata: {
