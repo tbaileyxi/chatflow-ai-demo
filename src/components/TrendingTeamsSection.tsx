@@ -60,17 +60,19 @@ export const TrendingTeamsSection: React.FC = () => {
             city,
             logo_url,
             league,
-            featured_order
+            featured_order,
+            status
           )
         `)
         .eq('is_private', false)
-        .eq('is_official_team_huddle', true);
+        .eq('is_official_team_huddle', true)
+        .neq('teams.status', 'inactive');
 
       if (error) throw error;
 
       // Calculate trending scores and combine data
       const combined = huddles
-        ?.filter(h => h.teams) // Ensure team data exists
+        ?.filter(h => h.teams && h.teams.status !== 'inactive') // Ensure team data exists and not inactive
         .map(h => ({
           id: h.teams.id,
           name: h.teams.name,

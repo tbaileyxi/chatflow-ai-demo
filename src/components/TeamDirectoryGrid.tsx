@@ -33,6 +33,7 @@ export const TeamDirectoryGrid: React.FC = () => {
       const { data: teamsData, error: teamsError } = await supabase
         .from('teams')
         .select('id, name, city, logo_url, league')
+        .neq('status', 'inactive')
         .order('league', { ascending: true })
         .order('city', { ascending: true });
 
