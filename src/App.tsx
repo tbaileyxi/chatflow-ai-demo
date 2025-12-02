@@ -13,7 +13,7 @@ import { Admin } from "./pages/Admin";
 import { Auth } from "./pages/Auth";
 import { BillsChatDemo } from "./components/BillsChatDemo";
 import { MobileProfile } from "./pages/MobileProfile";
-import { TeamDirectory } from "./pages/TeamDirectory";
+// TeamDirectory removed - teams discovery now on Home page only
 import { TeamFeed } from "./pages/TeamFeed";
 import { Huddle } from "./pages/Huddle";
 import { JoinHuddle } from "./pages/JoinHuddle";
@@ -53,7 +53,7 @@ const AppContent = () => {
           <Route path="/admin" element={<Admin />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/profile" element={<MobileProfile />} />
-          <Route path="/teams" element={<TeamDirectory />} />
+          {/* /teams route removed - discovery happens on Home */}
           <Route path="/teams/:teamId" element={<TeamFeed />} />
           <Route path="/huddle/:huddleId" element={<Huddle />} />
           <Route path="/huddle/:huddleId/settings" element={<HuddleSettings />} />

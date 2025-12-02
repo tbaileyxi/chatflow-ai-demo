@@ -1,13 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { GlassHeader } from '@/components/mobile/GlassHeader';
 import { BottomNav } from '@/components/mobile/BottomNav';
 import { TrendingTeamsSection } from '@/components/TrendingTeamsSection';
 import { TeamDirectoryGrid } from '@/components/TeamDirectoryGrid';
 import { Button } from '@/components/ui/button';
-import { LogIn } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 import logo from '@/assets/sh-logo.png';
 
 export default function Home() {
@@ -44,12 +43,12 @@ export default function Home() {
             {!user && (
               <div className="pt-2">
                 <Button 
-                  onClick={() => navigate('/auth')}
-                  className="bg-primary hover:bg-primary/90"
+                  onClick={() => navigate('/auth?signup=true')}
+                  className="bg-yellow-400 hover:bg-yellow-500 text-black font-semibold"
                   size="lg"
                 >
-                  <LogIn className="w-4 h-4 mr-2" />
-                  Sign In / Sign Up
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Join the Huddle
                 </Button>
               </div>
             )}

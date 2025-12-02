@@ -347,17 +347,17 @@ export const RetroChatInput = ({
         transition={{ duration: 0.3, ease: "easeOut" }}
       >
         <div className="flex gap-2 items-end max-w-4xl mx-auto">
-          {/* Single Media/Action Button */}
+          {/* Single Media/Action Button - Big Yellow */}
           <Popover open={mediaOptionsOpen} onOpenChange={setMediaOptionsOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-10 w-10 p-0 bg-team-primary/20 border border-team-primary/40 hover:bg-team-primary/30 rounded-full retro-button-glow"
+                className="h-10 w-10 p-0 bg-yellow-400 hover:bg-yellow-500 text-black rounded-full shadow-lg"
                 disabled={disabled || sending || uploading}
                 aria-label="Add media"
               >
-                <Plus className="w-5 h-5 text-team-primary" />
+                <Plus className="w-5 h-5" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-56 p-2 bg-background/95 backdrop-blur-sm border-team-primary/30" side="top">
@@ -479,15 +479,15 @@ export const RetroChatInput = ({
             <Bot className="w-5 h-5 text-team-primary" />
           </Button>
           
-          {/* Send button */}
+          {/* Send button - Big Yellow Instagram style */}
           <Button
             onClick={handleSend}
             disabled={!message.trim() || sending || disabled}
             size="sm"
             className={cn(
-              "h-10 w-10 p-0 rounded-full transition-all duration-200",
-              "bg-team-primary hover:bg-team-primary/90 text-white",
-              "retro-button-glow hover:scale-105",
+              "h-10 w-10 p-0 rounded-full transition-all duration-200 shadow-lg",
+              "bg-yellow-400 hover:bg-yellow-500 text-black",
+              "hover:scale-105",
               !message.trim() && "opacity-50 cursor-not-allowed"
             )}
           >
