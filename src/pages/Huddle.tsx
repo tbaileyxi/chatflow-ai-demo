@@ -545,7 +545,7 @@ export const Huddle = () => {
           
             {/* Action buttons - touch-friendly on mobile */}
             <div className="flex items-center gap-1 sm:gap-2">
-              {/* Create Side Huddle button for official huddles */}
+              {/* Branch to Private button for official huddles - big yellow */}
               {huddle?.is_official_team_huddle && (
                 <StartHuddleDialog
                   onHuddleCreated={() => {
@@ -559,11 +559,11 @@ export const Huddle = () => {
                   trigger={
                     <Button
                       size="sm"
-                      variant="outline"
-                      className="text-xs h-8"
+                      className="text-xs h-8 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold"
                     >
                       <Plus className="h-3 w-3 mr-1" />
-                      <span className="hidden sm:inline">Create Side Huddle</span>
+                      <span className="hidden sm:inline">Branch to Private</span>
+                      <span className="sm:hidden">Private</span>
                     </Button>
                   }
                 />
@@ -674,15 +674,19 @@ export const Huddle = () => {
             />
           ) : (
             <div className="border-t border-team-primary/30 bg-background/95 backdrop-blur-sm p-4 safe-area-inset-bottom">
-              <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 bg-primary/10 border border-primary/30 rounded-lg p-4">
+              <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 bg-yellow-400/10 border border-yellow-400/30 rounded-lg p-4">
                 <p className="text-sm text-foreground text-center sm:text-left">
-                  <span className="font-semibold text-primary">Sign in</span> to join the conversation and participate in this huddle
+                  <span className="font-semibold text-yellow-400">Join</span> to chat with fellow fans in this huddle
                 </p>
                 <Button 
-                  onClick={() => navigate('/auth')}
-                  className="bg-primary hover:bg-primary/90 shrink-0 w-full sm:w-auto"
+                  onClick={() => {
+                    localStorage.setItem('intended_huddle_id', huddleId!);
+                    localStorage.setItem('intended_team_id', huddle?.team_id || '');
+                    navigate('/auth?signup=true');
+                  }}
+                  className="bg-yellow-400 hover:bg-yellow-500 text-black font-semibold shrink-0 w-full sm:w-auto"
                 >
-                  Sign In
+                  Join the Huddle
                 </Button>
               </div>
             </div>

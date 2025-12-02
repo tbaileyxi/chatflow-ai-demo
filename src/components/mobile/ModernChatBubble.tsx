@@ -20,11 +20,13 @@ interface ModernChatBubbleProps {
   previousMessage?: any;
   onReaction?: (messageId: string, emoji: string) => void;
   onViewPickEm?: (instanceId: string) => void;
+  onReply?: (message: any) => void;
+  replies?: any[];
 }
 
 const QUICK_REACTIONS = ['👍', '😂', '🔥'];
 
-const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previousMessage, onReaction, onViewPickEm }: ModernChatBubbleProps) => {
+const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previousMessage, onReaction, onViewPickEm, onReply, replies = [] }: ModernChatBubbleProps) => {
   const [reactionPopoverOpen, setReactionPopoverOpen] = useState(false);
   const [hovering, setHovering] = useState(false);
 
@@ -333,6 +335,56 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
                 <span className="mr-1">{emoji}</span>
                 <span className="text-xs font-medium">{data.count}</span>
               </Button>
+            ))}
+          </div>
+        )}
+
+        {/* Reply link */}
+        {onReply && (
+          <div className={cn(
+            "mt-1",
+            isOwnMessage ? "text-right" : "text-left"
+          )}>
+            <button
+              onClick={() => onReply(message)}
+              className="text-xs text-muted-foreground hover:text-primary transition-colors"
+            >
+              Reply
+            </button>
+          </div>
+        )}
+
+        {/* Threaded replies (one level deep) */}
+        {replies.length > 0 && (
+          <div className={cn(
+            "mt-3 space-y-2 pl-4 border-l-2 border-primary/30",
+            isOwnMessage ? "ml-auto max-w-[90%]" : "max-w-[90%]"
+          )}>
+            {replies.map((reply) => (
+              <div key={reply.id} className="text-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <Avatar className="h-5 w-5">
+                    <AvatarImage src={reply.profile?.avatar_url} />
+                    <AvatarFallback className="text-[10px]">
+                      {reply.profile?.display_name?.[0] || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs font-medium text-foreground">
+                    {reply.profile?.display_name || 'User'}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+                  </span>
+                </div>
+                <div className={cn(
+                  "rounded-lg px-3 py-2",
+                  reply.user_id === currentUserId
+                    ? "bg-primary/80 text-primary-foreground"
+                    : "bg-muted/60 text-foreground"
+                )}>
+                  {reply.content}
+                </div>
+              </div>
             ))}
           </div>
         )}

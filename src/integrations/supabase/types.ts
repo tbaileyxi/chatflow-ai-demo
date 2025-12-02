@@ -369,6 +369,7 @@ export type Database = {
           origin_post_id: string | null
           origin_team_id: string | null
           poll_data: Json | null
+          reply_to_id: string | null
           user_id: string
         }
         Insert: {
@@ -386,6 +387,7 @@ export type Database = {
           origin_post_id?: string | null
           origin_team_id?: string | null
           poll_data?: Json | null
+          reply_to_id?: string | null
           user_id: string
         }
         Update: {
@@ -403,6 +405,7 @@ export type Database = {
           origin_post_id?: string | null
           origin_team_id?: string | null
           poll_data?: Json | null
+          reply_to_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -418,6 +421,13 @@ export type Database = {
             columns: ["origin_team_id"]
             isOneToOne: false
             referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "huddle_messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "huddle_messages"
             referencedColumns: ["id"]
           },
         ]

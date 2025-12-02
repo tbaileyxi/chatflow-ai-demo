@@ -45,6 +45,7 @@ interface RetroMessageBubbleProps {
       embed_code: string;
       embed_type: 'x' | 'iframe' | 'youtube';
     }>;
+    reply_to_id?: string;
   };
   user: {
     id: string;
@@ -58,6 +59,8 @@ interface RetroMessageBubbleProps {
   onMegaphone?: (messageId: string) => void;
   onHighlight?: (messageId: string) => void;
   onCopyCallout?: (messageId: string, content: string) => void;
+  onReply?: (message: any) => void;
+  replies?: any[];
   className?: string;
 }
 
@@ -73,6 +76,8 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   onMegaphone,
   onHighlight,
   onCopyCallout,
+  onReply,
+  replies = [],
   className
 }) => {
   const { user: currentUser } = useAuth();
@@ -608,6 +613,18 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                 <Copy className="h-3 w-3 sm:mr-1" />
                 <span className="hidden sm:inline">Copy</span>
               </Button>
+
+              {/* Reply button */}
+              {onReply && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onReply(message)}
+                  className="h-8 px-2 sm:px-3 text-xs hover:bg-team-primary/20 text-muted-foreground rounded-full touch-manipulation"
+                >
+                  <span>Reply</span>
+                </Button>
+              )}
 
               {/* Lightning Heat Button - Only show if not own message */}
               {message.user_id !== currentUser?.id && (

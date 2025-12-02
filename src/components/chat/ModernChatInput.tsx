@@ -406,7 +406,7 @@ export const ModernChatInput = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-12 w-12 p-0 hover:bg-muted rounded-full"
+                  className="h-12 w-12 p-0 rounded-full bg-yellow-400 hover:bg-yellow-500 text-black"
                   disabled={disabled || sending || uploading}
                   aria-label="Add media"
                 >
@@ -513,7 +513,7 @@ export const ModernChatInput = ({
               size="sm"
               className={cn(
                 "h-12 w-12 p-0 rounded-full transition-all duration-200",
-                "bg-primary hover:bg-primary/90 text-primary-foreground",
+                "bg-yellow-400 hover:bg-yellow-500 text-black shadow-lg",
                 !message.trim() && "opacity-50 cursor-not-allowed"
               )}
             >

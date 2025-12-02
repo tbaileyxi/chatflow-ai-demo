@@ -8,25 +8,30 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { LogIn, UserPlus } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 
 interface SignupPromptModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   huddleId?: string;
+  teamId?: string;
 }
 
 export const SignupPromptModal: React.FC<SignupPromptModalProps> = ({
   open,
   onOpenChange,
   huddleId,
+  teamId,
 }) => {
   const navigate = useNavigate();
 
   const handleSignup = () => {
-    // Store intended huddle for auto-join after signup
+    // Store intended huddle and team for auto-join after signup
     if (huddleId) {
       localStorage.setItem('intended_huddle_id', huddleId);
+    }
+    if (teamId) {
+      localStorage.setItem('intended_team_id', teamId);
     }
     navigate('/auth?signup=true');
   };
@@ -36,6 +41,9 @@ export const SignupPromptModal: React.FC<SignupPromptModalProps> = ({
     if (huddleId) {
       localStorage.setItem('intended_huddle_id', huddleId);
     }
+    if (teamId) {
+      localStorage.setItem('intended_team_id', teamId);
+    }
     navigate('/auth');
   };
 
@@ -43,7 +51,7 @@ export const SignupPromptModal: React.FC<SignupPromptModalProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Join the Conversation</DialogTitle>
+          <DialogTitle className="text-2xl">Join the Huddle</DialogTitle>
           <DialogDescription className="text-base">
             Create your free account to join the conversation.
             <br />
@@ -55,22 +63,22 @@ export const SignupPromptModal: React.FC<SignupPromptModalProps> = ({
           <Button
             onClick={handleSignup}
             size="lg"
-            className="w-full bg-primary hover:bg-primary/90"
+            className="w-full bg-yellow-400 hover:bg-yellow-500 text-black font-semibold"
           >
             <UserPlus className="w-5 h-5 mr-2" />
-            Create Free Account
-          </Button>
-
-          <Button
-            onClick={handleSignin}
-            size="lg"
-            variant="outline"
-            className="w-full"
-          >
-            <LogIn className="w-5 h-5 mr-2" />
-            Sign In
+            Join the Huddle
           </Button>
         </div>
+
+        <p className="text-xs text-muted-foreground text-center mt-4">
+          Already have an account?{' '}
+          <button
+            onClick={handleSignin}
+            className="text-primary hover:underline font-medium"
+          >
+            Log in
+          </button>
+        </p>
 
         <p className="text-xs text-muted-foreground text-center mt-2">
           By signing up, you agree to our{' '}

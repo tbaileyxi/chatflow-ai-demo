@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { MessageSquare, Sparkles, User, Compass, Grid, LogIn } from 'lucide-react';
+import { MessageSquare, Sparkles, User, Compass, Grid } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -81,20 +81,18 @@ export const BottomNav = () => {
             );
           })}
           
-          {/* Sign In button for anonymous users */}
+          {/* Yellow Join CTA for anonymous users */}
           {!user && (
             <Button
-              onClick={() => navigate('/auth')}
-              variant="ghost"
+              onClick={() => navigate('/auth?signup=true')}
               className={cn(
-                "flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-200",
-                "min-w-[64px] relative h-auto",
-                "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                "flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-200",
+                "min-w-[64px] h-auto",
+                "bg-yellow-400 hover:bg-yellow-500 text-black font-semibold"
               )}
             >
-              <LogIn className="h-5 w-5" />
-              <span className="text-xs font-medium opacity-60">
-                Sign In
+              <span className="text-xs font-bold">
+                Join
               </span>
             </Button>
           )}

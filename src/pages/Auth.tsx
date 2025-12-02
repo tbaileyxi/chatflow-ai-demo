@@ -3,12 +3,11 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Info, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, UserPlus } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 
 
@@ -17,7 +16,8 @@ export const Auth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [isSignUp, setIsSignUp] = useState(false);
+  // Default to signup mode
+  const [isSignUp, setIsSignUp] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -26,10 +26,12 @@ export const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(true);
 
-  // Check URL params for signup intent
+  // Check URL params for explicit login intent
   useEffect(() => {
     if (searchParams.get('signup') === 'true') {
       setIsSignUp(true);
+    } else if (searchParams.get('login') === 'true') {
+      setIsSignUp(false);
     }
   }, [searchParams]);
 
@@ -47,12 +49,25 @@ export const Auth = () => {
       }
     }
     
+    // Check for intended team to follow after signup
+    const intendedTeamId = localStorage.getItem('intended_team_id');
+    if (intendedTeamId) {
+      localStorage.removeItem('intended_team_id');
+      
+      // Auto-follow the team (trigger will auto-join public huddle)
+      setTimeout(async () => {
+        await supabase
+          .from('user_follows')
+          .insert({ team_id: intendedTeamId, user_id: user.id });
+      }, 0);
+    }
+    
     // Check for intended huddle after signup
     const intendedHuddleId = localStorage.getItem('intended_huddle_id');
     if (intendedHuddleId) {
       localStorage.removeItem('intended_huddle_id');
       
-      // Auto-join the public huddle - the trigger will update member count
+      // Auto-join the public huddle
       setTimeout(async () => {
         await supabase
           .from('huddle_members')
@@ -165,16 +180,33 @@ export const Auth = () => {
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold text-foreground">
-            Finally: Private group chats that actually follow your team
+            {isSignUp ? 'Join the Huddle' : 'Welcome Back'}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Curated social media posts + your friends in one place
+            {isSignUp 
+              ? 'Private group chats that actually follow your team'
+              : 'Sign in to continue to your huddles'
+            }
           </p>
         </div>
         
         <Card className="w-full">
           <CardContent className="pt-6">
             <form onSubmit={handleAuth} className="space-y-4">
+              {isSignUp && (
+                <div className="space-y-2">
+                  <Label htmlFor="displayName">Display Name</Label>
+                  <Input
+                    id="displayName"
+                    type="text"
+                    placeholder="Enter your display name"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -215,30 +247,17 @@ export const Auth = () => {
               </div>
 
               {isSignUp && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="displayName">Display Name</Label>
-                    <Input
-                      id="displayName"
-                      type="text"
-                      placeholder="Enter your display name"
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm Password</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      placeholder="Confirm your password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                </>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Confirm your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </div>
               )}
 
               <div className="flex items-center space-x-2">
@@ -263,20 +282,31 @@ export const Auth = () => {
 
               <Button 
                 type="submit" 
-                className="w-full" 
+                className="w-full bg-yellow-400 hover:bg-yellow-500 text-black font-semibold" 
                 disabled={loading || !agreedToTerms}
               >
-                {loading ? (isSignUp ? 'Creating Account...' : 'Signing In...') : (isSignUp ? 'Create Account' : 'Sign In')}
+                {loading 
+                  ? (isSignUp ? 'Creating Account...' : 'Signing In...') 
+                  : (isSignUp ? (
+                    <>
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Join the Huddle
+                    </>
+                  ) : 'Sign In')
+                }
               </Button>
               
               <div className="text-center">
-                <Button
-                  type="button"
-                  variant="link"
-                  onClick={() => setIsSignUp(!isSignUp)}
-                >
-                  {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-                </Button>
+                <p className="text-sm text-muted-foreground">
+                  {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+                  <button
+                    type="button"
+                    onClick={() => setIsSignUp(!isSignUp)}
+                    className="text-primary hover:underline font-medium"
+                  >
+                    {isSignUp ? 'Log in' : 'Sign Up'}
+                  </button>
+                </p>
               </div>
             </form>
           </CardContent>
