@@ -50,6 +50,7 @@ export const TeamDirectory = () => {
       const { data, error } = await supabase
         .from('teams')
         .select('*')
+        .neq('status', 'inactive')
         .order('league', { ascending: true })
         .order('city', { ascending: true });
 
