@@ -22,6 +22,8 @@ interface RetroChatInputProps {
   showPickEm?: boolean;
   teamName?: string;
   isAdmin?: boolean;
+  replyingTo?: any;
+  onCancelReply?: () => void;
 }
 
 const TEAM_EMOJIS = [
@@ -42,7 +44,9 @@ export const RetroChatInput = ({
   onPickEm,
   showPickEm = false,
   teamName,
-  isAdmin = false
+  isAdmin = false,
+  replyingTo,
+  onCancelReply
 }: RetroChatInputProps) => {
   const [message, setMessage] = useState('');
   const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
@@ -341,11 +345,30 @@ export const RetroChatInput = ({
       />
       
       <motion.div 
-        className="p-3 bg-team-primary/10 border-t border-team-primary/30 sticky bottom-0 left-0 right-0 pb-[calc(env(safe-area-inset-bottom)+8px)]"
+        className="bg-team-primary/10 border-t border-team-primary/30 sticky bottom-0 left-0 right-0"
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
       >
+        {/* Reply preview banner */}
+        {replyingTo && (
+          <div className="px-3 py-2 bg-yellow-400/20 border-b border-yellow-400/30 flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <span className="text-xs text-yellow-600 font-medium">Replying to {replyingTo.profile?.display_name || 'User'}</span>
+              <p className="text-xs text-muted-foreground truncate">{replyingTo.content}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onCancelReply}
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
+            >
+              ✕
+            </Button>
+          </div>
+        )}
+        
+        <div className="p-3 pb-[calc(env(safe-area-inset-bottom)+8px)]">
         <div className="flex gap-2 items-end max-w-4xl mx-auto">
           {/* Single Media/Action Button - Big Yellow */}
           <Popover open={mediaOptionsOpen} onOpenChange={setMediaOptionsOpen}>
@@ -467,16 +490,16 @@ export const RetroChatInput = ({
             </Popover>
           </div>
           
-          {/* Coach button */}
+          {/* Coach button - bright yellow */}
           <Button
             variant="ghost"
             size="sm"
-            className="h-10 w-10 p-0 bg-team-primary/20 border border-team-primary/40 hover:bg-team-primary/30 rounded-full retro-button-glow"
+            className="h-10 w-10 p-0 bg-yellow-400 hover:bg-yellow-500 text-black rounded-full shadow-lg"
             disabled={disabled || sending}
             onClick={handleCoachClick}
             aria-label="Ask Coach"
           >
-            <Bot className="w-5 h-5 text-team-primary" />
+            <Bot className="w-5 h-5" />
           </Button>
           
           {/* Send button - Big Yellow Instagram style */}
@@ -493,6 +516,7 @@ export const RetroChatInput = ({
           >
             <Send className="w-5 h-5" />
           </Button>
+        </div>
         </div>
       </motion.div>
     </div>

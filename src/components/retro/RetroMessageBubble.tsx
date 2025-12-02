@@ -687,6 +687,33 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             </motion.div>
           )}
         </AnimatePresence>
+        
+        {/* Render replies (one level deep only) */}
+        {replies.length > 0 && (
+          <div className="ml-8 sm:ml-10 mt-2 space-y-1 border-l-2 border-team-primary/30 pl-2">
+            {replies.map((reply) => (
+              <div key={reply.id} className="flex gap-2 p-1.5 rounded bg-team-primary/5">
+                <Avatar className="h-5 w-5 shrink-0">
+                  <AvatarImage src={reply.profile?.avatar_url} />
+                  <AvatarFallback className="bg-team-primary/20 text-team-primary text-xs">
+                    {(reply.profile?.display_name || 'U').slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-team-primary truncate">
+                      {reply.profile?.display_name || 'User'}
+                    </span>
+                    <span className="text-xs text-muted-foreground/60">
+                      {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+                    </span>
+                  </div>
+                  <p className="text-xs text-foreground">{reply.content}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </motion.div>
   );

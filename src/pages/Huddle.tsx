@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -33,6 +33,7 @@ export const Huddle = () => {
   const [teamName, setTeamName] = useState<string>('');
   const [showHighlights, setShowHighlights] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
+  const [replyingToMessage, setReplyingToMessage] = useState<any>(null);
   
   // Pagination state
   const [hasMore, setHasMore] = useState(true);
@@ -347,7 +348,7 @@ export const Huddle = () => {
   }, [messages.length]);
 
   // Send message (requires authentication)
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, replyToId?: string) => {
     if (!huddleId || !content.trim()) return;
     
     if (!user) {
@@ -363,13 +364,18 @@ export const Huddle = () => {
         .eq('user_id', user.id)
         .single();
       
-      const messageData = {
+      const messageData: any = {
         id: crypto.randomUUID(),
         content: content.trim(),
         huddle_id: huddleId,
         user_id: user.id,
         created_at: new Date().toISOString()
       };
+      
+      // Add reply_to_id if replying
+      if (replyToId) {
+        messageData.reply_to_id = replyToId;
+      }
 
       const messageWithProfile = {
         ...messageData,
@@ -381,6 +387,9 @@ export const Huddle = () => {
         }
       };
       setMessages(prev => [...prev, messageWithProfile]);
+      
+      // Clear reply state
+      setReplyingToMessage(null);
       
       // Auto-scroll after sending
       setTimeout(() => {
@@ -508,22 +517,39 @@ export const Huddle = () => {
 
   const teamLogo = huddle?.team?.logo_url;
 
+  // Group messages with their replies
+  const messagesWithReplies = useMemo(() => {
+    const repliesMap = new Map<string, any[]>();
+    const parentMessages: any[] = [];
+    
+    messages.forEach(msg => {
+      if (msg.reply_to_id) {
+        const replies = repliesMap.get(msg.reply_to_id) || [];
+        replies.push(msg);
+        repliesMap.set(msg.reply_to_id, replies);
+      } else {
+        parentMessages.push(msg);
+      }
+    });
+    
+    return { parentMessages, repliesMap };
+  }, [messages]);
+
   return (
     <div className="min-h-screen-dynamic w-full bg-gradient-to-br from-background via-background to-team-primary/5 flex flex-col">
-      {/* Floating back button - top left */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => navigate('/app')}
-        className="fixed top-4 left-4 z-50 h-12 w-12 rounded-full bg-background/95 backdrop-blur-sm border border-team-primary/30 hover:bg-team-primary/20 shadow-lg touch-manipulation"
-        aria-label="Back to huddles"
-      >
-        <ArrowLeft className="h-5 w-5" />
-      </Button>
-
-      {/* Mobile-first header - sticky at top */}
+      {/* Mobile-first header - sticky at top with integrated back button */}
       <div className="retro-header sticky top-0 z-20 px-3 sm:px-4 py-2 sm:py-3 border-b border-team-primary/30 bg-background/95 backdrop-blur-sm safe-area-inset-top">
-        <div className="flex items-center gap-2 sm:gap-3 ml-14">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Back button - integrated in header */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/app')}
+            className="h-9 w-9 p-0 rounded-full bg-team-primary/10 hover:bg-team-primary/20 shrink-0"
+            aria-label="Back to huddles"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           {/* Team logo - smaller on mobile */}
           {teamLogo && (
             <img 
@@ -626,13 +652,15 @@ export const Huddle = () => {
                 </div>
               )}
               
-              {messages.map((message, index) => {
-                const prevMessage = index > 0 ? messages[index - 1] : null;
+              {messagesWithReplies.parentMessages.map((message, index) => {
+                const prevMessage = index > 0 ? messagesWithReplies.parentMessages[index - 1] : null;
                 const isGrouped = prevMessage && 
                   prevMessage.user_id === message.user_id && 
                   !prevMessage.is_bot_message && 
                   !message.is_bot_message &&
                   (new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime()) < 60000;
+                
+                const replies = messagesWithReplies.repliesMap.get(message.id) || [];
                 
                 return (
                   <RetroMessageBubble
@@ -642,6 +670,8 @@ export const Huddle = () => {
                     currentUserId={user?.id}
                     isAdmin={isAdmin}
                     isGrouped={isGrouped}
+                    onReply={(msg) => setReplyingToMessage(msg)}
+                    replies={replies}
                   />
                 );
               })}
@@ -655,13 +685,16 @@ export const Huddle = () => {
           {/* Chat input - sticky at bottom OR sign-in prompt for anonymous users */}
           {user ? (
             <RetroChatInput
-              onSendMessage={sendMessage}
+              onSendMessage={(content) => sendMessage(content, replyingToMessage?.id)}
               onSendMedia={sendMediaMessage}
               placeholder="Chat here..."
               disabled={loading}
               huddleId={huddleId!}
+              userId={user.id}
               teamName={teamName}
               isAdmin={isAdmin}
+              replyingTo={replyingToMessage}
+              onCancelReply={() => setReplyingToMessage(null)}
               onTyping={(isTyping) => {
                 if (isTyping && user?.id) {
                   supabase.channel(`typing:${huddleId}`).send({
@@ -712,15 +745,15 @@ export const Huddle = () => {
         </div>
       </div>
 
-      {/* Floating Highlights Button - aligned under back button in upper left */}
+      {/* Floating Highlights Button - positioned below header */}
       <Button
         variant="ghost"
         size="icon"
         onClick={() => setShowHighlights(!showHighlights)}
-        className="fixed top-20 left-4 z-50 h-12 w-12 rounded-full bg-team-primary/20 backdrop-blur-sm border border-team-primary/30 hover:bg-team-primary/30 shadow-lg touch-manipulation"
+        className="fixed top-16 left-4 z-40 h-10 w-10 rounded-full bg-team-primary/20 backdrop-blur-sm border border-team-primary/30 hover:bg-team-primary/30 shadow-lg touch-manipulation"
         aria-label="Toggle Highlights"
       >
-        <Zap className="h-5 w-5 text-team-primary" />
+        <Zap className="h-4 w-4 text-team-primary" />
       </Button>
 
       {/* Pick 'Em Dialog */}

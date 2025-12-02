@@ -215,15 +215,18 @@ serve(async (req) => {
     const userQuery = coachMention ? coachMention[1].trim() : '';
 
     // Provide context for empty queries
-    let finalQuery = userQuery || `What are the latest news and updates about the ${teamName}? Keep it brief.`;
+    let finalQuery = userQuery || `What are the latest news and updates about the ${teamName} in ${etYear}? Keep it brief.`;
 
+    // ALWAYS append current year to force 2025 results
+    const yearEnforcement = ` ${etYear} season current`;
+    
     // Enhance ranking/standings/news queries for live search
     if (finalQuery.toLowerCase().match(/rank|cfp|playoff|standings|seeding|bowl|selection|committee|news|latest|update|injury|injuries|transfer|portal/)) {
       const rankingContext = league === 'NCAA' 
         ? 'College Football Playoff CFP rankings standings' 
         : 'NFL Playoff standings wild card';
-      finalQuery += ` Search X and the web for CURRENT ${rankingContext} information about ${teamName} as of ${formattedDate}. Include the team's current rank, record, and playoff picture.`;
-      console.log(`📊 Rankings/news query detected - enhanced for live search`);
+      finalQuery += ` Search X and the web for CURRENT ${etYear} ${rankingContext} information about ${teamName} as of ${formattedDate}. Include the team's current ${etYear} rank, record, and playoff picture. ONLY ${etYear} data.`;
+      console.log(`📊 Rankings/news query detected - enhanced for ${etYear} live search`);
     }
 
     // Enhance score/game queries to force real-time search from live trackers
@@ -233,18 +236,23 @@ serve(async (req) => {
       
       if (isLikelyLive) {
         // Force search of live score pages with specific sites
-        finalQuery += ` Search ESPN.com, NFL.com, or CBS Sports for LIVE CURRENT score and game status for ${teamName} vs their opponent RIGHT NOW on ${formattedDate}. Include the current quarter and time remaining. [Current time: ${formattedTime} ET - search for MOST RECENT update posted within the last 5 minutes]`;
+        finalQuery += ` Search ESPN.com, NFL.com, or CBS Sports for LIVE CURRENT score and game status for ${teamName} vs their opponent RIGHT NOW on ${formattedDate} ${etYear}. Include the current quarter and time remaining. [Current time: ${formattedTime} ET - search for MOST RECENT update posted within the last 5 minutes]`;
       } else {
         // Search for final score
-        finalQuery += ` Search ESPN.com or NFL.com for FINAL score for ${teamName} game on ${formattedDate}.`;
+        finalQuery += ` Search ESPN.com or NFL.com for FINAL score for ${teamName} game on ${formattedDate} ${etYear}.`;
       }
       console.log(`🏈 Live score query enhanced with specific sites (likely live: ${isLikelyLive})`);
     }
 
     // Enhance betting-related queries
     if (finalQuery.toLowerCase().match(/spread|line|odds|betting|over.under|moneyline/)) {
-      finalQuery += ` Search for current betting odds from ESPN BET, DraftKings, or FanDuel.`;
+      finalQuery += ` Search for current ${etYear} betting odds from ESPN BET, DraftKings, or FanDuel.`;
       console.log(`🎰 Betting query detected - enhanced for web search`);
+    }
+    
+    // Always add year enforcement to query
+    if (!finalQuery.includes(String(etYear))) {
+      finalQuery += yearEnforcement;
     }
 
     console.log(`🎯 Team: ${teamName} (${league})`);
@@ -320,7 +328,13 @@ serve(async (req) => {
 
 🗓️ TODAY'S DATE: ${formattedDate}
 ⏰ CURRENT TIME: ${formattedTime} ET
-🏈 CURRENT SEASON: ${seasonString}
+🏈 CURRENT SEASON: ${etYear}-${etYear + 1} (WE ARE IN ${etYear})
+
+⚠️ CRITICAL YEAR RULE: The current year is ${etYear}. 
+- NEVER mention ${etYear - 1} season data as current
+- NEVER say "2024 season" when discussing current events - we are in ${etYear}
+- If you find search results from ${etYear - 1}, IGNORE them and search again with "${etYear}" in the query
+- All rankings, standings, news MUST be from ${etYear}
 
 🔍 LIVE SEARCH ENABLED: You have access to:
 - Web Search: ESPN, NFL.com, CBS Sports, news sites
@@ -329,7 +343,8 @@ serve(async (req) => {
 For ANY question about rankings, standings, CFP, news, injuries, trades, or transfers:
 → USE YOUR SEARCH TOOLS FIRST
 → DO NOT say "I'll check" or "let me look" - just search and provide the answer
-→ Cite specific recent information you found (e.g., "According to latest CFP rankings...")
+→ Include "${etYear}" in all search queries to get current data
+→ Cite specific recent information you found (e.g., "According to latest ${etYear} CFP rankings...")
 → Search X for breaking news and fan discussions about ${teamName}
 
 🎯 RESPONSE FORMAT:
@@ -494,6 +509,14 @@ User question: ${finalQuery}`;
     if (isScoreQuery && !hasScoreFormat && !hasNotStarted) {
       console.warn('⚠️ Score query but no score found in response');
       console.warn('Response:', aiResponse.substring(0, 200));
+    }
+    
+    // Post-processing: Warn if response mentions wrong year
+    const wrongYearMention = aiResponse.match(/\b(2024|2023)\b.*?(season|rank|standings|record)/i);
+    if (wrongYearMention && !aiResponse.toLowerCase().includes('last year') && !aiResponse.toLowerCase().includes('previous season')) {
+      console.warn(`⚠️ Response may contain outdated ${wrongYearMention[1]} data`);
+      // Add disclaimer if we detect stale data
+      aiResponse += `\n\n⚠️ *Note: Please verify this info is from the current ${etYear} season.*`;
     }
 
     // Remove any source citations that Grok might include
