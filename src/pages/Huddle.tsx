@@ -607,11 +607,56 @@ export const Huddle = () => {
         </div>
       </div>
 
+      {/* Chat input - STICKY under header for top-down layout */}
+      <div className="sticky top-[52px] sm:top-[60px] z-20 bg-background/95 backdrop-blur-sm border-b border-team-primary/30 shadow-md px-2 sm:px-4 py-2">
+        <div className="max-w-4xl mx-auto">
+          {user ? (
+            <RetroChatInput
+              onSendMessage={(content) => sendMessage(content, replyingToMessage?.id)}
+              onSendMedia={sendMediaMessage}
+              placeholder="Chat here..."
+              disabled={loading}
+              huddleId={huddleId!}
+              userId={user.id}
+              teamName={teamName}
+              isAdmin={isAdmin}
+              replyingTo={replyingToMessage}
+              onCancelReply={() => setReplyingToMessage(null)}
+              onTyping={(isTyping) => {
+                if (isTyping && user?.id) {
+                  supabase.channel(`typing:${huddleId}`).send({
+                    type: 'broadcast',
+                    event: 'typing',
+                    payload: { userId: user.id, isTyping: true }
+                  });
+                }
+              }}
+            />
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-yellow-400/10 border border-yellow-400/30 rounded-lg p-3">
+              <p className="text-sm text-foreground text-center sm:text-left">
+                <span className="font-semibold text-yellow-400">Join</span> to chat with fellow fans
+              </p>
+              <Button 
+                onClick={() => {
+                  localStorage.setItem('intended_huddle_id', huddleId!);
+                  localStorage.setItem('intended_team_id', huddle?.team_id || '');
+                  navigate('/auth?signup=true');
+                }}
+                className="bg-yellow-400 hover:bg-yellow-500 text-black font-semibold shrink-0 w-full sm:w-auto"
+              >
+                Join the Huddle
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Main chat area - mobile-first flex layout */}
       <div className="flex-1 flex flex-col sm:flex-row relative overflow-hidden">
         {/* Messages container - full width on mobile */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Messages - mobile optimized scrolling with proper ref connection */}
+          {/* Messages - mobile optimized scrolling */}
           <div 
             ref={(el) => {
               messagesContainerRef.current = el;
@@ -682,49 +727,6 @@ export const Huddle = () => {
           
           {/* Jump to newest button */}
           <JumpToLatest visible={showJumpToNewest} onClick={jumpToNewest} />
-
-          {/* Chat input - sticky at bottom OR sign-in prompt for anonymous users */}
-          {user ? (
-            <RetroChatInput
-              onSendMessage={(content) => sendMessage(content, replyingToMessage?.id)}
-              onSendMedia={sendMediaMessage}
-              placeholder="Chat here..."
-              disabled={loading}
-              huddleId={huddleId!}
-              userId={user.id}
-              teamName={teamName}
-              isAdmin={isAdmin}
-              replyingTo={replyingToMessage}
-              onCancelReply={() => setReplyingToMessage(null)}
-              onTyping={(isTyping) => {
-                if (isTyping && user?.id) {
-                  supabase.channel(`typing:${huddleId}`).send({
-                    type: 'broadcast',
-                    event: 'typing',
-                    payload: { userId: user.id, isTyping: true }
-                  });
-                }
-              }}
-            />
-          ) : (
-            <div className="border-t border-team-primary/30 bg-background/95 backdrop-blur-sm p-4 safe-area-inset-bottom">
-              <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 bg-yellow-400/10 border border-yellow-400/30 rounded-lg p-4">
-                <p className="text-sm text-foreground text-center sm:text-left">
-                  <span className="font-semibold text-yellow-400">Join</span> to chat with fellow fans in this huddle
-                </p>
-                <Button 
-                  onClick={() => {
-                    localStorage.setItem('intended_huddle_id', huddleId!);
-                    localStorage.setItem('intended_team_id', huddle?.team_id || '');
-                    navigate('/auth?signup=true');
-                  }}
-                  className="bg-yellow-400 hover:bg-yellow-500 text-black font-semibold shrink-0 w-full sm:w-auto"
-                >
-                  Join the Huddle
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Collapsible highlights sidebar - slide over on mobile */}
