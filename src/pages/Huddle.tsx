@@ -11,7 +11,9 @@ import { PickEmView } from '@/components/pickem/PickEmView';
 import { useToast } from '@/hooks/use-toast';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { JumpToLatest } from '@/components/JumpToLatest';
+import { DateDivider } from '@/components/chat/DateDivider';
 import { Zap, ArrowLeft, Plus, LogIn } from 'lucide-react';
+import { isSameDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { HuddleSettingsDropdown } from '@/components/HuddleSettingsDropdown';
@@ -39,10 +41,10 @@ export const Huddle = () => {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [oldestCreatedAt, setOldestCreatedAt] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // Auto-scroll functionality
-  const { showJumpToLatest, scrollRef, handleAtBottomStateChange, jumpToLatest } = useAutoScroll();
+  // Auto-scroll functionality (top-down layout)
+  const { showJumpToNewest, scrollRef, handleScrollPosition, jumpToNewest, isNearTop } = useAutoScroll();
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Check if current user is owner
   const isOwner = user?.id === huddle?.owner_id;
@@ -126,7 +128,7 @@ export const Huddle = () => {
           }
         }));
 
-        setMessages(messagesWithProfiles.reverse());
+        setMessages(messagesWithProfiles); // Keep newest-first order (no reverse)
         setOldestCreatedAt(rawMessages[rawMessages.length - 1]?.created_at || null);
         setHasMore(rawMessages.length === 50);
       }
@@ -150,9 +152,9 @@ export const Huddle = () => {
       clearTimeout(timeoutId);
       setLoading(false);
       
-      // Auto-scroll to bottom after loading
+      // Scroll to top (newest messages) after loading
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+        messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
       }, 100);
       
     } catch (error) {
@@ -268,7 +270,8 @@ export const Huddle = () => {
           }
         }));
 
-        setMessages(prev => [...messagesWithProfiles.reverse(), ...prev]);
+        // Append older messages to the end (they appear below in top-down view)
+        setMessages(prev => [...prev, ...messagesWithProfiles]);
         setOldestCreatedAt(olderMessages[olderMessages.length - 1].created_at);
         setHasMore(olderMessages.length === 50);
       } else {
@@ -296,41 +299,34 @@ export const Huddle = () => {
         if (payload.new) {
           const newMessage = payload.new as any;
           
-          // Prevent duplicates - check if message already exists
-          setMessages(prev => {
-            if (prev.some(m => m.id === newMessage.id)) {
-              return prev;
+          // Fetch profile for the new message
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', newMessage.user_id)
+            .single();
+          
+          const messageWithProfile = {
+            ...newMessage,
+            profile: profile || {
+              user_id: newMessage.user_id,
+              display_name: 'User',
+              username: 'user'
             }
-            
-            // Fetch profile for the new message
-            supabase
-              .from('profiles')
-              .select('*')
-              .eq('user_id', newMessage.user_id)
-              .single()
-              .then(({ data: profile }) => {
-                const messageWithProfile = {
-                  ...newMessage,
-                  profile: profile || {
-                    user_id: newMessage.user_id,
-                    display_name: 'User',
-                    username: 'user'
-                  }
-                };
-                
-                setMessages(prev => {
-                  if (prev.some(m => m.id === newMessage.id)) return prev;
-                  return [...prev, messageWithProfile];
-                });
-              });
-            
-            return prev;
+          };
+          
+          // Prepend new message at the top (newest-first order)
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMessage.id)) return prev;
+            return [messageWithProfile, ...prev];
           });
           
-          // Auto-scroll to new messages
-          setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-          }, 100);
+          // Auto-scroll to top if user is near the top (following live conversation)
+          if (isNearTop) {
+            setTimeout(() => {
+              messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+            }, 100);
+          }
         }
       })
       .subscribe();
@@ -338,14 +334,7 @@ export const Huddle = () => {
     return () => {
       messagesChannel.unsubscribe();
     };
-  }, [huddleId, user]);
-
-  // Auto-scroll when messages change
-  useEffect(() => {
-    if (messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
-  }, [messages.length]);
+  }, [huddleId, user, isNearTop]);
 
   // Send message (requires authentication)
   const sendMessage = useCallback(async (content: string, replyToId?: string) => {
@@ -386,14 +375,15 @@ export const Huddle = () => {
           avatar_url: null
         }
       };
-      setMessages(prev => [...prev, messageWithProfile]);
+      // Prepend own message at top (newest-first)
+      setMessages(prev => [messageWithProfile, ...prev]);
       
       // Clear reply state
       setReplyingToMessage(null);
       
-      // Auto-scroll after sending
+      // Scroll to top to see own message
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
       }, 100);
 
       supabase
@@ -457,11 +447,12 @@ export const Huddle = () => {
           avatar_url: null
         }
       };
-      setMessages(prev => [...prev, messageWithProfile]);
+      // Prepend media message at top (newest-first)
+      setMessages(prev => [messageWithProfile, ...prev]);
       
-      // Auto-scroll after sending media
+      // Scroll to top to see own message
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
       }, 100);
 
       const { error } = await supabase
@@ -623,21 +614,53 @@ export const Huddle = () => {
           {/* Messages - mobile optimized scrolling with proper ref connection */}
           <div 
             ref={(el) => {
+              messagesContainerRef.current = el;
               if (el && scrollRef.current) {
-                scrollRef.current.scrollToBottom = (behavior = 'smooth') => {
-                  messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
+                scrollRef.current.scrollToTop = (behavior: ScrollBehavior = 'smooth') => {
+                  el.scrollTo({ top: 0, behavior });
                 };
               }
             }}
             className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-4 py-3 sm:py-4 retro-chat-column touch-pan-y"
             onScroll={(e) => {
               const target = e.target as HTMLDivElement;
-              const isAtBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 100;
-              handleAtBottomStateChange(isAtBottom);
+              handleScrollPosition(target.scrollTop);
             }}
           >
             <div className="max-w-4xl mx-auto space-y-1">
-              {/* Load older messages button */}
+              {messagesWithReplies.parentMessages.map((message, index) => {
+                const prevMessage = index > 0 ? messagesWithReplies.parentMessages[index - 1] : null;
+                
+                // Show date divider when date changes (top-down: check if current message's date differs from previous)
+                const showDateDivider = index === 0 || 
+                  !isSameDay(new Date(message.created_at), new Date(prevMessage!.created_at));
+                
+                const isGrouped = prevMessage && 
+                  prevMessage.user_id === message.user_id && 
+                  !prevMessage.is_bot_message && 
+                  !message.is_bot_message &&
+                  isSameDay(new Date(message.created_at), new Date(prevMessage.created_at)) &&
+                  Math.abs(new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime()) < 60000;
+                
+                const replies = messagesWithReplies.repliesMap.get(message.id) || [];
+                
+                return (
+                  <React.Fragment key={message.id}>
+                    {showDateDivider && <DateDivider date={new Date(message.created_at)} />}
+                    <RetroMessageBubble
+                      message={message}
+                      user={message.profile}
+                      currentUserId={user?.id}
+                      isAdmin={isAdmin}
+                      isGrouped={isGrouped}
+                      onReply={(msg) => setReplyingToMessage(msg)}
+                      replies={replies}
+                    />
+                  </React.Fragment>
+                );
+              })}
+              
+              {/* Load older messages button - at bottom for top-down layout */}
               {hasMore && (
                 <div className="flex justify-center py-3">
                   <Button
@@ -651,36 +674,11 @@ export const Huddle = () => {
                   </Button>
                 </div>
               )}
-              
-              {messagesWithReplies.parentMessages.map((message, index) => {
-                const prevMessage = index > 0 ? messagesWithReplies.parentMessages[index - 1] : null;
-                const isGrouped = prevMessage && 
-                  prevMessage.user_id === message.user_id && 
-                  !prevMessage.is_bot_message && 
-                  !message.is_bot_message &&
-                  (new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime()) < 60000;
-                
-                const replies = messagesWithReplies.repliesMap.get(message.id) || [];
-                
-                return (
-                  <RetroMessageBubble
-                    key={message.id}
-                    message={message}
-                    user={message.profile}
-                    currentUserId={user?.id}
-                    isAdmin={isAdmin}
-                    isGrouped={isGrouped}
-                    onReply={(msg) => setReplyingToMessage(msg)}
-                    replies={replies}
-                  />
-                );
-              })}
-              <div ref={messagesEndRef} />
             </div>
           </div>
           
-          {/* Jump to latest button */}
-          <JumpToLatest visible={showJumpToLatest} onClick={jumpToLatest} />
+          {/* Jump to newest button */}
+          <JumpToLatest visible={showJumpToNewest} onClick={jumpToNewest} />
 
           {/* Chat input - sticky at bottom OR sign-in prompt for anonymous users */}
           {user ? (
