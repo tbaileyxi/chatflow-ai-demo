@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { JumpToLatest } from '@/components/JumpToLatest';
 import { DateDivider } from '@/components/chat/DateDivider';
-import { Zap, ArrowLeft, Users, UserPlus } from 'lucide-react';
+import { Zap, ArrowLeft, MoreVertical, UserPlus } from 'lucide-react';
 import { isSameDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -567,8 +567,10 @@ export const Huddle = () => {
           
           {/* Huddle name only - clean and minimal */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-base sm:text-lg md:text-xl font-bold neon-text truncate">
-              {huddle?.name || 'Loading...'}
+            <h1 className="text-sm sm:text-base md:text-lg font-bold neon-text truncate">
+              {huddle?.is_official_team_huddle 
+                ? (huddle?.name?.replace(' Community', '') || 'Loading...')
+                : (huddle?.name || 'Loading...')}
             </h1>
           </div>
           
@@ -586,7 +588,7 @@ export const Huddle = () => {
               size="icon"
               className="h-9 w-9 rounded-full hover:bg-team-primary/20"
             >
-              <Users className="h-5 w-5" />
+              <MoreVertical className="h-5 w-5" />
             </Button>
           </HuddlePeopleSheet>
         </div>
