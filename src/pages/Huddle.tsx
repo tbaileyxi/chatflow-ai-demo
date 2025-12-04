@@ -632,15 +632,18 @@ export const Huddle = () => {
                 const prevMessage = index > 0 ? messagesWithReplies.parentMessages[index - 1] : null;
                 
                 // Show date divider when date changes (top-down: check if current message's date differs from previous)
+                // First message always shows divider, otherwise compare dates with null safety
                 const showDateDivider = index === 0 || 
-                  !isSameDay(new Date(message.created_at), new Date(prevMessage!.created_at));
+                  (prevMessage?.created_at && message.created_at && 
+                   !isSameDay(new Date(message.created_at), new Date(prevMessage.created_at)));
                 
-                const isGrouped = prevMessage && 
+                // Group consecutive messages from same user within 1 minute, with full null safety
+                const isGrouped = !!(prevMessage?.created_at && message.created_at &&
                   prevMessage.user_id === message.user_id && 
                   !prevMessage.is_bot_message && 
                   !message.is_bot_message &&
                   isSameDay(new Date(message.created_at), new Date(prevMessage.created_at)) &&
-                  Math.abs(new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime()) < 60000;
+                  Math.abs(new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime()) < 60000);
                 
                 const replies = messagesWithReplies.repliesMap.get(message.id) || [];
                 
