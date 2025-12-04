@@ -206,20 +206,18 @@ export const HuddlePeopleSheet = ({
 
             <Separator />
 
-            {/* Settings (for owners) */}
-            {isOwner && (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  navigate(`/huddle/${huddleId}/settings`);
-                  setOpen(false);
-                }}
-                className="w-full justify-start h-11"
-              >
-                <Settings className="h-4 w-4 mr-3" />
-                Huddle Settings
-              </Button>
-            )}
+            {/* Settings - visible to all users */}
+            <Button
+              variant="ghost"
+              onClick={() => {
+                navigate(`/huddle/${huddleId}/settings`);
+                setOpen(false);
+              }}
+              className="w-full justify-start h-11"
+            >
+              <Settings className="h-4 w-4 mr-3" />
+              Huddle Settings
+            </Button>
 
             {/* Leave Huddle - Red at bottom */}
             {user && (
