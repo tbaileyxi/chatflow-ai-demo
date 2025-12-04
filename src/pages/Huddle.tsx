@@ -477,6 +477,24 @@ export const Huddle = () => {
 
   const retroTheme = useRetroTheme(huddle?.team?.name);
 
+  // Group messages with their replies - MUST be before early returns to follow React hooks rules
+  const messagesWithReplies = useMemo(() => {
+    const repliesMap = new Map<string, any[]>();
+    const parentMessages: any[] = [];
+    
+    messages.forEach(msg => {
+      if (msg.reply_to_id) {
+        const replies = repliesMap.get(msg.reply_to_id) || [];
+        replies.push(msg);
+        repliesMap.set(msg.reply_to_id, replies);
+      } else {
+        parentMessages.push(msg);
+      }
+    });
+    
+    return { parentMessages, repliesMap };
+  }, [messages]);
+
   if (loading) {
     return (
       <div className="min-h-screen-dynamic bg-background flex items-center justify-center">
@@ -507,24 +525,6 @@ export const Huddle = () => {
   }
 
   const teamLogo = huddle?.team?.logo_url;
-
-  // Group messages with their replies
-  const messagesWithReplies = useMemo(() => {
-    const repliesMap = new Map<string, any[]>();
-    const parentMessages: any[] = [];
-    
-    messages.forEach(msg => {
-      if (msg.reply_to_id) {
-        const replies = repliesMap.get(msg.reply_to_id) || [];
-        replies.push(msg);
-        repliesMap.set(msg.reply_to_id, replies);
-      } else {
-        parentMessages.push(msg);
-      }
-    });
-    
-    return { parentMessages, repliesMap };
-  }, [messages]);
 
   return (
     <div className="min-h-screen-dynamic w-full bg-gradient-to-br from-background via-background to-team-primary/5 flex flex-col">
