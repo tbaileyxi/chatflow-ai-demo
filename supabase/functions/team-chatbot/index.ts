@@ -208,25 +208,29 @@ serve(async (req) => {
     const seasonString = `${seasonStartYear}-${seasonEndYear}`;
     const currentDate = now; // Keep reference for date calculations below
 
-    console.log(`📅 ET Date: ${formattedDate} | Season: ${seasonString} (start year: ${seasonStartYear})`);
+    // Build exact date string for searches (e.g., "December 4, 2025")
+    const exactDateForSearch = formattedDate; // Already formatted as "Month Day, Year"
+    const monthYearForSearch = `${now.toLocaleDateString('en-US', { month: 'long', timeZone: 'America/New_York' })} ${etYear}`;
+    
+    console.log(`📅 ET Date: ${formattedDate} | Exact search date: ${exactDateForSearch} | Season: ${seasonString}`);
 
     // Extract query after @coach
     const coachMention = content.match(/@coach\s+(.+)/i);
     const userQuery = coachMention ? coachMention[1].trim() : '';
 
-    // Provide context for empty queries
-    let finalQuery = userQuery || `What are the latest news and updates about the ${teamName} in ${etYear}? Keep it brief.`;
+    // Provide context for empty queries - use exact date
+    let finalQuery = userQuery || `What are the latest news and updates about the ${teamName} as of ${exactDateForSearch}? Keep it brief.`;
 
-    // ALWAYS append current year to force 2025 results
-    const yearEnforcement = ` ${etYear} season current`;
+    // ALWAYS append exact date to force current results
+    const dateEnforcement = ` "${exactDateForSearch}" OR "${monthYearForSearch}"`;
     
-    // Enhance ranking/standings/news queries for live search
+    // Enhance ranking/standings/news queries for live search with EXACT DATE
     if (finalQuery.toLowerCase().match(/rank|cfp|playoff|standings|seeding|bowl|selection|committee|news|latest|update|injury|injuries|transfer|portal/)) {
       const rankingContext = league === 'NCAA' 
         ? 'College Football Playoff CFP rankings standings' 
         : 'NFL Playoff standings wild card';
-      finalQuery += ` Search X and the web for CURRENT ${etYear} ${rankingContext} information about ${teamName} as of ${formattedDate}. Include the team's current ${etYear} rank, record, and playoff picture. ONLY ${etYear} data.`;
-      console.log(`📊 Rankings/news query detected - enhanced for ${etYear} live search`);
+      finalQuery += ` Search X and the web for CURRENT ${rankingContext} information about ${teamName} as of ${exactDateForSearch}. Include the team's current rank, record, and playoff picture. ONLY data from ${monthYearForSearch} - REJECT any ${etYear - 1} season data.`;
+      console.log(`📊 Rankings/news query detected - enhanced with exact date: ${exactDateForSearch}`);
     }
 
     // Enhance score/game queries to force real-time search from live trackers
@@ -236,23 +240,23 @@ serve(async (req) => {
       
       if (isLikelyLive) {
         // Force search of live score pages with specific sites
-        finalQuery += ` Search ESPN.com, NFL.com, or CBS Sports for LIVE CURRENT score and game status for ${teamName} vs their opponent RIGHT NOW on ${formattedDate} ${etYear}. Include the current quarter and time remaining. [Current time: ${formattedTime} ET - search for MOST RECENT update posted within the last 5 minutes]`;
+        finalQuery += ` Search ESPN.com, NFL.com, or CBS Sports for LIVE CURRENT score and game status for ${teamName} vs their opponent RIGHT NOW on ${exactDateForSearch}. Include the current quarter and time remaining. [Current time: ${formattedTime} ET - search for MOST RECENT update posted within the last 5 minutes]`;
       } else {
         // Search for final score
-        finalQuery += ` Search ESPN.com or NFL.com for FINAL score for ${teamName} game on ${formattedDate} ${etYear}.`;
+        finalQuery += ` Search ESPN.com or NFL.com for FINAL score for ${teamName} game on ${exactDateForSearch}.`;
       }
-      console.log(`🏈 Live score query enhanced with specific sites (likely live: ${isLikelyLive})`);
+      console.log(`🏈 Live score query enhanced with exact date: ${exactDateForSearch}`);
     }
 
     // Enhance betting-related queries
     if (finalQuery.toLowerCase().match(/spread|line|odds|betting|over.under|moneyline/)) {
-      finalQuery += ` Search for current ${etYear} betting odds from ESPN BET, DraftKings, or FanDuel.`;
-      console.log(`🎰 Betting query detected - enhanced for web search`);
+      finalQuery += ` Search for current betting odds from ESPN BET, DraftKings, or FanDuel as of ${exactDateForSearch}.`;
+      console.log(`🎰 Betting query detected - enhanced with exact date`);
     }
     
-    // Always add year enforcement to query
-    if (!finalQuery.includes(String(etYear))) {
-      finalQuery += yearEnforcement;
+    // Always add date enforcement to query
+    if (!finalQuery.includes(exactDateForSearch) && !finalQuery.includes(monthYearForSearch)) {
+      finalQuery += dateEnforcement;
     }
 
     console.log(`🎯 Team: ${teamName} (${league})`);
@@ -323,18 +327,20 @@ serve(async (req) => {
       }
     }
 
-    // Build system prompt for Grok
+    // Build system prompt for Grok with EXACT DATE enforcement
     const systemPrompt = `You are Coach, the AI assistant for ${teamName} fans in the ${league}.
 
-🗓️ TODAY'S DATE: ${formattedDate}
+🗓️ TODAY'S EXACT DATE: ${exactDateForSearch}
 ⏰ CURRENT TIME: ${formattedTime} ET
-🏈 CURRENT SEASON: ${etYear}-${etYear + 1} (WE ARE IN ${etYear})
+🏈 CURRENT SEASON: ${etYear}-${etYear + 1} (WE ARE IN ${monthYearForSearch})
 
-⚠️ CRITICAL YEAR RULE: The current year is ${etYear}. 
-- NEVER mention ${etYear - 1} season data as current
-- NEVER say "2024 season" when discussing current events - we are in ${etYear}
-- If you find search results from ${etYear - 1}, IGNORE them and search again with "${etYear}" in the query
-- All rankings, standings, news MUST be from ${etYear}
+⚠️ CRITICAL DATE RULE - READ CAREFULLY:
+- Today is ${exactDateForSearch} - use this EXACT date in all searches
+- The current year is ${etYear} - we are in ${monthYearForSearch}
+- NEVER mention "${etYear - 1} season" or "2024 season" as current - that was LAST YEAR
+- If search results mention "${etYear - 1} season" or "2024 rankings", those are OUTDATED - search again with "${monthYearForSearch}" 
+- All rankings, standings, news MUST be from ${monthYearForSearch}
+- When searching, ALWAYS include "${exactDateForSearch}" or "${monthYearForSearch}" in your query
 
 🔍 LIVE SEARCH ENABLED: You have access to:
 - Web Search: ESPN, NFL.com, CBS Sports, news sites

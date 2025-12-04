@@ -466,10 +466,10 @@ export const RetroChatInput = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 p-0 hover:bg-team-primary/20 rounded-full"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 bg-yellow-400 hover:bg-yellow-500 text-black rounded-full shadow-sm"
                   disabled={disabled || sending}
                 >
-                  <Smile className="w-4 h-4 text-team-primary" />
+                  <Smile className="w-4 h-4" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-64 p-3 bg-background/95 backdrop-blur-sm border-team-primary/30" align="end">
