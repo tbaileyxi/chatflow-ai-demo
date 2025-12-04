@@ -12,12 +12,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { JumpToLatest } from '@/components/JumpToLatest';
 import { DateDivider } from '@/components/chat/DateDivider';
-import { Zap, ArrowLeft, Plus, LogIn } from 'lucide-react';
+import { Zap, ArrowLeft, Users, UserPlus } from 'lucide-react';
 import { isSameDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { HuddleSettingsDropdown } from '@/components/HuddleSettingsDropdown';
-import { InviteButton } from '@/components/InviteButton';
+import { HuddlePeopleSheet } from '@/components/HuddlePeopleSheet';
 import { StartHuddleDialog } from '@/components/StartHuddleDialog';
 import { SignupPromptModal } from '@/components/SignupPromptModal';
 
@@ -475,6 +474,23 @@ export const Huddle = () => {
     }
   }, [huddleId, user, toast]);
 
+  // Handle invite - copies invite link to clipboard
+  const handleInvite = useCallback(async () => {
+    const inviteUrl = `${window.location.origin}/join/${huddleId}`;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      toast({
+        title: "Link Copied!",
+        description: "Share this link to invite friends to the huddle.",
+      });
+    } catch {
+      toast({
+        title: "Invite Link",
+        description: inviteUrl,
+      });
+    }
+  }, [huddleId, toast]);
+
   const retroTheme = useRetroTheme(huddle?.team?.name);
 
   // Group messages with their replies - MUST be before early returns to follow React hooks rules
@@ -550,60 +566,30 @@ export const Huddle = () => {
             />
           )}
           
-          {/* Huddle info - responsive text */}
+          {/* Huddle name only - clean and minimal */}
           <div className="flex-1 min-w-0">
             <h1 className="text-base sm:text-lg md:text-xl font-bold neon-text truncate">
               {huddle?.name || 'Loading...'}
             </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground/80 truncate">
-              {teamName} • {members.length} members
-            </p>
           </div>
           
-            {/* Action buttons - touch-friendly on mobile */}
-            <div className="flex items-center gap-1 sm:gap-2">
-              {/* Branch to Private button for official huddles - big yellow */}
-              {huddle?.is_official_team_huddle && (
-                <StartHuddleDialog
-                  onHuddleCreated={() => {
-                    toast({
-                      title: "Side Huddle Created!",
-                      description: "Your private huddle has been created",
-                    });
-                  }}
-                  parentTeamId={huddle.team_id}
-                  isCreatingSideHuddle={true}
-                  trigger={
-                    <Button
-                      size="sm"
-                      className="text-xs h-8 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold"
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      <span className="hidden sm:inline">Branch to Private</span>
-                      <span className="sm:hidden">Private</span>
-                    </Button>
-                  }
-                />
-              )}
-              
-              {/* Invite button */}
-              <InviteButton 
-                huddleId={huddleId!} 
-                ownerDisplayName={huddle?.owner?.display_name}
-                teamName={teamName}
-                className="h-8 w-8 sm:h-9 sm:w-9"
-              />
-              
-
-              {/* Settings dropdown */}
-              <HuddleSettingsDropdown
-                huddleId={huddleId!}
-                ownerId={huddle.owner_id}
-                isOwner={isOwner}
-                isVerified={huddle?.is_verified}
-                huddle={huddle}
-              />
-            </div>
+          {/* Single People icon - opens bottom sheet */}
+          <HuddlePeopleSheet
+            huddleId={huddleId!}
+            huddle={huddle}
+            members={members}
+            isOwner={isOwner}
+            onShowHighlights={() => setShowHighlights(true)}
+            onInvite={handleInvite}
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-full hover:bg-team-primary/20"
+            >
+              <Users className="h-5 w-5" />
+            </Button>
+          </HuddlePeopleSheet>
         </div>
       </div>
 
@@ -748,16 +734,37 @@ export const Huddle = () => {
         </div>
       </div>
 
-      {/* Floating Highlights Button - positioned below header */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setShowHighlights(!showHighlights)}
-        className="fixed top-16 left-4 z-40 h-10 w-10 rounded-full bg-team-primary/20 backdrop-blur-sm border border-team-primary/30 hover:bg-team-primary/30 shadow-lg touch-manipulation"
-        aria-label="Toggle Highlights"
-      >
-        <Zap className="h-4 w-4 text-team-primary" />
-      </Button>
+      {/* Yellow FAB - bottom right, adapts to huddle type */}
+      {user && (
+        <div className="fixed bottom-24 right-4 z-30">
+          {huddle?.is_official_team_huddle ? (
+            // Public huddle → Start Side Huddle
+            <StartHuddleDialog
+              onHuddleCreated={() => {
+                toast({
+                  title: "Side Huddle Created!",
+                  description: "Your private huddle has been created",
+                });
+              }}
+              parentTeamId={huddle.team_id}
+              isCreatingSideHuddle={true}
+              trigger={
+                <Button className="h-14 w-14 rounded-full bg-yellow-400 hover:bg-yellow-500 shadow-lg shadow-yellow-400/30">
+                  <UserPlus className="h-6 w-6 text-black" />
+                </Button>
+              }
+            />
+          ) : (
+            // Private huddle → Invite Friends
+            <Button 
+              onClick={handleInvite}
+              className="h-14 w-14 rounded-full bg-yellow-400 hover:bg-yellow-500 shadow-lg shadow-yellow-400/30"
+            >
+              <UserPlus className="h-6 w-6 text-black" />
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Pick 'Em Dialog */}
       {pickEmDialog.instanceId && (
