@@ -1,29 +1,31 @@
 import { useCallback, useRef, useState } from 'react';
 
 export const useAutoScroll = () => {
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
-  const scrollRef = useRef<{ scrollToBottom: (behavior?: 'smooth' | 'auto') => void } | null>(null);
+  const [isNearTop, setIsNearTop] = useState(true);
+  const [showJumpToNewest, setShowJumpToNewest] = useState(false);
+  const scrollRef = useRef<{ scrollToTop: (behavior?: 'smooth' | 'auto') => void } | null>(null);
 
-  const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
-    setIsAtBottom(atBottom);
-    setShowJumpToLatest(!atBottom);
+  // For top-down layout: track if user is near the TOP (newest messages)
+  const handleScrollPosition = useCallback((scrollTop: number) => {
+    const nearTop = scrollTop < 300;
+    setIsNearTop(nearTop);
+    setShowJumpToNewest(!nearTop);
   }, []);
 
-  const scrollToBottom = useCallback((behavior: 'smooth' | 'auto' = 'smooth') => {
-    scrollRef.current?.scrollToBottom(behavior);
+  const scrollToTop = useCallback((behavior: 'smooth' | 'auto' = 'smooth') => {
+    scrollRef.current?.scrollToTop(behavior);
   }, []);
 
-  const jumpToLatest = useCallback(() => {
-    scrollToBottom('smooth');
-  }, [scrollToBottom]);
+  const jumpToNewest = useCallback(() => {
+    scrollToTop('smooth');
+  }, [scrollToTop]);
 
   return {
-    isAtBottom,
-    showJumpToLatest,
+    isNearTop,
+    showJumpToNewest,
     scrollRef,
-    handleAtBottomStateChange,
-    scrollToBottom,
-    jumpToLatest
+    handleScrollPosition,
+    scrollToTop,
+    jumpToNewest
   };
 };

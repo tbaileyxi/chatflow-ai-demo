@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ChevronDown } from 'lucide-react';
+import { ChevronUp } from 'lucide-react';
 
 interface JumpToLatestProps {
   visible: boolean;
@@ -13,19 +13,19 @@ export const JumpToLatest: React.FC<JumpToLatestProps> = ({ visible, onClick }) 
     <AnimatePresence>
       {visible && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 20 }}
+          exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="fixed bottom-24 sm:bottom-20 right-3 sm:right-4 z-50"
+          className="fixed top-24 left-1/2 -translate-x-1/2 z-50"
         >
           <Button
             onClick={onClick}
-            className="bg-primary text-white rounded-full shadow-lg px-3 sm:px-4 py-2 hover:bg-primary/90 transition-colors touch-manipulation min-h-[44px]"
+            className="bg-yellow-400 text-black rounded-full shadow-lg px-4 py-2 hover:bg-yellow-500 transition-colors touch-manipulation min-h-[44px] font-semibold"
             size="sm"
           >
-            <ChevronDown className="h-4 w-4 sm:mr-1" />
-            <span className="hidden sm:inline">Jump to latest</span>
+            <ChevronUp className="h-4 w-4 mr-1" />
+            <span>New Messages</span>
           </Button>
         </motion.div>
       )}
