@@ -344,70 +344,67 @@ export const Huddle = () => {
       return;
     }
 
+    // Try to fetch profile, but don't fail if it errors (network issues, token refresh, etc.)
+    let profile = null;
     try {
-      // Fetch current user's profile from database
-      const { data: profile } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('user_id, display_name, username, avatar_url')
         .eq('user_id', user.id)
         .single();
-      
-      const messageData: any = {
-        id: crypto.randomUUID(),
-        content: content.trim(),
-        huddle_id: huddleId,
-        user_id: user.id,
-        created_at: new Date().toISOString()
-      };
-      
-      // Add reply_to_id if replying
-      if (replyToId) {
-        messageData.reply_to_id = replyToId;
-      }
-
-      const messageWithProfile = {
-        ...messageData,
-        profile: profile || {
-          user_id: user.id,
-          display_name: 'User',
-          username: 'user',
-          avatar_url: null
-        }
-      };
-      // Prepend own message at top (newest-first)
-      setMessages(prev => [messageWithProfile, ...prev]);
-      
-      // Clear reply state
-      setReplyingToMessage(null);
-      
-      // Scroll to top to see own message
-      setTimeout(() => {
-        messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 100);
-
-      supabase
-        .from('huddle_messages')
-        .insert([messageData])
-        .then(({ error }) => {
-          if (error) {
-            console.error('Error persisting message:', error);
-            setMessages(prev => prev.filter(m => m.id !== messageData.id));
-            toast({
-              title: "Error",
-              description: "Failed to send message",
-              variant: "destructive",
-            });
-          }
-        });
-        
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send message",
-        variant: "destructive",
-      });
+      profile = data;
+    } catch (profileError) {
+      console.warn('Could not fetch profile, using fallback:', profileError);
     }
+    
+    const messageData: any = {
+      id: crypto.randomUUID(),
+      content: content.trim(),
+      huddle_id: huddleId,
+      user_id: user.id,
+      created_at: new Date().toISOString()
+    };
+    
+    // Add reply_to_id if replying
+    if (replyToId) {
+      messageData.reply_to_id = replyToId;
+    }
+
+    const messageWithProfile = {
+      ...messageData,
+      profile: profile || {
+        user_id: user.id,
+        display_name: user.email?.split('@')[0] || 'User',
+        username: 'user',
+        avatar_url: null
+      }
+    };
+    // Prepend own message at top (newest-first)
+    setMessages(prev => [messageWithProfile, ...prev]);
+    
+    // Clear reply state
+    setReplyingToMessage(null);
+    
+    // Scroll to top to see own message
+    setTimeout(() => {
+      messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
+
+    // Fire-and-forget insert - errors handled separately
+    supabase
+      .from('huddle_messages')
+      .insert([messageData])
+      .then(({ error }) => {
+        if (error) {
+          console.error('Error persisting message:', error);
+          setMessages(prev => prev.filter(m => m.id !== messageData.id));
+          toast({
+            title: "Error",
+            description: "Failed to send message",
+            variant: "destructive",
+          });
+        }
+      });
   }, [huddleId, user, toast]);
 
   // Send media message (requires authentication)
@@ -419,59 +416,61 @@ export const Huddle = () => {
       return;
     }
 
+    // Try to fetch profile, but don't fail if it errors (network issues, token refresh, etc.)
+    let profile = null;
     try {
-      // Fetch current user's profile from database
-      const { data: profile } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('user_id, display_name, username, avatar_url')
         .eq('user_id', user.id)
         .single();
-      
-      const messageData = {
-        id: crypto.randomUUID(),
-        content: `[Shared ${type}]`,
-        huddle_id: huddleId,
-        user_id: user.id,
-        media_url: url,
-        media_type: type,
-        created_at: new Date().toISOString()
-      };
-
-      const messageWithProfile = {
-        ...messageData,
-        profile: profile || {
-          user_id: user.id,
-          display_name: 'User',
-          username: 'user',
-          avatar_url: null
-        }
-      };
-      // Prepend media message at top (newest-first)
-      setMessages(prev => [messageWithProfile, ...prev]);
-      
-      // Scroll to top to see own message
-      setTimeout(() => {
-        messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 100);
-
-      const { error } = await supabase
-        .from('huddle_messages')
-        .insert([messageData]);
-
-      if (error) throw error;
-
-      toast({
-        title: "Uploaded!",
-        description: "Media shared successfully",
-      });
-    } catch (error) {
-      console.error('Error sending media:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send media",
-        variant: "destructive",
-      });
+      profile = data;
+    } catch (profileError) {
+      console.warn('Could not fetch profile for media message, using fallback:', profileError);
     }
+    
+    const messageData = {
+      id: crypto.randomUUID(),
+      content: `[Shared ${type}]`,
+      huddle_id: huddleId,
+      user_id: user.id,
+      media_url: url,
+      media_type: type,
+      created_at: new Date().toISOString()
+    };
+
+    const messageWithProfile = {
+      ...messageData,
+      profile: profile || {
+        user_id: user.id,
+        display_name: user.email?.split('@')[0] || 'User',
+        username: 'user',
+        avatar_url: null
+      }
+    };
+    // Prepend media message at top (newest-first)
+    setMessages(prev => [messageWithProfile, ...prev]);
+    
+    // Scroll to top to see own message
+    setTimeout(() => {
+      messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
+
+    // Fire-and-forget insert - errors handled separately
+    supabase
+      .from('huddle_messages')
+      .insert([messageData])
+      .then(({ error }) => {
+        if (error) {
+          console.error('Error persisting media message:', error);
+          setMessages(prev => prev.filter(m => m.id !== messageData.id));
+          toast({
+            title: "Error",
+            description: "Failed to send media",
+            variant: "destructive",
+          });
+        }
+      });
   }, [huddleId, user, toast]);
 
   // Handle invite - copies invite link to clipboard
