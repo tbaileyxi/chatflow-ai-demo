@@ -475,7 +475,7 @@ export const Huddle = () => {
 
   // Handle invite - copies invite link to clipboard
   const handleInvite = useCallback(async () => {
-    const inviteUrl = `${window.location.origin}/join/${huddleId}`;
+    const inviteUrl = `${window.location.origin}/join-huddle/${huddleId}`;
     try {
       await navigator.clipboard.writeText(inviteUrl);
       toast({
