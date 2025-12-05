@@ -104,7 +104,7 @@ export const Huddle = () => {
           *, 
           poll_data, 
           message_type,
-          origin_teams:teams!origin_team_id(id, name, city, logo_url)
+          origin_teams:teams!origin_team_id(id, name, city, logo_url, sponsor, sponsor_url)
         `)
         .eq('huddle_id', huddleId)
         .order('created_at', { ascending: false })
@@ -244,7 +244,7 @@ export const Huddle = () => {
           *, 
           poll_data, 
           message_type,
-          origin_teams:teams!origin_team_id(id, name, city, logo_url)
+          origin_teams:teams!origin_team_id(id, name, city, logo_url, sponsor, sponsor_url)
         `)
         .eq('huddle_id', huddleId)
         .lt('created_at', oldestCreatedAt)
