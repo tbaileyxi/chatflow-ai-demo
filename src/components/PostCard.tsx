@@ -413,23 +413,10 @@ export const PostCard = ({ post, isSpotlight = false, disableReply = false }: Po
                   (post.team.name || 'Unknown')
               }
             </h3>
-            {/* Show sponsor for agent/broadcast posts */}
+            {/* SPONSORED pill for agent/broadcast posts */}
             {(post.is_team_agent_message || post.is_agent_post) && post.team.sponsor && (
-              <span className="text-xs text-muted-foreground font-light">
-                sponsored by: {
-                  post.team.sponsor_url ? (
-                    <a 
-                      href={post.team.sponsor_url.startsWith('http') ? post.team.sponsor_url : `https://${post.team.sponsor_url}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="text-primary hover:underline"
-                    >
-                      {post.team.sponsor}
-                    </a>
-                  ) : (
-                    post.team.sponsor
-                  )
-                }
+              <span className="px-1.5 py-0.5 text-[10px] font-bold bg-primary/20 text-primary rounded-full">
+                SPONSORED
               </span>
             )}
             {/* Show team name for user posts */}
@@ -580,6 +567,25 @@ export const PostCard = ({ post, isSpotlight = false, disableReply = false }: Po
               </p>
             </div>
           </div>
+        )}
+        
+        {/* Sponsored by link - shown below content for agent/broadcast posts */}
+        {(post.is_team_agent_message || post.is_agent_post) && post.team.sponsor && (
+          <p className="text-xs text-muted-foreground mt-3">
+            Sponsored by{' '}
+            {post.team.sponsor_url ? (
+              <a 
+                href={post.team.sponsor_url.startsWith('http') ? post.team.sponsor_url : `https://${post.team.sponsor_url}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:underline font-medium"
+              >
+                {post.team.sponsor}
+              </a>
+            ) : (
+              <span className="font-medium">{post.team.sponsor}</span>
+            )}
+          </p>
         )}
       </div>
 

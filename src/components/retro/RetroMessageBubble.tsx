@@ -23,11 +23,13 @@ interface RetroMessageBubbleProps {
     is_bot_message?: boolean;
     is_team_agent_message?: boolean;
     origin_team_id?: string;
-    origin_teams?: {
+  origin_teams?: {
       id: string;
       name: string;
       city?: string;
       logo_url?: string;
+      sponsor?: string;
+      sponsor_url?: string;
     };
     media_url?: string;
     media_type?: string;
@@ -278,8 +280,14 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                     ? `${message.origin_teams.name} Bot`
                     : 'Live Update'}
               </span>
+              {/* SPONSORED pill for sponsored bot messages */}
+              {message.origin_teams?.sponsor && (
+                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-black/20 text-black rounded-full">
+                  SPONSORED
+                </span>
+              )}
             </div>
-            <div className="flex items-center gap-1 text-sm text-gray-600">
+            <div className="flex items-center gap-1 text-xs text-gray-600">
               {formattedTime}
             </div>
           </div>
@@ -359,7 +367,26 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             </div>
           )}
 
-          {/* Bot message actions - simplified */}
+          {/* Sponsored by link - shown under content */}
+          {message.origin_teams?.sponsor && (
+            <p className="text-xs text-gray-600 mt-2">
+              Sponsored by{' '}
+              {message.origin_teams.sponsor_url ? (
+                <a 
+                  href={message.origin_teams.sponsor_url.startsWith('http') ? message.origin_teams.sponsor_url : `https://${message.origin_teams.sponsor_url}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-black font-medium hover:underline"
+                >
+                  {message.origin_teams.sponsor}
+                </a>
+              ) : (
+                <span className="font-medium">{message.origin_teams.sponsor}</span>
+              )}
+            </p>
+          )}
+
+          {/* Bot message actions */}
           <div className="flex items-center gap-2 mt-3">
             <Button
               variant="ghost"
@@ -370,6 +397,17 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
               <Copy className="h-3 w-3 mr-1" />
               Copy
             </Button>
+            {/* Reply button for bot messages */}
+            {onReply && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onReply(message)}
+                className="h-7 px-2 text-xs hover:bg-team-primary/20 text-team-primary rounded-lg"
+              >
+                Reply
+              </Button>
+            )}
           </div>
         </motion.div>
       </div>
