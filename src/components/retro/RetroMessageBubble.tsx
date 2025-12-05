@@ -386,6 +386,37 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             </p>
           )}
 
+          {/* Poll options for bot messages */}
+          {message.poll_data && (
+            <div className="mt-3 p-3 rounded-lg border border-black/20 bg-black/10">
+              <div className="space-y-2">
+                {message.poll_data.options?.map((option: any, idx: number) => {
+                  const totalVotes = message.poll_data.options.reduce((sum: number, opt: any) => sum + (opt.votes || 0), 0);
+                  const voteCount = option.votes || 0;
+                  const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+                  
+                  return (
+                    <div key={idx} className="relative">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-medium text-black">{option.text}</span>
+                        <span className="text-gray-700">{voteCount} votes ({percentage}%)</span>
+                      </div>
+                      <div className="h-2 bg-black/20 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-black/40 transition-all duration-300"
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-2 text-xs text-gray-700 text-center">
+                Total votes: {message.poll_data.options?.reduce((sum: number, opt: any) => sum + (opt.votes || 0), 0) || 0}
+              </div>
+            </div>
+          )}
+
           {/* Bot message actions */}
           <div className="flex items-center gap-2 mt-3">
             <Button
