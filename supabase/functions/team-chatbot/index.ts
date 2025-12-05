@@ -224,13 +224,13 @@ serve(async (req) => {
     // ALWAYS append exact date to force current results
     const dateEnforcement = ` "${exactDateForSearch}" OR "${monthYearForSearch}"`;
     
-    // Enhance ranking/standings/news queries for live search with EXACT DATE
-    if (finalQuery.toLowerCase().match(/rank|cfp|playoff|standings|seeding|bowl|selection|committee|news|latest|update|injury|injuries|transfer|portal/)) {
+    // Only enhance for EXPLICIT CFP/rankings questions (not generic news/updates)
+    if (finalQuery.toLowerCase().match(/\b(cfp|ranking|rankings|playoff standings|college football playoff|playoff picture|playoff spot|playoff chances)\b/)) {
       const rankingContext = league === 'NCAA' 
-        ? 'College Football Playoff CFP rankings standings' 
-        : 'NFL Playoff standings wild card';
-      finalQuery += ` Search X and the web for CURRENT ${rankingContext} information about ${teamName} as of ${exactDateForSearch}. Include the team's current rank, record, and playoff picture. ONLY data from ${monthYearForSearch} - REJECT any ${etYear - 1} season data.`;
-      console.log(`📊 Rankings/news query detected - enhanced with exact date: ${exactDateForSearch}`);
+        ? 'College Football Playoff CFP rankings' 
+        : 'NFL Playoff standings';
+      finalQuery += ` Search for CURRENT ${rankingContext} as of ${exactDateForSearch}. ONLY data from ${monthYearForSearch}.`;
+      console.log(`📊 Explicit CFP/rankings query - adding context`);
     }
 
     // Enhance score/game queries to force real-time search from live trackers
