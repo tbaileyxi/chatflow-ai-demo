@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/hooks/useAuth";
 import { HelmetProvider } from "react-helmet-async";
@@ -29,6 +29,12 @@ import FAQ from "./pages/FAQ";
 import { RetroDemo } from "./pages/RetroDemo";
 
 const queryClient = new QueryClient();
+
+// Redirect old /join/ URLs to /join-huddle/
+const JoinHuddleRedirect = () => {
+  const { huddleId } = useParams();
+  return <Navigate to={`/join-huddle/${huddleId}`} replace />;
+};
 
 const AppContent = () => {
   // Initialize global join request notifications
@@ -60,6 +66,7 @@ const AppContent = () => {
           <Route path="/huddle/:huddleId/coach-settings" element={<HuddleCoachSettings />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/join-huddle/:huddleId" element={<JoinHuddle />} />
+          <Route path="/join/:huddleId" element={<JoinHuddleRedirect />} />
           <Route path="/huddle-search" element={<HuddleSearch />} />
           <Route path="/spotlight" element={<MobileSpotlight />} />
           <Route path="/spotlight/:id" element={<SpotlightPost />} />
