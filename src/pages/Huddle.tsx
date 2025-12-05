@@ -385,10 +385,20 @@ export const Huddle = () => {
     // Clear reply state
     setReplyingToMessage(null);
     
-    // Scroll to top to see own message
-    setTimeout(() => {
-      messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 100);
+    // If this was a reply, scroll to the parent message to show the reply beneath it
+    if (replyToId) {
+      setTimeout(() => {
+        const parentElement = document.getElementById(`message-${replyToId}`);
+        if (parentElement) {
+          parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 200);
+    } else {
+      // For non-reply messages, scroll to top to see own message
+      setTimeout(() => {
+        messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
+    }
 
     // Fire-and-forget insert - errors handled separately
     supabase
