@@ -997,6 +997,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          message_id: string | null
           option_id: number
           post_id: string
           user_id: string
@@ -1004,6 +1005,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          message_id?: string | null
           option_id: number
           post_id: string
           user_id: string
@@ -1011,11 +1013,20 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          message_id?: string | null
           option_id?: number
           post_id?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "poll_votes_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "huddle_messages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       post_reactions: {
         Row: {

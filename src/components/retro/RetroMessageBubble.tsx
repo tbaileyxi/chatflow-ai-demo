@@ -62,6 +62,7 @@ interface RetroMessageBubbleProps {
   onHighlight?: (messageId: string) => void;
   onCopyCallout?: (messageId: string, content: string) => void;
   onReply?: (message: any) => void;
+  onPollVote?: (messageId: string, optionIndex: number) => void;
   replies?: any[];
   className?: string;
 }
@@ -79,6 +80,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   onHighlight,
   onCopyCallout,
   onReply,
+  onPollVote,
   replies = [],
   className
 }) => {
@@ -92,6 +94,107 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   const [hasGivenHeat, setHasGivenHeat] = useState(false);
   const [isGivingHeat, setIsGivingHeat] = useState(false);
   const { toast } = useToast();
+  
+  // Poll voting state
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [userVote, setUserVote] = useState<number | null>(null);
+  const [isVoting, setIsVoting] = useState(false);
+  const [voteCounts, setVoteCounts] = useState<Map<number, number>>(new Map());
+  
+  // Fetch existing poll votes for this message
+  useEffect(() => {
+    if (!message.poll_data || !currentUser) return;
+    
+    const fetchPollVotes = async () => {
+      // Get current user's vote
+      const { data: userVoteData } = await supabase
+        .from('poll_votes')
+        .select('option_id')
+        .eq('message_id', message.id)
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+      
+      if (userVoteData) {
+        setUserVote(userVoteData.option_id);
+      }
+      
+      // Get all vote counts
+      const { data: allVotes } = await supabase
+        .from('poll_votes')
+        .select('option_id')
+        .eq('message_id', message.id);
+      
+      if (allVotes) {
+        const counts = new Map<number, number>();
+        allVotes.forEach(v => {
+          counts.set(v.option_id, (counts.get(v.option_id) || 0) + 1);
+        });
+        setVoteCounts(counts);
+      }
+    };
+    
+    fetchPollVotes();
+    
+    // Subscribe to poll vote changes
+    const channel = supabase
+      .channel(`poll-votes-${message.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'poll_votes',
+          filter: `message_id=eq.${message.id}`
+        },
+        () => {
+          fetchPollVotes();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [message.id, message.poll_data, currentUser]);
+  
+  // Handle poll vote submission
+  const handleSubmitVote = useCallback(async () => {
+    if (!currentUser || selectedOption === null || isVoting || userVote !== null) return;
+    
+    setIsVoting(true);
+    try {
+      const { error } = await supabase
+        .from('poll_votes')
+        .upsert({
+          message_id: message.id,
+          user_id: currentUser.id,
+          option_id: selectedOption,
+          post_id: message.id // Use message.id as post_id for compatibility
+        }, {
+          onConflict: 'message_id,user_id'
+        });
+      
+      if (error) throw error;
+      
+      setUserVote(selectedOption);
+      toast({
+        title: "Vote submitted!",
+        description: "Your vote has been recorded",
+      });
+      
+      // Call parent handler if provided
+      onPollVote?.(message.id, selectedOption);
+    } catch (error) {
+      console.error('Error submitting vote:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit vote. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsVoting(false);
+    }
+  }, [currentUser, selectedOption, isVoting, userVote, message.id, toast, onPollVote]);
 
   const isBot = message.is_bot_message || message.is_team_agent_message;
 
@@ -386,33 +489,51 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             </p>
           )}
 
-          {/* Poll options for bot messages */}
+          {/* Interactive Poll options for bot messages */}
           {message.poll_data && (
             <div className="mt-3 p-3 rounded-lg border border-black/20 bg-black/10">
+              <div className="text-sm font-semibold mb-3 text-black">
+                {message.poll_data.question}
+              </div>
               <div className="space-y-2">
                 {message.poll_data.options?.map((option: any, idx: number) => {
-                  const totalVotes = message.poll_data.options.reduce((sum: number, opt: any) => sum + (opt.votes || 0), 0);
-                  const voteCount = option.votes || 0;
+                  const dbVoteCount = voteCounts.get(idx) || 0;
+                  const totalDbVotes = Array.from(voteCounts.values()).reduce((sum, count) => sum + count, 0);
+                  const voteCount = dbVoteCount || option.votes || 0;
+                  const totalVotes = totalDbVotes || message.poll_data.options.reduce((sum: number, opt: any) => sum + (opt.votes || 0), 0);
                   const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+                  const isSelected = selectedOption === idx;
+                  const isUserVote = userVote === idx;
                   
                   return (
-                    <div key={idx} className="relative">
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="font-medium text-black">{option.text}</span>
-                        <span className="text-gray-700">{voteCount} votes ({percentage}%)</span>
-                      </div>
-                      <div className="h-2 bg-black/20 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-black/40 transition-all duration-300"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
+                    <Button
+                      key={idx}
+                      variant={isUserVote ? "default" : isSelected ? "secondary" : "outline"}
+                      className={cn(
+                        "w-full justify-between h-auto p-3 text-left",
+                        isUserVote && "bg-yellow-400 hover:bg-yellow-500 text-black",
+                        isSelected && !isUserVote && "border-yellow-400 border-2"
+                      )}
+                      onClick={() => userVote === null ? setSelectedOption(idx) : undefined}
+                      disabled={userVote !== null || isVoting}
+                    >
+                      <span className="font-medium">{option.text}</span>
+                      <span className="text-sm opacity-75">{voteCount} ({percentage}%)</span>
+                    </Button>
                   );
                 })}
               </div>
+              {userVote === null && selectedOption !== null && (
+                <Button 
+                  onClick={handleSubmitVote}
+                  disabled={isVoting}
+                  className="w-full mt-3 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold"
+                >
+                  {isVoting ? 'Submitting...' : 'SUBMIT VOTE'}
+                </Button>
+              )}
               <div className="mt-2 text-xs text-gray-700 text-center">
-                Total votes: {message.poll_data.options?.reduce((sum: number, opt: any) => sum + (opt.votes || 0), 0) || 0}
+                {userVote !== null ? '✓ You voted' : 'Tap an option to vote'} • Total: {Array.from(voteCounts.values()).reduce((sum, count) => sum + count, 0) || message.poll_data.options?.reduce((sum: number, opt: any) => sum + (opt.votes || 0), 0) || 0}
               </div>
             </div>
           )}
@@ -500,7 +621,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
 
         {/* Message content - mobile optimized padding */}
         <div className="retro-bubble p-2 rounded-lg border border-team-primary/30 bg-gradient-to-br from-background/80 to-team-primary/5 backdrop-blur-sm relative">
-          {/* Render Poll if present */}
+          {/* Interactive Poll for user messages */}
           {message.poll_data && (
             <div className="mb-3 p-3 rounded-lg border border-team-primary/30 bg-team-primary/5">
               <div className="text-sm font-semibold mb-3 text-foreground">
@@ -508,28 +629,43 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
               </div>
               <div className="space-y-2">
                 {message.poll_data.options?.map((option: any, idx: number) => {
-                  const totalVotes = message.poll_data.options.reduce((sum: number, opt: any) => sum + (opt.votes || 0), 0);
-                  const voteCount = option.votes || 0;
+                  const dbVoteCount = voteCounts.get(idx) || 0;
+                  const totalDbVotes = Array.from(voteCounts.values()).reduce((sum, count) => sum + count, 0);
+                  const voteCount = dbVoteCount || option.votes || 0;
+                  const totalVotes = totalDbVotes || message.poll_data.options.reduce((sum: number, opt: any) => sum + (opt.votes || 0), 0);
                   const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+                  const isSelected = selectedOption === idx;
+                  const isUserVote = userVote === idx;
                   
                   return (
-                    <div key={idx} className="relative">
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="font-medium">{option.text}</span>
-                        <span className="text-muted-foreground">{voteCount} votes ({percentage}%)</span>
-                      </div>
-                      <div className="h-2 bg-background/50 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-team-primary/60 transition-all duration-300"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
+                    <Button
+                      key={idx}
+                      variant={isUserVote ? "default" : isSelected ? "secondary" : "outline"}
+                      className={cn(
+                        "w-full justify-between h-auto p-3 text-left",
+                        isUserVote && "bg-yellow-400 hover:bg-yellow-500 text-black",
+                        isSelected && !isUserVote && "border-yellow-400 border-2"
+                      )}
+                      onClick={() => userVote === null ? setSelectedOption(idx) : undefined}
+                      disabled={userVote !== null || isVoting}
+                    >
+                      <span className="font-medium">{option.text}</span>
+                      <span className="text-sm opacity-75">{voteCount} ({percentage}%)</span>
+                    </Button>
                   );
                 })}
               </div>
+              {userVote === null && selectedOption !== null && (
+                <Button 
+                  onClick={handleSubmitVote}
+                  disabled={isVoting}
+                  className="w-full mt-3 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold"
+                >
+                  {isVoting ? 'Submitting...' : 'SUBMIT VOTE'}
+                </Button>
+              )}
               <div className="mt-2 text-xs text-muted-foreground text-center">
-                Total votes: {message.poll_data.options.reduce((sum: number, opt: any) => sum + (opt.votes || 0), 0)}
+                {userVote !== null ? '✓ You voted' : 'Tap an option to vote'} • Total: {Array.from(voteCounts.values()).reduce((sum, count) => sum + count, 0) || message.poll_data.options?.reduce((sum: number, opt: any) => sum + (opt.votes || 0), 0) || 0}
               </div>
             </div>
           )}
