@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Check, Trophy, Gift, X } from 'lucide-react';
+import { Check, Trophy, Gift, X, Copy } from 'lucide-react';
 import { useFoundingCounts } from '@/hooks/useFoundingCounts';
 import { useFoundingStatus } from '@/hooks/useFoundingStatus';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 export function FoundingBanner() {
   const { user } = useAuth();
   const { charterRemaining, foundingRemaining, isExpired, isSoldOut, loading: countsLoading } = useFoundingCounts();
-  const { isFoundingMember, foundingTier, spotNumber, loading: statusLoading } = useFoundingStatus();
+  const { isFoundingMember, foundingTier, spotNumber, promoCode, loading: statusLoading } = useFoundingStatus();
   const [checkoutLoading, setCheckoutLoading] = useState<'charter' | 'founding' | null>(null);
   const [dismissed, setDismissed] = useState(() => {
     if (user?.id) {
@@ -63,6 +63,13 @@ export function FoundingBanner() {
     const tierLabel = foundingTier === 'charter' ? 'Platinum Charter' : 'Gold Founding';
     const tierColor = foundingTier === 'charter' ? 'text-[#C0C0C0]' : 'text-[#FFD700]';
     
+    const handleCopyCode = () => {
+      if (promoCode) {
+        navigator.clipboard.writeText(promoCode);
+        toast.success('Promo code copied!');
+      }
+    };
+    
     return (
       <div className="bg-gradient-to-r from-muted/80 to-muted/40 border border-border rounded-lg p-4 mb-4">
         <div className="flex items-center gap-3">
@@ -78,6 +85,30 @@ export function FoundingBanner() {
             </p>
           </div>
         </div>
+        
+        {promoCode && (
+          <div className="mt-4 p-3 bg-black/20 rounded-lg">
+            <p className="text-xs text-muted-foreground mb-1">
+              Your Free Verified Huddle Code:
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-yellow-500/20 px-3 py-2 rounded text-yellow-400 font-mono text-sm">
+                {promoCode}
+              </code>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={handleCopyCode}
+                className="hover:bg-yellow-500/20"
+              >
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Use when creating a Verified Huddle • Never expires
+            </p>
+          </div>
+        )}
       </div>
     );
   }
