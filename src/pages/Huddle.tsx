@@ -38,6 +38,15 @@ export const Huddle = () => {
   const [showFoundingModal, setShowFoundingModal] = useState(false);
   const [replyingToMessage, setReplyingToMessage] = useState<any>(null);
   
+  // Fix 3: Handler to set reply and auto-scroll to top (where input is)
+  const handleReply = useCallback((message: any) => {
+    setReplyingToMessage(message);
+    // Auto-scroll to top where the input is
+    setTimeout(() => {
+      messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
+  }, []);
+  
   // Pagination state
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -729,7 +738,7 @@ export const Huddle = () => {
                       currentUserId={user?.id}
                       isAdmin={isAdmin}
                       isGrouped={isGrouped}
-                      onReply={(msg) => setReplyingToMessage(msg)}
+                      onReply={handleReply}
                       replies={replies}
                     />
                   </React.Fragment>

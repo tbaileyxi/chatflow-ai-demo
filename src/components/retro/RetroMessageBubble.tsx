@@ -373,26 +373,26 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
           animate={{ opacity: 1, y: 0 }}
           className="retro-megaphone p-3 sm:p-4 rounded-lg border-2 border-yellow-600/60 bg-gradient-to-r from-yellow-400 to-amber-500 shadow-lg"
         >
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-black animate-pulse" />
-              <span className="font-bold text-xs tracking-wider uppercase text-black">
-                {message.message_type === 'coach_response' 
-                  ? '🤖 Coach' 
-                  : message.is_team_agent_message && message.origin_teams?.name
-                    ? `${message.origin_teams.name} Bot`
-                    : 'Live Update'}
-              </span>
-              {/* SPONSORED pill for sponsored bot messages */}
-              {message.origin_teams?.sponsor && (
-                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-black/20 text-black rounded-full">
-                  SPONSORED
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1 text-xs text-gray-600">
-              {formattedTime}
-            </div>
+          {/* Header - Bot name on first line */}
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-2 h-2 rounded-full bg-black animate-pulse" />
+            <span className="font-bold text-xs tracking-wider uppercase text-black">
+              {message.message_type === 'coach_response' 
+                ? '🤖 Coach' 
+                : message.is_team_agent_message && message.origin_teams?.name
+                  ? `${message.origin_teams.name} Bot`
+                  : 'Live Update'}
+            </span>
+          </div>
+          {/* Timestamp + SPONSORED on second line */}
+          <div className="flex items-center gap-2 text-xs text-gray-600 mb-2">
+            <span>{formattedTime}</span>
+            {message.origin_teams?.sponsor && (
+              <>
+                <span>•</span>
+                <span className="font-semibold text-gray-700">SPONSORED</span>
+              </>
+            )}
           </div>
           
           {/* Fixed: Solid background instead of gradient for better readability */}
@@ -470,29 +470,12 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             </div>
           )}
 
-          {/* Sponsored by link - shown under content */}
-          {message.origin_teams?.sponsor && (
-            <p className="text-xs text-gray-600 mt-2">
-              Sponsored by{' '}
-              {message.origin_teams.sponsor_url ? (
-                <a 
-                  href={message.origin_teams.sponsor_url.startsWith('http') ? message.origin_teams.sponsor_url : `https://${message.origin_teams.sponsor_url}`} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-black font-medium hover:underline"
-                >
-                  {message.origin_teams.sponsor}
-                </a>
-              ) : (
-                <span className="font-medium">{message.origin_teams.sponsor}</span>
-              )}
-            </p>
-          )}
+          {/* Polls and embeds render here - sponsor moved to above action buttons */}
 
-          {/* Interactive Poll options for bot messages */}
+          {/* Interactive Poll options for bot messages - Fix 4: Dark backgrounds for visibility */}
           {message.poll_data && (
-            <div className="mt-3 p-3 rounded-lg border border-black/20 bg-black/10">
-              <div className="text-sm font-semibold mb-3 text-black">
+            <div className="mt-3 p-3 rounded-lg border border-zinc-700 bg-zinc-900/95">
+              <div className="text-sm font-semibold mb-3 text-white">
                 {message.poll_data.question}
               </div>
               <div className="space-y-2">
@@ -508,11 +491,15 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                   return (
                     <Button
                       key={idx}
-                      variant={isUserVote ? "default" : isSelected ? "secondary" : "outline"}
+                      variant="outline"
                       className={cn(
-                        "w-full justify-between h-auto p-3 text-left",
-                        isUserVote && "bg-yellow-400 hover:bg-yellow-500 text-black",
-                        isSelected && !isUserVote && "border-yellow-400 border-2"
+                        "w-full justify-between h-auto p-3 text-left border-zinc-600",
+                        // Default: dark background with white text for visibility
+                        !isUserVote && !isSelected && "bg-zinc-800 text-white hover:bg-zinc-700 hover:text-white",
+                        // Selected (before voting): yellow border
+                        isSelected && !isUserVote && "border-yellow-400 border-2 bg-zinc-800 text-white",
+                        // User's voted option: yellow background
+                        isUserVote && "bg-yellow-400 hover:bg-yellow-500 text-black border-yellow-400"
                       )}
                       onClick={() => userVote === null ? setSelectedOption(idx) : undefined}
                       disabled={userVote !== null || isVoting}
@@ -532,19 +519,38 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                   {isVoting ? 'Submitting...' : 'SUBMIT VOTE'}
                 </Button>
               )}
-              <div className="mt-2 text-xs text-gray-700 text-center">
+              <div className="mt-2 text-xs text-zinc-400 text-center">
                 {userVote !== null ? '✓ You voted' : 'Tap an option to vote'} • Total: {Array.from(voteCounts.values()).reduce((sum, count) => sum + count, 0) || message.poll_data.options?.reduce((sum: number, opt: any) => sum + (opt.votes || 0), 0) || 0}
               </div>
             </div>
           )}
 
+          {/* Sponsored by link - Fix 2: Single placement above action buttons */}
+          {message.origin_teams?.sponsor && (
+            <p className="text-xs text-gray-600 mt-3 text-right">
+              Sponsored by{' '}
+              {message.origin_teams.sponsor_url ? (
+                <a 
+                  href={message.origin_teams.sponsor_url.startsWith('http') ? message.origin_teams.sponsor_url : `https://${message.origin_teams.sponsor_url}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-gray-700 font-medium hover:underline"
+                >
+                  {message.origin_teams.sponsor}
+                </a>
+              ) : (
+                <span className="font-medium text-gray-700">{message.origin_teams.sponsor}</span>
+              )}
+            </p>
+          )}
+
           {/* Bot message actions */}
-          <div className="flex items-center gap-2 mt-3">
+          <div className="flex items-center gap-2 mt-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={handleCopy}
-              className="h-7 px-2 text-xs hover:bg-team-primary/20 text-team-primary rounded-lg"
+              className="h-7 px-2 text-xs hover:bg-black/10 text-gray-700 rounded-lg"
             >
               <Copy className="h-3 w-3 mr-1" />
               Copy
@@ -555,12 +561,39 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                 variant="ghost"
                 size="sm"
                 onClick={() => onReply(message)}
-                className="h-7 px-2 text-xs hover:bg-team-primary/20 text-team-primary rounded-lg"
+                className="h-7 px-2 text-xs hover:bg-black/10 text-gray-700 rounded-lg"
               >
                 Reply
               </Button>
             )}
           </div>
+
+          {/* Fix 3: Render replies for bot messages (one level deep only) */}
+          {replies.length > 0 && (
+            <div className="ml-4 mt-3 space-y-1 border-l-2 border-black/20 pl-2">
+              {replies.map((reply) => (
+                <div key={reply.id} className="flex gap-2 p-1.5 rounded bg-black/10">
+                  <Avatar className="h-5 w-5 shrink-0">
+                    <AvatarImage src={reply.profile?.avatar_url} />
+                    <AvatarFallback className="bg-black/20 text-black text-xs">
+                      {(reply.profile?.display_name || 'U').slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-black truncate">
+                        {reply.profile?.display_name || 'User'}
+                      </span>
+                      <span className="text-xs text-gray-600">
+                        {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-black">{reply.content}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </motion.div>
       </div>
     );
