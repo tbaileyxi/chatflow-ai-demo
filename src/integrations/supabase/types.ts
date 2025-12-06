@@ -1189,7 +1189,12 @@ export type Database = {
           blocked_at: string | null
           created_at: string
           display_name: string | null
+          founding_purchased_at: string | null
+          founding_spot_number: number | null
+          founding_tier: string | null
+          has_lifetime_verified_huddle_code: boolean | null
           id: string
+          is_founding_member: boolean | null
           last_login_at: string | null
           onboarding_completed: boolean
           phone_number: string | null
@@ -1198,6 +1203,7 @@ export type Database = {
           updated_at: string
           user_id: string
           username: string | null
+          verified_huddle_promo_code: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -1207,7 +1213,12 @@ export type Database = {
           blocked_at?: string | null
           created_at?: string
           display_name?: string | null
+          founding_purchased_at?: string | null
+          founding_spot_number?: number | null
+          founding_tier?: string | null
+          has_lifetime_verified_huddle_code?: boolean | null
           id?: string
+          is_founding_member?: boolean | null
           last_login_at?: string | null
           onboarding_completed?: boolean
           phone_number?: string | null
@@ -1216,6 +1227,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           username?: string | null
+          verified_huddle_promo_code?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -1225,7 +1237,12 @@ export type Database = {
           blocked_at?: string | null
           created_at?: string
           display_name?: string | null
+          founding_purchased_at?: string | null
+          founding_spot_number?: number | null
+          founding_tier?: string | null
+          has_lifetime_verified_huddle_code?: boolean | null
           id?: string
+          is_founding_member?: boolean | null
           last_login_at?: string | null
           onboarding_completed?: boolean
           phone_number?: string | null
@@ -1234,6 +1251,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           username?: string | null
+          verified_huddle_promo_code?: string | null
         }
         Relationships: []
       }
@@ -1634,9 +1652,21 @@ export type Database = {
         Args: { post_uuid: string }
         Returns: number
       }
+      claim_founding_spot: {
+        Args: { p_promo_code: string; p_tier: string; p_user_id: string }
+        Returns: number
+      }
       get_current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
+      }
+      get_founding_counts: {
+        Args: never
+        Returns: {
+          charter_count: number
+          founding_count: number
+          total_count: number
+        }[]
       }
       get_huddle_subscription_status: {
         Args: { target_huddle_id: string }
