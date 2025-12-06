@@ -41,3 +41,9 @@ on_schedule = "*/10 * * * *"
 
 [functions.pickem-backfill-week1]
 verify_jwt = false
+
+[functions.create-founding-checkout]
+verify_jwt = false
+
+[functions.stripe-founding-webhook]
+verify_jwt = false

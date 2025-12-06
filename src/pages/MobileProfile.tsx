@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Camera, LogOut, User, Settings, Shield } from 'lucide-react';
+import { FoundingBanner } from '@/components/founding/FoundingBanner';
 
 interface UserProfile {
   user_id: string;
@@ -218,6 +219,9 @@ export const MobileProfile = () => {
       />
       
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {/* Founding Member Banner */}
+        <FoundingBanner />
+
         {/* Avatar Section */}
         <Card className="glass-card border-glass-border">
           <CardContent className="p-6">
