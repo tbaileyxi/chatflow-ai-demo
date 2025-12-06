@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { HuddlePeopleSheet } from '@/components/HuddlePeopleSheet';
 import { StartHuddleDialog } from '@/components/StartHuddleDialog';
 import { SignupPromptModal } from '@/components/SignupPromptModal';
+import { FoundingMemberModal } from '@/components/founding/FoundingMemberModal';
 
 export const Huddle = () => {
   const { huddleId } = useParams<{ huddleId: string }>();
@@ -34,6 +35,7 @@ export const Huddle = () => {
   const [teamName, setTeamName] = useState<string>('');
   const [showHighlights, setShowHighlights] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
+  const [showFoundingModal, setShowFoundingModal] = useState(false);
   const [replyingToMessage, setReplyingToMessage] = useState<any>(null);
   
   // Pagination state
@@ -413,9 +415,38 @@ export const Huddle = () => {
             description: "Failed to send message",
             variant: "destructive",
           });
+        } else {
+          // Successfully sent - check if this is user's first message
+          checkFirstMessageAndShowModal();
         }
       });
   }, [huddleId, user, toast]);
+
+  // Check if this is the user's first message and show founding modal
+  const checkFirstMessageAndShowModal = useCallback(async () => {
+    if (!user?.id) return;
+    
+    const FIRST_MSG_KEY = `sh_first_message_sent_${user.id}`;
+    const DISMISSED_KEY = `sh_founding_dismissed_${user.id}`;
+    
+    if (localStorage.getItem(FIRST_MSG_KEY)) return; // Already sent first message before
+    
+    localStorage.setItem(FIRST_MSG_KEY, 'true');
+    
+    // Check if user is already a founding member
+    const { data } = await supabase
+      .from('profiles')
+      .select('is_founding_member')
+      .eq('user_id', user.id)
+      .single();
+    
+    if (!data?.is_founding_member && !localStorage.getItem(DISMISSED_KEY)) {
+      // Small delay to let the message appear first
+      setTimeout(() => {
+        setShowFoundingModal(true);
+      }, 1500);
+    }
+  }, [user?.id]);
 
   // Send media message (requires authentication)
   const sendMediaMessage = useCallback(async (url: string, type: 'image' | 'video') => {
@@ -797,6 +828,17 @@ export const Huddle = () => {
         open={showSignupModal}
         onOpenChange={setShowSignupModal}
         huddleId={huddleId}
+      />
+
+      {/* Founding Member Modal - shows after first message */}
+      <FoundingMemberModal 
+        open={showFoundingModal}
+        onClose={() => {
+          setShowFoundingModal(false);
+          if (user?.id) {
+            localStorage.setItem(`sh_founding_dismissed_${user.id}`, 'true');
+          }
+        }}
       />
     </div>
   );
