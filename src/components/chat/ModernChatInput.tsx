@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Send, Plus, Smile, Camera, Image, Trophy, Video, Bot } from 'lucide-react';
+import { Send, Plus, Camera, Image, Trophy, Video, Bot } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,10 +21,6 @@ interface ChatInputProps {
   showPickEm?: boolean;
 }
 
-const QUICK_EMOJIS = [
-  '😀', '😂', '😍', '🤔', '👍', '👎', '❤️', '🔥', '💯', '😎',
-  '🎉', '⚽', '🏀', '🏈', '⚾', '🎯', '🏆', '💪', '👏', '🙌'
-];
 
 export const ModernChatInput = ({ 
   onSendMessage, 
@@ -40,7 +36,6 @@ export const ModernChatInput = ({
   showPickEm = false
 }: ChatInputProps) => {
   const [message, setMessage] = useState('');
-  const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
   const [mediaOptionsOpen, setMediaOptionsOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -101,22 +96,6 @@ export const ModernChatInput = ({
     onTyping?.(value.length > 0);
   }, [onTyping]);
 
-  const handleEmojiSelect = useCallback((emoji: string) => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const newMessage = message.slice(0, start) + emoji + message.slice(end);
-      setMessage(newMessage);
-      
-      // Reset cursor position
-      setTimeout(() => {
-        textarea.setSelectionRange(start + emoji.length, start + emoji.length);
-        textarea.focus();
-      }, 0);
-    }
-    setEmojiPopoverOpen(false);
-  }, [message]);
 
   const handleFileUpload = useCallback(async (file: File) => {
     if (uploading) return;
@@ -349,6 +328,113 @@ export const ModernChatInput = ({
       <div className="p-4 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 border-t border-border sticky bottom-0 left-0 right-0 pb-[calc(env(safe-area-inset-bottom)+12px)]">
 
         <div className="flex gap-3 items-end">
+          {/* Media options */}
+          <Popover open={mediaOptionsOpen} onOpenChange={setMediaOptionsOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-12 w-12 p-0 rounded-full bg-yellow-400 hover:bg-yellow-500 text-black"
+                disabled={disabled || sending || uploading}
+                aria-label="Add media"
+              >
+                <Plus className="w-5 h-5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-2" side="top">
+              <div className="grid gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCameraClick}
+                  className="justify-start h-8"
+                  disabled={disabled || sending || uploading}
+                >
+                  <Camera className="h-4 w-4 mr-2" />
+                  Take Photo
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handlePhotoLibraryClick}
+                  className="justify-start h-8"
+                  disabled={disabled || sending || uploading}
+                >
+                  <Image className="h-4 w-4 mr-2" />
+                  Choose Photo
+                </Button>
+                <input
+                  type="file"
+                  accept="video/*"
+                  capture="environment"
+                  onChange={handleFileChange}
+                  style={{ display: 'none' }}
+                  id="video-capture"
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    document.getElementById('video-capture')?.click();
+                    setMediaOptionsOpen(false);
+                  }}
+                  className="justify-start h-8"
+                  disabled={disabled || sending || uploading}
+                >
+                  <Video className="h-4 w-4 mr-2" />
+                  Record Video
+                </Button>
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={handleFileChange}
+                  style={{ display: 'none' }}
+                  id="video-select"
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    document.getElementById('video-select')?.click();
+                    setMediaOptionsOpen(false);
+                  }}
+                  className="justify-start h-8"
+                  disabled={disabled || sending || uploading}
+                >
+                  <Video className="h-4 w-4 mr-2" />
+                  Choose Video
+                </Button>
+                {showPickEm && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-start h-8 text-primary"
+                    disabled={disabled || sending}
+                    onClick={() => {
+                      onPickEm?.();
+                      setMediaOptionsOpen(false);
+                    }}
+                  >
+                    <Trophy className="h-4 w-4 mr-2" />
+                    Start Pick 'Em
+                  </Button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+          
+          {/* Coach button - outline style */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-12 w-12 p-0 border-2 border-yellow-400 bg-transparent text-yellow-400 hover:bg-yellow-400/20 rounded-full"
+            disabled={disabled || sending}
+            onClick={handleCoachClick}
+            aria-label="Ask Coach"
+          >
+            <Bot className="w-5 h-5" />
+          </Button>
+
           {/* Main input area */}
           <div className="flex-1 relative">
             <Textarea
@@ -360,166 +446,28 @@ export const ModernChatInput = ({
               placeholder={placeholder}
               disabled={disabled || sending}
               className={cn(
-                "resize-none min-h-[96px] max-h-[180px] pl-4 pr-12 py-3",
+                "resize-none min-h-[96px] max-h-[180px] pl-4 pr-4 py-3",
                 "border-2 border-border focus:border-primary transition-colors",
                 "bg-background text-foreground placeholder:text-muted-foreground",
                 "rounded-2xl"
               )}
               rows={1}
             />
-            
-            {/* Emoji button inside textarea */}
-            <Popover open={emojiPopoverOpen} onOpenChange={setEmojiPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-muted"
-                  disabled={disabled || sending}
-                >
-                  <Smile className="w-4 h-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-3" align="end">
-                <div className="grid grid-cols-5 gap-2">
-                  {QUICK_EMOJIS.map((emoji) => (
-                    <Button
-                      key={emoji}
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-lg hover:bg-muted"
-                      onClick={() => handleEmojiSelect(emoji)}
-                    >
-                      {emoji}
-                    </Button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
           </div>
           
-          {/* Action buttons */}
-          <div className="flex gap-2 items-end">
-            {/* Media options */}
-            <Popover open={mediaOptionsOpen} onOpenChange={setMediaOptionsOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-12 w-12 p-0 rounded-full bg-yellow-400 hover:bg-yellow-500 text-black"
-                  disabled={disabled || sending || uploading}
-                  aria-label="Add media"
-                >
-                  <Plus className="w-5 h-5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-48 p-2" side="top">
-                <div className="grid gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCameraClick}
-                    className="justify-start h-8"
-                    disabled={disabled || sending || uploading}
-                  >
-                    <Camera className="h-4 w-4 mr-2" />
-                    Take Photo
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handlePhotoLibraryClick}
-                    className="justify-start h-8"
-                    disabled={disabled || sending || uploading}
-                  >
-                    <Image className="h-4 w-4 mr-2" />
-                    Choose Photo
-                  </Button>
-                  <input
-                    type="file"
-                    accept="video/*"
-                    capture="environment"
-                    onChange={handleFileChange}
-                    style={{ display: 'none' }}
-                    id="video-capture"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      document.getElementById('video-capture')?.click();
-                      setMediaOptionsOpen(false);
-                    }}
-                    className="justify-start h-8"
-                    disabled={disabled || sending || uploading}
-                  >
-                    <Video className="h-4 w-4 mr-2" />
-                    Record Video
-                  </Button>
-                  <input
-                    type="file"
-                    accept="video/*"
-                    onChange={handleFileChange}
-                    style={{ display: 'none' }}
-                    id="video-select"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      document.getElementById('video-select')?.click();
-                      setMediaOptionsOpen(false);
-                    }}
-                    className="justify-start h-8"
-                    disabled={disabled || sending || uploading}
-                  >
-                    <Video className="h-4 w-4 mr-2" />
-                    Choose Video
-                  </Button>
-                  {showPickEm && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="justify-start h-8 text-primary"
-                      disabled={disabled || sending}
-                      onClick={() => {
-                        onPickEm?.();
-                        setMediaOptionsOpen(false);
-                      }}
-                    >
-                      <Trophy className="h-4 w-4 mr-2" />
-                      Start Pick 'Em
-                    </Button>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
-            
-            {/* Coach button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-12 w-12 p-0 hover:bg-muted rounded-full"
-              disabled={disabled || sending}
-              onClick={handleCoachClick}
-              aria-label="Ask Coach"
-            >
-              <Bot className="w-5 h-5 text-primary" />
-            </Button>
-            
-            <Button
-              onClick={handleSend}
-              disabled={!message.trim() || sending || disabled}
-              size="sm"
-              className={cn(
-                "h-12 w-12 p-0 rounded-full transition-all duration-200",
-                "bg-yellow-400 hover:bg-yellow-500 text-black shadow-lg",
-                !message.trim() && "opacity-50 cursor-not-allowed"
-              )}
-            >
-              <Send className="w-5 h-5" />
-            </Button>
-          </div>
+          {/* Send button */}
+          <Button
+            onClick={handleSend}
+            disabled={!message.trim() || sending || disabled}
+            size="sm"
+            className={cn(
+              "h-12 w-12 p-0 rounded-full transition-all duration-200",
+              "bg-yellow-400 hover:bg-yellow-500 text-black shadow-lg",
+              !message.trim() && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            <Send className="w-5 h-5" />
+          </Button>
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Send, Plus, Smile, Camera, Image, Trophy, Video, Bot } from 'lucide-react';
+import { Send, Plus, Camera, Image, Trophy, Video, Bot } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,10 +26,6 @@ interface RetroChatInputProps {
   onCancelReply?: () => void;
 }
 
-const TEAM_EMOJIS = [
-  '🔥', '💪', '🦬', '⭐', '🏆', '💯', '👏', '🙌', '❤️',
-  '😤', '🤝', '👊', '💥', '⚽', '🏀', '🏈', '⚾', '🎯', '🚀'
-];
 
 export const RetroChatInput = ({ 
   onSendMessage, 
@@ -49,7 +45,6 @@ export const RetroChatInput = ({
   onCancelReply
 }: RetroChatInputProps) => {
   const [message, setMessage] = useState('');
-  const [emojiPopoverOpen, setEmojiPopoverOpen] = useState(false);
   const [mediaOptionsOpen, setMediaOptionsOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -109,21 +104,6 @@ export const RetroChatInput = ({
     onTyping?.(value.length > 0);
   }, [onTyping]);
 
-  const handleEmojiSelect = useCallback((emoji: string) => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const newMessage = message.slice(0, start) + emoji + message.slice(end);
-      setMessage(newMessage);
-      
-      setTimeout(() => {
-        textarea.setSelectionRange(start + emoji.length, start + emoji.length);
-        textarea.focus();
-      }, 0);
-    }
-    setEmojiPopoverOpen(false);
-  }, [message]);
 
   const handleFileUpload = useCallback(async (file: File) => {
     if (uploading) return;
@@ -441,6 +421,18 @@ export const RetroChatInput = ({
             </PopoverContent>
           </Popover>
 
+          {/* Coach button - outline style */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-10 w-10 p-0 border-2 border-yellow-400 bg-transparent text-yellow-400 hover:bg-yellow-400/20 rounded-full"
+            disabled={disabled || sending}
+            onClick={handleCoachClick}
+            aria-label="Ask Coach"
+          >
+            <Bot className="w-5 h-5" />
+          </Button>
+
           {/* Main input area */}
           <div className="flex-1 relative">
             <Textarea
@@ -451,7 +443,7 @@ export const RetroChatInput = ({
               placeholder={placeholder}
               disabled={disabled || sending}
               className={cn(
-                "resize-none min-h-[40px] max-h-[100px] pl-4 pr-12 py-3",
+                "resize-none min-h-[40px] max-h-[100px] pl-4 pr-4 py-3",
                 "border-2 border-team-primary/40 focus:border-team-primary transition-colors",
                 "bg-background/50 backdrop-blur-sm text-foreground placeholder:text-muted-foreground",
                 "rounded-xl font-exo2",
@@ -459,48 +451,7 @@ export const RetroChatInput = ({
               )}
               rows={1}
             />
-            
-            {/* Emoji button inside textarea */}
-            <Popover open={emojiPopoverOpen} onOpenChange={setEmojiPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 bg-yellow-400 hover:bg-yellow-500 text-black rounded-full shadow-sm"
-                  disabled={disabled || sending}
-                >
-                  <Smile className="w-4 h-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-3 bg-background/95 backdrop-blur-sm border-team-primary/30" align="end">
-                <div className="grid grid-cols-5 gap-2">
-                  {TEAM_EMOJIS.map((emoji) => (
-                    <Button
-                      key={emoji}
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-lg hover:bg-team-primary/20 hover:scale-110 transition-all duration-200 rounded-full"
-                      onClick={() => handleEmojiSelect(emoji)}
-                    >
-                      {emoji}
-                    </Button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
           </div>
-          
-          {/* Coach button - bright yellow */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-10 w-10 p-0 bg-yellow-400 hover:bg-yellow-500 text-black rounded-full shadow-lg"
-            disabled={disabled || sending}
-            onClick={handleCoachClick}
-            aria-label="Ask Coach"
-          >
-            <Bot className="w-5 h-5" />
-          </Button>
           
           {/* Send button - Big Yellow Instagram style */}
           <Button
