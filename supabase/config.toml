@@ -47,3 +47,12 @@ verify_jwt = false
 
 [functions.stripe-founding-webhook]
 verify_jwt = false
+
+[functions.stripe-membership-webhook]
+verify_jwt = false
+
+[functions.create-verification-payment]
+verify_jwt = true
+
+[functions.create-huddle-membership-checkout]
+verify_jwt = true
