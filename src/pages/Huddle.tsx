@@ -125,7 +125,7 @@ export const Huddle = () => {
         const messageUserIds = [...new Set(rawMessages.map((m: any) => m.user_id))];
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('user_id, display_name, username, avatar_url')
+          .select('user_id, display_name, username, avatar_url, is_founding_member, founding_tier')
           .in('user_id', messageUserIds);
 
         const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
@@ -153,7 +153,7 @@ export const Huddle = () => {
         const memberIds = membersData.map(m => m.user_id);
         const { data: profilesData } = await supabase
           .from('profiles')
-          .select('user_id, display_name, username, avatar_url')
+          .select('user_id, display_name, username, avatar_url, is_founding_member, founding_tier')
           .in('user_id', memberIds);
 
         setMembers(profilesData || []);
@@ -267,7 +267,7 @@ export const Huddle = () => {
         const messageUserIds = [...new Set(olderMessages.map((m: any) => m.user_id))];
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('user_id, display_name, username, avatar_url')
+          .select('user_id, display_name, username, avatar_url, is_founding_member, founding_tier')
           .in('user_id', messageUserIds);
 
         const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Upload, User, Mail, Phone, FileText } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { FoundingBadge, FoundingCheckmark } from '@/components/founding';
 
 interface UserProfile {
   user_id: string;
@@ -18,6 +19,10 @@ interface UserProfile {
   phone_number: string | null;
   bio: string | null;
   avatar_url: string | null;
+  is_founding_member?: boolean;
+  founding_tier?: 'charter' | 'founding' | null;
+  founding_spot_number?: number | null;
+  verified_huddle_promo_code?: string | null;
 }
 
 export const Profile = () => {
@@ -47,7 +52,10 @@ export const Profile = () => {
       }
 
       if (data) {
-        setProfile(data);
+        setProfile({
+          ...data,
+          founding_tier: data.founding_tier as 'charter' | 'founding' | null
+        });
       } else {
         // Create a default profile if none exists
         const defaultProfile = {
@@ -205,14 +213,45 @@ export const Profile = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Founding Member Banner */}
+            {profile.is_founding_member && (
+              <div className="mb-4 p-4 rounded-lg border-2 border-yellow-400 bg-gradient-to-r from-yellow-400/10 to-amber-500/10">
+                <div className="flex items-center gap-2 text-yellow-400 font-bold">
+                  <FoundingCheckmark size="md" />
+                  <span>Founding Member 2025 – Spot #{profile.founding_spot_number} locked in forever</span>
+                </div>
+                {profile.verified_huddle_promo_code && (
+                  <div className="mt-3 p-3 rounded-lg bg-background/80 border border-yellow-400/30">
+                    <div className="text-xs text-muted-foreground mb-1">Your Lifetime Verified Huddle Code:</div>
+                    <div className="flex items-center gap-2">
+                      <code className="text-yellow-400 font-mono text-lg">{profile.verified_huddle_promo_code}</code>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(profile.verified_huddle_promo_code || '');
+                          toast({ title: "Copied!", description: "Promo code copied to clipboard" });
+                        }}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Use when creating a Verified Huddle • Never expires</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Avatar Section */}
             <div className="flex items-center gap-4">
-              <Avatar className="w-20 h-20">
-                <AvatarImage src={profile.avatar_url || undefined} />
-                <AvatarFallback>
-                  {profile.display_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
-                </AvatarFallback>
-              </Avatar>
+              <FoundingBadge tier={profile.founding_tier} size="lg">
+                <Avatar className="w-20 h-20">
+                  <AvatarImage src={profile.avatar_url || undefined} />
+                  <AvatarFallback>
+                    {profile.display_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+              </FoundingBadge>
               <div>
                 <Label htmlFor="avatar-upload" className="cursor-pointer">
                   <Button variant="outline" disabled={uploading} asChild>

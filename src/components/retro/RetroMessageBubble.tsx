@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { XPostEmbed } from '@/components/embeds/XPostEmbed';
 import { isXEmbed } from '@/utils/embedUtils';
 import DOMPurify from 'dompurify';
+import { FoundingBadge, FoundingCheckmark } from '@/components/founding';
 
 interface RetroMessageBubbleProps {
   message: {
@@ -54,6 +55,8 @@ interface RetroMessageBubbleProps {
     display_name: string;
     avatar_url?: string;
     username?: string;
+    is_founding_member?: boolean;
+    founding_tier?: 'charter' | 'founding' | null;
   } | null;
   currentUserId?: string;
   isAdmin?: boolean;
@@ -629,12 +632,14 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
     >
       {/* Avatar - hidden if grouped */}
       {!isGrouped && (
-        <Avatar className="h-7 w-7 sm:h-8 sm:w-8 ring-2 ring-team-primary/30 shrink-0">
-          <AvatarImage src={user?.avatar_url} />
-          <AvatarFallback className="bg-team-primary/20 text-team-primary text-xs">
-            {displayName.slice(0, 2).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        <FoundingBadge tier={user?.founding_tier} size="sm">
+          <Avatar className="h-7 w-7 sm:h-8 sm:w-8 ring-2 ring-team-primary/30 shrink-0">
+            <AvatarImage src={user?.avatar_url} />
+            <AvatarFallback className="bg-team-primary/20 text-team-primary text-xs">
+              {displayName.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </FoundingBadge>
       )}
       {isGrouped && <div className="h-7 w-7 sm:h-8 sm:w-8 shrink-0" />}
 
@@ -646,6 +651,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             <span className="font-semibold text-team-primary text-xs sm:text-sm truncate">
               {displayName}
             </span>
+            {user?.is_founding_member && <FoundingCheckmark size="sm" />}
             <span className="text-xs text-muted-foreground/60 shrink-0">
               {formattedTime}
             </span>
