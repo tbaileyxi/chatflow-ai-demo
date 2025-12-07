@@ -238,6 +238,13 @@ serve(async (req) => {
       finalQuery += ` Search for CURRENT ${rankingContext} as of ${exactDateForSearch}. ONLY data from ${monthYearForSearch}.`;
       console.log(`📊 Explicit CFP/rankings query - adding context`);
     }
+    
+    // Detect CFP matchup/bracket/opponent questions (who do we play, opponent, matchup, etc.)
+    if (finalQuery.toLowerCase().match(/\b(who do we play|who are we playing|opponent|matchup|bracket|first round|play(ing)? in the (cfp|playoff)|cfp opponent|playoff matchup|who plays who)\b/) ||
+        (finalQuery.toLowerCase().match(/play/) && finalQuery.toLowerCase().match(/playoff|cfp/))) {
+      finalQuery += ` Search for OFFICIAL College Football Playoff bracket and matchups announced ${exactDateForSearch}. Who is ${teamName} playing in the first round of the CFP? Include opponent name, seed numbers, game date, and location/venue. The CFP bracket was revealed on December 7, 2025 - search for results from today.`;
+      console.log(`🏆 CFP matchup/bracket query detected - adding specific search for opponent`);
+    }
 
     // Enhance score/game queries to force real-time search from live trackers
     if (finalQuery.toLowerCase().match(/score|game|playing|final|result|recap/)) {
@@ -368,6 +375,12 @@ For ANY question about rankings, standings, CFP, news, injuries, trades, or tran
 → Cite specific recent information you found (e.g., "According to latest ${etYear} CFP rankings...")
 → Search X for breaking news and fan discussions about ${teamName}
 
+🏆 CFP BRACKET CONTEXT:
+The College Football Playoff selection show and bracket announcement was on December 7, 2025.
+If user asks "who do we play" after discussing CFP/rankings, they mean CFP first round opponent.
+ALWAYS search for: "${teamName} CFP matchup" or "College Football Playoff bracket ${etYear}" or "CFP first round opponent"
+Do NOT say matchups are "pending" or "to be revealed" - the bracket was already announced!
+
 🎯 RESPONSE FORMAT:
 
 For game scores: Report the score in ONE line, then add 1-2 sentences max.
@@ -479,7 +492,7 @@ User question: ${finalQuery}`;
             { type: "x" }      // Search X/Twitter for real-time sports discussion
           ],
           return_citations: false,  // Keep response clean without source links
-          max_search_results: 10    // Get enough results for comprehensive answers
+          max_search_results: finalQuery.toLowerCase().match(/cfp|playoff|bracket|matchup/) ? 15 : 10  // More results for CFP queries
         }
       }),
     });
@@ -538,6 +551,13 @@ User question: ${finalQuery}`;
       console.warn(`⚠️ Response may contain outdated ${wrongYearMention[1]} data`);
       // Add disclaimer if we detect stale data
       aiResponse += `\n\n⚠️ *Note: Please verify this info is from the current ${etYear} season.*`;
+    }
+    
+    // Detect stale "TBD" or "to be announced" responses for past events (like CFP bracket)
+    const staleResponsePatterns = /(set to be revealed|will be announced|still pending|not yet disclosed|yet to be announced|awaiting (disclosure|announcement)|to be (determined|decided)|pending full disclosure|matchups are still pending)/i;
+    if (staleResponsePatterns.test(aiResponse)) {
+      console.warn('⚠️ Response contains stale "pending" language - info may be outdated');
+      aiResponse += `\n\n⚠️ *This info may be outdated. Try asking again with "CFP bracket" or "CFP matchups ${exactDateForSearch}" for the latest.*`;
     }
 
     // Remove any source citations that Grok might include
