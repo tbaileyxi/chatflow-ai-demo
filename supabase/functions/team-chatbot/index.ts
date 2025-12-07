@@ -224,6 +224,12 @@ serve(async (req) => {
     // ALWAYS append exact date to force current results
     const dateEnforcement = ` "${exactDateForSearch}" OR "${monthYearForSearch}"`;
     
+    // Detect general news/update queries - expand beyond just scores
+    if (finalQuery.toLowerCase().match(/\b(news|update|updates|latest|happening|what's new|what's going on)\b/) && !finalQuery.toLowerCase().match(/score|game|playing/)) {
+      finalQuery += ` Search for latest ${teamName} news in ${monthYearForSearch} including: signings, transfers, coaching hires, injuries, player updates, roster moves, team announcements, practice reports. NOT just game scores - get ALL recent team news.`;
+      console.log(`📰 General news query detected - expanding search scope`);
+    }
+    
     // Only enhance for EXPLICIT CFP/rankings questions (not generic news/updates)
     if (finalQuery.toLowerCase().match(/\b(cfp|ranking|rankings|playoff standings|college football playoff|playoff picture|playoff spot|playoff chances)\b/)) {
       const rankingContext = league === 'NCAA' 
@@ -286,27 +292,13 @@ serve(async (req) => {
           });
         }
       } else {
-        console.log(`⚠️ ESPN API: No active game found for ${teamName}`);
+        console.log(`⚠️ ESPN API: No active game found for ${teamName} - may be bye week`);
       }
     } catch (error) {
       console.error('⚠️ ESPN API error:', error);
     }
 
-    // Build personality-specific tone instructions
-    let personalityPrompt = '';
-    switch (personality) {
-      case 'hype':
-        personalityPrompt = `You're ENTHUSIASTIC! Use emojis sparingly. Report facts first, then add 1-2 sentences of hype. Keep responses under 3 sentences.`;
-        break;
-      case 'analytical':
-        personalityPrompt = `You're DATA-DRIVEN and PRECISE. Focus on key stats and metrics. Keep it professional and concise - under 3 sentences.`;
-        break;
-      case 'casual':
-        personalityPrompt = `You're CONVERSATIONAL and FRIENDLY. Chat like you're at the game. Keep it real and brief - under 3 sentences.`;
-        break;
-    }
-
-    // Build game context from ESPN data
+    // Build game context from ESPN data - include bye week messaging
     let gameContext = '';
     if (espnGameData) {
       if (espnGameData.status === 'STATUS_IN_PROGRESS') {
@@ -325,7 +317,25 @@ serve(async (req) => {
         gameContext += `${espnGameData.awayTeam} @ ${espnGameData.homeTeam}\n`;
         gameContext += `Status: Scheduled - Game has not started yet\n`;
       }
+    } else {
+      // No game found - could be bye week
+      gameContext = `\n⚠️ NO GAME TODAY: ESPN API returned no game for ${teamName} today (${exactDateForSearch}). This could mean:\n- It's a BYE WEEK for ${teamName}\n- No game scheduled today\n- Check their schedule for next game\n`;
     }
+
+    // Build personality-specific tone instructions
+    let personalityPrompt = '';
+    switch (personality) {
+      case 'hype':
+        personalityPrompt = `You're ENTHUSIASTIC! Use emojis sparingly. Report facts first, then add 1-2 sentences of hype. Keep responses under 3 sentences.`;
+        break;
+      case 'analytical':
+        personalityPrompt = `You're DATA-DRIVEN and PRECISE. Focus on key stats and metrics. Keep it professional and concise - under 3 sentences.`;
+        break;
+      case 'casual':
+        personalityPrompt = `You're CONVERSATIONAL and FRIENDLY. Chat like you're at the game. Keep it real and brief - under 3 sentences.`;
+        break;
+    }
+
 
     // Build system prompt for Grok with EXACT DATE enforcement
     const systemPrompt = `You are Coach, the AI assistant for ${teamName} fans in the ${league}.
@@ -344,7 +354,12 @@ serve(async (req) => {
 
 🔍 LIVE SEARCH ENABLED: You have access to:
 - Web Search: ESPN, NFL.com, CBS Sports, news sites
-- X Search: Real-time tweets about ${teamName}
+- X Search: Real-time tweets about ${teamName} from beat reporters, team accounts, and fans
+
+CRITICAL RESPONSE RULE: 
+- NEVER say "I searched..." or "Looking at X..." or "According to ESPN..." - just give the answer directly
+- NEVER mention your sources or that you performed a search
+- Just answer the question as if you naturally know the information
 
 For ANY question about rankings, standings, CFP, news, injuries, trades, or transfers:
 → USE YOUR SEARCH TOOLS FIRST
@@ -527,11 +542,16 @@ User question: ${finalQuery}`;
 
     // Remove any source citations that Grok might include
     aiResponse = aiResponse
-      .replace(/Sources?:.*$/i, '') // Remove "Sources: ..." at end
+      .replace(/Sources?:.*$/gim, '') // Remove "Sources: ..." at end
       .replace(/\(.*?\.(com|net|org|io)\)/g, '') // Remove (website.com) patterns
       .replace(/According to .+?,/gi, '') // Remove "According to X,"
       .replace(/per .+? reports?,/gi, '') // Remove "per ESPN reports,"
       .replace(/\[.*?\]\(.*?\)/g, '') // Remove markdown links
+      .replace(/I searched .+?\./gi, '') // Remove "I searched ESPN."
+      .replace(/Looking at .+?,/gi, '') // Remove "Looking at X,"
+      .replace(/Based on .+? search,/gi, '') // Remove "Based on my search,"
+      .replace(/From my search.+?,/gi, '') // Remove "From my search..."
+      .replace(/\s+/g, ' ') // Collapse multiple spaces
       .trim();
 
     console.log(`✅ Grok response received (${aiResponse.length} chars)`);
