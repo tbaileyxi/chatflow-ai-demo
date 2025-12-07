@@ -28,6 +28,10 @@ interface Huddle {
     display_name?: string;
     username?: string;
   };
+  pricing?: {
+    is_enabled: boolean;
+    price_per_month: number;
+  };
 }
 
 export const HuddleSearchSidebar = ({ isExpanded }: HuddleSearchSidebarProps) => {
@@ -62,6 +66,10 @@ export const HuddleSearchSidebar = ({ isExpanded }: HuddleSearchSidebarProps) =>
           teams!team_id (
             name,
             logo_url
+          ),
+          huddle_pricing!left (
+            is_enabled,
+            price_per_month
           )
         `)
         .eq("is_private", false)
@@ -81,7 +89,8 @@ export const HuddleSearchSidebar = ({ isExpanded }: HuddleSearchSidebarProps) =>
       const formattedHuddles = data?.map(huddle => ({
         ...huddle,
         team: huddle.teams || { name: "Unknown Team" },
-        owner_profile: ownerProfiles?.find(p => p.user_id === huddle.owner_id)
+        owner_profile: ownerProfiles?.find(p => p.user_id === huddle.owner_id),
+        pricing: huddle.huddle_pricing?.[0] || null
       })) || [];
 
       setHuddles(formattedHuddles);
@@ -175,6 +184,8 @@ export const HuddleSearchSidebar = ({ isExpanded }: HuddleSearchSidebarProps) =>
                         huddle={huddle} 
                         onJoinSuccess={handleJoinSuccess}
                         compact
+                        membershipRequired={huddle.pricing?.is_enabled || false}
+                        membershipPrice={huddle.pricing?.price_per_month || 0}
                       />
                     </div>
                   </div>

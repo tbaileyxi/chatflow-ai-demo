@@ -2,8 +2,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Shield, Star, Users, Search } from "lucide-react";
@@ -21,35 +19,18 @@ export const HuddleVerificationDialog = ({
 }: HuddleVerificationDialogProps) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [promoCode, setPromoCode] = useState("");
   const { toast } = useToast();
 
   const handleUpgrade = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-verification-payment', {
-        body: { 
-          huddleId,
-          promoCode: promoCode.trim() || undefined
-        }
+        body: { huddleId }
       });
 
       if (error) throw error;
 
-      // Check if promo code gave free verification (no URL returned)
-      if (data.success && !data.url) {
-        toast({
-          title: "Huddle Verified! 🎉",
-          description: data.message || "Your huddle is now verified.",
-        });
-        setOpen(false);
-        
-        // Reload page to refresh subscription status
-        window.location.reload();
-        return;
-      }
-
-      // Redirect to Stripe checkout for paid verification
+      // Redirect to Stripe checkout in same tab
       if (data.url) {
         window.location.href = data.url;
       }
@@ -127,22 +108,8 @@ export const HuddleVerificationDialog = ({
           <div className="text-center p-4 bg-verified-background rounded-lg">
             <div className="text-2xl font-bold text-verified-primary">$49.99</div>
             <div className="text-sm text-muted-foreground">One-time payment</div>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="promo-code" className="text-sm font-medium">
-              Promo Code (Optional)
-            </Label>
-            <Input
-              id="promo-code"
-              type="text"
-              placeholder="Enter promo code"
-              value={promoCode}
-              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-              className="uppercase"
-            />
-            <p className="text-xs text-muted-foreground">
-              Have a promo code? Enter it for discounts or free verification.
+            <p className="text-xs text-muted-foreground mt-2">
+              Have a promo code? Enter it at checkout.
             </p>
           </div>
           
@@ -155,7 +122,7 @@ export const HuddleVerificationDialog = ({
               disabled={loading}
               className="bg-verified-primary hover:bg-verified-primary/90 text-white"
             >
-              {loading ? "Processing..." : "Upgrade Now"}
+              {loading ? "Processing..." : "Continue to Payment"}
             </Button>
           </div>
         </div>
