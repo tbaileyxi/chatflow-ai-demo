@@ -120,8 +120,8 @@ export const HuddleJoinButton = ({
         <Button 
           size={compact ? "sm" : "sm"}
           className={compact 
-            ? "bg-huddle-primary hover:bg-huddle-primary/90 text-white text-xs h-6 px-2 w-full justify-center"
-            : "bg-huddle-primary hover:bg-huddle-primary/90 text-white"
+            ? "bg-huddle-primary hover:bg-huddle-primary/90 text-black text-xs h-6 px-2 w-full justify-center"
+            : "bg-huddle-primary hover:bg-huddle-primary/90 text-black"
           }
         >
           {compact ? (
@@ -186,7 +186,7 @@ export const HuddleJoinButton = ({
             <Button 
               onClick={handleJoinRequest}
               disabled={loading}
-              className="bg-huddle-primary hover:bg-huddle-primary/90 text-white"
+              className="bg-huddle-primary hover:bg-huddle-primary/90 text-black"
             >
               {loading ? (membershipRequired ? "Redirecting..." : "Joining...") : (membershipRequired ? `Pay $${(membershipPrice / 100).toFixed(2)}/mo` : "Join Huddle")}
             </Button>
@@ -220,7 +220,7 @@ export const HuddleJoinButton = ({
                 setShowSuccessDialog(false);
                 onJoinSuccess?.();
               }}
-              className="bg-huddle-primary hover:bg-huddle-primary/90 text-white"
+              className="bg-huddle-primary hover:bg-huddle-primary/90 text-black"
             >
               <ArrowRight className="w-4 h-4 mr-2" />
               Go to Huddle
