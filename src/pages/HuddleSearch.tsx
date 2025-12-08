@@ -89,7 +89,7 @@ export const HuddleSearch = () => {
         ...huddle,
         team: huddle.teams || { name: "Unknown Team" },
         owner_profile: ownerProfiles?.find(p => p.user_id === huddle.owner_id),
-        pricing: huddle.huddle_pricing?.[0] || null
+        pricing: huddle.huddle_pricing || null
       })) || [];
 
       setVerifiedHuddles(formattedHuddles);
