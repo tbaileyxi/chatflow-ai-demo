@@ -136,7 +136,8 @@ export const HuddleSettings = () => {
   // Check for verification success/failure on URL parameters
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const verificationStatus = urlParams.get('verified');
+    // Support both 'verified' and 'verification' parameter names
+    const verificationStatus = urlParams.get('verification') || urlParams.get('verified');
     const sessionId = urlParams.get('session_id');
 
     if (verificationStatus === 'success' && sessionId && isOwner) {
