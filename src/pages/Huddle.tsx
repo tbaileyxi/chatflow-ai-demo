@@ -134,7 +134,9 @@ export const Huddle = () => {
           profile: profilesMap.get(m.user_id) || {
             user_id: m.user_id,
             display_name: 'User',
-            username: 'user'
+            username: 'user',
+            is_founding_member: false,
+            founding_tier: null
           }
         }));
 
@@ -276,7 +278,9 @@ export const Huddle = () => {
           profile: profilesMap.get(m.user_id) || {
             user_id: m.user_id,
             display_name: 'User',
-            username: 'user'
+            username: 'user',
+            is_founding_member: false,
+            founding_tier: null
           }
         }));
 
@@ -321,7 +325,9 @@ export const Huddle = () => {
             profile: profile || {
               user_id: newMessage.user_id,
               display_name: 'User',
-              username: 'user'
+              username: 'user',
+              is_founding_member: false,
+              founding_tier: null
             }
           };
           

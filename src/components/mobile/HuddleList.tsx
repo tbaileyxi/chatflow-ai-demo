@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Users, Globe, Lock } from 'lucide-react';
+import { Plus, Users, Globe, Lock, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -277,14 +277,29 @@ export const HuddleList = () => {
                     <div 
                       key={huddle.id}
                       onClick={() => handleHuddlePress(huddle)}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-muted/5 border border-border/40 cursor-pointer hover:bg-muted/10 transition-all"
+                      className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
+                        huddle.is_verified 
+                          ? 'bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20' 
+                          : 'bg-muted/5 border border-border/40 hover:bg-muted/10'
+                      }`}
                     >
-                      <div className="h-10 w-10 rounded-full bg-muted/20 flex items-center justify-center">
-                        <Lock className="h-4 w-4 text-muted-foreground" />
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                        huddle.is_verified ? 'bg-emerald-500/20' : 'bg-muted/20'
+                      }`}>
+                        {huddle.is_verified ? (
+                          <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                        ) : (
+                          <Lock className="h-4 w-4 text-muted-foreground" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-foreground truncate">{huddle.name}</span>
+                          {huddle.is_verified && (
+                            <Badge variant="outline" className="h-5 px-1.5 text-[10px] border-emerald-500/50 text-emerald-500">
+                              VERIFIED
+                            </Badge>
+                          )}
                           {huddle.unread_count > 0 && (
                             <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
                               {huddle.unread_count > 99 ? '99+' : huddle.unread_count}
