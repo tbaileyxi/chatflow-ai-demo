@@ -56,3 +56,6 @@ verify_jwt = true
 
 [functions.create-huddle-membership-checkout]
 verify_jwt = true
+
+[functions.stripe-verification-webhook]
+verify_jwt = false
