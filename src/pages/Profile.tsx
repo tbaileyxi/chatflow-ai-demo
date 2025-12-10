@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -8,9 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Upload, User, Mail, Phone, FileText } from 'lucide-react';
+import { Upload, User, Mail, Phone, FileText, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FoundingBadge, FoundingCheckmark } from '@/components/founding';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 interface UserProfile {
   user_id: string;
@@ -28,10 +29,69 @@ interface UserProfile {
 export const Profile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [verifyingPurchase, setVerifyingPurchase] = useState(false);
+
+  // Check for founding=success URL param and poll for status
+  useEffect(() => {
+    const foundingSuccess = searchParams.get('founding');
+    const sessionId = searchParams.get('session_id');
+    
+    if (foundingSuccess === 'success' && sessionId && user) {
+      setVerifyingPurchase(true);
+      let attempts = 0;
+      const maxAttempts = 10; // 15 seconds total (1.5s * 10)
+      
+      const pollForFoundingStatus = async () => {
+        const { data } = await supabase
+          .from('profiles')
+          .select('is_founding_member, founding_tier, founding_spot_number, verified_huddle_promo_code')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (data?.is_founding_member) {
+          // Success! Update profile and show toast
+          setProfile(prev => prev ? { ...prev, ...data, founding_tier: data.founding_tier as 'charter' | 'founding' | null } : null);
+          setVerifyingPurchase(false);
+          toast({
+            title: "Welcome to the Founding 300! 🎉",
+            description: `You're Spot #${data.founding_spot_number}. Check your email for your promo code!`,
+          });
+          // Clear URL params
+          navigate('/profile', { replace: true });
+          return true;
+        }
+        return false;
+      };
+      
+      const interval = setInterval(async () => {
+        attempts++;
+        const found = await pollForFoundingStatus();
+        
+        if (found || attempts >= maxAttempts) {
+          clearInterval(interval);
+          if (!found) {
+            setVerifyingPurchase(false);
+            toast({
+              title: "Still processing...",
+              description: "Your purchase is being verified. Please refresh in a moment.",
+            });
+            navigate('/profile', { replace: true });
+          }
+        }
+      }, 1500);
+      
+      // Initial check immediately
+      pollForFoundingStatus();
+      
+      return () => clearInterval(interval);
+    }
+  }, [searchParams, user, navigate, toast]);
 
   useEffect(() => {
     if (user) {
@@ -199,6 +259,16 @@ export const Profile = () => {
 
   return (
     <div className="min-h-screen bg-background crt-effect p-4">
+      {/* Verifying Purchase Overlay */}
+      {verifyingPurchase && (
+        <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <Loader2 className="w-12 h-12 animate-spin text-yellow-400 mx-auto" />
+            <h2 className="text-xl font-bold text-foreground">Verifying your founding membership...</h2>
+            <p className="text-muted-foreground">This usually takes just a few seconds</p>
+          </div>
+        </div>
+      )}
       <div className="fixed inset-0 pointer-events-none opacity-10">
         <div className="absolute inset-0 retro-grid"></div>
         <div className="absolute inset-0 retro-scanlines"></div>

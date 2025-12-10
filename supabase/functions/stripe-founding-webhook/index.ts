@@ -89,7 +89,7 @@ serve(async (req) => {
 
       // Try to send confirmation email (optional - won't fail if not configured)
       try {
-        const resendApiKey = Deno.env.get("RESEND_API_KEY");
+        const resendApiKey = Deno.env.get("resend_founding");
         if (resendApiKey && session.customer_email) {
           const tierLabel = tier === 'charter' ? 'Platinum Charter' : 'Gold Founding';
           
