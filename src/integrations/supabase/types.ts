@@ -1148,38 +1148,6 @@ export type Database = {
           },
         ]
       }
-      processed_highlights: {
-        Row: {
-          highlight_id: number
-          id: string
-          match_id: number
-          posted_at: string
-          team_id: string | null
-        }
-        Insert: {
-          highlight_id: number
-          id?: string
-          match_id: number
-          posted_at?: string
-          team_id?: string | null
-        }
-        Update: {
-          highlight_id?: number
-          id?: string
-          match_id?: number
-          posted_at?: string
-          team_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "processed_highlights_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "teams"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           avatar_url: string | null
