@@ -158,15 +158,24 @@ export const Auth = () => {
       }
     } catch (error: any) {
       let errorMessage = error.message;
+      let errorTitle = "Error";
       
       if (error.message?.includes('Invalid login credentials')) {
         errorMessage = "Invalid email or password. Please try again.";
-      } else if (error.message?.includes('User already registered')) {
+      } else if (error.message?.includes('User already registered') || error.message?.includes('already registered')) {
         errorMessage = "An account with this email already exists. Please sign in instead.";
+        errorTitle = "Account Exists";
+        setIsSignUp(false); // Switch to login mode
+      } else if (error.message?.includes('duplicate key') || error.message?.includes('unique constraint')) {
+        errorMessage = "An account with this email already exists. Please sign in instead.";
+        errorTitle = "Account Exists";
+        setIsSignUp(false);
+      } else if (error.message?.includes('Email rate limit exceeded')) {
+        errorMessage = "Too many signup attempts. Please wait a few minutes and try again.";
       }
       
       toast({
-        title: "Error",
+        title: errorTitle,
         description: errorMessage,
         variant: "destructive"
       });
