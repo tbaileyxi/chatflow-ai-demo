@@ -127,6 +127,177 @@ export type Database = {
           },
         ]
       }
+      fade_ledgers: {
+        Row: {
+          created_at: string
+          current_streak_a: number
+          huddle_id: string
+          id: string
+          last_fade_at: string | null
+          net_points: number
+          total_fades: number
+          user_a_id: string
+          user_a_wins: number
+          user_b_id: string
+          user_b_wins: number
+        }
+        Insert: {
+          created_at?: string
+          current_streak_a?: number
+          huddle_id: string
+          id?: string
+          last_fade_at?: string | null
+          net_points?: number
+          total_fades?: number
+          user_a_id: string
+          user_a_wins?: number
+          user_b_id: string
+          user_b_wins?: number
+        }
+        Update: {
+          created_at?: string
+          current_streak_a?: number
+          huddle_id?: string
+          id?: string
+          last_fade_at?: string | null
+          net_points?: number
+          total_fades?: number
+          user_a_id?: string
+          user_a_wins?: number
+          user_b_id?: string
+          user_b_wins?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fade_ledgers_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fade_season_stats: {
+        Row: {
+          current_streak: number
+          huddle_id: string
+          id: string
+          season_year: number
+          total_losses: number
+          total_points: number
+          total_wins: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          current_streak?: number
+          huddle_id: string
+          id?: string
+          season_year?: number
+          total_losses?: number
+          total_points?: number
+          total_wins?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          current_streak?: number
+          huddle_id?: string
+          id?: string
+          season_year?: number
+          total_losses?: number
+          total_points?: number
+          total_wins?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fade_season_stats_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fades: {
+        Row: {
+          accepter_id: string | null
+          away_team: string
+          created_at: string
+          fade_type: string
+          final_score_away: number | null
+          final_score_home: number | null
+          game_commence_time: string
+          game_id: string
+          home_team: string
+          huddle_id: string
+          id: string
+          line_description: string
+          line_value: number
+          locked_at: string | null
+          poster_id: string
+          settled_at: string | null
+          sport: string
+          stake: number
+          status: string
+          winner_id: string | null
+        }
+        Insert: {
+          accepter_id?: string | null
+          away_team: string
+          created_at?: string
+          fade_type: string
+          final_score_away?: number | null
+          final_score_home?: number | null
+          game_commence_time: string
+          game_id: string
+          home_team: string
+          huddle_id: string
+          id?: string
+          line_description: string
+          line_value: number
+          locked_at?: string | null
+          poster_id: string
+          settled_at?: string | null
+          sport?: string
+          stake?: number
+          status?: string
+          winner_id?: string | null
+        }
+        Update: {
+          accepter_id?: string | null
+          away_team?: string
+          created_at?: string
+          fade_type?: string
+          final_score_away?: number | null
+          final_score_home?: number | null
+          game_commence_time?: string
+          game_id?: string
+          home_team?: string
+          huddle_id?: string
+          id?: string
+          line_description?: string
+          line_value?: number
+          locked_at?: string | null
+          poster_id?: string
+          settled_at?: string | null
+          sport?: string
+          stake?: number
+          status?: string
+          winner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fades_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       game_states: {
         Row: {
           created_at: string
