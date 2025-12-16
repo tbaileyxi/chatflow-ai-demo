@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,7 @@ interface StartHuddleDialogProps {
 }
 
 export const StartHuddleDialog = ({ onHuddleCreated, trigger, parentTeamId, isCreatingSideHuddle = false }: StartHuddleDialogProps) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -142,6 +144,11 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger, parentTeamId, isCr
       setFormData({ name: '', team_id: '' });
       setOpen(false);
       onHuddleCreated?.();
+      
+      // Navigate to the newly created huddle
+      if (huddle?.id) {
+        navigate(`/huddle/${huddle.id}`);
+      }
     } catch (error) {
       console.error('Error creating huddle:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create huddle';

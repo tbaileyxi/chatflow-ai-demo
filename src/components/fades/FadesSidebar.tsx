@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 interface FadesSidebarProps {
   huddleId: string;
   teamName: string;
+  teamLeague: string;
   open: boolean;
   onClose: () => void;
 }
@@ -15,6 +16,7 @@ interface FadesSidebarProps {
 export const FadesSidebar: React.FC<FadesSidebarProps> = ({
   huddleId,
   teamName,
+  teamLeague,
   open,
   onClose,
 }) => {
@@ -68,7 +70,7 @@ export const FadesSidebar: React.FC<FadesSidebarProps> = ({
         {activeTab === 'rivalries' ? (
           <RivalriesTab huddleId={huddleId} />
         ) : (
-          <FadesTab huddleId={huddleId} teamName={teamName} />
+          <FadesTab huddleId={huddleId} teamName={teamName} teamLeague={teamLeague} />
         )}
       </div>
     </div>

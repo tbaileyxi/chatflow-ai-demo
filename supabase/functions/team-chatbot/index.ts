@@ -40,11 +40,21 @@ async function createHighlightlyClient() {
   };
 }
 
-// Fetch live scores from ESPN API
-async function fetchESPNScores(league: 'NFL' | 'NCAA', teamName: string) {
+// Fetch live scores from ESPN API - supports football and basketball
+async function fetchESPNScores(league: 'NFL' | 'NCAA' | 'NBA', teamName: string, sport: 'football' | 'basketball' = 'football') {
   try {
-    const leagueCode = league === 'NFL' ? 'nfl' : 'college-football';
-    const url = `http://site.api.espn.com/apis/site/v2/sports/football/${leagueCode}/scoreboard`;
+    let url: string;
+    
+    if (sport === 'basketball') {
+      if (league === 'NBA') {
+        url = `http://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard`;
+      } else {
+        url = `http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard`;
+      }
+    } else {
+      const leagueCode = league === 'NFL' ? 'nfl' : 'college-football';
+      url = `http://site.api.espn.com/apis/site/v2/sports/football/${leagueCode}/scoreboard`;
+    }
     
     console.log(`📡 Fetching ESPN API: ${url}`);
     const response = await fetch(url);
@@ -86,7 +96,8 @@ async function fetchESPNScores(league: 'NFL' | 'NCAA', teamName: string) {
       period: status.period,
       clock: status.displayClock,
       detail: status.type.detail, // e.g., "4th Quarter", "Final"
-      lastPlay: competition.situation?.lastPlay?.text || null
+      lastPlay: competition.situation?.lastPlay?.text || null,
+      sport: sport
     };
   } catch (error) {
     console.error('❌ Error fetching ESPN API:', error);
@@ -276,11 +287,37 @@ serve(async (req) => {
     console.log(`🎯 Personality: ${personality}`);
     console.log(`🎯 Final query: "${finalQuery}"`);
 
-    // Fetch REAL-TIME data from ESPN API
+    // Fetch REAL-TIME data from ESPN API - try both football and basketball for NCAA
     let espnGameData = null;
     try {
       console.log(`📊 Fetching real-time data from ESPN API...`);
-      espnGameData = await fetchESPNScores(league as 'NFL' | 'NCAA', teamName);
+      
+      // Determine sport based on query content and time of year
+      const isBasketballQuery = finalQuery.toLowerCase().match(/basketball|hoops|march madness|ncaa tournament|bracket|acc|sec tournament|big ten|big 12|pac-12|final four/);
+      const isFootballQuery = finalQuery.toLowerCase().match(/football|nfl|cfp|playoff|bowl game|touchdown|field goal|quarterback|running back/);
+      
+      // Default to basketball during Nov-March for NCAA, football otherwise
+      const month = new Date().getMonth(); // 0-indexed
+      const isBasketballSeason = month >= 10 || month <= 2; // Nov-March
+      
+      if (league === 'NCAA') {
+        // Try basketball first during basketball season or if query mentions basketball
+        if (isBasketballQuery || (isBasketballSeason && !isFootballQuery)) {
+          console.log(`🏀 Trying NCAA basketball for ${teamName}...`);
+          espnGameData = await fetchESPNScores('NCAA', teamName, 'basketball');
+        }
+        
+        // If no basketball game found or query mentions football, try football
+        if (!espnGameData && (!isBasketballQuery || isFootballQuery)) {
+          console.log(`🏈 Trying NCAA football for ${teamName}...`);
+          espnGameData = await fetchESPNScores('NCAA', teamName, 'football');
+        }
+      } else if (league === 'NBA') {
+        espnGameData = await fetchESPNScores('NBA', teamName, 'basketball');
+      } else {
+        // NFL - always football
+        espnGameData = await fetchESPNScores('NFL', teamName, 'football');
+      }
       
       if (espnGameData) {
         // Validate ESPN game is actually TODAY
@@ -295,21 +332,23 @@ serve(async (req) => {
           console.log(`✅ ESPN API: Game found`, {
             score: `${espnGameData.awayTeam} ${espnGameData.awayScore} - ${espnGameData.homeTeam} ${espnGameData.homeScore}`,
             status: espnGameData.detail,
-            clock: espnGameData.clock
+            clock: espnGameData.clock,
+            sport: espnGameData.sport
           });
         }
       } else {
-        console.log(`⚠️ ESPN API: No active game found for ${teamName} - may be bye week`);
+        console.log(`⚠️ ESPN API: No active game found for ${teamName} - may be off day`);
       }
     } catch (error) {
       console.error('⚠️ ESPN API error:', error);
     }
 
-    // Build game context from ESPN data - include bye week messaging
+    // Build game context from ESPN data - include sport-specific emoji
+    const sportEmoji = espnGameData?.sport === 'basketball' ? '🏀' : '🏈';
     let gameContext = '';
     if (espnGameData) {
       if (espnGameData.status === 'STATUS_IN_PROGRESS') {
-        gameContext = `\n🏈 LIVE GAME DATA (ESPN API - REAL-TIME):\n`;
+        gameContext = `\n${sportEmoji} LIVE GAME DATA (ESPN API - REAL-TIME):\n`;
         gameContext += `${espnGameData.awayTeam} ${espnGameData.awayScore} @ ${espnGameData.homeTeam} ${espnGameData.homeScore}\n`;
         gameContext += `Status: ${espnGameData.detail} (${espnGameData.clock} remaining)\n`;
         if (espnGameData.lastPlay) {
@@ -317,16 +356,16 @@ serve(async (req) => {
         }
         gameContext += `\nIMPORTANT: Use this EXACT score in your response. This is live ESPN data updated in real-time.\n`;
       } else if (espnGameData.status === 'STATUS_FINAL') {
-        gameContext = `\n🏈 FINAL SCORE (ESPN API):\n`;
+        gameContext = `\n${sportEmoji} FINAL SCORE (ESPN API):\n`;
         gameContext += `${espnGameData.awayTeam} ${espnGameData.awayScore} @ ${espnGameData.homeTeam} ${espnGameData.homeScore} - FINAL\n`;
       } else if (espnGameData.status === 'STATUS_SCHEDULED') {
-        gameContext = `\n🏈 UPCOMING GAME (ESPN API):\n`;
+        gameContext = `\n${sportEmoji} UPCOMING GAME (ESPN API):\n`;
         gameContext += `${espnGameData.awayTeam} @ ${espnGameData.homeTeam}\n`;
         gameContext += `Status: Scheduled - Game has not started yet\n`;
       }
     } else {
-      // No game found - could be bye week
-      gameContext = `\n⚠️ NO GAME TODAY: ESPN API returned no game for ${teamName} today (${exactDateForSearch}). This could mean:\n- It's a BYE WEEK for ${teamName}\n- No game scheduled today\n- Check their schedule for next game\n`;
+      // No game found - could be off day
+      gameContext = `\n⚠️ NO GAME TODAY: ESPN API returned no game for ${teamName} today (${exactDateForSearch}). This could mean:\n- No game scheduled today\n- Check their schedule for next game\n`;
     }
 
     // Build personality-specific tone instructions
