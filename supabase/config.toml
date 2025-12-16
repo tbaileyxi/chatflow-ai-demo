@@ -59,3 +59,10 @@ verify_jwt = true
 
 [functions.stripe-verification-webhook]
 verify_jwt = false
+
+[functions.fades-get-odds]
+verify_jwt = false
+
+[functions.fades-settle]
+verify_jwt = false
+on_schedule = "0 */3 * * *"
