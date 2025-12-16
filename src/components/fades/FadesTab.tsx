@@ -49,21 +49,6 @@ interface Fade {
   poster?: { display_name: string | null; username: string | null; avatar_url: string | null };
   accepter?: { display_name: string | null; username: string | null; avatar_url: string | null };
 }
-  game_commence_time: string;
-  home_team: string;
-  away_team: string;
-  fade_type: string;
-  line_value: number;
-  line_description: string;
-  stake: number;
-  status: 'open' | 'locked' | 'expired' | 'settled';
-  winner_id: string | null;
-  final_score_home: number | null;
-  final_score_away: number | null;
-  created_at: string;
-  poster?: { display_name: string | null; username: string | null; avatar_url: string | null };
-  accepter?: { display_name: string | null; username: string | null; avatar_url: string | null };
-}
 
 export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName }) => {
   const { user } = useAuth();
@@ -135,23 +120,30 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName }) => {
     try {
       const { data, error } = await supabase
         .from('fades')
-        .select(`
-          *,
-          poster:profiles!fades_poster_id_fkey(display_name, username, avatar_url),
-          accepter:profiles!fades_accepter_id_fkey(display_name, username, avatar_url)
-        `)
+        .select('*')
         .eq('huddle_id', huddleId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        // If join fails, fetch without profiles
-        const { data: simpleFades } = await supabase
-          .from('fades')
-          .select('*')
-          .eq('huddle_id', huddleId)
-          .order('created_at', { ascending: false });
-        
-        setFades(simpleFades || []);
+      if (error) throw error;
+
+      // Fetch profiles for poster and accepter
+      const userIds = [...new Set(data?.flatMap(f => [f.poster_id, f.accepter_id].filter(Boolean)) || [])];
+      
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, display_name, username, avatar_url')
+          .in('user_id', userIds);
+
+        const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+
+        const fadesWithProfiles = data?.map(fade => ({
+          ...fade,
+          poster: profileMap.get(fade.poster_id),
+          accepter: fade.accepter_id ? profileMap.get(fade.accepter_id) : null,
+        })) || [];
+
+        setFades(fadesWithProfiles as Fade[]);
       } else {
         setFades(data || []);
       }

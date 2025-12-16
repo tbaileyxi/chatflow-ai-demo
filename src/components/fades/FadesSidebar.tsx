@@ -3,22 +3,29 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RivalriesTab } from './RivalriesTab';
 import { FadesTab } from './FadesTab';
+import { cn } from '@/lib/utils';
 
 interface FadesSidebarProps {
   huddleId: string;
   teamName: string;
+  open: boolean;
   onClose: () => void;
 }
 
 export const FadesSidebar: React.FC<FadesSidebarProps> = ({
   huddleId,
   teamName,
+  open,
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<'rivalries' | 'fades'>('rivalries');
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full sm:w-96 bg-zinc-950 border-l border-yellow-400/30 z-50 flex flex-col shadow-2xl">
+    <div className={cn(
+      "fixed inset-y-0 right-0 w-full sm:w-96 bg-zinc-950 border-l border-yellow-400/30 z-50 flex flex-col shadow-2xl",
+      "transition-transform duration-300 ease-in-out",
+      open ? "translate-x-0" : "translate-x-full"
+    )}>
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-yellow-400/20">
         <h2 className="text-xl font-bold text-yellow-400">⚡ Fades</h2>
