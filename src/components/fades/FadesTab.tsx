@@ -12,6 +12,7 @@ import { format, formatDistanceToNow, isPast } from 'date-fns';
 interface FadesTabProps {
   huddleId: string;
   teamName: string;
+  teamLeague: string;
 }
 
 interface GameData {
@@ -50,7 +51,7 @@ interface Fade {
   accepter?: { display_name: string | null; username: string | null; avatar_url: string | null };
 }
 
-export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName }) => {
+export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeague }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [game, setGame] = useState<GameData | null>(null);
@@ -80,15 +81,29 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [huddleId, teamName]);
+  }, [huddleId, teamName, teamLeague]);
+
+  // Determine sport based on league
+  const getSport = (): string => {
+    const league = teamLeague?.toUpperCase() || '';
+    if (league === 'NFL') return 'nfl';
+    if (league === 'NBA') return 'nba';
+    // NCAA defaults to basketball during winter months, football during fall
+    const month = new Date().getMonth();
+    if (month >= 10 || month <= 2) return 'ncaab'; // Nov-Feb = basketball
+    return 'ncaaf'; // Aug-Oct = football
+  };
 
   const fetchOdds = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      const sport = getSport();
+      console.log(`Fetching odds for ${teamName}, sport: ${sport}, league: ${teamLeague}`);
+
       const { data, error } = await supabase.functions.invoke('fades-get-odds', {
-        body: { team: teamName, sport: 'ncaab' },
+        body: { team: teamName, sport },
       });
 
       if (error) throw error;

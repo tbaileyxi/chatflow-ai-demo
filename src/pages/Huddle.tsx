@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { JumpToLatest } from '@/components/JumpToLatest';
 import { DateDivider } from '@/components/chat/DateDivider';
-import { Zap, ArrowLeft, MoreVertical, UserPlus } from 'lucide-react';
+import { Zap, ArrowLeft, MoreVertical, UserPlus, UsersRound, Lock } from 'lucide-react';
 import { isSameDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -806,8 +806,8 @@ export const Huddle = () => {
             </Button>
           )}
           
-          {huddle?.is_official_team_huddle ? (
-            // Public huddle → Start Side Huddle
+        {huddle?.is_official_team_huddle ? (
+            // Public huddle → Start Side Huddle (group + lock icon)
             <StartHuddleDialog
               onHuddleCreated={() => {
                 toast({
@@ -818,8 +818,9 @@ export const Huddle = () => {
               parentTeamId={huddle.team_id}
               isCreatingSideHuddle={true}
               trigger={
-                <Button className="h-14 w-14 rounded-full bg-yellow-400 hover:bg-yellow-500 shadow-lg shadow-yellow-400/30">
-                  <UserPlus className="h-6 w-6 text-black" />
+                <Button className="h-14 w-14 rounded-full bg-yellow-400 hover:bg-yellow-500 shadow-lg shadow-yellow-400/30 relative">
+                  <UsersRound className="h-6 w-6 text-black" />
+                  <Lock className="h-3 w-3 text-black absolute bottom-3 right-3" />
                 </Button>
               }
             />
@@ -839,6 +840,7 @@ export const Huddle = () => {
       <FadesSidebar
         huddleId={huddleId!}
         teamName={teamName}
+        teamLeague={huddle?.team?.league || huddle?.teams?.league || 'NCAA'}
         open={showFadesSidebar}
         onClose={() => setShowFadesSidebar(false)}
       />
