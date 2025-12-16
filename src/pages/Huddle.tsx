@@ -20,6 +20,7 @@ import { HuddlePeopleSheet } from '@/components/HuddlePeopleSheet';
 import { StartHuddleDialog } from '@/components/StartHuddleDialog';
 import { SignupPromptModal } from '@/components/SignupPromptModal';
 import { FoundingMemberModal } from '@/components/founding/FoundingMemberModal';
+import { FadesSidebar } from '@/components/fades/FadesSidebar';
 
 export const Huddle = () => {
   const { huddleId } = useParams<{ huddleId: string }>();
@@ -36,6 +37,7 @@ export const Huddle = () => {
   const [showHighlights, setShowHighlights] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [showFoundingModal, setShowFoundingModal] = useState(false);
+  const [showFadesSidebar, setShowFadesSidebar] = useState(false);
   const [replyingToMessage, setReplyingToMessage] = useState<any>(null);
   
   // Fix 3: Handler to set reply and auto-scroll to top (where input is)
@@ -793,7 +795,17 @@ export const Huddle = () => {
 
       {/* Yellow FAB - bottom right, adapts to huddle type */}
       {user && (
-        <div className="fixed bottom-24 right-4 z-30">
+        <div className="fixed bottom-24 right-4 z-30 flex flex-col gap-3">
+          {/* Fades Lightning FAB - only for private huddles */}
+          {huddle?.is_private && !huddle?.is_official_team_huddle && (
+            <Button 
+              onClick={() => setShowFadesSidebar(true)}
+              className="h-14 w-14 rounded-full bg-yellow-400 hover:bg-yellow-500 shadow-lg shadow-yellow-400/30"
+            >
+              <Zap className="h-6 w-6 text-black" />
+            </Button>
+          )}
+          
           {huddle?.is_official_team_huddle ? (
             // Public huddle → Start Side Huddle
             <StartHuddleDialog
@@ -822,6 +834,14 @@ export const Huddle = () => {
           )}
         </div>
       )}
+
+      {/* Fades Sidebar - slide over */}
+      <FadesSidebar
+        huddleId={huddleId!}
+        teamName={teamName}
+        open={showFadesSidebar}
+        onClose={() => setShowFadesSidebar(false)}
+      />
 
       {/* Pick 'Em Dialog */}
       {pickEmDialog.instanceId && (
