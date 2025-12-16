@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Zap } from 'lucide-react';
+import { X, Zap, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface FadeOption {
   type: string;
@@ -11,7 +12,7 @@ interface FadeOption {
 
 interface PostFadeModalProps {
   option: FadeOption;
-  onPost: (stake: number) => void;
+  onPost: (stake: number, announceInChat: boolean) => void;
   onClose: () => void;
 }
 
@@ -21,11 +22,12 @@ export const PostFadeModal: React.FC<PostFadeModalProps> = ({
   onClose,
 }) => {
   const [selectedStake, setSelectedStake] = useState<number>(100);
+  const [announceInChat, setAnnounceInChat] = useState(true);
   const [posting, setPosting] = useState(false);
 
   const handlePost = async () => {
     setPosting(true);
-    await onPost(selectedStake);
+    await onPost(selectedStake, announceInChat);
     setPosting(false);
   };
 
@@ -71,6 +73,23 @@ export const PostFadeModal: React.FC<PostFadeModalProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Announce in Chat Checkbox */}
+          <div className="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-lg">
+            <Checkbox
+              id="announceInChat"
+              checked={announceInChat}
+              onCheckedChange={(checked) => setAnnounceInChat(checked === true)}
+              className="border-yellow-400/50 data-[state=checked]:bg-yellow-400 data-[state=checked]:border-yellow-400"
+            />
+            <label
+              htmlFor="announceInChat"
+              className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer"
+            >
+              <MessageSquare className="h-4 w-4 text-yellow-400" />
+              Announce in chat
+            </label>
           </div>
 
           {/* Info */}

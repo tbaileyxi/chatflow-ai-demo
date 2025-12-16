@@ -6,8 +6,9 @@ import { PostFadeModal } from './PostFadeModal';
 import { ActiveFadeCard } from './ActiveFadeCard';
 import { LockedFadeCard } from './LockedFadeCard';
 import { SettledFadeCard } from './SettledFadeCard';
-import { Clock, CalendarDays, Loader2 } from 'lucide-react';
-import { format, formatDistanceToNow, isPast } from 'date-fns';
+import { LiveCountdown } from './LiveCountdown';
+import { CalendarDays, Loader2, Sparkles } from 'lucide-react';
+import { format, isPast, differenceInHours } from 'date-fns';
 
 interface FadesTabProps {
   huddleId: string;
@@ -173,7 +174,7 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
     setShowPostModal(true);
   };
 
-  const handlePostFade = async (stake: number) => {
+  const handlePostFade = async (stake: number, announceInChat: boolean) => {
     if (!user || !game || !selectedOption) return;
 
     try {
@@ -193,24 +194,26 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
 
       if (error) throw error;
 
-      // Post to chat
-      const systemUser = await supabase.rpc('get_or_create_system_user');
-      
-      const { data: posterProfile } = await supabase
-        .from('profiles')
-        .select('display_name, username')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      // Only post to chat if user checked the option
+      if (announceInChat) {
+        const systemUser = await supabase.rpc('get_or_create_system_user');
+        
+        const { data: posterProfile } = await supabase
+          .from('profiles')
+          .select('display_name, username')
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-      const posterName = posterProfile?.display_name || posterProfile?.username || 'Someone';
+        const posterName = posterProfile?.display_name || posterProfile?.username || 'Someone';
 
-      await supabase.from('huddle_messages').insert({
-        huddle_id: huddleId,
-        user_id: systemUser.data,
-        content: `🔥 New Fade: ${posterName} posted ${stake} points on ${selectedOption.label} – anyone fading?`,
-        message_type: 'fade_notification',
-        is_bot_message: true,
-      });
+        await supabase.from('huddle_messages').insert({
+          huddle_id: huddleId,
+          user_id: systemUser.data,
+          content: `🔥 New Fade: ${posterName} posted ${stake} points on ${selectedOption.label} – anyone fading?`,
+          message_type: 'fade_notification',
+          is_bot_message: true,
+        });
+      }
 
       setShowPostModal(false);
       setSelectedOption(null);
@@ -235,7 +238,7 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
 
       if (error) throw error;
 
-      // Post to chat
+      // Post to chat (always announce accepts)
       const systemUser = await supabase.rpc('get_or_create_system_user');
       
       const { data: profiles } = await supabase
@@ -269,6 +272,7 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
 
   const gameTime = game ? new Date(game.commence_time) : null;
   const isGameLocked = gameTime ? isPast(gameTime) : false;
+  const showCountdown = gameTime && differenceInHours(gameTime, new Date()) <= 24 && !isGameLocked;
 
   // Group fades by date
   const groupedFades = fades.reduce((acc, fade) => {
@@ -293,29 +297,33 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
         {game ? (
           <>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-400 uppercase tracking-wider">
-                {game.sport_key.includes('ncaa') ? 'NCAA' : 'NFL'}
+              <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">
+                {game.sport_key.includes('ncaa') ? 'NCAA' : game.sport_key.includes('nfl') ? 'NFL' : 'NBA'}
               </span>
-              <div className="flex items-center gap-1 text-xs text-gray-400">
-                <Clock className="h-3 w-3" />
-                {isGameLocked ? (
-                  <span className="text-red-400">Locked</span>
-                ) : (
-                  <span>{formatDistanceToNow(gameTime!, { addSuffix: true })}</span>
-                )}
-              </div>
+              {showCountdown ? (
+                <LiveCountdown targetTime={gameTime!} />
+              ) : isGameLocked ? (
+                <span className="text-xs font-medium text-red-400 bg-red-400/10 px-2 py-1 rounded">
+                  LOCKED
+                </span>
+              ) : (
+                <span className="text-xs text-gray-400">
+                  {format(gameTime!, 'h:mm a')}
+                </span>
+              )}
             </div>
             <h3 className="text-lg font-bold text-white mb-1">
               {game.away_team} @ {game.home_team}
             </h3>
             <div className="flex items-center gap-2 text-sm text-gray-400">
               <CalendarDays className="h-4 w-4" />
-              {format(gameTime!, 'EEE, MMM d, h:mm a')}
+              {format(gameTime!, 'EEEE, MMMM d, yyyy • h:mm a')}
             </div>
           </>
         ) : (
-          <div className="text-center py-4">
-            <p className="text-gray-400">{error || 'No upcoming games'}</p>
+          <div className="text-center py-6">
+            <p className="text-gray-300 font-medium">No upcoming games found for {teamName}</p>
+            <p className="text-sm text-gray-500 mt-1">Check back closer to game day</p>
           </div>
         )}
       </div>
@@ -323,6 +331,7 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
       {/* Fade Options (fixed section) */}
       {game && !isGameLocked && (
         <div className="p-4 space-y-2 border-b border-zinc-800">
+          <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Pick your fade</p>
           {fadeOptions.map((option) => (
             <FadeOptionCard
               key={option.type}
@@ -339,7 +348,7 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
           <div key={date}>
             <div className="flex items-center gap-2 my-4">
               <div className="flex-1 border-t border-dotted border-gray-600" />
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500 font-medium">
                 {format(new Date(date), 'EEEE, MMM d')}
               </span>
               <div className="flex-1 border-t border-dotted border-gray-600" />
@@ -374,9 +383,10 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
         ))}
 
         {fades.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            <p>No fades yet</p>
-            <p className="text-sm mt-1">Be the first to post!</p>
+          <div className="text-center py-12">
+            <Sparkles className="h-12 w-12 mx-auto text-yellow-400/40 mb-4" />
+            <p className="text-gray-300 font-medium">No fades yet</p>
+            <p className="text-sm text-gray-500 mt-1">Be the first to post!</p>
           </div>
         )}
       </div>
