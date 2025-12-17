@@ -61,6 +61,7 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
   const [selectedOption, setSelectedOption] = useState<FadeOption | null>(null);
   const [showPostModal, setShowPostModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [optionsCollapsed, setOptionsCollapsed] = useState(false);
 
   useEffect(() => {
     fetchOdds();
@@ -178,7 +179,7 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
     if (!user || !game || !selectedOption) return;
 
     try {
-      const { error } = await supabase.from('fades').insert({
+      const { error: insertError } = await supabase.from('fades').insert({
         huddle_id: huddleId,
         poster_id: user.id,
         game_id: game.id,
@@ -192,31 +193,44 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
         stake,
       });
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
       // Only post to chat if user checked the option
       if (announceInChat) {
-        const systemUser = await supabase.rpc('get_or_create_system_user');
-        
-        const { data: posterProfile } = await supabase
-          .from('profiles')
-          .select('display_name, username')
-          .eq('user_id', user.id)
-          .maybeSingle();
+        try {
+          const { data: systemUserId, error: rpcError } = await supabase.rpc('get_or_create_system_user');
+          
+          if (rpcError) {
+            console.error('Error getting system user:', rpcError);
+          } else if (systemUserId) {
+            const { data: posterProfile } = await supabase
+              .from('profiles')
+              .select('display_name, username')
+              .eq('user_id', user.id)
+              .maybeSingle();
 
-        const posterName = posterProfile?.display_name || posterProfile?.username || 'Someone';
+            const posterName = posterProfile?.display_name || posterProfile?.username || 'Someone';
 
-        await supabase.from('huddle_messages').insert({
-          huddle_id: huddleId,
-          user_id: systemUser.data,
-          content: `🔥 New Fade: ${posterName} posted ${stake} points on ${selectedOption.label} – anyone fading?`,
-          message_type: 'fade_notification',
-          is_bot_message: true,
-        });
+            const { error: chatError } = await supabase.from('huddle_messages').insert({
+              huddle_id: huddleId,
+              user_id: systemUserId,
+              content: `🔥 New Fade: ${posterName} posted ${stake} points on ${selectedOption.label} – anyone fading?`,
+              message_type: 'fade_notification',
+              is_bot_message: true,
+            });
+            
+            if (chatError) {
+              console.error('Error posting fade to chat:', chatError);
+            }
+          }
+        } catch (chatErr) {
+          console.error('Error with chat announcement:', chatErr);
+        }
       }
 
       setShowPostModal(false);
       setSelectedOption(null);
+      setOptionsCollapsed(true); // Collapse after posting
       fetchFades();
     } catch (err: any) {
       console.error('Error posting fade:', err);
@@ -328,17 +342,27 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
         )}
       </div>
 
-      {/* Fade Options (fixed section) */}
+      {/* Fade Options (collapsible section) */}
       {game && !isGameLocked && (
-        <div className="p-4 space-y-2 border-b border-zinc-800">
-          <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Pick your fade</p>
-          {fadeOptions.map((option) => (
-            <FadeOptionCard
-              key={option.type}
-              label={option.label}
-              onClick={() => handleOptionClick(option)}
-            />
-          ))}
+        <div className="border-b border-zinc-800">
+          <button 
+            onClick={() => setOptionsCollapsed(!optionsCollapsed)}
+            className="w-full p-4 flex items-center justify-between hover:bg-zinc-900/50 transition-colors"
+          >
+            <span className="text-xs text-gray-500 uppercase tracking-wider">Pick your fade</span>
+            <span className="text-xs text-yellow-400">{optionsCollapsed ? '▼ Show' : '▲ Hide'}</span>
+          </button>
+          {!optionsCollapsed && (
+            <div className="px-4 pb-4 space-y-2">
+              {fadeOptions.map((option) => (
+                <FadeOptionCard
+                  key={option.type}
+                  label={option.label}
+                  onClick={() => handleOptionClick(option)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
