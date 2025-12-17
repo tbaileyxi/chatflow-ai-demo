@@ -13,159 +13,404 @@ const SPORT_KEYS: Record<string, string> = {
   'nba': 'basketball_nba',
 };
 
-// Team name aliases for better matching
-const TEAM_ALIASES: Record<string, string[]> = {
-  'north carolina': ['unc', 'tar heels', 'tarheels', 'carolina', 'north carolina tar heels'],
-  'duke': ['blue devils', 'duke blue devils'],
-  'kentucky': ['wildcats', 'kentucky wildcats', 'uk'],
-  'kansas': ['jayhawks', 'kansas jayhawks', 'ku'],
-  'alabama': ['crimson tide', 'bama', 'tide', 'alabama crimson tide', 'roll tide'],
-  'georgia': ['bulldogs', 'georgia bulldogs', 'uga', 'dawgs'],
-  'ohio state': ['buckeyes', 'ohio state buckeyes', 'osu'],
-  'michigan': ['wolverines', 'michigan wolverines', 'um'],
-  'texas': ['longhorns', 'texas longhorns', 'ut'],
-  'notre dame': ['fighting irish', 'irish', 'notre dame fighting irish', 'nd'],
-  'clemson': ['tigers', 'clemson tigers'],
-  'florida': ['gators', 'florida gators', 'uf'],
-  'lsu': ['tigers', 'louisiana state', 'lsu tigers'],
-  'auburn': ['tigers', 'auburn tigers', 'war eagle'],
-  'tennessee': ['volunteers', 'vols', 'tennessee volunteers'],
-  'oklahoma': ['sooners', 'oklahoma sooners', 'ou'],
-  'oregon': ['ducks', 'oregon ducks', 'uo'],
-  'penn state': ['nittany lions', 'psu', 'penn state nittany lions'],
-  'usc': ['trojans', 'southern california', 'usc trojans'],
-  'ucla': ['bruins', 'ucla bruins'],
-  'arizona': ['wildcats', 'arizona wildcats'],
-  'gonzaga': ['bulldogs', 'gonzaga bulldogs', 'zags'],
-  'villanova': ['wildcats', 'villanova wildcats', 'nova'],
-  'uconn': ['huskies', 'connecticut', 'uconn huskies'],
-  'houston': ['cougars', 'houston cougars', 'uh'],
-  'purdue': ['boilermakers', 'purdue boilermakers'],
-  'iowa': ['hawkeyes', 'iowa hawkeyes'],
-  'indiana': ['hoosiers', 'indiana hoosiers', 'iu'],
-  'wisconsin': ['badgers', 'wisconsin badgers'],
-  'illinois': ['fighting illini', 'illini', 'illinois fighting illini'],
-  'arkansas': ['razorbacks', 'hogs', 'arkansas razorbacks'],
-  'mississippi state': ['bulldogs', 'miss state', 'msu'],
-  'ole miss': ['rebels', 'mississippi', 'ole miss rebels'],
-  'south carolina': ['gamecocks', 'south carolina gamecocks', 'usc'],
-  'virginia': ['cavaliers', 'virginia cavaliers', 'uva', 'wahoos'],
-  'virginia tech': ['hokies', 'virginia tech hokies', 'vt'],
-  'nc state': ['wolfpack', 'north carolina state', 'nc state wolfpack'],
-  'wake forest': ['demon deacons', 'wake forest demon deacons', 'wake'],
-  'louisville': ['cardinals', 'louisville cardinals'],
-  'syracuse': ['orange', 'syracuse orange', 'cuse'],
-  'pittsburgh': ['panthers', 'pittsburgh panthers', 'pitt'],
-  'miami': ['hurricanes', 'miami hurricanes', 'the u'],
-  'florida state': ['seminoles', 'florida state seminoles', 'fsu', 'noles'],
-  'baylor': ['bears', 'baylor bears'],
-  'tcu': ['horned frogs', 'texas christian', 'tcu horned frogs'],
-  'kansas state': ['wildcats', 'kansas state wildcats', 'k-state', 'ksu'],
-  'iowa state': ['cyclones', 'iowa state cyclones'],
-  'colorado': ['buffaloes', 'colorado buffaloes', 'buffs', 'cu'],
-  'utah': ['utes', 'utah utes'],
-  'arizona state': ['sun devils', 'arizona state sun devils', 'asu'],
-  'stanford': ['cardinal', 'stanford cardinal'],
-  'california': ['golden bears', 'cal', 'california golden bears', 'cal bears'],
-  'washington': ['huskies', 'washington huskies', 'uw'],
-  'washington state': ['cougars', 'washington state cougars', 'wsu', 'wazzu'],
-  'boise state': ['broncos', 'boise state broncos'],
-  'memphis': ['tigers', 'memphis tigers'],
-  'cincinnati': ['bearcats', 'cincinnati bearcats', 'uc'],
-  'smu': ['mustangs', 'southern methodist', 'smu mustangs'],
-  'tulane': ['green wave', 'tulane green wave'],
+// FALSE POSITIVE PREFIXES - these prefixes indicate a DIFFERENT school
+const FALSE_POSITIVE_PREFIXES = [
+  'middle',
+  'eastern',
+  'western',
+  'northern',
+  'southern',
+  'central',
+  'southeast',
+  'southwest',
+  'northeast',
+  'northwest',
+];
+
+// FALSE POSITIVE BLOCKS - full phrases that should block matches
+// If API name contains these AND search does NOT contain the prefix, block the match
+const FALSE_POSITIVE_BLOCKS = [
+  'middle tennessee',
+  'eastern michigan',
+  'western michigan', 
+  'central michigan',
+  'northern illinois',
+  'eastern illinois',
+  'western illinois',
+  'southern illinois',
+  'eastern kentucky',
+  'western kentucky',
+  'northern kentucky',
+  'eastern washington',
+  'central florida',  // UCF is different from Florida
+  'south florida',    // USF is different from Florida
+  'north carolina state', // NC State is different from UNC
+  'south carolina state',
+  'georgia state',
+  'georgia southern',
+  'georgia tech',     // Different from Georgia
+  'louisiana tech',   // Different from Louisiana/LSU
+  'texas tech',       // Different from Texas
+  'texas state',
+  'texas a&m',        // Different from Texas
+  'michigan state',
+  'mississippi state',
+  'florida state',    // Different from Florida
+  'ohio state',       // Different from Ohio (the school)
+  'penn state',       // Different from Penn
+  'iowa state',
+  'kansas state',
+  'washington state',
+  'arizona state',
+  'oregon state',
+  'oklahoma state',
+  'colorado state',
+  'utah state',
+  'boise state',
+  'fresno state',
+  'san diego state',
+  'san jose state',
+  'ball state',
+  'kent state',
+  'appalachian state',
+];
+
+// CANONICAL TEAM MAPPINGS - exact mapping from our app's team names to API team names
+const CANONICAL_TEAMS: Record<string, string[]> = {
+  // SEC
+  'tennessee': ['tennessee volunteers'],
+  'alabama': ['alabama crimson tide'],
+  'georgia': ['georgia bulldogs'],
+  'florida': ['florida gators'],
+  'lsu': ['lsu tigers', 'louisiana state tigers'],
+  'auburn': ['auburn tigers'],
+  'texas a&m': ['texas a&m aggies'],
+  'arkansas': ['arkansas razorbacks'],
+  'mississippi state': ['mississippi state bulldogs'],
+  'ole miss': ['ole miss rebels', 'mississippi rebels'],
+  'south carolina': ['south carolina gamecocks'],
+  'kentucky': ['kentucky wildcats'],
+  'missouri': ['missouri tigers'],
+  'vanderbilt': ['vanderbilt commodores'],
+  'oklahoma': ['oklahoma sooners'],
+  'texas': ['texas longhorns'],
+  
+  // Big Ten
+  'ohio state': ['ohio state buckeyes'],
+  'michigan': ['michigan wolverines'],
+  'penn state': ['penn state nittany lions'],
+  'iowa': ['iowa hawkeyes'],
+  'wisconsin': ['wisconsin badgers'],
+  'minnesota': ['minnesota golden gophers'],
+  'illinois': ['illinois fighting illini'],
+  'northwestern': ['northwestern wildcats'],
+  'purdue': ['purdue boilermakers'],
+  'indiana': ['indiana hoosiers'],
+  'nebraska': ['nebraska cornhuskers'],
+  'maryland': ['maryland terrapins'],
+  'rutgers': ['rutgers scarlet knights'],
+  'michigan state': ['michigan state spartans'],
+  'oregon': ['oregon ducks'],
+  'washington': ['washington huskies'],
+  'usc': ['usc trojans', 'southern california trojans'],
+  'ucla': ['ucla bruins'],
+  
+  // ACC
+  'clemson': ['clemson tigers'],
+  'florida state': ['florida state seminoles'],
+  'miami': ['miami hurricanes'],
+  'north carolina': ['north carolina tar heels'],
+  'nc state': ['nc state wolfpack', 'north carolina state wolfpack'],
+  'duke': ['duke blue devils'],
+  'virginia': ['virginia cavaliers'],
+  'virginia tech': ['virginia tech hokies'],
+  'louisville': ['louisville cardinals'],
+  'pittsburgh': ['pittsburgh panthers', 'pitt panthers'],
+  'syracuse': ['syracuse orange'],
+  'boston college': ['boston college eagles'],
+  'wake forest': ['wake forest demon deacons'],
+  'georgia tech': ['georgia tech yellow jackets'],
+  'stanford': ['stanford cardinal'],
+  'california': ['california golden bears', 'cal bears'],
+  'smu': ['smu mustangs', 'southern methodist mustangs'],
+  
+  // Big 12
+  'kansas': ['kansas jayhawks'],
+  'kansas state': ['kansas state wildcats'],
+  'baylor': ['baylor bears'],
+  'tcu': ['tcu horned frogs'],
+  'iowa state': ['iowa state cyclones'],
+  'texas tech': ['texas tech red raiders'],
+  'oklahoma state': ['oklahoma state cowboys'],
+  'west virginia': ['west virginia mountaineers'],
+  'cincinnati': ['cincinnati bearcats'],
+  'houston': ['houston cougars'],
+  'ucf': ['ucf knights', 'central florida knights'],
+  'byu': ['byu cougars', 'brigham young cougars'],
+  'colorado': ['colorado buffaloes'],
+  'arizona': ['arizona wildcats'],
+  'arizona state': ['arizona state sun devils'],
+  'utah': ['utah utes'],
+  
+  // Other notable
+  'notre dame': ['notre dame fighting irish'],
+  'gonzaga': ['gonzaga bulldogs'],
+  'villanova': ['villanova wildcats'],
+  'uconn': ['uconn huskies', 'connecticut huskies'],
+  'memphis': ['memphis tigers'],
+  'tulane': ['tulane green wave'],
+  'boise state': ['boise state broncos'],
+  
   // NFL Teams
-  'chiefs': ['kansas city chiefs', 'kansas city', 'kc chiefs'],
-  'bills': ['buffalo bills', 'buffalo'],
+  'chiefs': ['kansas city chiefs'],
+  'bills': ['buffalo bills'],
   'dolphins': ['miami dolphins'],
-  'patriots': ['new england patriots', 'new england', 'pats'],
-  'jets': ['new york jets', 'ny jets'],
-  'ravens': ['baltimore ravens', 'baltimore'],
+  'patriots': ['new england patriots'],
+  'jets': ['new york jets'],
+  'ravens': ['baltimore ravens'],
   'bengals': ['cincinnati bengals'],
-  'browns': ['cleveland browns', 'cleveland'],
+  'browns': ['cleveland browns'],
   'steelers': ['pittsburgh steelers'],
   'texans': ['houston texans'],
-  'colts': ['indianapolis colts', 'indianapolis', 'indy'],
-  'jaguars': ['jacksonville jaguars', 'jacksonville', 'jags'],
+  'colts': ['indianapolis colts'],
+  'jaguars': ['jacksonville jaguars'],
   'titans': ['tennessee titans'],
-  'broncos': ['denver broncos', 'denver'],
-  'chargers': ['los angeles chargers', 'la chargers'],
-  'raiders': ['las vegas raiders', 'las vegas', 'lv raiders'],
-  'cowboys': ['dallas cowboys', 'dallas', 'america\'s team'],
-  'eagles': ['philadelphia eagles', 'philadelphia', 'philly'],
-  'giants': ['new york giants', 'ny giants'],
-  'commanders': ['washington commanders', 'washington'],
-  'bears': ['chicago bears', 'chicago', 'da bears'],
-  'lions': ['detroit lions', 'detroit'],
-  'packers': ['green bay packers', 'green bay', 'gb packers'],
-  'vikings': ['minnesota vikings', 'minnesota'],
-  'falcons': ['atlanta falcons', 'atlanta', 'atl'],
-  'panthers': ['carolina panthers', 'carolina'],
-  'saints': ['new orleans saints', 'new orleans', 'nola'],
-  'buccaneers': ['tampa bay buccaneers', 'tampa bay', 'tb', 'bucs'],
+  'broncos': ['denver broncos'],
+  'chargers': ['los angeles chargers'],
+  'raiders': ['las vegas raiders'],
+  'cowboys': ['dallas cowboys'],
+  'eagles': ['philadelphia eagles'],
+  'giants': ['new york giants'],
+  'commanders': ['washington commanders'],
+  'bears': ['chicago bears'],
+  'lions': ['detroit lions'],
+  'packers': ['green bay packers'],
+  'vikings': ['minnesota vikings'],
+  'falcons': ['atlanta falcons'],
+  'panthers': ['carolina panthers'],
+  'saints': ['new orleans saints'],
+  'buccaneers': ['tampa bay buccaneers'],
   'cardinals': ['arizona cardinals'],
-  'rams': ['los angeles rams', 'la rams'],
-  '49ers': ['san francisco 49ers', 'san francisco', 'sf', 'niners'],
-  'seahawks': ['seattle seahawks', 'seattle'],
+  'rams': ['los angeles rams'],
+  '49ers': ['san francisco 49ers'],
+  'seahawks': ['seattle seahawks'],
 };
 
-// Find matching team name in API data - handles "Tennessee Volunteers" matching "Tennessee" or "Volunteers"
+// Additional aliases that map to canonical names
+const TEAM_ALIASES: Record<string, string> = {
+  // Tennessee variations -> tennessee
+  'vols': 'tennessee',
+  'volunteers': 'tennessee',
+  'tennessee vols': 'tennessee',
+  'tennessee volunteers': 'tennessee',
+  'ut': 'tennessee',
+  
+  // Alabama variations
+  'bama': 'alabama',
+  'crimson tide': 'alabama',
+  'roll tide': 'alabama',
+  
+  // Georgia variations
+  'dawgs': 'georgia',
+  'uga': 'georgia',
+  'bulldogs': 'georgia', // Context-dependent, but default to Georgia
+  
+  // UNC variations
+  'unc': 'north carolina',
+  'tar heels': 'north carolina',
+  'tarheels': 'north carolina',
+  'carolina': 'north carolina',
+  
+  // Michigan variations
+  'wolverines': 'michigan',
+  'um': 'michigan',
+  'go blue': 'michigan',
+  
+  // Ohio State variations
+  'buckeyes': 'ohio state',
+  'osu': 'ohio state',
+  'the ohio state': 'ohio state',
+  
+  // Notre Dame variations
+  'irish': 'notre dame',
+  'fighting irish': 'notre dame',
+  'nd': 'notre dame',
+  
+  // Florida variations
+  'gators': 'florida',
+  'uf': 'florida',
+  
+  // LSU variations
+  'tigers': 'lsu', // Default context
+  'louisiana state': 'lsu',
+  'geaux tigers': 'lsu',
+  
+  // Clemson variations
+  'clemson tigers': 'clemson',
+  
+  // Texas variations
+  'longhorns': 'texas',
+  'hook em': 'texas',
+  
+  // Oklahoma variations
+  'sooners': 'oklahoma',
+  'ou': 'oklahoma',
+  'boomer sooner': 'oklahoma',
+  
+  // Oregon variations
+  'ducks': 'oregon',
+  'uo': 'oregon',
+  
+  // USC variations
+  'trojans': 'usc',
+  'southern california': 'usc',
+  'southern cal': 'usc',
+  
+  // Penn State variations
+  'nittany lions': 'penn state',
+  'psu': 'penn state',
+  
+  // Florida State variations
+  'seminoles': 'florida state',
+  'fsu': 'florida state',
+  'noles': 'florida state',
+  
+  // Miami variations
+  'hurricanes': 'miami',
+  'the u': 'miami',
+  'canes': 'miami',
+  
+  // Kentucky variations
+  'wildcats': 'kentucky', // Default context for basketball
+  'uk': 'kentucky',
+  'big blue nation': 'kentucky',
+  
+  // Duke variations
+  'blue devils': 'duke',
+  
+  // Kansas variations
+  'jayhawks': 'kansas',
+  'ku': 'kansas',
+  'rock chalk': 'kansas',
+  
+  // Gonzaga variations
+  'zags': 'gonzaga',
+  
+  // South Carolina variations
+  'gamecocks': 'south carolina',
+  'cocks': 'south carolina',
+  'uofsc': 'south carolina',
+  
+  // Auburn variations
+  'war eagle': 'auburn',
+  
+  // Arkansas variations
+  'razorbacks': 'arkansas',
+  'hogs': 'arkansas',
+  'woo pig': 'arkansas',
+  
+  // Ole Miss variations
+  'rebels': 'ole miss',
+  'mississippi': 'ole miss',
+  'hotty toddy': 'ole miss',
+  
+  // Virginia variations
+  'cavaliers': 'virginia',
+  'uva': 'virginia',
+  'wahoos': 'virginia',
+  'hoos': 'virginia',
+};
+
+// Find matching team name in API data with strict false positive prevention
 function findMatchingTeam(searchTerm: string, apiTeamName: string): boolean {
   const searchLower = searchTerm.toLowerCase().trim();
   const apiLower = apiTeamName.toLowerCase().trim();
   
-  // Exact match
-  if (searchLower === apiLower) {
-    return true;
+  console.log(`  Checking: "${searchLower}" vs API: "${apiLower}"`);
+  
+  // Step 1: Resolve search term to canonical name
+  let canonicalSearch = searchLower;
+  
+  // Check if search term IS a canonical name
+  if (CANONICAL_TEAMS[searchLower]) {
+    canonicalSearch = searchLower;
+  } 
+  // Check if search term is an alias
+  else if (TEAM_ALIASES[searchLower]) {
+    canonicalSearch = TEAM_ALIASES[searchLower];
+  }
+  // Try partial matching on canonical names
+  else {
+    for (const canonical of Object.keys(CANONICAL_TEAMS)) {
+      if (canonical.includes(searchLower) || searchLower.includes(canonical)) {
+        canonicalSearch = canonical;
+        break;
+      }
+    }
   }
   
-  // API name contains search term as a word (e.g., "Tennessee Volunteers" contains "Tennessee" or "Volunteers")
-  const apiWords = apiLower.split(/\s+/);
-  const searchWords = searchLower.split(/\s+/);
+  console.log(`  Canonical search: "${canonicalSearch}"`);
   
-  // Check if ALL search words appear in API name
-  const allSearchWordsMatch = searchWords.every(sw => 
-    apiWords.some(aw => aw === sw || aw.startsWith(sw) || sw.startsWith(aw))
-  );
-  if (allSearchWordsMatch && searchWords.length > 0) {
-    return true;
+  // Step 2: FALSE POSITIVE BLOCK CHECK (CRITICAL)
+  // If API team contains a blocking phrase but search doesn't include the prefix, BLOCK
+  for (const block of FALSE_POSITIVE_BLOCKS) {
+    if (apiLower.includes(block)) {
+      const blockPrefix = block.split(' ')[0]; // e.g., 'middle' from 'middle tennessee'
+      
+      // If search term doesn't explicitly include the blocking prefix, reject
+      if (!searchLower.includes(blockPrefix) && !canonicalSearch.includes(blockPrefix)) {
+        console.log(`  ❌ BLOCKED: API contains "${block}" but search doesn't include "${blockPrefix}"`);
+        return false;
+      }
+    }
   }
   
-  // Check aliases - map search term to canonical and see if API matches any variant
-  for (const [canonical, aliases] of Object.entries(TEAM_ALIASES)) {
-    const allVariants = [canonical, ...aliases].map(v => v.toLowerCase());
-    
-    // Check if search term matches any variant
-    const searchMatchesVariant = allVariants.some(v => 
-      searchLower === v || 
-      searchLower.includes(v) || 
-      v.includes(searchLower)
-    );
-    
-    if (searchMatchesVariant) {
-      // Check if API team matches any variant
-      const apiMatchesVariant = allVariants.some(v => 
-        apiLower === v || 
-        apiLower.includes(v) ||
-        v.includes(apiLower) ||
-        apiWords.some(aw => aw === v || v.split(/\s+/).includes(aw))
+  // Step 3: Check for false positive prefixes in API name
+  for (const prefix of FALSE_POSITIVE_PREFIXES) {
+    // Check if API name STARTS with a false positive prefix
+    if (apiLower.startsWith(prefix + ' ')) {
+      // Only allow if search explicitly includes that prefix
+      if (!searchLower.startsWith(prefix) && !canonicalSearch.startsWith(prefix)) {
+        console.log(`  ❌ BLOCKED: API starts with prefix "${prefix}" but search doesn't`);
+        return false;
+      }
+    }
+  }
+  
+  // Step 4: Get expected API names for the canonical team
+  const expectedApiNames = CANONICAL_TEAMS[canonicalSearch];
+  
+  if (expectedApiNames) {
+    // Check if API team name matches any expected name
+    for (const expected of expectedApiNames) {
+      if (apiLower === expected || apiLower.includes(expected) || expected.includes(apiLower)) {
+        console.log(`  ✅ MATCH via canonical: "${expected}"`);
+        return true;
+      }
+      
+      // Also check word-by-word matching
+      const expectedWords = expected.split(/\s+/);
+      const apiWords = apiLower.split(/\s+/);
+      
+      // All expected words should be in API name
+      const allWordsMatch = expectedWords.every(ew => 
+        apiWords.some(aw => aw === ew || aw.includes(ew) || ew.includes(aw))
       );
       
-      if (apiMatchesVariant) {
-        // Extra check: prevent "South Carolina" matching "South Carolina State"
-        if (apiLower.includes(' state') && !searchLower.includes(' state') && !canonical.includes(' state')) {
-          continue; // Skip this match
-        }
+      if (allWordsMatch) {
+        console.log(`  ✅ MATCH via word matching: "${expected}"`);
         return true;
       }
     }
   }
   
-  // Direct partial: if search is part of API name as complete word
-  if (apiWords.includes(searchLower) || apiLower.startsWith(searchLower + ' ')) {
+  // Step 5: Fallback - direct exact match only (very strict)
+  if (apiLower === searchLower || apiLower === canonicalSearch) {
+    console.log(`  ✅ MATCH via exact match`);
     return true;
   }
   
+  console.log(`  ❌ NO MATCH`);
   return false;
 }
 
@@ -204,12 +449,10 @@ serve(async (req) => {
     }
 
     const sportKey = SPORT_KEYS[sport] || sport;
-    console.log(`Fetching odds for team: ${team}, sport: ${sportKey}`);
+    console.log(`🔍 Fetching odds for team: "${team}", sport: ${sportKey}`);
 
     // Fetch odds from The Odds API with 7-day window
     const oddsUrl = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${apiKey}&regions=us&markets=spreads,totals&oddsFormat=decimal&daysFrom=7`;
-    
-    console.log(`API URL: ${oddsUrl.replace(apiKey, 'REDACTED')}`);
     
     const oddsResponse = await fetch(oddsUrl);
     
@@ -217,7 +460,6 @@ serve(async (req) => {
       const errorText = await oddsResponse.text();
       console.error('Odds API error:', oddsResponse.status, errorText);
       
-      // Return fallback on API error
       const fallback = getFallbackLines(sportKey);
       return new Response(
         JSON.stringify({ 
@@ -230,28 +472,32 @@ serve(async (req) => {
     }
 
     const games = await oddsResponse.json();
-    console.log(`Found ${games.length} total games for ${sportKey}`);
+    console.log(`📊 Found ${games.length} total games for ${sportKey}`);
     
-    // Log first few team names for debugging
+    // Log all team names for debugging
     if (games.length > 0) {
-      const sampleTeams = games.slice(0, 5).map((g: any) => `${g.home_team} vs ${g.away_team}`);
-      console.log('Sample games from API:', sampleTeams);
+      console.log('All teams in API response:');
+      const uniqueTeams = new Set<string>();
+      games.forEach((g: any) => {
+        uniqueTeams.add(g.home_team);
+        uniqueTeams.add(g.away_team);
+      });
+      Array.from(uniqueTeams).sort().forEach(t => console.log(`  - ${t}`));
     }
 
-    // Find games involving the specified team using improved matching
+    // Find games involving the specified team using strict matching
+    console.log(`\n🎯 Looking for matches for: "${team}"`);
     const matchingGames = games.filter((game: any) => {
+      console.log(`\nChecking game: ${game.home_team} vs ${game.away_team}`);
       const homeMatch = findMatchingTeam(team, game.home_team);
       const awayMatch = findMatchingTeam(team, game.away_team);
-      if (homeMatch || awayMatch) {
-        console.log(`✓ Match found: ${game.home_team} vs ${game.away_team} (search: ${team})`);
-      }
       return homeMatch || awayMatch;
     });
 
-    console.log(`Found ${matchingGames.length} matching games for team: ${team}`);
+    console.log(`\n✅ Found ${matchingGames.length} matching games for team: ${team}`);
 
     if (matchingGames.length === 0) {
-      console.log(`No games found for team: ${team}`);
+      console.log(`❌ No games found for team: ${team}`);
       const fallback = getFallbackLines(sportKey);
       return new Response(
         JSON.stringify({ 
@@ -284,7 +530,7 @@ serve(async (req) => {
       new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime()
     )[0];
 
-    console.log(`Next game: ${nextGame.home_team} vs ${nextGame.away_team} at ${nextGame.commence_time}`);
+    console.log(`🏀 Next game: ${nextGame.home_team} vs ${nextGame.away_team} at ${nextGame.commence_time}`);
 
     // Extract odds from bookmakers (prefer DraftKings, FanDuel, or average)
     let totals: any = null;
@@ -332,14 +578,13 @@ serve(async (req) => {
     // Get spread for the huddle's team
     let huddleSpread = fallbackLines.spread;
     if (spreads) {
-      // Find the spread outcome for the huddle team
       const teamSpread = spreads.find((s: any) => 
         findMatchingTeam(team, s.name)
       );
       if (teamSpread) {
         huddleSpread = teamSpread.point;
       } else if (!isHomeTeam) {
-        huddleSpread = -huddleSpread; // Away team typically gets opposite spread
+        huddleSpread = -huddleSpread;
       }
     }
 
@@ -389,7 +634,7 @@ serve(async (req) => {
       ],
     };
 
-    console.log('Returning odds data:', JSON.stringify(result, null, 2));
+    console.log('📤 Returning odds data for:', result.game.home_team, 'vs', result.game.away_team);
 
     return new Response(
       JSON.stringify(result),
