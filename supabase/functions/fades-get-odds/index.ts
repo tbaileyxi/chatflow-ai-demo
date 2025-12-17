@@ -109,65 +109,61 @@ const TEAM_ALIASES: Record<string, string[]> = {
   'seahawks': ['seattle seahawks', 'seattle'],
 };
 
-// Find matching team name in API data - STRICT matching to prevent false positives
+// Find matching team name in API data - handles "Tennessee Volunteers" matching "Tennessee" or "Volunteers"
 function findMatchingTeam(searchTerm: string, apiTeamName: string): boolean {
   const searchLower = searchTerm.toLowerCase().trim();
   const apiLower = apiTeamName.toLowerCase().trim();
   
-  // Exact match first
+  // Exact match
   if (searchLower === apiLower) {
     return true;
   }
   
-  // Normalize both for comparison (remove common suffixes/prefixes)
-  const normalizeTeamName = (name: string) => {
-    return name
-      .replace(/\s+(state|university|college|of|the)$/gi, '')
-      .replace(/^(university|college)\s+of\s+/gi, '')
-      .trim();
-  };
+  // API name contains search term as a word (e.g., "Tennessee Volunteers" contains "Tennessee" or "Volunteers")
+  const apiWords = apiLower.split(/\s+/);
+  const searchWords = searchLower.split(/\s+/);
   
-  const normalizedSearch = normalizeTeamName(searchLower);
-  const normalizedApi = normalizeTeamName(apiLower);
-  
-  // STRICT: Only match if normalized names are equal OR one fully contains the other as complete words
-  if (normalizedSearch === normalizedApi) {
+  // Check if ALL search words appear in API name
+  const allSearchWordsMatch = searchWords.every(sw => 
+    apiWords.some(aw => aw === sw || aw.startsWith(sw) || sw.startsWith(aw))
+  );
+  if (allSearchWordsMatch && searchWords.length > 0) {
     return true;
   }
   
-  // Prevent partial matches like "South Carolina" matching "South Carolina State"
-  // Only allow if the API name STARTS or ENDS with the search term as a complete word
-  const searchWords = normalizedSearch.split(/\s+/);
-  const apiWords = normalizedApi.split(/\s+/);
-  
-  // If search is fewer words, API must START with those exact words
-  if (searchWords.length < apiWords.length) {
-    const apiStart = apiWords.slice(0, searchWords.length).join(' ');
-    if (apiStart === normalizedSearch && apiWords.length === searchWords.length) {
-      return true;
+  // Check aliases - map search term to canonical and see if API matches any variant
+  for (const [canonical, aliases] of Object.entries(TEAM_ALIASES)) {
+    const allVariants = [canonical, ...aliases].map(v => v.toLowerCase());
+    
+    // Check if search term matches any variant
+    const searchMatchesVariant = allVariants.some(v => 
+      searchLower === v || 
+      searchLower.includes(v) || 
+      v.includes(searchLower)
+    );
+    
+    if (searchMatchesVariant) {
+      // Check if API team matches any variant
+      const apiMatchesVariant = allVariants.some(v => 
+        apiLower === v || 
+        apiLower.includes(v) ||
+        v.includes(apiLower) ||
+        apiWords.some(aw => aw === v || v.split(/\s+/).includes(aw))
+      );
+      
+      if (apiMatchesVariant) {
+        // Extra check: prevent "South Carolina" matching "South Carolina State"
+        if (apiLower.includes(' state') && !searchLower.includes(' state') && !canonical.includes(' state')) {
+          continue; // Skip this match
+        }
+        return true;
+      }
     }
-    // Don't match if API has more words (prevents "South Carolina" matching "South Carolina State")
-    return false;
   }
   
-  // Check aliases - be more strict here too
-  for (const [canonical, aliases] of Object.entries(TEAM_ALIASES)) {
-    const allVariants = [canonical, ...aliases];
-    
-    // Search term must EXACTLY match one of the variants
-    const searchMatches = allVariants.some(v => 
-      normalizedSearch === v.toLowerCase() || searchLower === v.toLowerCase()
-    );
-    
-    // API term must EXACTLY match one of the variants
-    const apiMatches = allVariants.some(v => 
-      normalizedApi === v.toLowerCase() || apiLower === v.toLowerCase() ||
-      apiLower.startsWith(v.toLowerCase() + ' ') || apiLower.endsWith(' ' + v.toLowerCase())
-    );
-    
-    if (searchMatches && apiMatches) {
-      return true;
-    }
+  // Direct partial: if search is part of API name as complete word
+  if (apiWords.includes(searchLower) || apiLower.startsWith(searchLower + ' ')) {
+    return true;
   }
   
   return false;
@@ -235,12 +231,22 @@ serve(async (req) => {
 
     const games = await oddsResponse.json();
     console.log(`Found ${games.length} total games for ${sportKey}`);
+    
+    // Log first few team names for debugging
+    if (games.length > 0) {
+      const sampleTeams = games.slice(0, 5).map((g: any) => `${g.home_team} vs ${g.away_team}`);
+      console.log('Sample games from API:', sampleTeams);
+    }
 
     // Find games involving the specified team using improved matching
-    const matchingGames = games.filter((game: any) => 
-      findMatchingTeam(team, game.home_team) ||
-      findMatchingTeam(team, game.away_team)
-    );
+    const matchingGames = games.filter((game: any) => {
+      const homeMatch = findMatchingTeam(team, game.home_team);
+      const awayMatch = findMatchingTeam(team, game.away_team);
+      if (homeMatch || awayMatch) {
+        console.log(`✓ Match found: ${game.home_team} vs ${game.away_team} (search: ${team})`);
+      }
+      return homeMatch || awayMatch;
+    });
 
     console.log(`Found ${matchingGames.length} matching games for team: ${team}`);
 
