@@ -109,24 +109,60 @@ const TEAM_ALIASES: Record<string, string[]> = {
   'seahawks': ['seattle seahawks', 'seattle'],
 };
 
-// Find matching team name in API data
+// Find matching team name in API data - STRICT matching to prevent false positives
 function findMatchingTeam(searchTerm: string, apiTeamName: string): boolean {
   const searchLower = searchTerm.toLowerCase().trim();
-  const apiLower = apiTeamName.toLowerCase();
+  const apiLower = apiTeamName.toLowerCase().trim();
   
-  // Direct match
-  if (apiLower.includes(searchLower) || searchLower.includes(apiLower)) {
+  // Exact match first
+  if (searchLower === apiLower) {
     return true;
   }
   
-  // Check aliases
+  // Normalize both for comparison (remove common suffixes/prefixes)
+  const normalizeTeamName = (name: string) => {
+    return name
+      .replace(/\s+(state|university|college|of|the)$/gi, '')
+      .replace(/^(university|college)\s+of\s+/gi, '')
+      .trim();
+  };
+  
+  const normalizedSearch = normalizeTeamName(searchLower);
+  const normalizedApi = normalizeTeamName(apiLower);
+  
+  // STRICT: Only match if normalized names are equal OR one fully contains the other as complete words
+  if (normalizedSearch === normalizedApi) {
+    return true;
+  }
+  
+  // Prevent partial matches like "South Carolina" matching "South Carolina State"
+  // Only allow if the API name STARTS or ENDS with the search term as a complete word
+  const searchWords = normalizedSearch.split(/\s+/);
+  const apiWords = normalizedApi.split(/\s+/);
+  
+  // If search is fewer words, API must START with those exact words
+  if (searchWords.length < apiWords.length) {
+    const apiStart = apiWords.slice(0, searchWords.length).join(' ');
+    if (apiStart === normalizedSearch && apiWords.length === searchWords.length) {
+      return true;
+    }
+    // Don't match if API has more words (prevents "South Carolina" matching "South Carolina State")
+    return false;
+  }
+  
+  // Check aliases - be more strict here too
   for (const [canonical, aliases] of Object.entries(TEAM_ALIASES)) {
     const allVariants = [canonical, ...aliases];
+    
+    // Search term must EXACTLY match one of the variants
     const searchMatches = allVariants.some(v => 
-      searchLower.includes(v) || v.includes(searchLower)
+      normalizedSearch === v.toLowerCase() || searchLower === v.toLowerCase()
     );
+    
+    // API term must EXACTLY match one of the variants
     const apiMatches = allVariants.some(v => 
-      apiLower.includes(v) || v.includes(apiLower)
+      normalizedApi === v.toLowerCase() || apiLower === v.toLowerCase() ||
+      apiLower.startsWith(v.toLowerCase() + ' ') || apiLower.endsWith(' ' + v.toLowerCase())
     );
     
     if (searchMatches && apiMatches) {

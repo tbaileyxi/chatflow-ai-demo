@@ -796,8 +796,8 @@ export const Huddle = () => {
       {/* Yellow FAB - bottom right, adapts to huddle type */}
       {user && (
         <div className="fixed bottom-24 right-4 z-30 flex flex-col gap-3">
-          {/* Fades Lightning FAB - only for private huddles */}
-          {huddle?.is_private && !huddle?.is_official_team_huddle && (
+          {/* Fades Lightning FAB - for private huddles AND verified huddles */}
+          {(huddle?.is_private || huddle?.is_verified) && !huddle?.is_official_team_huddle && (
             <Button 
               onClick={() => setShowFadesSidebar(true)}
               className="h-14 w-14 rounded-full bg-yellow-400 hover:bg-yellow-500 shadow-lg shadow-yellow-400/30"
