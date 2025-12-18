@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Zap } from 'lucide-react';
+import { Zap, Loader2 } from 'lucide-react';
 
 interface ActiveFadeCardProps {
   fade: {
@@ -13,16 +13,29 @@ interface ActiveFadeCardProps {
     poster?: { display_name: string | null; username: string | null; avatar_url: string | null };
   };
   currentUserId?: string;
-  onAccept: () => void;
+  onAccept: () => Promise<void>;
+  isAccepting?: boolean;
 }
 
 export const ActiveFadeCard: React.FC<ActiveFadeCardProps> = ({
   fade,
   currentUserId,
   onAccept,
+  isAccepting = false,
 }) => {
+  const [localAccepting, setLocalAccepting] = useState(false);
   const posterName = fade.poster?.display_name || fade.poster?.username || 'Someone';
   const isOwn = fade.poster_id === currentUserId;
+
+  const handleAccept = async () => {
+    if (localAccepting) return;
+    setLocalAccepting(true);
+    try {
+      await onAccept();
+    } finally {
+      setLocalAccepting(false);
+    }
+  };
 
   const getOppositeLabel = () => {
     if (fade.fade_type === 'over') return 'Take Under';
@@ -69,11 +82,21 @@ export const ActiveFadeCard: React.FC<ActiveFadeCardProps> = ({
       {/* Accept Button (only show if not own fade) */}
       {!isOwn && (
         <Button
-          onClick={onAccept}
-          className="w-full h-12 bg-yellow-400 hover:bg-yellow-500 text-black font-bold"
+          onClick={handleAccept}
+          disabled={localAccepting || isAccepting}
+          className="w-full h-12 bg-yellow-400 hover:bg-yellow-500 text-black font-bold disabled:opacity-50"
         >
-          <Zap className="h-5 w-5 mr-2" />
-          Fade This – {getOppositeLabel()}
+          {localAccepting ? (
+            <>
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              Accepting...
+            </>
+          ) : (
+            <>
+              <Zap className="h-5 w-5 mr-2" />
+              Fade This – {getOppositeLabel()}
+            </>
+          )}
         </Button>
       )}
 
