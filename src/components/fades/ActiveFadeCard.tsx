@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Zap, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface ActiveFadeCardProps {
   fade: {
@@ -10,6 +11,7 @@ interface ActiveFadeCardProps {
     line_description: string;
     stake: number;
     fade_type: string;
+    game_commence_time: string;
     poster?: { display_name: string | null; username: string | null; avatar_url: string | null };
   };
   currentUserId?: string;
@@ -32,6 +34,10 @@ export const ActiveFadeCard: React.FC<ActiveFadeCardProps> = ({
     setLocalAccepting(true);
     try {
       await onAccept();
+      toast.success('Fade accepted! Game on! 🔥');
+    } catch (err: any) {
+      console.error('Accept fade error:', err);
+      toast.error(err?.message || 'Failed to accept fade');
     } finally {
       setLocalAccepting(false);
     }
@@ -43,8 +49,11 @@ export const ActiveFadeCard: React.FC<ActiveFadeCardProps> = ({
     return 'Take Opposite';
   };
 
+  // Check if game already started
+  const gameStarted = new Date(fade.game_commence_time) < new Date();
+
   return (
-    <div className="p-4 bg-zinc-900 rounded-xl border-2 border-yellow-400/30">
+    <div className={`p-4 bg-zinc-900 rounded-xl border-2 ${gameStarted ? 'border-red-400/30 opacity-60' : 'border-yellow-400/30'}`}>
       {/* VS Layout */}
       <div className="flex items-center justify-between mb-4">
         {/* Poster */}
@@ -79,8 +88,8 @@ export const ActiveFadeCard: React.FC<ActiveFadeCardProps> = ({
         <span className="font-medium">{fade.line_description}</span>
       </p>
 
-      {/* Accept Button (only show if not own fade) */}
-      {!isOwn && (
+      {/* Accept Button (only show if not own fade and game hasn't started) */}
+      {!isOwn && !gameStarted && (
         <Button
           onClick={handleAccept}
           disabled={localAccepting || isAccepting}
@@ -100,9 +109,21 @@ export const ActiveFadeCard: React.FC<ActiveFadeCardProps> = ({
         </Button>
       )}
 
-      {isOwn && (
+      {!isOwn && gameStarted && (
+        <p className="text-center text-sm text-red-400 font-medium">
+          Game already started – expired
+        </p>
+      )}
+
+      {isOwn && !gameStarted && (
         <p className="text-center text-sm text-gray-500">
           Waiting for someone to fade...
+        </p>
+      )}
+
+      {isOwn && gameStarted && (
+        <p className="text-center text-sm text-red-400 font-medium">
+          No takers – game started
         </p>
       )}
     </div>

@@ -240,13 +240,23 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
   const handleAcceptFade = async (fade: Fade): Promise<void> => {
     if (!user) {
       console.error('No user logged in');
-      return;
+      throw new Error('You must be logged in to accept a fade');
+    }
+
+    // Check if game has already started
+    const gameTime = new Date(fade.game_commence_time);
+    if (isPast(gameTime)) {
+      console.error('Game has already started, cannot accept fade');
+      // Auto-expire the fade in database
+      await supabase.from('fades').update({ status: 'expired' }).eq('id', fade.id).eq('status', 'open');
+      fetchFades();
+      throw new Error('This game has already started - fade expired');
     }
 
     try {
       console.log('Accepting fade:', fade.id, 'by user:', user.id);
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('fades')
         .update({
           accepter_id: user.id,
@@ -254,14 +264,22 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
           locked_at: new Date().toISOString(),
         })
         .eq('id', fade.id)
-        .eq('status', 'open'); // Only accept if still open
+        .eq('status', 'open')
+        .select(); // Get updated row back to verify
 
       if (error) {
         console.error('Error updating fade:', error);
         throw error;
       }
 
-      console.log('Fade accepted, posting to chat...');
+      // Check if update actually affected any rows
+      if (!data || data.length === 0) {
+        console.error('Fade was not updated - it may have already been accepted or expired');
+        fetchFades();
+        throw new Error('This fade is no longer available');
+      }
+
+      console.log('Fade accepted successfully, posting to chat...');
 
       // Post to chat (always announce accepts)
       const { data: systemUserId, error: systemUserError } = await supabase.rpc('get_or_create_system_user');
