@@ -747,6 +747,7 @@ export const Huddle = () => {
                       isAdmin={isAdmin}
                       isGrouped={isGrouped}
                       onReply={handleReply}
+                      onOpenFades={() => setShowFadesSidebar(true)}
                       replies={replies}
                     />
                   </React.Fragment>

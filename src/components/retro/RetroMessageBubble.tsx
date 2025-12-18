@@ -66,6 +66,7 @@ interface RetroMessageBubbleProps {
   onCopyCallout?: (messageId: string, content: string) => void;
   onReply?: (message: any) => void;
   onPollVote?: (messageId: string, optionIndex: number) => void;
+  onOpenFades?: () => void;
   replies?: any[];
   className?: string;
 }
@@ -84,6 +85,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   onCopyCallout,
   onReply,
   onPollVote,
+  onOpenFades,
   replies = [],
   className
 }) => {
@@ -567,6 +569,18 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                 className="h-7 px-2 text-xs hover:bg-black/10 text-gray-700 rounded-lg"
               >
                 Reply
+              </Button>
+            )}
+            {/* View Fades button for fade notifications */}
+            {message.message_type === 'fade_notification' && onOpenFades && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onOpenFades}
+                className="h-7 px-2 text-xs bg-yellow-400/20 hover:bg-yellow-400/40 text-yellow-600 font-semibold rounded-lg"
+              >
+                <Zap className="h-3 w-3 mr-1" />
+                View Fades
               </Button>
             )}
           </div>

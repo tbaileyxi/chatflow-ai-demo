@@ -237,10 +237,15 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
     }
   };
 
-  const handleAcceptFade = async (fade: Fade) => {
-    if (!user) return;
+  const handleAcceptFade = async (fade: Fade): Promise<void> => {
+    if (!user) {
+      console.error('No user logged in');
+      return;
+    }
 
     try {
+      console.log('Accepting fade:', fade.id, 'by user:', user.id);
+      
       const { error } = await supabase
         .from('fades')
         .update({
@@ -248,39 +253,54 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
           status: 'locked',
           locked_at: new Date().toISOString(),
         })
-        .eq('id', fade.id);
+        .eq('id', fade.id)
+        .eq('status', 'open'); // Only accept if still open
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating fade:', error);
+        throw error;
+      }
+
+      console.log('Fade accepted, posting to chat...');
 
       // Post to chat (always announce accepts)
-      const systemUser = await supabase.rpc('get_or_create_system_user');
+      const { data: systemUserId, error: systemUserError } = await supabase.rpc('get_or_create_system_user');
       
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, display_name, username')
-        .in('user_id', [fade.poster_id, user.id]);
+      if (systemUserError) {
+        console.error('Error getting system user:', systemUserError);
+      } else if (systemUserId) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, display_name, username')
+          .in('user_id', [fade.poster_id, user.id]);
 
-      const posterProfile = profiles?.find(p => p.user_id === fade.poster_id);
-      const accepterProfile = profiles?.find(p => p.user_id === user.id);
+        const posterProfile = profiles?.find(p => p.user_id === fade.poster_id);
+        const accepterProfile = profiles?.find(p => p.user_id === user.id);
 
-      const posterName = posterProfile?.display_name || posterProfile?.username || 'Poster';
-      const accepterName = accepterProfile?.display_name || accepterProfile?.username || 'Someone';
+        const posterName = posterProfile?.display_name || posterProfile?.username || 'Poster';
+        const accepterName = accepterProfile?.display_name || accepterProfile?.username || 'Someone';
 
-      const oppositeOption = fade.fade_type === 'over' ? 'Under' : 
-                            fade.fade_type === 'under' ? 'Over' : 
-                            `Against ${fade.line_description}`;
+        const oppositeOption = fade.fade_type === 'over' ? 'Under' : 
+                              fade.fade_type === 'under' ? 'Over' : 
+                              `Against ${fade.line_description}`;
 
-      await supabase.from('huddle_messages').insert({
-        huddle_id: huddleId,
-        user_id: systemUser.data,
-        content: `💥 ${accepterName} faded ${posterName}! Locked: ${posterName} (${fade.line_description}) vs ${accepterName} (${oppositeOption}) – ${fade.stake} points`,
-        message_type: 'fade_notification',
-        is_bot_message: true,
-      });
+        const { error: chatError } = await supabase.from('huddle_messages').insert({
+          huddle_id: huddleId,
+          user_id: systemUserId,
+          content: `💥 ${accepterName} faded ${posterName}! Locked: ${posterName} (${fade.line_description}) vs ${accepterName} (${oppositeOption}) – ${fade.stake} points`,
+          message_type: 'fade_notification',
+          is_bot_message: true,
+        });
+
+        if (chatError) {
+          console.error('Error posting to chat:', chatError);
+        }
+      }
 
       fetchFades();
     } catch (err: any) {
       console.error('Error accepting fade:', err);
+      throw err;
     }
   };
 
