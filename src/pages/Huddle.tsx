@@ -363,6 +363,35 @@ export const Huddle = () => {
       return;
     }
 
+    // For public huddles, auto-join user if not already a member
+    if (huddle && huddle.is_private === false) {
+      // Check if user is already a member
+      const { data: existingMember } = await supabase
+        .from('huddle_members')
+        .select('id')
+        .eq('huddle_id', huddleId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (!existingMember) {
+        // Auto-join the public huddle
+        const { error: joinError } = await supabase
+          .from('huddle_members')
+          .insert({ huddle_id: huddleId, user_id: user.id });
+        
+        if (joinError) {
+          console.error('Error auto-joining public huddle:', joinError);
+          toast({
+            title: "Error",
+            description: "Failed to join huddle. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        console.log('✅ Auto-joined public huddle');
+      }
+    }
+
     // Try to fetch profile, but don't fail if it errors (network issues, token refresh, etc.)
     let profile = null;
     try {
@@ -437,7 +466,7 @@ export const Huddle = () => {
           checkFirstMessageAndShowModal();
         }
       });
-  }, [huddleId, user, toast]);
+  }, [huddleId, user, toast, huddle]);
 
   // Check if this is the user's first message and show founding modal
   const checkFirstMessageAndShowModal = useCallback(async () => {
