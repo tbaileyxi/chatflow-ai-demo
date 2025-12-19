@@ -67,11 +67,20 @@ serve(async (req) => {
       const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       const supabase = createClient(supabaseUrl, supabaseKey);
 
-      // Generate promo code
-      const { data: countsData } = await supabase.rpc('get_founding_counts');
-      const totalCount = Number(countsData?.[0]?.total_count || 0);
-      const nextSpot = totalCount + 1;
+      // Get next available spot number using MAX to avoid conflicts
+      const { data: maxSpotData } = await supabase
+        .from('profiles')
+        .select('founding_spot_number')
+        .not('founding_spot_number', 'is', null)
+        .order('founding_spot_number', { ascending: false })
+        .limit(1)
+        .single();
+      
+      const maxSpot = maxSpotData?.founding_spot_number || 0;
+      const nextSpot = maxSpot + 1;
       const promoCode = `FOUNDER2025-${String(nextSpot).padStart(4, '0')}`;
+
+      console.log(`Calculated next spot: ${nextSpot} (max existing: ${maxSpot})`);
 
       // Claim the founding spot using the database function
       const { data: spotNumber, error: claimError } = await supabase.rpc('claim_founding_spot', {
