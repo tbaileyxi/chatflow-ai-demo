@@ -108,11 +108,12 @@ serve(async (req) => {
         throw subscriptionError;
       }
 
-      // Update huddle to set is_verified = true (trigger will also do this, but be explicit)
+      // Update huddle to set is_verified = true AND is_private = false (so it shows in discovery)
       const { error: huddleError } = await supabaseServiceRole
         .from("huddles")
         .update({
           is_verified: true,
+          is_private: false,
           verification_expires_at: permanentDate.toISOString(),
         })
         .eq("id", huddleId);

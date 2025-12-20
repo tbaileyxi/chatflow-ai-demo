@@ -90,10 +90,14 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
     const league = teamLeague?.toUpperCase() || '';
     if (league === 'NFL') return 'nfl';
     if (league === 'NBA') return 'nba';
-    // NCAA defaults to basketball during winter months, football during fall
+    // For NCAA: during Dec/Jan (bowl season + CFP), try football first
+    // Otherwise use basketball Nov-Feb, football Aug-Oct
     const month = new Date().getMonth();
-    if (month >= 10 || month <= 2) return 'ncaab'; // Nov-Feb = basketball
-    return 'ncaaf'; // Aug-Oct = football
+    // Dec (11) and Jan (0) are bowl/CFP season - prioritize football for CFB teams
+    if (month === 11 || month === 0) return 'ncaaf';
+    if (month >= 1 && month <= 2) return 'ncaab'; // Feb-Mar = basketball
+    if (month >= 10) return 'ncaab'; // Nov = basketball season started
+    return 'ncaaf'; // Aug-Oct = football season
   };
 
   const fetchOdds = async () => {

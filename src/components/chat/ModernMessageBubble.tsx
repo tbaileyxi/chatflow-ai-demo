@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { XPostEmbed } from "@/components/embeds/XPostEmbed";
 import { shouldShowProfile, parsePickEmMessage } from "@/utils/chatMessage";
 import { PickEmCard } from "@/components/pickem/PickEmCard";
+import { FoundingCheckmark } from "@/components/founding/FoundingCheckmark";
 
 interface ModernMessageBubbleProps {
   message: any;
@@ -155,12 +156,15 @@ export const ModernMessageBubble = memo(({
             isOwnMessage ? "justify-end" : "justify-start"
           )}>
             <span className={cn(
-              "text-sm font-semibold text-foreground",
+              "text-sm font-semibold text-foreground inline-flex items-center gap-1",
               (message.is_team_agent_message || message.is_bot_message || message.message_type === 'coach_response') && "font-share-tech"
             )}>
               {message.is_team_agent_message
                 ? `${message.origin_teams?.name || originTeamName || teamName || 'Team'} Agent`
                 : (message.profiles?.display_name || message.profiles?.username || `User ${message.user_id.slice(0, 8)}`)}
+              {message.profiles?.is_founding_member && (
+                <FoundingCheckmark size="sm" />
+              )}
             </span>
             <span className="text-xs text-muted-foreground">
               {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
