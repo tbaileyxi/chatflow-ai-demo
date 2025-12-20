@@ -327,7 +327,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({
             )}>
               <div className={cn(
                 "text-lg font-normal leading-snug",
-                (isGameBot || isTeamAgent) && "font-share-tech text-base"
+                (isGameBot || isTeamAgent) && "font-share-tech font-extrabold text-base uppercase tracking-wide"
               )}>
                 {renderedContent}
               </div>
