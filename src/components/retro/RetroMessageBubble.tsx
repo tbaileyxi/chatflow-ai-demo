@@ -402,7 +402,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
           
           {/* Fixed: Solid background instead of gradient for better readability */}
           <div className="px-3 py-1.5 rounded-lg bg-background border border-team-primary/30">
-            <p className="text-sm font-extrabold text-foreground font-share-tech uppercase tracking-wide">
+            <p className="text-sm text-foreground uppercase tracking-wide" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800 }}>
               {message.content}
             </p>
           </div>

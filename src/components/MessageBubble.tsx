@@ -325,10 +325,13 @@ export const MessageBubble = memo<MessageBubbleProps>(({
                   ? "rounded-l-xl rounded-tr-md rounded-br-xl"
                   : "rounded-r-xl rounded-tl-md rounded-bl-xl"
             )}>
-              <div className={cn(
-                "text-lg font-normal leading-snug",
-                (isGameBot || isTeamAgent) && "font-share-tech font-extrabold text-base uppercase tracking-wide"
-              )}>
+              <div 
+                className={cn(
+                  "text-lg font-normal leading-snug",
+                  (isGameBot || isTeamAgent) && "text-base uppercase tracking-wide"
+                )}
+                style={(isGameBot || isTeamAgent) ? { fontFamily: 'Montserrat, sans-serif', fontWeight: 800 } : undefined}
+              >
                 {renderedContent}
               </div>
             </div>
