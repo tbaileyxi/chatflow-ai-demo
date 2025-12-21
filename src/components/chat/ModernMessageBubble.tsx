@@ -155,10 +155,13 @@ export const ModernMessageBubble = memo(({
             "flex items-center gap-3 mb-2 flex-wrap",
             isOwnMessage ? "justify-end" : "justify-start"
           )}>
-            <span className={cn(
-              "text-sm font-semibold text-foreground inline-flex items-center gap-1",
-              (message.is_team_agent_message || message.is_bot_message || message.message_type === 'coach_response') && "font-share-tech font-extrabold uppercase tracking-wide"
-            )}>
+            <span 
+              className={cn(
+                "text-sm font-semibold text-foreground inline-flex items-center gap-1",
+                (message.is_team_agent_message || message.is_bot_message || message.message_type === 'coach_response') && "uppercase tracking-wide"
+              )}
+              style={(message.is_team_agent_message || message.is_bot_message || message.message_type === 'coach_response') ? { fontFamily: 'Montserrat, sans-serif', fontWeight: 800 } : undefined}
+            >
               {message.is_team_agent_message
                 ? `${message.origin_teams?.name || originTeamName || teamName || 'Team'} Agent`
                 : (message.profiles?.display_name || message.profiles?.username || `User ${message.user_id.slice(0, 8)}`)}
@@ -237,10 +240,13 @@ export const ModernMessageBubble = memo(({
 
               {/* Text Content */}
               {showContent && (
-                <div className={cn(
-                  "whitespace-pre-wrap break-words leading-relaxed",
-                  (message.is_bot_message || message.is_team_agent_message || message.message_type === 'coach_response') && "font-share-tech font-extrabold text-base uppercase tracking-wide"
-                )}>
+                <div 
+                  className={cn(
+                    "whitespace-pre-wrap break-words leading-relaxed",
+                    (message.is_bot_message || message.is_team_agent_message || message.message_type === 'coach_response') && "text-base uppercase tracking-wide"
+                  )}
+                  style={(message.is_bot_message || message.is_team_agent_message || message.message_type === 'coach_response') ? { fontFamily: 'Montserrat, sans-serif', fontWeight: 800 } : undefined}
+                >
                   {contentWithoutTags}
                 </div>
               )}

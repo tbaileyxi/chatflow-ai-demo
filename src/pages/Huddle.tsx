@@ -43,8 +43,10 @@ export const Huddle = () => {
   // Fix 3: Handler to set reply and auto-scroll to top (where input is)
   const handleReply = useCallback((message: any) => {
     setReplyingToMessage(message);
-    // Auto-scroll to top where the input is
+    // Auto-scroll page to top where the chat input is (sticky under header)
     setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Also scroll the messages container to top
       messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     }, 100);
   }, []);
