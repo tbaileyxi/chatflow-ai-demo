@@ -120,7 +120,7 @@ export const TrendingTeamsSection: React.FC = () => {
     <section className="space-y-3">
       <div className="flex items-center gap-2">
         <Flame className="w-5 h-5 text-orange-500" />
-        <h2 className="text-lg font-bold text-foreground">🔥 Trending Teams</h2>
+        <h2 className="text-lg font-bold text-foreground">🔥 Trending Team Chats</h2>
       </div>
       
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
