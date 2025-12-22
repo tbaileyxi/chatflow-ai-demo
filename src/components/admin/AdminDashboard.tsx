@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, MessageSquare, Shield, Trophy, Home, ArrowLeft, Play } from 'lucide-react';
+import { Users, MessageSquare, Shield, Trophy, Home, ArrowLeft, Play, Rss } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,6 +24,7 @@ export const AdminDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [scoringLoading, setScoringLoading] = useState(false);
+  const [redditBuzzLoading, setRedditBuzzLoading] = useState(false);
 
   useEffect(() => {
     fetchDashboardStats();
@@ -80,6 +81,38 @@ export const AdminDashboard = () => {
       });
     } finally {
       setScoringLoading(false);
+    }
+  };
+
+  const triggerRedditBuzz = async () => {
+    setRedditBuzzLoading(true);
+    try {
+      console.log('Triggering Reddit social buzz function...');
+      const { data, error } = await supabase.functions.invoke('reddit-social-buzz');
+      
+      if (error) {
+        console.error('Reddit buzz error:', error);
+        toast({
+          title: "Reddit Buzz Failed",
+          description: `Error: ${error.message}`,
+          variant: "destructive",
+        });
+      } else {
+        console.log('Reddit buzz result:', data);
+        toast({
+          title: "Reddit Buzz Complete",
+          description: `Processed ${data?.teams_processed || 0} teams, posted ${data?.total_posts || 0} messages`,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to trigger Reddit buzz:', error);
+      toast({
+        title: "Reddit Buzz Failed",
+        description: "Failed to trigger Reddit buzz function",
+        variant: "destructive",
+      });
+    } finally {
+      setRedditBuzzLoading(false);
     }
   };
 
@@ -219,6 +252,20 @@ export const AdminDashboard = () => {
                 </Button>
                 <p className="text-xs text-muted-foreground mt-2">
                   Manually trigger the scoring function to update game results
+                </p>
+              </div>
+              <div className="border-t border-border pt-4">
+                <Button
+                  onClick={triggerRedditBuzz}
+                  disabled={redditBuzzLoading}
+                  className="w-full flex items-center gap-2"
+                  variant="outline"
+                >
+                  <Rss className="h-4 w-4" />
+                  {redditBuzzLoading ? 'Fetching Reddit Buzz...' : 'Run Reddit Buzz Now'}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Manually fetch and post Reddit social buzz to team huddles
                 </p>
               </div>
             </div>
