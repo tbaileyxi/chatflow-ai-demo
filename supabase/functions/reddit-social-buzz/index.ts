@@ -273,57 +273,28 @@ Deno.serve(async (req) => {
         const relevantPosts = posts.filter(isRelevantPost);
         console.log(`✨ ${relevantPosts.length} posts are relevant`);
 
-        // Get official huddle for this team
-        const { data: huddle } = await supabase
+        // Get ALL huddles for this team (official + private user huddles)
+        const { data: huddles } = await supabase
           .from('huddles')
-          .select('id')
-          .eq('team_id', teamId)
-          .eq('is_official_team_huddle', true)
-          .single();
+          .select('id, name, is_official_team_huddle')
+          .eq('team_id', teamId);
 
-        if (!huddle) {
-          console.log(`⚠️ No official huddle found for ${teamName}`);
+        if (!huddles || huddles.length === 0) {
+          console.log(`⚠️ No huddles found for ${teamName}`);
           continue;
         }
 
-        const huddleId = huddle.id;
+        console.log(`📢 Found ${huddles.length} huddles for ${teamName}`);
 
-        // Check today's post count
+        // Track posts added across all huddles for this team
+        let totalPostsAdded = 0;
         const today = new Date().toISOString().split('T')[0];
-        const { data: dailyCount } = await supabase
-          .from('reddit_daily_counts')
-          .select('post_count')
-          .eq('huddle_id', huddleId)
-          .eq('post_date', today)
-          .single();
 
-        const currentCount = dailyCount?.post_count || 0;
-        const maxDaily = 5;
-        
-        if (currentCount >= maxDaily) {
-          console.log(`📊 Daily limit reached for ${teamName} (${currentCount}/${maxDaily})`);
-          continue;
-        }
-
-        // Track that we processed this team even if at limit
-        if (currentCount >= maxDaily) {
-          results.push({
-            team: teamName,
-            postsAdded: 0,
-            totalProcessed: 0,
-            status: 'daily_limit_reached'
-          });
-          continue;
-        }
-
-        const remainingSlots = maxDaily - currentCount;
-        let postsAdded = 0;
-
-        // Process top relevant posts
-        for (const post of relevantPosts.slice(0, remainingSlots)) {
+        // Process each relevant post once per team (dedup at team level)
+        for (const post of relevantPosts.slice(0, 5)) {
           const contentHash = createContentHash(post.title, post.url);
 
-          // Check if already posted (last 48 hours)
+          // Check if already posted to this team (last 48 hours)
           const { data: existingPost } = await supabase
             .from('reddit_posts_log')
             .select('id')
@@ -357,9 +328,8 @@ Deno.serve(async (req) => {
           // Generate curated caption (includes source link)
           const messageContent = generateCaption(post, teamName, true);
 
-          // Prepare message data
-          const messageData: Record<string, unknown> = {
-            huddle_id: huddleId,
+          // Prepare base message data
+          const baseMessageData: Record<string, unknown> = {
             user_id: systemUserId,
             content: messageContent,
             is_bot_message: true,
@@ -368,51 +338,78 @@ Deno.serve(async (req) => {
 
           // Add media if available
           if (post.mediaUrl) {
-            // Determine media type
             const isVideo = post.mediaUrl.includes('v.redd.it') || 
+                           post.mediaUrl.includes('proxy-reddit-video') ||
                            post.mediaUrl.endsWith('.mp4') || 
                            post.mediaUrl.endsWith('.webm');
-            messageData.media_url = post.mediaUrl;
-            messageData.media_type = isVideo ? 'video' : 'image';
+            baseMessageData.media_url = post.mediaUrl;
+            baseMessageData.media_type = isVideo ? 'video' : 'image';
           }
 
-          // Insert message
-          const { error: msgError } = await supabase
-            .from('huddle_messages')
-            .insert(messageData);
+          // Post to ALL huddles for this team
+          let postedToAny = false;
+          for (const huddle of huddles) {
+            // Check daily limit per huddle
+            const { data: dailyCount } = await supabase
+              .from('reddit_daily_counts')
+              .select('post_count')
+              .eq('huddle_id', huddle.id)
+              .eq('post_date', today)
+              .single();
 
-          if (msgError) {
-            console.error(`❌ Failed to post message: ${msgError.message}`);
-            continue;
+            const currentCount = dailyCount?.post_count || 0;
+            const maxDaily = 5;
+            
+            if (currentCount >= maxDaily) {
+              console.log(`📊 Daily limit reached for huddle ${huddle.name} (${currentCount}/${maxDaily})`);
+              continue;
+            }
+
+            // Insert message to this huddle
+            const { error: msgError } = await supabase
+              .from('huddle_messages')
+              .insert({
+                ...baseMessageData,
+                huddle_id: huddle.id
+              });
+
+            if (msgError) {
+              console.error(`❌ Failed to post to ${huddle.name}: ${msgError.message}`);
+              continue;
+            }
+
+            // Update daily count for this huddle
+            await supabase
+              .from('reddit_daily_counts')
+              .upsert({
+                huddle_id: huddle.id,
+                post_date: today,
+                post_count: currentCount + 1
+              }, { onConflict: 'huddle_id,post_date' });
+
+            console.log(`✅ Posted to ${huddle.name}: ${post.title.substring(0, 40)}...`);
+            postedToAny = true;
           }
 
-          // Log the post
-          await supabase
-            .from('reddit_posts_log')
-            .insert({
-              team_id: teamId,
-              reddit_post_id: post.id,
-              title: post.title,
-              url: post.url,
-              content_hash: contentHash
-            });
-
-          // Update daily count
-          await supabase
-            .from('reddit_daily_counts')
-            .upsert({
-              huddle_id: huddleId,
-              post_date: today,
-              post_count: currentCount + postsAdded + 1
-            }, { onConflict: 'huddle_id,post_date' });
-
-          postsAdded++;
-          console.log(`✅ Posted: ${post.title.substring(0, 50)}...`);
+          // Only log the post once per team (not per huddle)
+          if (postedToAny) {
+            await supabase
+              .from('reddit_posts_log')
+              .insert({
+                team_id: teamId,
+                reddit_post_id: post.id,
+                title: post.title,
+                url: post.url,
+                content_hash: contentHash
+              });
+            totalPostsAdded++;
+          }
         }
 
         results.push({
           team: teamName,
-          postsAdded,
+          postsAdded: totalPostsAdded,
+          huddlesTargeted: huddles.length,
           totalProcessed: relevantPosts.length,
           status: 'processed'
         });
