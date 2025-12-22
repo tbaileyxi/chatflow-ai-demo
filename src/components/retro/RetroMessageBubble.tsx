@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { XPostEmbed } from '@/components/embeds/XPostEmbed';
 import { isXEmbed } from '@/utils/embedUtils';
+import { MediaViewer } from '@/components/MediaViewer';
 import DOMPurify from 'dompurify';
 import { FoundingBadge, FoundingCheckmark } from '@/components/founding';
 
@@ -259,6 +260,41 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
     return user?.display_name || user?.username || `User ${message.user_id.slice(0, 8)}`;
   }, [isBot, user, message.user_id]);
 
+  const isSocialBuzz = message.message_type === 'social_buzz';
+
+  const renderSocialBuzzContent = useCallback((content: string) => {
+    const lines = String(content || '').split('\n');
+
+    return lines
+      .map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed) return { kind: 'br' as const };
+
+        // Hide any raw URL-only lines
+        if (/^\(?https?:\/\/\S+\)?$/i.test(trimmed)) return null;
+
+        // Convert markdown links like "🔗 [Source](https://...)" to a clean hyperlink.
+        const md = trimmed.match(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/);
+        if (md) {
+          const url = md[2];
+          const hasIcon = trimmed.includes('🔗');
+          return {
+            kind: 'link' as const,
+            key: `l-${idx}`,
+            url,
+            prefix: hasIcon ? '🔗 ' : ''
+          };
+        }
+
+        return { kind: 'text' as const, key: `t-${idx}`, text: line };
+      })
+      .filter(Boolean);
+  }, []);
+
+  const socialBuzzParts = useMemo(() => {
+    return isSocialBuzz ? renderSocialBuzzContent(message.content) : null;
+  }, [isSocialBuzz, message.content, renderSocialBuzzContent]);
+
   const handleCopy = useCallback(async () => {
     try {
       // Build complete copy with text, media, and embeds
@@ -400,11 +436,58 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             )}
           </div>
           
+          {/* Media first for Reddit social buzz */}
+          {isSocialBuzz && message.media_url && (
+            <div className="mt-3 rounded-lg overflow-hidden border border-team-primary/30 bg-black/10">
+              <MediaViewer
+                mediaUrl={message.media_url}
+                mediaType={message.media_type === 'video' ? 'video' : 'image'}
+                showLightbox={message.media_type === 'image'}
+              />
+            </div>
+          )}
+
           {/* Fixed: Solid background instead of gradient for better readability */}
-          <div className="px-3 py-1.5 rounded-lg bg-background border border-team-primary/30">
-            <p className="text-sm text-foreground uppercase tracking-wide" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800 }}>
-              {message.content}
-            </p>
+          <div className="mt-3 px-3 py-1.5 rounded-lg bg-background border border-team-primary/30 overflow-hidden">
+            {isSocialBuzz && socialBuzzParts ? (
+              <p
+                className="text-sm text-foreground uppercase tracking-wide whitespace-pre-wrap break-words"
+                style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800 }}
+              >
+                {socialBuzzParts.map((part: any, i: number) => {
+                  if (!part) return null;
+                  if (part.kind === 'br') return <br key={`br-${i}`} />;
+                  if (part.kind === 'link') {
+                    return (
+                      <span key={part.key} className="inline-flex items-center gap-1">
+                        {part.prefix}
+                        <a
+                          href={part.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs underline underline-offset-4 opacity-80 hover:opacity-100"
+                        >
+                          Source
+                        </a>
+                      </span>
+                    );
+                  }
+                  return (
+                    <span key={part.key}>
+                      {part.text}
+                      {i < socialBuzzParts.length - 1 ? <br /> : null}
+                    </span>
+                  );
+                })}
+              </p>
+            ) : (
+              <p
+                className="text-sm text-foreground uppercase tracking-wide whitespace-pre-wrap break-words"
+                style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800 }}
+              >
+                {message.content}
+              </p>
+            )}
           </div>
           
           {/* New embeds - handle both array and object formats */}
