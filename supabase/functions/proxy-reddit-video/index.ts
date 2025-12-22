@@ -32,14 +32,26 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Proxying Reddit video: ${videoUrl}`);
+    console.log(`[proxy-reddit-video] Incoming request`, {
+      videoUrl,
+      method: req.method,
+      range: req.headers.get('Range') || null,
+    });
 
-    // Build headers for the upstream request
+    // Build headers for the upstream request (Reddit is strict; mimic a real browser)
     const upstreamHeaders: Record<string, string> = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5',
-      'Accept-Language': 'en-US,en;q=0.5',
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+      'Accept-Language': 'en-US,en;q=0.9',
       'Referer': 'https://www.reddit.com/',
+      'Origin': 'https://www.reddit.com',
+      'DNT': '1',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      'Sec-Fetch-Dest': 'video',
+      'Sec-Fetch-Mode': 'no-cors',
+      'Sec-Fetch-Site': 'cross-site',
     };
 
     // Forward range header for seeking support
@@ -48,16 +60,44 @@ serve(async (req) => {
       upstreamHeaders['Range'] = rangeHeader;
     }
 
-    const response = await fetch(videoUrl, {
-      headers: upstreamHeaders,
-    });
+    const tryFetch = async (targetUrl: string) => {
+      const res = await fetch(targetUrl, { headers: upstreamHeaders, redirect: 'follow' });
+      console.log(`[proxy-reddit-video] Upstream response`, {
+        targetUrl,
+        status: res.status,
+        statusText: res.statusText,
+        contentType: res.headers.get('Content-Type'),
+        contentLength: res.headers.get('Content-Length'),
+        contentRange: res.headers.get('Content-Range'),
+        acceptRanges: res.headers.get('Accept-Ranges'),
+      });
+      return res;
+    };
+
+    let response = await tryFetch(videoUrl);
+
+    // Retry once: Reddit sometimes 403s the ?source=fallback URL but allows the same path without query.
+    if (response.status === 403 && videoUrl.includes('?')) {
+      const strippedUrl = videoUrl.split('?')[0];
+      console.log(`[proxy-reddit-video] 403 from Reddit; retrying without query`, { strippedUrl });
+      response = await tryFetch(strippedUrl);
+    }
 
     if (!response.ok) {
-      console.error(`Failed to fetch video: ${response.status} ${response.statusText}`);
-      return new Response(JSON.stringify({ error: `Failed to fetch video: ${response.status}` }), {
+      console.error(`[proxy-reddit-video] Failed upstream fetch`, {
         status: response.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        statusText: response.statusText,
       });
+      return new Response(
+        JSON.stringify({
+          error: `Failed to fetch video: ${response.status}`,
+          status: response.status,
+        }),
+        {
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     // Build response headers
@@ -65,26 +105,29 @@ serve(async (req) => {
       ...corsHeaders,
       'Content-Type': response.headers.get('Content-Type') || 'video/mp4',
       'Cache-Control': 'public, max-age=31536000',
+      // Force range support for the browser video element
+      'Accept-Ranges': 'bytes',
     };
 
-    // Forward content-length if present
+    // Forward important upstream headers (helps playback + seeking)
     const contentLength = response.headers.get('Content-Length');
-    if (contentLength) {
-      responseHeaders['Content-Length'] = contentLength;
-    }
+    if (contentLength) responseHeaders['Content-Length'] = contentLength;
 
-    // Forward range-related headers for seeking
     const contentRange = response.headers.get('Content-Range');
-    if (contentRange) {
-      responseHeaders['Content-Range'] = contentRange;
-    }
-    
-    const acceptRanges = response.headers.get('Accept-Ranges');
-    if (acceptRanges) {
-      responseHeaders['Accept-Ranges'] = acceptRanges;
-    }
+    if (contentRange) responseHeaders['Content-Range'] = contentRange;
 
-    console.log(`Successfully proxying video, status: ${response.status}`);
+    const etag = response.headers.get('ETag');
+    if (etag) responseHeaders['ETag'] = etag;
+
+    const lastModified = response.headers.get('Last-Modified');
+    if (lastModified) responseHeaders['Last-Modified'] = lastModified;
+
+    console.log(`[proxy-reddit-video] Streaming response`, {
+      status: response.status,
+      contentType: responseHeaders['Content-Type'],
+      contentLength: responseHeaders['Content-Length'] || null,
+      contentRange: responseHeaders['Content-Range'] || null,
+    });
 
     return new Response(response.body, {
       status: response.status,

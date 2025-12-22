@@ -99,6 +99,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   const [heatCount, setHeatCount] = useState(0);
   const [hasGivenHeat, setHasGivenHeat] = useState(false);
   const [isGivingHeat, setIsGivingHeat] = useState(false);
+  const [socialBuzzVideoFailed, setSocialBuzzVideoFailed] = useState(false);
   const { toast } = useToast();
   
   // Poll voting state
@@ -441,13 +442,33 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             <div className="w-full max-w-full my-3">
               {message.media_type === 'video' ? (
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30 bg-black">
-                  <video
-                    src={message.media_url}
-                    className="absolute inset-0 w-full h-full object-contain"
-                    controls
-                    playsInline
-                    preload="metadata"
-                  />
+                  {socialBuzzVideoFailed ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
+                      <p className="text-sm font-semibold text-foreground">Video couldn’t load.</p>
+                      <div className="flex items-center gap-2">
+                        {socialBuzzParts?.find((p: any) => p?.kind === 'link')?.url ? (
+                          <Button asChild size="sm" variant="secondary">
+                            <a
+                              href={socialBuzzParts.find((p: any) => p?.kind === 'link')?.url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Watch on Reddit
+                            </a>
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : (
+                    <video
+                      src={message.media_url}
+                      className="absolute inset-0 w-full h-full object-contain"
+                      controls
+                      playsInline
+                      preload="metadata"
+                      onError={() => setSocialBuzzVideoFailed(true)}
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="rounded-lg overflow-hidden border border-team-primary/30 bg-black/10">
