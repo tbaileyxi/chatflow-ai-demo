@@ -436,14 +436,29 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             )}
           </div>
           
-          {/* Media first for Reddit social buzz */}
+          {/* Media first for Reddit social buzz - full-width mobile like X embeds */}
           {isSocialBuzz && message.media_url && (
-            <div className="mt-3 rounded-lg overflow-hidden border border-team-primary/30 bg-black/10">
-              <MediaViewer
-                mediaUrl={message.media_url}
-                mediaType={message.media_type === 'video' ? 'video' : 'image'}
-                showLightbox={message.media_type === 'image'}
-              />
+            <div className="w-full max-w-full my-3">
+              {message.media_type === 'video' ? (
+                <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30 bg-black">
+                  <video
+                    src={message.media_url}
+                    className="absolute inset-0 w-full h-full object-contain"
+                    controls
+                    playsInline
+                    preload="metadata"
+                    crossOrigin="anonymous"
+                  />
+                </div>
+              ) : (
+                <div className="rounded-lg overflow-hidden border border-team-primary/30 bg-black/10">
+                  <MediaViewer
+                    mediaUrl={message.media_url}
+                    mediaType="image"
+                    showLightbox={true}
+                  />
+                </div>
+              )}
             </div>
           )}
 
