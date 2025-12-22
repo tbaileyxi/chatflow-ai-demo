@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, MessageSquare, Shield, Trophy, Home, ArrowLeft, Play, Rss } from 'lucide-react';
+import { Users, MessageSquare, Shield, Trophy, Home, ArrowLeft, Play, Rss, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,6 +25,7 @@ export const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [scoringLoading, setScoringLoading] = useState(false);
   const [redditBuzzLoading, setRedditBuzzLoading] = useState(false);
+  const [resetLimitsLoading, setResetLimitsLoading] = useState(false);
 
   useEffect(() => {
     fetchDashboardStats();
@@ -115,6 +116,40 @@ export const AdminDashboard = () => {
       });
     } finally {
       setRedditBuzzLoading(false);
+    }
+  };
+
+  const resetDailyLimits = async () => {
+    setResetLimitsLoading(true);
+    try {
+      console.log('Resetting Reddit daily limits...');
+      const { error } = await supabase
+        .from('reddit_daily_counts')
+        .delete()
+        .gte('post_date', new Date().toISOString().split('T')[0]);
+      
+      if (error) {
+        console.error('Reset error:', error);
+        toast({
+          title: "Reset Failed",
+          description: `Error: ${error.message}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Daily Limits Reset",
+          description: "Reddit daily post limits have been cleared for today",
+        });
+      }
+    } catch (error) {
+      console.error('Failed to reset limits:', error);
+      toast({
+        title: "Reset Failed",
+        description: "Failed to reset daily limits",
+        variant: "destructive",
+      });
+    } finally {
+      setResetLimitsLoading(false);
     }
   };
 
@@ -269,6 +304,16 @@ export const AdminDashboard = () => {
                 <p className="text-xs text-muted-foreground mt-2">
                   Manually fetch and post Reddit social buzz to team huddles
                 </p>
+                <Button
+                  onClick={resetDailyLimits}
+                  disabled={resetLimitsLoading}
+                  className="w-full flex items-center gap-2 mt-2"
+                  variant="ghost"
+                  size="sm"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  {resetLimitsLoading ? 'Resetting...' : 'Reset Daily Limits'}
+                </Button>
               </div>
             </div>
           </CardContent>
