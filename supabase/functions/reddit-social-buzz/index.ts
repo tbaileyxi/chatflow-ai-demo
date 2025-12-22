@@ -244,6 +244,17 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // Track that we processed this team even if at limit
+        if (currentCount >= maxDaily) {
+          results.push({
+            team: teamName,
+            postsAdded: 0,
+            totalProcessed: 0,
+            status: 'daily_limit_reached'
+          });
+          continue;
+        }
+
         const remainingSlots = maxDaily - currentCount;
         let postsAdded = 0;
 
@@ -347,13 +358,17 @@ Deno.serve(async (req) => {
         results.push({
           team: teamName,
           postsAdded,
-          totalProcessed: relevantPosts.length
+          totalProcessed: relevantPosts.length,
+          status: 'processed'
         });
 
       } catch (teamError) {
         console.error(`❌ Error processing ${teamName}:`, teamError);
         results.push({
           team: teamName,
+          postsAdded: 0,
+          totalProcessed: 0,
+          status: 'error',
           error: teamError.message
         });
       }
@@ -361,9 +376,17 @@ Deno.serve(async (req) => {
 
     console.log('\n📊 Summary:', results);
 
+    // Calculate totals for response
+    const teamsProcessed = results.length;
+    const totalPosts = results.reduce((sum, r) => sum + (r.postsAdded || 0), 0);
+    const teamsAtLimit = results.filter(r => r.status === 'daily_limit_reached').length;
+
     return new Response(JSON.stringify({ 
       success: true, 
       results,
+      teams_processed: teamsProcessed,
+      total_posts: totalPosts,
+      teams_at_daily_limit: teamsAtLimit,
       processedAt: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
