@@ -99,7 +99,7 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   const [heatCount, setHeatCount] = useState(0);
   const [hasGivenHeat, setHasGivenHeat] = useState(false);
   const [isGivingHeat, setIsGivingHeat] = useState(false);
-  const [socialBuzzVideoFailed, setSocialBuzzVideoFailed] = useState(false);
+  const [videoHoverHint, setVideoHoverHint] = useState(false);
   const { toast } = useToast();
   
   // Poll voting state
@@ -440,37 +440,82 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
           {/* Media first for Reddit social buzz - full-width mobile like X embeds */}
           {isSocialBuzz && message.media_url && (
             <div className="w-full max-w-full my-3">
-              {message.media_type === 'video' ? (
-                <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-team-primary/30 bg-black">
-                  {socialBuzzVideoFailed ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
-                      <p className="text-sm font-semibold text-foreground">Video couldn’t load.</p>
-                      <div className="flex items-center gap-2">
-                        {socialBuzzParts?.find((p: any) => p?.kind === 'link')?.url ? (
-                          <Button asChild size="sm" variant="secondary">
-                            <a
-                              href={socialBuzzParts.find((p: any) => p?.kind === 'link')?.url}
-                              target="_blank"
-                              rel="noreferrer"
+              {message.media_type === 'reddit_video' || message.media_type === 'video' ? (
+                // Reddit video: Premium thumbnail preview + tap-to-open (no inline playback)
+                (() => {
+                  const embedData = message.embeds as { type?: string; post_url?: string; thumbnail?: string } | undefined;
+                  const postUrl = embedData?.post_url || socialBuzzParts?.find((p: any) => p?.kind === 'link')?.url || '';
+                  
+                  return (
+                    <a
+                      href={postUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block group"
+                      onMouseEnter={() => setVideoHoverHint(true)}
+                      onMouseLeave={() => setVideoHoverHint(false)}
+                    >
+                      <div 
+                        className={cn(
+                          "relative w-full aspect-video rounded-lg overflow-hidden border-2 bg-black/90 cursor-pointer transition-all duration-200",
+                          "border-yellow-500/40 hover:border-yellow-400/70",
+                          "shadow-lg hover:shadow-yellow-500/20 hover:shadow-xl",
+                          "active:scale-[0.98]"
+                        )}
+                      >
+                        {/* Thumbnail image */}
+                        <img
+                          src={message.media_url}
+                          alt="Video thumbnail"
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://www.redditstatic.com/shreddit/assets/thinking-snoo.png';
+                          }}
+                        />
+                        
+                        {/* Dark overlay for contrast */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                        
+                        {/* Centered play button overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className={cn(
+                            "w-16 h-16 rounded-full bg-yellow-500/90 flex items-center justify-center transition-all duration-200",
+                            "group-hover:bg-yellow-400 group-hover:scale-110",
+                            "shadow-lg shadow-black/30"
+                          )}>
+                            <svg className="w-7 h-7 text-black ml-1" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          </div>
+                        </div>
+                        
+                        {/* Hover hint text */}
+                        <AnimatePresence>
+                          {videoHoverHint && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0 }}
+                              className="absolute bottom-3 left-0 right-0 text-center"
                             >
-                              Watch on Reddit
-                            </a>
-                          </Button>
-                        ) : null}
+                              <span className="px-3 py-1.5 bg-black/80 rounded-full text-xs text-white font-medium">
+                                Tap for full video (sound on)
+                              </span>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                        
+                        {/* Video clip label */}
+                        <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 bg-black/70 rounded text-xs text-white font-medium">
+                          <span>🎥</span>
+                          <span>Video clip</span>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <video
-                      src={message.media_url}
-                      className="absolute inset-0 w-full h-full object-contain"
-                      controls
-                      playsInline
-                      preload="metadata"
-                      onError={() => setSocialBuzzVideoFailed(true)}
-                    />
-                  )}
-                </div>
+                    </a>
+                  );
+                })()
               ) : (
+                // Images/GIFs: render inline as normal (unchanged)
                 <div className="rounded-lg overflow-hidden border border-team-primary/30 bg-black/10">
                   <MediaViewer
                     mediaUrl={message.media_url}
@@ -525,8 +570,8 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             )}
           </div>
           
-          {/* New embeds - handle both array and object formats */}
-          {message.embeds && (
+          {/* New embeds - handle both array and object formats (skip reddit_video since handled above) */}
+          {message.embeds && (message.embeds as any).type !== 'reddit_video' && (
             <div className="mt-3 space-y-2">
               {Array.isArray(message.embeds) ? (
                 // Array format (old style)
