@@ -447,7 +447,6 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                     controls
                     playsInline
                     preload="metadata"
-                    crossOrigin="anonymous"
                   />
                 </div>
               ) : (
