@@ -77,9 +77,16 @@ function parseRSS(xmlText: string): RedditPost[] {
       }
 
       // Normalize reddit hosted videos to a direct MP4 URL for inline playback.
-      // RSS often contains https://v.redd.it/<id> which is not directly playable in <video>.
+      // Reddit uses DASH streams which have CORS issues. Try fallback MP4 formats.
+      // The ?source=fallback helps avoid some restrictions.
       if (mediaUrl && /^https?:\/\/v\.redd\.it\/[^/]+\/?$/i.test(mediaUrl)) {
-        mediaUrl = `${mediaUrl.replace(/\/$/, '')}/DASH_720.mp4?source=fallback`;
+        // Try 480p first as it's more compatible, with source=fallback for CORS
+        mediaUrl = `${mediaUrl.replace(/\/$/, '')}/DASH_480.mp4?source=fallback`;
+      }
+      
+      // Also handle v.redd.it URLs that already have paths but no MP4 extension
+      if (mediaUrl && /^https?:\/\/v\.redd\.it\/[^/]+\/(?!DASH_)[^.]*$/i.test(mediaUrl)) {
+        mediaUrl = `${mediaUrl.replace(/\/$/, '')}/DASH_480.mp4?source=fallback`;
       }
       
       // Also check for thumbnail separately
