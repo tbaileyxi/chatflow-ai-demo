@@ -38,21 +38,53 @@ function parseRSS(xmlText: string): RedditPost[] {
     
     if (idMatch && titleMatch) {
       const content = contentMatch ? contentMatch[1] : '';
+      const decodedContent = decodeHTMLEntities(content);
       
-      // Extract media URL from content if present
+      // Extract media URL from content - improved detection
       let mediaUrl = '';
-      const imgMatch = /href="([^"]+\.(jpg|jpeg|png|gif|webp)[^"]*)"/i.exec(content);
-      const videoMatch = /href="([^"]+v\.redd\.it[^"]*)"/.exec(content) ||
-                         /href="([^"]+\.(mp4|webm)[^"]*)"/i.exec(content);
+      let thumbnail = '';
       
+      // Check for i.redd.it images (most common for Reddit images)
+      const iRedditMatch = /href="(https?:\/\/i\.redd\.it\/[^"]+)"/i.exec(decodedContent);
+      
+      // Check for preview.redd.it images (previews/thumbnails)
+      const previewMatch = /href="(https?:\/\/preview\.redd\.it\/[^"]+)"/i.exec(decodedContent) ||
+                          /src="(https?:\/\/preview\.redd\.it\/[^"]+)"/i.exec(decodedContent);
+      
+      // Check for external images (imgur, etc.)
+      const imgMatch = /href="(https?:\/\/(?:i\.)?imgur\.com\/[^"]+\.(jpg|jpeg|png|gif|webp)[^"]*)"/i.exec(decodedContent) ||
+                      /href="([^"]+\.(jpg|jpeg|png|gif|webp)(?:\?[^"]*)?)"/i.exec(decodedContent);
+      
+      // Check for videos
+      const videoMatch = /href="(https?:\/\/v\.redd\.it\/[^"]+)"/i.exec(decodedContent) ||
+                        /href="([^"]+\.(mp4|webm)[^"]*)"/i.exec(decodedContent);
+      
+      // Check for img src directly
+      const imgSrcMatch = /src="(https?:\/\/[^"]+\.(jpg|jpeg|png|gif|webp)[^"]*)"/i.exec(decodedContent);
+      
+      // Prioritize: video > i.redd.it > imgur > other images > preview
       if (videoMatch) {
         mediaUrl = videoMatch[1];
+      } else if (iRedditMatch) {
+        mediaUrl = iRedditMatch[1];
       } else if (imgMatch) {
         mediaUrl = imgMatch[1];
+      } else if (imgSrcMatch) {
+        mediaUrl = imgSrcMatch[1];
+      } else if (previewMatch) {
+        // Use preview as thumbnail if no main media
+        thumbnail = previewMatch[1];
+      }
+      
+      // Also check for thumbnail separately
+      if (!thumbnail && previewMatch) {
+        thumbnail = previewMatch[1];
       }
       
       // Extract post ID from reddit ID format
       const postId = idMatch[1].split('/').pop() || idMatch[1];
+      
+      console.log(`📷 Post ${postId} media: ${mediaUrl || thumbnail || 'none'}`);
       
       posts.push({
         id: postId,
@@ -61,7 +93,8 @@ function parseRSS(xmlText: string): RedditPost[] {
         content: decodeHTMLEntities(content.replace(/<[^>]*>/g, ' ').substring(0, 500)),
         author: authorMatch ? authorMatch[1] : 'unknown',
         created: updatedMatch ? new Date(updatedMatch[1]).getTime() : Date.now(),
-        mediaUrl,
+        mediaUrl: mediaUrl || thumbnail, // Use thumbnail as fallback
+        thumbnail,
       });
     }
   }
@@ -119,22 +152,30 @@ function isRelevantPost(post: RedditPost): boolean {
 }
 
 // Generate a curated caption using simple templates
-function generateCaption(post: RedditPost, teamName: string): string {
+function generateCaption(post: RedditPost, teamName: string, includeSource: boolean = true): string {
   const title = post.title;
   const emojis = ['🔥', '👀', '📰', '🏈', '💪', '🗣️', '📱', '⚡'];
   const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
   
-  // Create engaging caption
+  // Create engaging caption - shorter for media posts
+  const maxLen = post.mediaUrl ? 80 : 100;
+  const truncatedTitle = title.length > maxLen ? title.substring(0, maxLen) + '...' : title;
+  
   let caption = '';
   
   if (title.toLowerCase().includes('tweet') || title.toLowerCase().includes('twitter')) {
-    caption = `${randomEmoji} ${teamName} fan buzz on X: "${title.substring(0, 100)}${title.length > 100 ? '...' : ''}"`;
+    caption = `${randomEmoji} ${teamName} fan buzz: "${truncatedTitle}"`;
   } else if (title.toLowerCase().includes('video') || title.toLowerCase().includes('clip')) {
-    caption = `🎬 Check this out ${teamName} fans: "${title.substring(0, 100)}${title.length > 100 ? '...' : ''}"`;
+    caption = `🎬 ${teamName}: "${truncatedTitle}"`;
   } else if (title.toLowerCase().includes('breaking') || title.toLowerCase().includes('news')) {
-    caption = `📢 ${teamName} News Alert: "${title.substring(0, 100)}${title.length > 100 ? '...' : ''}"`;
+    caption = `📢 ${teamName} News: "${truncatedTitle}"`;
   } else {
-    caption = `${randomEmoji} From the ${teamName} community: "${title.substring(0, 100)}${title.length > 100 ? '...' : ''}"`;
+    caption = `${randomEmoji} From r/${teamName}: "${truncatedTitle}"`;
+  }
+  
+  // Add clean source link at the end
+  if (includeSource && post.url) {
+    caption += `\n\n🔗 [Source](${post.url})`;
   }
   
   return caption;
@@ -293,14 +334,8 @@ Deno.serve(async (req) => {
           // Get or create system user for bot messages
           const { data: systemUserId } = await supabase.rpc('get_or_create_system_user');
 
-          // Generate curated caption
-          const caption = generateCaption(post, teamName);
-          
-          // Build message content
-          let messageContent = caption;
-          if (post.url) {
-            messageContent += `\n\n🔗 Source: ${post.url}`;
-          }
+          // Generate curated caption (includes source link)
+          const messageContent = generateCaption(post, teamName, true);
 
           // Prepare message data
           const messageData: Record<string, unknown> = {
