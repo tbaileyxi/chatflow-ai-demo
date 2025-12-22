@@ -654,13 +654,23 @@ export const Huddle = () => {
             />
           )}
           
-          {/* Huddle name only - clean and minimal */}
+          {/* Huddle name with public/private badge */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-sm sm:text-base md:text-lg font-bold neon-text truncate">
-              {huddle?.is_official_team_huddle 
-                ? (huddle?.name?.replace(' Community', '') || 'Loading...')
-                : (huddle?.name || 'Loading...')}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm sm:text-base md:text-lg font-bold neon-text truncate">
+                {huddle?.is_official_team_huddle 
+                  ? (huddle?.name?.replace(' Community', '') || 'Loading...')
+                  : (huddle?.name || 'Loading...')}
+              </h1>
+              <span className={cn(
+                "text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide shrink-0",
+                huddle?.is_private 
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" 
+                  : "bg-green-500/20 text-green-400 border border-green-500/30"
+              )}>
+                {huddle?.is_private ? 'Private' : 'Public'}
+              </span>
+            </div>
           </div>
           
           {/* Single People icon - opens bottom sheet */}
