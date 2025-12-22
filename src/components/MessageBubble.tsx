@@ -25,6 +25,7 @@ interface MessageBubbleProps {
     is_team_agent_message?: boolean;
     media_url?: string;
     media_type?: string;
+    message_type?: string;
     embed_code?: string;
     embeds?: Array<{
       commentary: string;
@@ -214,16 +215,54 @@ export const MessageBubble = memo<MessageBubbleProps>(({
     }
   }, [message.media_url, message.media_type]);
 
+  // Parse markdown links in content (e.g., [Source](url))
+  const parseMarkdownLinks = useCallback((text: string) => {
+    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match;
+    
+    while ((match = linkRegex.exec(text)) !== null) {
+      // Add text before the link
+      if (match.index > lastIndex) {
+        parts.push(text.substring(lastIndex, match.index));
+      }
+      // Add the link
+      parts.push(
+        <a 
+          key={match.index}
+          href={match[2]} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-blue-400 hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {match[1]}
+        </a>
+      );
+      lastIndex = match.index + match[0].length;
+    }
+    
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+    
+    return parts.length > 0 ? parts : text;
+  }, []);
+
   // Debounced content rendering for streaming
   const renderedContent = useMemo(() => {
     const content = message.content;
+    const parsedContent = parseMarkdownLinks(content);
+    
     return (
       <div className="whitespace-pre-wrap break-words">
-        {content}
+        {parsedContent}
         {isStreaming && <StreamingCaret />}
       </div>
     );
-  }, [message.content, isStreaming]);
+  }, [message.content, isStreaming, parseMarkdownLinks]);
 
   // Handle Pick 'Em card rendering using centralized parser
   const pickemData = parsePickEmMessage(message);
@@ -378,12 +417,21 @@ export const MessageBubble = memo<MessageBubbleProps>(({
         ) : null}
 
         {message.media_url && (
-          <div className="mt-2">
+          <div className={cn(
+            "mt-2 overflow-hidden rounded-lg",
+            // Make media more prominent for bot/social buzz posts
+            (isGameBot || message.message_type === 'social_buzz') && "w-full max-w-md"
+          )}>
             {message.media_type === 'image' ? (
               <img
                 src={message.media_url}
                 alt="Shared media"
-                className="max-w-xs rounded-lg shadow-sm"
+                className={cn(
+                  "rounded-lg shadow-sm object-cover",
+                  (isGameBot || message.message_type === 'social_buzz') 
+                    ? "w-full max-h-96" 
+                    : "max-w-xs"
+                )}
                 loading="lazy"
               />
             ) : (
@@ -391,7 +439,12 @@ export const MessageBubble = memo<MessageBubbleProps>(({
                 src={message.media_url}
                 poster={videoPoster || undefined}
                 controls
-                className="max-w-xs rounded-lg shadow-sm"
+                className={cn(
+                  "rounded-lg shadow-sm",
+                  (isGameBot || message.message_type === 'social_buzz') 
+                    ? "w-full max-h-96" 
+                    : "max-w-xs"
+                )}
                 preload="metadata"
               />
             )}
