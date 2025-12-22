@@ -66,3 +66,7 @@ verify_jwt = false
 [functions.fades-settle]
 verify_jwt = false
 on_schedule = "0 */3 * * *"
+
+[functions.reddit-social-buzz]
+verify_jwt = false
+on_schedule = "30 */1 * * *"

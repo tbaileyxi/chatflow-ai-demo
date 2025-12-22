@@ -1436,6 +1436,76 @@ export type Database = {
         }
         Relationships: []
       }
+      reddit_daily_counts: {
+        Row: {
+          huddle_id: string
+          id: string
+          post_count: number | null
+          post_date: string
+        }
+        Insert: {
+          huddle_id: string
+          id?: string
+          post_count?: number | null
+          post_date?: string
+        }
+        Update: {
+          huddle_id?: string
+          id?: string
+          post_count?: number | null
+          post_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reddit_daily_counts_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reddit_posts_log: {
+        Row: {
+          content_hash: string | null
+          created_at: string
+          id: string
+          posted_to_huddle_at: string | null
+          reddit_post_id: string
+          team_id: string
+          title: string | null
+          url: string | null
+        }
+        Insert: {
+          content_hash?: string | null
+          created_at?: string
+          id?: string
+          posted_to_huddle_at?: string | null
+          reddit_post_id: string
+          team_id: string
+          title?: string | null
+          url?: string | null
+        }
+        Update: {
+          content_hash?: string | null
+          created_at?: string
+          id?: string
+          posted_to_huddle_at?: string | null
+          reddit_post_id?: string
+          team_id?: string
+          title?: string | null
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reddit_posts_log_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_sources: {
         Row: {
           created_at: string
@@ -1563,6 +1633,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      team_subreddits: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          rss_url: string
+          subreddit_name: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          rss_url: string
+          subreddit_name: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          rss_url?: string
+          subreddit_name?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_subreddits_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       team_trending: {
         Row: {
