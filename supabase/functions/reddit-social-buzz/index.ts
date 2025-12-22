@@ -331,7 +331,8 @@ Deno.serve(async (req) => {
             user_id: systemUserId,
             content: messageContent,
             is_bot_message: true,
-            message_type: 'social_buzz'
+            message_type: 'social_buzz',
+            origin_team_id: teamId  // Link to team for sponsor display
           };
 
           // Add media if available
