@@ -17,6 +17,77 @@ interface RedditPost {
   upvotes?: number;
 }
 
+function isLikelyVideoUrl(url: string): boolean {
+  const u = url.toLowerCase();
+  return (
+    u.includes('v.redd.it') ||
+    u.includes('cors.lol') ||
+    u.includes('allorigins') ||
+    u.endsWith('.mp4') ||
+    u.includes('.mp4?') ||
+    u.endsWith('.webm') ||
+    u.includes('.webm?')
+  );
+}
+
+async function resolveRedditVideoViaPublicProxy(directUrl: string): Promise<{
+  url: string | null;
+  proxy: 'cors.lol' | 'allorigins' | null;
+  debug: Array<Record<string, unknown>>;
+}> {
+  const debug: Array<Record<string, unknown>> = [];
+
+  const candidates: Array<{ proxy: 'cors.lol' | 'allorigins'; url: string }> = [
+    { proxy: 'cors.lol', url: `https://cors.lol/${directUrl}` },
+    { proxy: 'allorigins', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}` },
+  ];
+
+  for (const c of candidates) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 8000);
+
+    try {
+      const res = await fetch(c.url, {
+        method: 'GET',
+        headers: {
+          // Keep it tiny; we just want to know if the proxy can reach the media.
+          Range: 'bytes=0-0',
+          Accept: 'video/*,*/*;q=0.8',
+        },
+        redirect: 'follow',
+        signal: controller.signal,
+      });
+
+      const contentType = res.headers.get('content-type') || '';
+      debug.push({
+        proxy: c.proxy,
+        status: res.status,
+        contentType,
+        contentLength: res.headers.get('content-length'),
+        contentRange: res.headers.get('content-range'),
+      });
+
+      const looksLikeVideo =
+        contentType.toLowerCase().includes('video/') ||
+        contentType.toLowerCase().includes('application/octet-stream');
+
+      const looksBlocked =
+        contentType.toLowerCase().includes('text/html') ||
+        contentType.toLowerCase().includes('application/xml');
+
+      if (res.ok && looksLikeVideo && !looksBlocked) {
+        return { url: c.url, proxy: c.proxy, debug };
+      }
+    } catch (e) {
+      debug.push({ proxy: c.proxy, error: String(e) });
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  return { url: null, proxy: null, debug };
+}
+
 // Parse RSS XML to extract posts
 function parseRSS(xmlText: string): RedditPost[] {
   const posts: RedditPost[] = [];
@@ -76,25 +147,18 @@ function parseRSS(xmlText: string): RedditPost[] {
         thumbnail = previewMatch[1];
       }
 
-      // Normalize reddit hosted videos to a direct MP4 URL for inline playback.
-      // Reddit uses DASH streams which have CORS issues. We proxy through our edge function.
+      // Normalize reddit hosted videos to a direct MP4 URL (DASH stream).
+      // Note: Playback often requires a proxy (CORS/403). We resolve the proxy later during posting.
       if (mediaUrl && /^https?:\/\/v\.redd\.it\/[^/]+\/?$/i.test(mediaUrl)) {
-        // Build direct MP4 URL first
-        const directUrl = `${mediaUrl.replace(/\/$/, '')}/DASH_480.mp4?source=fallback`;
-        // Proxy through our edge function to bypass CORS
-        mediaUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/proxy-reddit-video?url=${encodeURIComponent(directUrl)}`;
+        mediaUrl = `${mediaUrl.replace(/\/$/, '')}/DASH_480.mp4?source=fallback`;
       }
-      
+
       // Also handle v.redd.it URLs that already have paths but no MP4 extension
       if (mediaUrl && /^https?:\/\/v\.redd\.it\/[^/]+\/(?!DASH_)[^.]*$/i.test(mediaUrl)) {
-        const directUrl = `${mediaUrl.replace(/\/$/, '')}/DASH_480.mp4?source=fallback`;
-        mediaUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/proxy-reddit-video?url=${encodeURIComponent(directUrl)}`;
+        mediaUrl = `${mediaUrl.replace(/\/$/, '')}/DASH_480.mp4?source=fallback`;
       }
-      
-      // Handle v.redd.it URLs that already have DASH paths - also proxy them
-      if (mediaUrl && /^https?:\/\/v\.redd\.it\/.+\.mp4/i.test(mediaUrl)) {
-        mediaUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/proxy-reddit-video?url=${encodeURIComponent(mediaUrl)}`;
-      }
+
+      // If it's already a direct MP4 under v.redd.it, keep as-is.
       
       // Also check for thumbnail separately
       if (!thumbnail && previewMatch) {
@@ -338,12 +402,27 @@ Deno.serve(async (req) => {
 
           // Add media if available
           if (post.mediaUrl) {
-            const isVideo = post.mediaUrl.includes('v.redd.it') || 
-                           post.mediaUrl.includes('proxy-reddit-video') ||
-                           post.mediaUrl.endsWith('.mp4') || 
-                           post.mediaUrl.endsWith('.webm');
-            baseMessageData.media_url = post.mediaUrl;
-            baseMessageData.media_type = isVideo ? 'video' : 'image';
+            let finalMediaUrl = post.mediaUrl;
+            let finalMediaType: 'video' | 'image' = isLikelyVideoUrl(finalMediaUrl) ? 'video' : 'image';
+
+            // For Reddit DASH MP4s, try public CORS proxies (our own proxy is getting 403'd).
+            if (/^https?:\/\/v\.redd\.it\/.+\.mp4/i.test(finalMediaUrl)) {
+              const resolved = await resolveRedditVideoViaPublicProxy(finalMediaUrl);
+              if (resolved.url) {
+                console.log(`🎥 Using public proxy: ${resolved.proxy}`, { original: finalMediaUrl });
+                finalMediaUrl = resolved.url;
+                finalMediaType = 'video';
+              } else {
+                console.warn('⚠️ Public proxy failed for Reddit video', {
+                  original: finalMediaUrl,
+                  attempts: resolved.debug,
+                });
+                finalMediaType = 'video';
+              }
+            }
+
+            baseMessageData.media_url = finalMediaUrl;
+            baseMessageData.media_type = finalMediaType;
           }
 
           // Post to ALL huddles for this team
