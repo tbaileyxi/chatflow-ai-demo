@@ -75,6 +75,12 @@ function parseRSS(xmlText: string): RedditPost[] {
         // Use preview as thumbnail if no main media
         thumbnail = previewMatch[1];
       }
+
+      // Normalize reddit hosted videos to a direct MP4 URL for inline playback.
+      // RSS often contains https://v.redd.it/<id> which is not directly playable in <video>.
+      if (mediaUrl && /^https?:\/\/v\.redd\.it\/[^/]+\/?$/i.test(mediaUrl)) {
+        mediaUrl = `${mediaUrl.replace(/\/$/, '')}/DASH_720.mp4?source=fallback`;
+      }
       
       // Also check for thumbnail separately
       if (!thumbnail && previewMatch) {
