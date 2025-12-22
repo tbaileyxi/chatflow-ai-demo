@@ -99,9 +99,11 @@ export const AdminDashboard = () => {
         });
       } else {
         console.log('Reddit buzz result:', data);
+        const atLimit = data?.teams_at_daily_limit || 0;
+        const limitMsg = atLimit > 0 ? ` (${atLimit} teams at daily limit)` : '';
         toast({
           title: "Reddit Buzz Complete",
-          description: `Processed ${data?.teams_processed || 0} teams, posted ${data?.total_posts || 0} messages`,
+          description: `Processed ${data?.teams_processed || 0} teams, posted ${data?.total_posts || 0} messages${limitMsg}`,
         });
       }
     } catch (error) {
