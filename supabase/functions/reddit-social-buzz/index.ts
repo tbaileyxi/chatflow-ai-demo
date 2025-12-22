@@ -77,16 +77,23 @@ function parseRSS(xmlText: string): RedditPost[] {
       }
 
       // Normalize reddit hosted videos to a direct MP4 URL for inline playback.
-      // Reddit uses DASH streams which have CORS issues. Try fallback MP4 formats.
-      // The ?source=fallback helps avoid some restrictions.
+      // Reddit uses DASH streams which have CORS issues. We proxy through our edge function.
       if (mediaUrl && /^https?:\/\/v\.redd\.it\/[^/]+\/?$/i.test(mediaUrl)) {
-        // Try 480p first as it's more compatible, with source=fallback for CORS
-        mediaUrl = `${mediaUrl.replace(/\/$/, '')}/DASH_480.mp4?source=fallback`;
+        // Build direct MP4 URL first
+        const directUrl = `${mediaUrl.replace(/\/$/, '')}/DASH_480.mp4?source=fallback`;
+        // Proxy through our edge function to bypass CORS
+        mediaUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/proxy-reddit-video?url=${encodeURIComponent(directUrl)}`;
       }
       
       // Also handle v.redd.it URLs that already have paths but no MP4 extension
       if (mediaUrl && /^https?:\/\/v\.redd\.it\/[^/]+\/(?!DASH_)[^.]*$/i.test(mediaUrl)) {
-        mediaUrl = `${mediaUrl.replace(/\/$/, '')}/DASH_480.mp4?source=fallback`;
+        const directUrl = `${mediaUrl.replace(/\/$/, '')}/DASH_480.mp4?source=fallback`;
+        mediaUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/proxy-reddit-video?url=${encodeURIComponent(directUrl)}`;
+      }
+      
+      // Handle v.redd.it URLs that already have DASH paths - also proxy them
+      if (mediaUrl && /^https?:\/\/v\.redd\.it\/.+\.mp4/i.test(mediaUrl)) {
+        mediaUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/proxy-reddit-video?url=${encodeURIComponent(mediaUrl)}`;
       }
       
       // Also check for thumbnail separately
