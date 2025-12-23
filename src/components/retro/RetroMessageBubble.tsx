@@ -446,6 +446,13 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                   const embedData = message.embeds as { type?: string; post_url?: string; thumbnail?: string } | undefined;
                   const postUrl = embedData?.post_url || socialBuzzParts?.find((p: any) => p?.kind === 'link')?.url || '';
                   
+                  // Check if we have a real thumbnail (not the Reddit logo placeholder)
+                  const hasRealThumbnail = message.media_url && 
+                    !message.media_url.includes('thinking-snoo') &&
+                    !message.media_url.includes('redditstatic.com') &&
+                    !message.media_url.includes('default') &&
+                    message.media_url.startsWith('http');
+                  
                   return (
                     <a
                       href={postUrl}
@@ -457,21 +464,28 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                     >
                       <div 
                         className={cn(
-                          "relative w-full aspect-video rounded-lg overflow-hidden border-2 bg-black/90 cursor-pointer transition-all duration-200",
+                          "relative w-full aspect-video rounded-lg overflow-hidden border-2 cursor-pointer transition-all duration-200",
                           "border-yellow-500/40 hover:border-yellow-400/70",
                           "shadow-lg hover:shadow-yellow-500/20 hover:shadow-xl",
-                          "active:scale-[0.98]"
+                          "active:scale-[0.98]",
+                          hasRealThumbnail ? "bg-black/90" : "bg-zinc-900"
                         )}
                       >
-                        {/* Thumbnail image */}
-                        <img
-                          src={message.media_url}
-                          alt="Video thumbnail"
-                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://www.redditstatic.com/shreddit/assets/thinking-snoo.png';
-                          }}
-                        />
+                        {hasRealThumbnail ? (
+                          // Real thumbnail image
+                          <img
+                            src={message.media_url}
+                            alt="Video thumbnail"
+                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                            onError={(e) => {
+                              // On error, hide the image and let the neutral container show
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          // No thumbnail: neutral video container with gradient
+                          <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black" />
+                        )}
                         
                         {/* Dark overlay for contrast */}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
