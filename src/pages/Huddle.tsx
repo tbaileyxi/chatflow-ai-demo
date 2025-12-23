@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { JumpToLatest } from '@/components/JumpToLatest';
 import { DateDivider } from '@/components/chat/DateDivider';
-import { Zap, ArrowLeft, MoreVertical, UserPlus, UsersRound, Lock } from 'lucide-react';
+import { Zap, ArrowLeft, MoreVertical, UserPlus, UsersRound, Lock, Heart, Check } from 'lucide-react';
 import { isSameDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -39,6 +39,8 @@ export const Huddle = () => {
   const [showFoundingModal, setShowFoundingModal] = useState(false);
   const [showFadesSidebar, setShowFadesSidebar] = useState(false);
   const [replyingToMessage, setReplyingToMessage] = useState<any>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
   
   // Fix 3: Handler to set reply and auto-scroll to top (where input is)
   const handleReply = useCallback((message: any) => {
@@ -231,6 +233,24 @@ export const Huddle = () => {
     loadHuddle();
   }, [loadHuddle]);
 
+  // Check if user is following this huddle (member)
+  useEffect(() => {
+    if (!huddleId || !user) return;
+    
+    const checkFollowStatus = async () => {
+      const { data } = await supabase
+        .from('huddle_members')
+        .select('id')
+        .eq('huddle_id', huddleId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      setIsFollowing(!!data);
+    };
+    
+    checkFollowStatus();
+  }, [huddleId, user]);
+
   // Update last read when user opens the huddle
   useEffect(() => {
     if (!huddleId || !user) return;
@@ -248,6 +268,53 @@ export const Huddle = () => {
 
     updateLastRead();
   }, [huddleId, user]);
+
+  // Follow/unfollow huddle handler
+  const handleFollowToggle = useCallback(async () => {
+    if (!user || !huddleId || !huddle) return;
+    
+    setFollowLoading(true);
+    try {
+      if (isFollowing) {
+        // Unfollow - remove from huddle_members
+        const { error } = await supabase
+          .from('huddle_members')
+          .delete()
+          .eq('huddle_id', huddleId)
+          .eq('user_id', user.id);
+        
+        if (error) throw error;
+        
+        setIsFollowing(false);
+        toast({
+          title: "Unfollowed",
+          description: `Removed from your huddles`,
+        });
+      } else {
+        // Follow - add to huddle_members
+        const { error } = await supabase
+          .from('huddle_members')
+          .insert({ huddle_id: huddleId, user_id: user.id });
+        
+        if (error) throw error;
+        
+        setIsFollowing(true);
+        toast({
+          title: "Following!",
+          description: `Added to your huddles`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error toggling follow:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update follow status",
+        variant: "destructive",
+      });
+    } finally {
+      setFollowLoading(false);
+    }
+  }, [user, huddleId, huddle, isFollowing, toast]);
 
   // Load older messages function
   const loadMoreMessages = useCallback(async () => {
@@ -365,9 +432,10 @@ export const Huddle = () => {
       return;
     }
 
-    // For public huddles, auto-join user if not already a member
+    // For public huddles, check if user is a member - but DON'T auto-join
+    // Users must explicitly follow to join My Huddles
     if (huddle && huddle.is_private === false) {
-      // Check if user is already a member
+      // Just check membership, don't auto-add
       const { data: existingMember } = await supabase
         .from('huddle_members')
         .select('id')
@@ -375,22 +443,10 @@ export const Huddle = () => {
         .eq('user_id', user.id)
         .maybeSingle();
       
+      // Non-members can still send messages to public huddles (read + write)
+      // but they won't appear in "My Huddles" until they explicitly follow
       if (!existingMember) {
-        // Auto-join the public huddle
-        const { error: joinError } = await supabase
-          .from('huddle_members')
-          .insert({ huddle_id: huddleId, user_id: user.id });
-        
-        if (joinError) {
-          console.error('Error auto-joining public huddle:', joinError);
-          toast({
-            title: "Error",
-            description: "Failed to join huddle. Please try again.",
-            variant: "destructive",
-          });
-          return;
-        }
-        console.log('✅ Auto-joined public huddle');
+        console.log('📝 User sending message to public huddle they haven\'t followed yet');
       }
     }
 
@@ -672,6 +728,36 @@ export const Huddle = () => {
               </span>
             </div>
           </div>
+          
+          {/* Follow button for authenticated users on public huddles */}
+          {user && !huddle?.is_private && (
+            <Button
+              variant={isFollowing ? "default" : "outline"}
+              size="sm"
+              onClick={handleFollowToggle}
+              disabled={followLoading}
+              className={cn(
+                "h-8 px-3 rounded-full shrink-0 text-xs font-medium",
+                isFollowing 
+                  ? "bg-yellow-400 hover:bg-yellow-500 text-black" 
+                  : "border-yellow-400/50 text-yellow-400 hover:bg-yellow-400/10"
+              )}
+            >
+              {followLoading ? (
+                <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : isFollowing ? (
+                <>
+                  <Check className="h-3 w-3 mr-1" />
+                  Following
+                </>
+              ) : (
+                <>
+                  <Heart className="h-3 w-3 mr-1" />
+                  Follow
+                </>
+              )}
+            </Button>
+          )}
           
           {/* Single People icon - opens bottom sheet */}
           <HuddlePeopleSheet

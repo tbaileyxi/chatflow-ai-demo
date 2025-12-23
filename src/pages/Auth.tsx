@@ -54,7 +54,7 @@ export const Auth = () => {
     if (intendedTeamId) {
       localStorage.removeItem('intended_team_id');
       
-      // Auto-follow the team (trigger will auto-join public huddle)
+      // Auto-follow the team only (don't auto-join huddle)
       setTimeout(async () => {
         await supabase
           .from('user_follows')
@@ -62,18 +62,12 @@ export const Auth = () => {
       }, 0);
     }
     
-    // Check for intended huddle after signup
+    // Check for intended huddle after signup - navigate there but DON'T auto-join
+    // User must explicitly click Follow to add to My Huddles
     const intendedHuddleId = localStorage.getItem('intended_huddle_id');
     if (intendedHuddleId) {
       localStorage.removeItem('intended_huddle_id');
-      
-      // Auto-join the public huddle
-      setTimeout(async () => {
-        await supabase
-          .from('huddle_members')
-          .insert({ huddle_id: intendedHuddleId, user_id: user.id });
-      }, 0);
-      
+      // Navigate to huddle page where user can choose to follow
       return <Navigate to={`/huddle/${intendedHuddleId}`} replace />;
     }
     
