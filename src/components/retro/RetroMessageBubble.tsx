@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatDistanceToNow } from 'date-fns';
-import { Megaphone, Copy, Zap } from 'lucide-react';
+import { Megaphone, Copy, Zap, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +15,7 @@ import { isXEmbed } from '@/utils/embedUtils';
 import { MediaViewer } from '@/components/MediaViewer';
 import DOMPurify from 'dompurify';
 import { FoundingBadge, FoundingCheckmark } from '@/components/founding';
+import { classifyRedditMedia, extractSourceUrl, getDisplayDomain } from '@/utils/redditMediaUtils';
 
 interface RetroMessageBubbleProps {
   message: {
@@ -437,109 +438,134 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             )}
           </div>
           
-          {/* Media first for Reddit social buzz - full-width mobile like X embeds */}
-          {isSocialBuzz && message.media_url && (
-            <div className="w-full max-w-full my-3">
-              {message.media_type === 'reddit_video' || message.media_type === 'video' ? (
-                // Reddit video: Premium thumbnail preview + tap-to-open (no inline playback)
-                (() => {
-                  const embedData = message.embeds as { type?: string; post_url?: string; thumbnail?: string } | undefined;
-                  const postUrl = embedData?.post_url || socialBuzzParts?.find((p: any) => p?.kind === 'link')?.url || '';
-                  
-                  // Check if we have a real thumbnail (not the Reddit logo placeholder)
-                  const hasRealThumbnail = message.media_url && 
-                    !message.media_url.includes('thinking-snoo') &&
-                    !message.media_url.includes('redditstatic.com') &&
-                    !message.media_url.includes('default') &&
-                    message.media_url.startsWith('http');
-                  
-                  return (
+          {/* Media for Reddit social buzz - only render for guaranteed media */}
+          {isSocialBuzz && (() => {
+            const embedData = message.embeds as { type?: string; post_url?: string; thumbnail?: string } | undefined;
+            const sourceUrl = socialBuzzParts?.find((p: any) => p?.kind === 'link')?.url || extractSourceUrl(message.content) || '';
+            
+            // Classify the media to determine rendering
+            const mediaClassification = classifyRedditMedia(
+              message.media_url,
+              message.media_type,
+              embedData,
+              sourceUrl
+            );
+            
+            // Only render media container for guaranteed media
+            if (!mediaClassification.hasGuaranteedMedia) {
+              // For external link posts, show a link badge instead
+              if (mediaClassification.isExternalLink && sourceUrl) {
+                const domain = getDisplayDomain(sourceUrl);
+                return (
+                  <div className="my-2">
                     <a
-                      href={postUrl}
+                      href={sourceUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="block group"
-                      onMouseEnter={() => setVideoHoverHint(true)}
-                      onMouseLeave={() => setVideoHoverHint(false)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 rounded-full text-xs text-zinc-300 hover:text-white transition-colors"
                     >
-                      <div 
-                        className={cn(
-                          "relative w-full aspect-video rounded-lg overflow-hidden border-2 cursor-pointer transition-all duration-200",
-                          "border-yellow-500/40 hover:border-yellow-400/70",
-                          "shadow-lg hover:shadow-yellow-500/20 hover:shadow-xl",
-                          "active:scale-[0.98]",
-                          hasRealThumbnail ? "bg-black/90" : "bg-zinc-900"
-                        )}
-                      >
-                        {hasRealThumbnail ? (
-                          // Real thumbnail image
-                          <img
-                            src={message.media_url}
-                            alt="Video thumbnail"
-                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
-                            onError={(e) => {
-                              // On error, hide the image and let the neutral container show
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        ) : (
-                          // No thumbnail: neutral video container with gradient
-                          <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black" />
-                        )}
-                        
-                        {/* Dark overlay for contrast */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-                        
-                        {/* Centered play button overlay */}
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className={cn(
-                            "w-16 h-16 rounded-full bg-yellow-500/90 flex items-center justify-center transition-all duration-200",
-                            "group-hover:bg-yellow-400 group-hover:scale-110",
-                            "shadow-lg shadow-black/30"
-                          )}>
-                            <svg className="w-7 h-7 text-black ml-1" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M8 5v14l11-7z" />
-                            </svg>
-                          </div>
-                        </div>
-                        
-                        {/* Hover hint text */}
-                        <AnimatePresence>
-                          {videoHoverHint && (
-                            <motion.div
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0 }}
-                              className="absolute bottom-3 left-0 right-0 text-center"
-                            >
-                              <span className="px-3 py-1.5 bg-black/80 rounded-full text-xs text-white font-medium">
-                                Tap for full video (sound on)
-                              </span>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                        
-                        {/* Video clip label */}
-                        <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 bg-black/70 rounded text-xs text-white font-medium">
-                          <span>🎥</span>
-                          <span>Video clip</span>
+                      <ExternalLink className="w-3 h-3" />
+                      <span>🔗 {domain || 'Link'}</span>
+                    </a>
+                  </div>
+                );
+              }
+              return null;
+            }
+            
+            // Render video with valid thumbnail
+            if (mediaClassification.type === 'video') {
+              const postUrl = embedData?.post_url || sourceUrl;
+              
+              return (
+                <div className="w-full max-w-full my-3">
+                  <a
+                    href={postUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block group"
+                    onMouseEnter={() => setVideoHoverHint(true)}
+                    onMouseLeave={() => setVideoHoverHint(false)}
+                  >
+                    <div 
+                      className={cn(
+                        "relative w-full aspect-video rounded-lg overflow-hidden border-2 cursor-pointer transition-all duration-200",
+                        "border-yellow-500/40 hover:border-yellow-400/70",
+                        "shadow-lg hover:shadow-yellow-500/20 hover:shadow-xl",
+                        "active:scale-[0.98]",
+                        "bg-black/90"
+                      )}
+                    >
+                      <img
+                        src={mediaClassification.mediaUrl || ''}
+                        alt="Video thumbnail"
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                        onError={(e) => {
+                          // On error, hide the entire container
+                          (e.target as HTMLImageElement).parentElement?.parentElement?.parentElement?.remove();
+                        }}
+                      />
+                      
+                      {/* Dark overlay for contrast */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                      
+                      {/* Centered play button overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className={cn(
+                          "w-16 h-16 rounded-full bg-yellow-500/90 flex items-center justify-center transition-all duration-200",
+                          "group-hover:bg-yellow-400 group-hover:scale-110",
+                          "shadow-lg shadow-black/30"
+                        )}>
+                          <svg className="w-7 h-7 text-black ml-1" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
                         </div>
                       </div>
-                    </a>
-                  );
-                })()
-              ) : (
-                // Images/GIFs: render inline as normal (unchanged)
-                <div className="rounded-lg overflow-hidden border border-team-primary/30 bg-black/10">
-                  <MediaViewer
-                    mediaUrl={message.media_url}
-                    mediaType="image"
-                    showLightbox={true}
-                  />
+                      
+                      {/* Hover hint text */}
+                      <AnimatePresence>
+                        {videoHoverHint && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute bottom-3 left-0 right-0 text-center"
+                          >
+                            <span className="px-3 py-1.5 bg-black/80 rounded-full text-xs text-white font-medium">
+                              Tap for full video (sound on)
+                            </span>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      
+                      {/* Video clip label */}
+                      <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 bg-black/70 rounded text-xs text-white font-medium">
+                        <span>🎥</span>
+                        <span>Video clip</span>
+                      </div>
+                    </div>
+                  </a>
                 </div>
-              )}
-            </div>
-          )}
+              );
+            }
+            
+            // Render genuine image
+            if (mediaClassification.type === 'image' && mediaClassification.mediaUrl) {
+              return (
+                <div className="w-full max-w-full my-3">
+                  <div className="rounded-lg overflow-hidden border border-team-primary/30 bg-black/10">
+                    <MediaViewer
+                      mediaUrl={mediaClassification.mediaUrl}
+                      mediaType="image"
+                      showLightbox={true}
+                    />
+                  </div>
+                </div>
+              );
+            }
+            
+            return null;
+          })()}
 
           {/* Fixed: Solid background instead of gradient for better readability */}
           <div className="mt-3 px-3 py-1.5 rounded-lg bg-background border border-team-primary/30 overflow-hidden">
