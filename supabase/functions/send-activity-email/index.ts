@@ -222,9 +222,10 @@ Deno.serve(async (req) => {
 </html>
         `;
 
-        // Send the email
+        // Send the email - use verified Resend domain
+        const emailFrom = Deno.env.get('EMAIL_FROM') || 'Side Huddle Sports <updates@updates.sidehuddlesports.com>';
         const { error: sendError } = await resend.emails.send({
-          from: 'Side Huddle <updates@sidehuddle.io>',
+          from: emailFrom,
           to: [userEmail],
           subject: subject,
           html: htmlBody,

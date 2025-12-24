@@ -231,6 +231,15 @@ export const Landing = () => {
           </Button>
         </div>
       </div>
+
+      {/* Footer Links */}
+      <div className="py-8 bg-muted/50 border-t border-border">
+        <div className="max-w-4xl mx-auto px-4 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
+          <a href="/faq" className="hover:text-foreground transition-colors">FAQs</a>
+          <a href="mailto:contact@sidehuddlesports.com" className="hover:text-foreground transition-colors">Contact Us</a>
+          <a href="https://sidehuddlefounders.carrd.co/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Sponsorship</a>
+        </div>
+      </div>
     </div>
   );
 };
