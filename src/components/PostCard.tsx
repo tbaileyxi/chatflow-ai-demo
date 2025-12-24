@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Heart, Flame, Share } from "lucide-react";
+import { Heart, Flame, Share, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,6 +11,7 @@ import { ReportButton } from "@/components/ReportButton";
 import { linkifyTeamNames } from "@/utils/teamLinking";
 import { XPostEmbed } from "@/components/embeds/XPostEmbed";
 import { ThreadView } from "@/components/ThreadView";
+import { classifyRedditMedia, extractSourceUrl, getDisplayDomain } from "@/utils/redditMediaUtils";
 
 // Twitter global type
 declare global {
@@ -466,67 +467,148 @@ export const PostCard = ({ post, isSpotlight = false, disableReply = false }: Po
           </div>
         ) : null}
 
-        {/* Media Display */}
-        {post.media_url && !post.embed_code && (
-          <div className="mt-3 rounded-lg overflow-hidden">
-            {/* Check if it's a direct media file for MediaViewer */}
-            {(post.media_url.includes('.jpg') || post.media_url.includes('.jpeg') || 
-              post.media_url.includes('.png') || post.media_url.includes('.gif') || 
-              post.media_url.includes('.webp')) ? (
-              <MediaViewer
-                mediaUrl={post.media_url}
-                mediaType="image"
-                className="w-full"
-              />
-            ) : (post.media_url.includes('.mp4') || post.media_url.includes('.webm') || 
-                   post.media_url.includes('.ogg') || post.media_url.includes('.mov')) ? (
-              <MediaViewer
-                mediaUrl={post.media_url}
-                mediaType="video"
-                className="w-full"
-              />
-            ) : /* Handle YouTube URLs */
-            (post.media_url.includes('youtube.com') || post.media_url.includes('youtu.be')) ? (
-              <div className="aspect-video">
-                <iframe
-                  src={post.media_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
-                  className="w-full h-full"
-                  frameBorder="0"
-                  allowFullScreen
-                  title="Video content"
+        {/* Media Display - with Reddit media validation */}
+        {post.media_url && !post.embed_code && (() => {
+          // For Reddit posts (team agent messages), apply strict media classification
+          const isRedditPost = post.is_team_agent_message && (
+            post.message_type === 'reddit_video' || 
+            post.media_url?.includes('redd.it') ||
+            post.media_url?.includes('preview.redd.it')
+          );
+          
+          if (isRedditPost) {
+            const sourceUrl = extractSourceUrl(post.content);
+            const embedsObj = post.embeds && !Array.isArray(post.embeds) ? post.embeds as any : null;
+            const mediaClassification = classifyRedditMedia(
+              post.media_url,
+              post.message_type,
+              embedsObj,
+              sourceUrl
+            );
+            
+            // Don't render media container for non-guaranteed media
+            if (!mediaClassification.hasGuaranteedMedia) {
+              // Show link badge for external link posts
+              if (mediaClassification.isExternalLink && sourceUrl) {
+                const domain = getDisplayDomain(sourceUrl);
+                return (
+                  <div className="mt-2">
+                    <a
+                      href={sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-muted hover:bg-muted/80 rounded-full text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>🔗 {domain || 'Link'}</span>
+                    </a>
+                  </div>
+                );
+              }
+              return null;
+            }
+            
+            // For video with valid thumbnail
+            if (mediaClassification.type === 'video' && mediaClassification.mediaUrl) {
+              const postUrl = embedsObj?.post_url || sourceUrl || post.media_url;
+              return (
+                <div className="mt-3 rounded-lg overflow-hidden">
+                  <a href={postUrl} target="_blank" rel="noreferrer" className="block group relative">
+                    <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                      <img
+                        src={mediaClassification.mediaUrl}
+                        alt="Video thumbnail"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        onError={(e) => (e.target as HTMLImageElement).parentElement?.parentElement?.remove()}
+                      />
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                        <div className="w-14 h-14 rounded-full bg-primary/90 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <svg className="w-6 h-6 text-primary-foreground ml-1" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/70 rounded text-xs text-white">
+                        🎥 Video
+                      </div>
+                    </div>
+                  </a>
+                </div>
+              );
+            }
+            
+            // For genuine image
+            if (mediaClassification.type === 'image' && mediaClassification.mediaUrl) {
+              return (
+                <div className="mt-3 rounded-lg overflow-hidden">
+                  <MediaViewer
+                    mediaUrl={mediaClassification.mediaUrl}
+                    mediaType="image"
+                    className="w-full"
+                  />
+                </div>
+              );
+            }
+            
+            return null;
+          }
+          
+          // Non-Reddit posts: use original media display logic
+          return (
+            <div className="mt-3 rounded-lg overflow-hidden">
+              {/* Check if it's a direct media file for MediaViewer */}
+              {(post.media_url.includes('.jpg') || post.media_url.includes('.jpeg') || 
+                post.media_url.includes('.png') || post.media_url.includes('.gif') || 
+                post.media_url.includes('.webp')) ? (
+                <MediaViewer
+                  mediaUrl={post.media_url}
+                  mediaType="image"
+                  className="w-full"
                 />
-              </div>
-            ) : /* Handle embed URLs */
-            post.media_url.includes('embed') || post.media_url.includes('iframe') ? (
-              <div className="aspect-video">
-                <iframe
-                  src={post.media_url}
-                  className="w-full h-full"
-                  frameBorder="0"
-                  allowFullScreen
-                  title="Embedded content"
+              ) : (post.media_url.includes('.mp4') || post.media_url.includes('.webm') || 
+                     post.media_url.includes('.ogg') || post.media_url.includes('.mov')) ? (
+                <MediaViewer
+                  mediaUrl={post.media_url}
+                  mediaType="video"
+                  className="w-full"
                 />
-              </div>
-            ) : /* Fallback - try as image first, then iframe */
-            (
-              <div>
+              ) : /* Handle YouTube URLs */
+              (post.media_url.includes('youtube.com') || post.media_url.includes('youtu.be')) ? (
+                <div className="aspect-video">
+                  <iframe
+                    src={post.media_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                    className="w-full h-full"
+                    frameBorder="0"
+                    allowFullScreen
+                    title="Video content"
+                  />
+                </div>
+              ) : /* Handle embed URLs */
+              post.media_url.includes('embed') || post.media_url.includes('iframe') ? (
+                <div className="aspect-video">
+                  <iframe
+                    src={post.media_url}
+                    className="w-full h-full"
+                    frameBorder="0"
+                    allowFullScreen
+                    title="Embedded content"
+                  />
+                </div>
+              ) : /* Fallback - try as image first */
+              (
                 <img 
                   src={post.media_url} 
                   alt="Post media" 
                   className="w-full h-auto"
                   onError={(e) => {
-                    // If image fails, try as iframe
-                    const target = e.target as HTMLImageElement;
-                    const parent = target.parentElement;
-                    if (parent) {
-                      parent.innerHTML = `<div class="aspect-video"><iframe src="${post.media_url}" class="w-full h-full" frameborder="0" title="Embedded content"></iframe></div>`;
-                    }
+                    // If image fails, remove the container entirely
+                    (e.target as HTMLImageElement).parentElement?.remove();
                   }}
                 />
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          );
+        })()}
         
         {/* Poll Display */}
         {post.poll_data && (
