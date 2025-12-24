@@ -415,6 +415,46 @@ Deno.serve(async (req) => {
                 content_hash: contentHash
               });
             totalPostsAdded++;
+            
+            // ALSO post to Spotlight (posts table) for league-wide visibility
+            const spotlightData: Record<string, unknown> = {
+              content: messageContent,
+              team_id: teamId,
+              origin_team_id: teamId,
+              author_id: systemUserId,
+              is_spotlight: true,
+              is_team_agent_message: true,
+              is_agent_post: false,
+              delivery_status: 'sent',
+              target_audience: ['spotlight']
+            };
+            
+            // Add media if available
+            if (post.mediaUrl) {
+              const isVideo = isRedditVideo(post.mediaUrl);
+              if (isVideo) {
+                spotlightData.media_url = post.thumbnail || null;
+                spotlightData.message_type = 'reddit_video';
+                spotlightData.embeds = { 
+                  type: 'reddit_video', 
+                  post_url: post.url,
+                  thumbnail: post.thumbnail
+                };
+              } else {
+                spotlightData.media_url = post.mediaUrl;
+                spotlightData.message_type = 'image';
+              }
+            }
+            
+            const { error: spotlightError } = await supabase
+              .from('posts')
+              .insert(spotlightData);
+              
+            if (spotlightError) {
+              console.error(`⚠️ Failed to add to Spotlight: ${spotlightError.message}`);
+            } else {
+              console.log(`🌟 Added to Spotlight: ${post.title.substring(0, 30)}...`);
+            }
           }
         }
 
