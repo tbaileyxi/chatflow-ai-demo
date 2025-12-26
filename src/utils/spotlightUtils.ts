@@ -6,14 +6,16 @@
  * Strips URLs from content for cleaner display
  */
 export function stripUrlsFromContent(content: string): string {
-  // Remove markdown-style links [text](url)
-  let cleaned = content.replace(/\[([^\]]*)\]\([^)]+\)/g, '$1');
+  // First, remove the full 🔗 [Source](url) markdown link line
+  let cleaned = content.replace(/🔗\s*\[Source\]\([^)]+\)/gi, '');
+  
+  // Remove any standalone markdown-style links [text](url) - keep the text
+  cleaned = cleaned.replace(/\[([^\]]*)\]\([^)]+\)/g, '$1');
   
   // Remove plain URLs (http/https)
   cleaned = cleaned.replace(/https?:\/\/[^\s]+/g, '');
   
-  // Remove reddit-style source links
-  cleaned = cleaned.replace(/🔗\s*\[?Source\]?[^\n]*/gi, '');
+  // Remove any remaining [Source] text
   cleaned = cleaned.replace(/\[Source\]/gi, '');
   
   // Clean up extra whitespace and newlines
