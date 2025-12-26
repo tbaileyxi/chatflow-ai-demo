@@ -40,57 +40,71 @@ Deno.serve(async (req) => {
   try {
     const cutoffTime = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     
-    // Step 1: Get all huddles with recent activity
-    const { data: activeHuddles, error: huddlesError } = await supabase
-      .from('huddles')
-      .select(`
-        id,
-        name,
-        last_message_at,
-        team_id,
-        teams!huddles_team_id_fkey (
-          name,
-          city
-        )
-      `)
-      .gt('last_message_at', cutoffTime);
+    // Step 1: Find huddles with ACTUAL recent messages (not relying on stale last_message_at)
+    const { data: recentMessages, error: messagesError } = await supabase
+      .from('huddle_messages')
+      .select('huddle_id')
+      .gt('created_at', cutoffTime)
+      .limit(1000);
 
-    if (huddlesError) {
-      console.error('❌ Error fetching active huddles:', huddlesError);
-      throw huddlesError;
+    if (messagesError) {
+      console.error('❌ Error fetching recent messages:', messagesError);
+      throw messagesError;
     }
 
-    console.log(`📊 Found ${activeHuddles?.length || 0} huddles with recent activity`);
-
-    // Step 2: Get all members of those huddles
-    const huddleIds = (activeHuddles || []).map(h => h.id);
+    // Get unique huddle IDs with recent messages
+    const huddleIdsWithActivity = [...new Set((recentMessages || []).map(m => m.huddle_id))];
     
-    if (huddleIds.length === 0) {
-      console.log('📭 No active huddles found');
+    console.log(`📊 Found ${huddleIdsWithActivity.length} huddles with recent messages`);
+
+    if (huddleIdsWithActivity.length === 0) {
+      console.log('📭 No huddles with recent activity');
       return new Response(JSON.stringify({
         success: true,
         emailsSent: 0,
         skipped: 0,
         noEmail: 0,
         noNewMessages: 0,
-        message: 'No active huddles',
+        message: 'No huddles with recent activity',
         processedAt: new Date().toISOString()
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
+    // Step 2: Get huddle details for those with activity
+    const { data: activeHuddles, error: huddlesError } = await supabase
+      .from('huddles')
+      .select(`
+        id,
+        name,
+        team_id,
+        teams!huddles_team_id_fkey (
+          name,
+          city
+        )
+      `)
+      .in('id', huddleIdsWithActivity);
+
+    if (huddlesError) {
+      console.error('❌ Error fetching huddles:', huddlesError);
+      throw huddlesError;
+    }
+
+    // Step 3: Get all members of those huddles
     const { data: memberships, error: membersError } = await supabase
       .from('huddle_members')
       .select('user_id, huddle_id')
-      .in('huddle_id', huddleIds);
+      .in('huddle_id', huddleIdsWithActivity);
 
     if (membersError) {
       console.error('❌ Error fetching memberships:', membersError);
       throw membersError;
     }
 
-    // Step 3: Get profiles for those users
+    console.log(`👥 Found ${memberships?.length || 0} memberships in active huddles`);
+
+    // Step 4: Get profiles for those users
     const userIds = [...new Set((memberships || []).map(m => m.user_id))];
     
     const { data: profiles, error: profilesError } = await supabase
@@ -150,7 +164,7 @@ Deno.serve(async (req) => {
         huddleId: huddle.id,
         huddleName: huddle.name,
         teamName,
-        lastActivity: new Date(huddle.last_message_at!)
+        lastActivity: new Date() // We know it's active since we found messages
       });
     }
 
