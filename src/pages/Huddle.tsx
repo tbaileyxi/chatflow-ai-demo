@@ -729,32 +729,27 @@ export const Huddle = () => {
             </div>
           </div>
           
-          {/* Follow button for authenticated users on public huddles */}
+          {/* Follow button for authenticated users on public huddles - icon only */}
           {user && !huddle?.is_private && (
             <Button
-              variant={isFollowing ? "default" : "outline"}
-              size="sm"
+              variant="ghost"
+              size="icon"
               onClick={handleFollowToggle}
               disabled={followLoading}
               className={cn(
-                "h-8 px-3 rounded-full shrink-0 text-xs font-medium",
+                "h-9 w-9 rounded-full shrink-0",
                 isFollowing 
                   ? "bg-yellow-400 hover:bg-yellow-500 text-black" 
-                  : "border-yellow-400/50 text-yellow-400 hover:bg-yellow-400/10"
+                  : "border border-yellow-400/50 text-yellow-400 hover:bg-yellow-400/10"
               )}
+              title={isFollowing ? "Following" : "Follow"}
             >
               {followLoading ? (
-                <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
               ) : isFollowing ? (
-                <>
-                  <Check className="h-3 w-3 mr-1" />
-                  Following
-                </>
+                <Check className="h-4 w-4" />
               ) : (
-                <>
-                  <Heart className="h-3 w-3 mr-1" />
-                  Follow
-                </>
+                <Heart className="h-4 w-4" />
               )}
             </Button>
           )}
