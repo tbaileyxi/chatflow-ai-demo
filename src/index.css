@@ -157,6 +157,23 @@
   animation: typing-dots 1.4s infinite;
 }
 
+/* Twitter/X embed width constraints for mobile */
+.twitter-tweet,
+.twitter-tweet-rendered,
+iframe[data-tweet-id] {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* Constrain all iframes in chat bubbles on mobile */
+@media (max-width: 640px) {
+  .twitter-tweet iframe,
+  [class*="ChatBubble"] iframe,
+  [class*="chat"] iframe {
+    max-width: 100% !important;
+  }
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */

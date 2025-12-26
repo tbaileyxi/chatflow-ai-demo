@@ -145,7 +145,7 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
       {/* Message Content */}
       <div
         className={cn(
-          "flex-1 min-w-0 max-w-[calc(100%-3rem)]",
+          "flex-1 min-w-0 max-w-[calc(100%-3rem)] overflow-hidden",
           isOwnMessage ? "text-right" : "text-left"
         )}
       >
@@ -181,9 +181,9 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
           <PopoverTrigger asChild>
             <div
               className={cn(
-                "inline-block w-full max-w-full rounded-2xl px-3 sm:px-4 py-2.5",
+                "inline-block w-full max-w-full rounded-2xl px-3 sm:px-4 py-2.5 overflow-hidden",
                 "text-base sm:text-lg cursor-pointer select-text transition-all duration-200",
-                "relative group/bubble break-words",
+                "relative group/bubble break-words overflow-wrap-anywhere",
                 isOwnMessage
                   ? "bg-primary text-primary-foreground shadow-lg"
                   : "bg-muted/80 backdrop-blur-sm text-foreground shadow-sm",
@@ -216,7 +216,8 @@ const ModernChatBubble = ({ message, currentUserId, teamId, teamLogoUrl, previou
 
               {/* Text Content */}
               <div
-                className="whitespace-pre-wrap break-words leading-relaxed overflow-wrap-anywhere"
+                className="whitespace-pre-wrap break-words leading-relaxed overflow-wrap-anywhere word-break-break-word"
+                style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
                 dangerouslySetInnerHTML={{ __html: message.content }}
               />
 
