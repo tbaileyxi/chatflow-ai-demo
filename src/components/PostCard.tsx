@@ -12,6 +12,7 @@ import { linkifyTeamNames } from "@/utils/teamLinking";
 import { XPostEmbed } from "@/components/embeds/XPostEmbed";
 import { ThreadView } from "@/components/ThreadView";
 import { classifyRedditMedia, extractSourceUrl, getDisplayDomain } from "@/utils/redditMediaUtils";
+import { cleanSpotlightContent, truncateAtWordBoundary, extractSourceUrlFromContent } from "@/utils/spotlightUtils";
 
 // Twitter global type
 declare global {
@@ -157,6 +158,7 @@ export const PostCard = ({ post, isSpotlight = false, disableReply = false }: Po
   const [pollVotes, setPollVotes] = useState<any[]>([]);
   const [userVote, setUserVote] = useState<number | null>(null);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const likeCount = reactions.filter(r => r.reaction_type === 'like').length;
   const fireCount = reactions.filter(r => r.reaction_type === 'fire').length;
@@ -168,7 +170,30 @@ export const PostCard = ({ post, isSpotlight = false, disableReply = false }: Po
   };
   
   const tags = extractTags(post.content);
-  const contentWithoutTags = post.content.replace(/#[\w]+/g, '').trim();
+  
+  // For Spotlight, clean content: strip URLs and apply truncation
+  const isRedditImport = post.message_type === 'social_buzz' || post.message_type === 'reddit_video' || post.message_type === 'image';
+  const rawContentWithoutTags = post.content.replace(/#[\w]+/g, '').trim();
+  
+  let displayContent: string;
+  let wasClipped = false;
+  let sourceUrl: string | null = null;
+  
+  if (isSpotlight && (post.is_team_agent_message || post.is_agent_post)) {
+    // For Spotlight bot/agent posts: clean and truncate
+    const cleanedContent = cleanSpotlightContent(rawContentWithoutTags);
+    sourceUrl = extractSourceUrlFromContent(rawContentWithoutTags);
+    
+    if (!isExpanded) {
+      const truncation = truncateAtWordBoundary(cleanedContent, 220);
+      displayContent = truncation.truncated;
+      wasClipped = truncation.wasClipped;
+    } else {
+      displayContent = cleanedContent;
+    }
+  } else {
+    displayContent = rawContentWithoutTags;
+  }
 
   // Fetch poll votes if this is a poll
   useEffect(() => {
@@ -450,8 +475,26 @@ export const PostCard = ({ post, isSpotlight = false, disableReply = false }: Po
       <div className="mb-3">
         <div 
           className="text-foreground leading-relaxed whitespace-pre-wrap" 
-          dangerouslySetInnerHTML={{ __html: linkifyTeamNames(contentWithoutTags) }}
+          dangerouslySetInnerHTML={{ __html: linkifyTeamNames(displayContent) }}
         />
+        
+        {/* Read more / Show less for truncated Spotlight content */}
+        {isSpotlight && wasClipped && !isExpanded && (
+          <button
+            onClick={() => setIsExpanded(true)}
+            className="text-primary text-sm font-medium mt-1 hover:underline"
+          >
+            Read more
+          </button>
+        )}
+        {isSpotlight && isExpanded && (
+          <button
+            onClick={() => setIsExpanded(false)}
+            className="text-muted-foreground text-sm mt-1 hover:underline"
+          >
+            Show less
+          </button>
+        )}
         
         {/* Thread View - handles both single embeds and thread embeds */}
         {(post.embeds && post.embeds.length > 0) ? (
@@ -648,6 +691,21 @@ export const PostCard = ({ post, isSpotlight = false, disableReply = false }: Po
                 {pollVotes.length} total votes
               </p>
             </div>
+          </div>
+        )}
+        
+        {/* Source button for Spotlight Reddit posts */}
+        {isSpotlight && sourceUrl && (
+          <div className="mt-3">
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-muted/50 hover:bg-muted rounded-full text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+              <span>Source</span>
+            </a>
           </div>
         )}
         

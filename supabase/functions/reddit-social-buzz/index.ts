@@ -15,6 +15,8 @@ interface RedditPost {
   thumbnail?: string;
   mediaUrl?: string;
   upvotes?: number;
+  numComments?: number;
+  score?: number;
 }
 
 function isRedditVideo(url: string): boolean {
@@ -167,6 +169,40 @@ function isRelevantPost(post: RedditPost): boolean {
   const hasRelevantKeyword = relevantKeywords.some(kw => combined.includes(kw));
   
   return hasMedia || hasRelevantKeyword;
+}
+
+// Quality filter for Spotlight: stricter than basic relevance
+// Only send to Spotlight if: has media (image/video with valid thumbnail) OR has strong engagement signal
+function meetsSpotlightQuality(post: RedditPost): boolean {
+  const title = post.title.toLowerCase();
+  const content = post.content.toLowerCase();
+  const combined = title + ' ' + content;
+  
+  // Priority 1: Has genuine media (image or video with thumbnail)
+  const hasMedia = !!post.mediaUrl && (
+    post.mediaUrl.includes('i.redd.it') ||
+    post.mediaUrl.includes('imgur.com') ||
+    (post.mediaUrl.includes('v.redd.it') && !!post.thumbnail) ||
+    /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(post.mediaUrl)
+  );
+  
+  if (hasMedia) return true;
+  
+  // Priority 2: Strong engagement keywords (breaking news, interviews, quotes)
+  const highValueKeywords = [
+    'breaking', 'interview', 'press conference', 'announcement', 
+    'just announced', 'official', 'trade', 'signing', 'extension',
+    'injury report', 'starting', 'benched'
+  ];
+  
+  const hasHighValueKeyword = highValueKeywords.some(kw => combined.includes(kw));
+  if (hasHighValueKeyword) return true;
+  
+  // Priority 3: For posts without media, require explicit social/news signals
+  const socialSignals = ['tweet', 'twitter', 'ig post', 'instagram post', 'quote'];
+  const hasSocialSignal = socialSignals.some(kw => combined.includes(kw));
+  
+  return hasSocialSignal;
 }
 
 // Generate a curated caption using simple templates
@@ -417,43 +453,48 @@ Deno.serve(async (req) => {
             totalPostsAdded++;
             
             // ALSO post to Spotlight (posts table) for league-wide visibility
-            const spotlightData: Record<string, unknown> = {
-              content: messageContent,
-              team_id: teamId,
-              origin_team_id: teamId,
-              author_id: systemUserId,
-              is_spotlight: true,
-              is_team_agent_message: true,
-              is_agent_post: false,
-              delivery_status: 'sent',
-              target_audience: ['spotlight']
-            };
-            
-            // Add media if available
-            if (post.mediaUrl) {
-              const isVideo = isRedditVideo(post.mediaUrl);
-              if (isVideo) {
-                spotlightData.media_url = post.thumbnail || null;
-                spotlightData.message_type = 'reddit_video';
-                spotlightData.embeds = { 
-                  type: 'reddit_video', 
-                  post_url: post.url,
-                  thumbnail: post.thumbnail
-                };
-              } else {
-                spotlightData.media_url = post.mediaUrl;
-                spotlightData.message_type = 'image';
-              }
-            }
-            
-            const { error: spotlightError } = await supabase
-              .from('posts')
-              .insert(spotlightData);
+            // Only if it meets quality thresholds
+            if (meetsSpotlightQuality(post)) {
+              const spotlightData: Record<string, unknown> = {
+                content: messageContent,
+                team_id: teamId,
+                origin_team_id: teamId,
+                author_id: systemUserId,
+                is_spotlight: true,
+                is_team_agent_message: true,
+                is_agent_post: false,
+                delivery_status: 'sent',
+                target_audience: ['spotlight']
+              };
               
-            if (spotlightError) {
-              console.error(`⚠️ Failed to add to Spotlight: ${spotlightError.message}`);
+              // Add media if available
+              if (post.mediaUrl) {
+                const isVideo = isRedditVideo(post.mediaUrl);
+                if (isVideo) {
+                  spotlightData.media_url = post.thumbnail || null;
+                  spotlightData.message_type = 'reddit_video';
+                  spotlightData.embeds = { 
+                    type: 'reddit_video', 
+                    post_url: post.url,
+                    thumbnail: post.thumbnail
+                  };
+                } else {
+                  spotlightData.media_url = post.mediaUrl;
+                  spotlightData.message_type = 'image';
+                }
+              }
+              
+              const { error: spotlightError } = await supabase
+                .from('posts')
+                .insert(spotlightData);
+                
+              if (spotlightError) {
+                console.error(`⚠️ Failed to add to Spotlight: ${spotlightError.message}`);
+              } else {
+                console.log(`🌟 Added to Spotlight: ${post.title.substring(0, 30)}...`);
+              }
             } else {
-              console.log(`🌟 Added to Spotlight: ${post.title.substring(0, 30)}...`);
+              console.log(`⏭️ Skipped Spotlight (quality threshold): ${post.title.substring(0, 30)}...`);
             }
           }
         }
