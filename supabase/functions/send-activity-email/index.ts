@@ -38,135 +38,223 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    // Get users who haven't received an email in 48 hours (or never)
     const cutoffTime = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     
-    // Get all users with their huddle memberships
-    const { data: eligibleUsers, error: usersError } = await supabase
-      .from('profiles')
+    // Step 1: Get all huddles with recent activity
+    const { data: activeHuddles, error: huddlesError } = await supabase
+      .from('huddles')
       .select(`
-        user_id,
-        display_name,
-        username
+        id,
+        name,
+        last_message_at,
+        team_id,
+        teams!huddles_team_id_fkey (
+          name,
+          city
+        )
       `)
-      .neq('status', 'banned')
-      .not('user_id', 'is', null);
+      .gt('last_message_at', cutoffTime);
 
-    if (usersError) throw usersError;
+    if (huddlesError) {
+      console.error('❌ Error fetching active huddles:', huddlesError);
+      throw huddlesError;
+    }
 
-    console.log(`👥 Found ${eligibleUsers?.length || 0} potential users`);
+    console.log(`📊 Found ${activeHuddles?.length || 0} huddles with recent activity`);
+
+    // Step 2: Get all members of those huddles
+    const huddleIds = (activeHuddles || []).map(h => h.id);
+    
+    if (huddleIds.length === 0) {
+      console.log('📭 No active huddles found');
+      return new Response(JSON.stringify({
+        success: true,
+        emailsSent: 0,
+        skipped: 0,
+        noEmail: 0,
+        noNewMessages: 0,
+        message: 'No active huddles',
+        processedAt: new Date().toISOString()
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { data: memberships, error: membersError } = await supabase
+      .from('huddle_members')
+      .select('user_id, huddle_id')
+      .in('huddle_id', huddleIds);
+
+    if (membersError) {
+      console.error('❌ Error fetching memberships:', membersError);
+      throw membersError;
+    }
+
+    // Step 3: Get profiles for those users
+    const userIds = [...new Set((memberships || []).map(m => m.user_id))];
+    
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('user_id, display_name, status')
+      .in('user_id', userIds)
+      .neq('status', 'banned');
+
+    if (profilesError) {
+      console.error('❌ Error fetching profiles:', profilesError);
+      throw profilesError;
+    }
+
+    // Create lookup maps
+    const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
+    const huddleMap = new Map((activeHuddles || []).map(h => [h.id, h]));
+
+    console.log(`👥 Found ${profileMap.size} eligible users in active huddles`);
+
+    // Group by user to process each user once
+    const userMap = new Map<string, {
+      userId: string;
+      displayName: string;
+      huddles: Array<{
+        huddleId: string;
+        huddleName: string;
+        teamName: string;
+        lastActivity: Date;
+      }>;
+    }>();
+
+    for (const membership of memberships || []) {
+      const userId = membership.user_id;
+      const huddleId = membership.huddle_id;
+      
+      const profile = profileMap.get(userId);
+      const huddle = huddleMap.get(huddleId);
+      
+      if (!profile || !huddle) continue;
+      
+      // Skip system users (UUIDs starting with 00000000)
+      if (userId.startsWith('00000000')) continue;
+      
+      const teamName = huddle.teams 
+        ? `${(huddle.teams as any).city || ''} ${(huddle.teams as any).name || ''}`.trim() 
+        : 'Team';
+
+      if (!userMap.has(userId)) {
+        userMap.set(userId, {
+          userId,
+          displayName: profile.display_name || 'User',
+          huddles: []
+        });
+      }
+
+      userMap.get(userId)!.huddles.push({
+        huddleId: huddle.id,
+        huddleName: huddle.name,
+        teamName,
+        lastActivity: new Date(huddle.last_message_at!)
+      });
+    }
+
+    console.log(`👥 Processing ${userMap.size} unique users with huddle activity`);
 
     let emailsSent = 0;
     let skipped = 0;
+    let noEmail = 0;
+    let noNewMessages = 0;
 
-    for (const user of eligibleUsers || []) {
+    for (const [userId, userData] of userMap) {
       try {
         // Check when user last received email
         const { data: emailRecord } = await supabase
           .from('user_email_notifications')
           .select('last_email_sent_at')
-          .eq('user_id', user.user_id)
+          .eq('user_id', userId)
           .single();
 
         // Skip if emailed within 48 hours
         if (emailRecord?.last_email_sent_at) {
           const lastSent = new Date(emailRecord.last_email_sent_at);
           if (lastSent.getTime() > Date.now() - 48 * 60 * 60 * 1000) {
+            console.log(`⏭️ Skipping ${userData.displayName} - emailed ${Math.round((Date.now() - lastSent.getTime()) / 3600000)}h ago`);
             skipped++;
             continue;
           }
         }
 
         // Get user's email from auth
-        const { data: authUser } = await supabase.auth.admin.getUserById(user.user_id);
+        const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(userId);
+        
+        if (authError) {
+          console.log(`⚠️ Auth error for ${userId}: ${authError.message}`);
+          noEmail++;
+          continue;
+        }
+        
         const userEmail = authUser?.user?.email;
 
         if (!userEmail) {
-          console.log(`⏭️ No email for user ${user.user_id}`);
+          console.log(`⏭️ No email for user ${userId} (${userData.displayName})`);
+          noEmail++;
           continue;
         }
 
-        // Get user's huddle memberships
-        const { data: memberships } = await supabase
-          .from('huddle_members')
-          .select(`
-            huddle_id,
-            huddles!inner (
-              id,
-              name,
-              last_message_at,
-              team_id,
-              teams (
-                name,
-                city
-              )
-            )
-          `)
-          .eq('user_id', user.user_id);
-
-        if (!memberships || memberships.length === 0) {
-          continue;
-        }
-
-        // Check for new activity since last email (or last 48h)
+        // Check for ACTUAL new messages (not just huddle activity timestamp)
         const checkSince = emailRecord?.last_email_sent_at || cutoffTime;
-        
-        // Get message counts per huddle since last email
-        const huddleActivity: Array<{
+        let hasNewMessages = false;
+        let mostActiveHuddle: {
           huddleId: string;
           huddleName: string;
           teamName: string;
           messageCount: number;
           latestMessage: string;
-          lastActivity: Date;
-        }> = [];
+        } | null = null;
 
-        for (const membership of memberships) {
-          const huddle = membership.huddles as any;
-          
-          // Count new messages in this huddle
-          const { count } = await supabase
+        for (const huddle of userData.huddles) {
+          // Count new messages NOT from this user
+          const { count, error: countError } = await supabase
             .from('huddle_messages')
             .select('*', { count: 'exact', head: true })
-            .eq('huddle_id', huddle.id)
+            .eq('huddle_id', huddle.huddleId)
             .gt('created_at', checkSince)
-            .neq('user_id', user.user_id); // Exclude user's own messages
+            .neq('user_id', userId);
+
+          if (countError) {
+            console.log(`⚠️ Error counting messages for huddle ${huddle.huddleId}: ${countError.message}`);
+            continue;
+          }
 
           if (count && count > 0) {
-            // Get a teaser from the latest message
+            hasNewMessages = true;
+            
+            // Get latest message teaser
             const { data: latestMsg } = await supabase
               .from('huddle_messages')
               .select('content')
-              .eq('huddle_id', huddle.id)
+              .eq('huddle_id', huddle.huddleId)
               .gt('created_at', checkSince)
-              .neq('user_id', user.user_id)
+              .neq('user_id', userId)
               .order('created_at', { ascending: false })
               .limit(1)
               .single();
 
-            const teamName = huddle.teams?.name || 'Team';
-            const cityName = huddle.teams?.city || '';
-            const displayTeam = cityName ? `${cityName} ${teamName}` : teamName;
-
-            huddleActivity.push({
-              huddleId: huddle.id,
-              huddleName: huddle.name,
-              teamName: displayTeam,
-              messageCount: count,
-              latestMessage: latestMsg?.content?.substring(0, 80) || 'New activity',
-              lastActivity: new Date(huddle.last_message_at)
-            });
+            if (!mostActiveHuddle || count > mostActiveHuddle.messageCount) {
+              mostActiveHuddle = {
+                huddleId: huddle.huddleId,
+                huddleName: huddle.huddleName,
+                teamName: huddle.teamName,
+                messageCount: count,
+                latestMessage: latestMsg?.content?.substring(0, 80) || 'New activity'
+              };
+            }
           }
         }
 
-        // Skip if no new activity
-        if (huddleActivity.length === 0) {
+        if (!hasNewMessages || !mostActiveHuddle) {
+          console.log(`⏭️ No new messages for ${userData.displayName} (${userEmail})`);
+          noNewMessages++;
           continue;
         }
 
-        // Sort by most recent activity
-        huddleActivity.sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
-        const mostActiveHuddle = huddleActivity[0];
+        console.log(`📬 Sending email to ${userEmail} - ${mostActiveHuddle.teamName} huddle (${mostActiveHuddle.messageCount} new msgs)`);
 
         // Pick a random subject line template
         const templateIndex = Math.floor(Math.random() * SUBJECT_TEMPLATES.length);
@@ -208,7 +296,7 @@ Deno.serve(async (req) => {
       Jump back in to see the full conversation.
     </p>
     
-    <a href="https://sidehuddle.io" 
+    <a href="https://sidehuddle.io/huddle/${mostActiveHuddle.huddleId}" 
        style="display: inline-block; background-color: #facc15; color: #1a1a1a; font-weight: 600; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 15px;">
       Open Side Huddle
     </a>
@@ -223,8 +311,8 @@ Deno.serve(async (req) => {
         `;
 
         // Send the email - use verified Resend domain
-        const emailFrom = Deno.env.get('EMAIL_FROM') || 'Side Huddle Sports <updates@updates.sidehuddlesports.com>';
-        const { error: sendError } = await resend.emails.send({
+        const emailFrom = Deno.env.get('EMAIL_FROM') || 'Side Huddle <updates@updates.sidehuddlesports.com>';
+        const { data: emailData, error: sendError } = await resend.emails.send({
           from: emailFrom,
           to: [userEmail],
           subject: subject,
@@ -236,28 +324,35 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        console.log(`✅ Email sent to ${userEmail} - Resend ID: ${emailData?.id}`);
+
         // Update last email sent timestamp
         await supabase
           .from('user_email_notifications')
           .upsert({
-            user_id: user.user_id,
+            user_id: userId,
             last_email_sent_at: new Date().toISOString()
           }, { onConflict: 'user_id' });
 
         emailsSent++;
-        console.log(`✅ Email sent to ${userEmail} - ${mostActiveHuddle.teamName} huddle`);
 
       } catch (userError) {
-        console.error(`❌ Error processing user ${user.user_id}:`, userError);
+        console.error(`❌ Error processing user ${userId}:`, userError);
       }
     }
 
-    console.log(`\n📊 Summary: ${emailsSent} emails sent, ${skipped} skipped (within 48h window)`);
+    console.log(`\n📊 Summary:`);
+    console.log(`  ✉️  Emails sent: ${emailsSent}`);
+    console.log(`  ⏭️  Skipped (48h window): ${skipped}`);
+    console.log(`  📭 No email address: ${noEmail}`);
+    console.log(`  💤 No new messages: ${noNewMessages}`);
 
     return new Response(JSON.stringify({
       success: true,
       emailsSent,
       skipped,
+      noEmail,
+      noNewMessages,
       processedAt: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
