@@ -183,7 +183,9 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
     if (!user || !game || !selectedOption) return;
 
     try {
-      const { error: insertError } = await supabase.from('fades').insert({
+      console.log('Posting fade with announceInChat:', announceInChat);
+      
+      const { data: insertedFade, error: insertError } = await supabase.from('fades').insert({
         huddle_id: huddleId,
         poster_id: user.id,
         game_id: game.id,
@@ -195,18 +197,24 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
         line_value: selectedOption.line_value,
         line_description: selectedOption.description,
         stake,
-      });
+      }).select().single();
 
       if (insertError) throw insertError;
 
-      // Only post to chat if user checked the option
+      console.log('Fade inserted successfully:', insertedFade?.id);
+
+      // Post to chat if user checked the option
       if (announceInChat) {
+        console.log('Attempting to post fade announcement to chat...');
+        
         try {
+          // Get system user
           const { data: systemUserId, error: rpcError } = await supabase.rpc('get_or_create_system_user');
           
           if (rpcError) {
             console.error('Error getting system user:', rpcError);
           } else if (systemUserId) {
+            // Get poster profile
             const { data: posterProfile } = await supabase
               .from('profiles')
               .select('display_name, username')
@@ -215,26 +223,30 @@ export const FadesTab: React.FC<FadesTabProps> = ({ huddleId, teamName, teamLeag
 
             const posterName = posterProfile?.display_name || posterProfile?.username || 'Someone';
 
-            const { error: chatError } = await supabase.from('huddle_messages').insert({
+            console.log(`Posting chat message as system user ${systemUserId}`);
+
+            const { data: chatMessage, error: chatError } = await supabase.from('huddle_messages').insert({
               huddle_id: huddleId,
               user_id: systemUserId,
               content: `🔥 New Fade: ${posterName} posted ${stake} points on ${selectedOption.label} – anyone fading?`,
               message_type: 'fade_notification',
               is_bot_message: true,
-            });
+            }).select().single();
             
             if (chatError) {
               console.error('Error posting fade to chat:', chatError);
+            } else {
+              console.log('Chat message posted successfully:', chatMessage?.id);
             }
           }
         } catch (chatErr) {
-          console.error('Error with chat announcement:', chatErr);
+          console.error('Exception in chat announcement:', chatErr);
         }
       }
 
       setShowPostModal(false);
       setSelectedOption(null);
-      setOptionsCollapsed(true); // Collapse after posting
+      setOptionsCollapsed(true);
       fetchFades();
     } catch (err: any) {
       console.error('Error posting fade:', err);
