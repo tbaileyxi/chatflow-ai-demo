@@ -5,6 +5,7 @@ verify_jwt = false
 
 [functions.youtube-highlights]
 verify_jwt = false
+on_schedule = "*/8 * * * *"
 
 [functions.coach-proactive]
 verify_jwt = false
