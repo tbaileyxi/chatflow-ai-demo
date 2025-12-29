@@ -1,5 +1,14 @@
 project_id = "dejuwyeypiggvlyfliap"
 
+[functions.huddle-backfill]
+verify_jwt = false
+
+[functions.youtube-highlights]
+verify_jwt = false
+
+[functions.coach-proactive]
+verify_jwt = false
+
 [functions.live-game-bot]
 verify_jwt = false
 on_schedule = "*/5 * * * *"

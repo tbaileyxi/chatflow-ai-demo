@@ -6,3 +6,4 @@ export { PostFadeModal } from './PostFadeModal';
 export { ActiveFadeCard } from './ActiveFadeCard';
 export { LockedFadeCard } from './LockedFadeCard';
 export { SettledFadeCard } from './SettledFadeCard';
+export { PrivateFeaturesTeaser } from './PrivateFeaturesTeaser';
