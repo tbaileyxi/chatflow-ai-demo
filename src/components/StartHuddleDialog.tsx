@@ -109,6 +109,9 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger, parentTeamId, isCr
 
     setSubmitLoading(true);
     try {
+      // Get team name for backfill
+      const selectedTeam = teams.find(t => t.id === formData.team_id);
+      
       console.log('Creating huddle with data:', {
         name: formData.name.trim(),
         owner_id: user.id,
@@ -134,6 +137,21 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger, parentTeamId, isCr
 
       if (huddleError) {
         throw new Error(`Failed to create huddle: ${huddleError.message}`);
+      }
+
+      // Trigger backfill for the new huddle (fire-and-forget)
+      if (huddle?.id && selectedTeam) {
+        supabase.functions.invoke('huddle-backfill', {
+          body: {
+            huddle_id: huddle.id,
+            team_id: formData.team_id,
+            team_name: `${selectedTeam.city} ${selectedTeam.name}`,
+            is_new_huddle: true
+          }
+        }).then(({ error }) => {
+          if (error) console.error('Backfill error:', error);
+          else console.log('✅ Huddle backfill triggered');
+        });
       }
 
       toast({

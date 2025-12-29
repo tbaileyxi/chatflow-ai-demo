@@ -21,6 +21,7 @@ import { StartHuddleDialog } from '@/components/StartHuddleDialog';
 import { SignupPromptModal } from '@/components/SignupPromptModal';
 import { FoundingMemberModal } from '@/components/founding/FoundingMemberModal';
 import { FadesSidebar } from '@/components/fades/FadesSidebar';
+import { GamePulseHeader } from '@/components/game-pulse/GamePulseHeader';
 
 export const Huddle = () => {
   const { huddleId } = useParams<{ huddleId: string }>();
@@ -41,6 +42,7 @@ export const Huddle = () => {
   const [replyingToMessage, setReplyingToMessage] = useState<any>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [liveGame, setLiveGame] = useState<any>(null);
   
   // Fix 3: Handler to set reply and auto-scroll to top (where input is)
   const handleReply = useCallback((message: any) => {
@@ -268,6 +270,53 @@ export const Huddle = () => {
 
     updateLastRead();
   }, [huddleId, user]);
+
+  // Check for live games for this team
+  useEffect(() => {
+    if (!huddle?.team?.highlightly_id) return;
+
+    const checkLiveGame = async () => {
+      try {
+        const { data: gameState } = await supabase
+          .from('game_states')
+          .select('*')
+          .contains('teams', [{ highlightly_id: huddle.team.highlightly_id }])
+          .in('last_status', ['1H', '2H', 'Q1', 'Q2', 'Q3', 'Q4', 'OT', 'HT', 'LIVE', 'IN_PLAY'])
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (gameState) {
+          const teams = gameState.teams as any[];
+          const homeTeam = teams?.find((t: any) => t.is_home);
+          const awayTeam = teams?.find((t: any) => !t.is_home);
+          const [homeScore, awayScore] = (gameState.last_score || '0-0').split('-').map(Number);
+
+          setLiveGame({
+            homeTeam: homeTeam?.name || 'Home',
+            awayTeam: awayTeam?.name || 'Away',
+            homeScore,
+            awayScore,
+            period: gameState.last_period,
+            clock: gameState.last_clock,
+            homeLogo: homeTeam?.logo_url,
+            awayLogo: awayTeam?.logo_url,
+            homeColor: huddle.team?.id === homeTeam?.team_id ? 'hsl(var(--team-primary))' : undefined,
+            awayColor: huddle.team?.id === awayTeam?.team_id ? 'hsl(var(--team-primary))' : undefined,
+          });
+        } else {
+          setLiveGame(null);
+        }
+      } catch (error) {
+        console.error('Error checking live game:', error);
+      }
+    };
+
+    checkLiveGame();
+    const interval = setInterval(checkLiveGame, 30000); // Poll every 30s
+
+    return () => clearInterval(interval);
+  }, [huddle?.team?.highlightly_id, huddle?.team?.id]);
 
   // Follow/unfollow huddle handler
   const handleFollowToggle = useCallback(async () => {
@@ -688,6 +737,9 @@ export const Huddle = () => {
 
   return (
     <div className="min-h-screen-dynamic w-full bg-gradient-to-br from-background via-background to-team-primary/5 flex flex-col">
+      {/* Game Pulse Header - shows when a live game is detected */}
+      {liveGame && <GamePulseHeader {...liveGame} />}
+      
       {/* Mobile-first header - sticky at top with integrated back button */}
       <div className="retro-header sticky top-0 z-20 px-3 sm:px-4 py-2 sm:py-3 border-b border-team-primary/30 bg-background/95 backdrop-blur-sm safe-area-inset-top">
         <div className="flex items-center gap-2 sm:gap-3">
