@@ -4,6 +4,7 @@ import { Search, Radio, Flame, Clock, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BottomNav } from '@/components/mobile/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -52,9 +53,19 @@ const addRecentlyViewed = (teamId: string) => {
   localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(recent.slice(0, 5)));
 };
 
+const LEAGUES = [
+  { id: 'all', label: 'All' },
+  { id: 'NFL', label: 'NFL' },
+  { id: 'NCAA', label: 'NCAA' },
+  { id: 'NBA', label: 'NBA' },
+  { id: 'NHL', label: 'NHL' },
+  { id: 'MLB', label: 'MLB' },
+];
+
 export default function Home() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedLeague, setSelectedLeague] = useState('all');
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [teams, setTeams] = useState<TeamWithActivity[]>([]);
   const [recentTeams, setRecentTeams] = useState<TeamWithActivity[]>([]);
@@ -143,13 +154,15 @@ export default function Home() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // Search stays on page, filtering happens inline via filteredTeams
   };
 
-  const filteredTeams = teams.filter(t =>
-    t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.city.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter teams by search and selected league
+  const filteredTeams = teams.filter(t => {
+    const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.city.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesLeague = selectedLeague === 'all' || t.league === selectedLeague;
+    return matchesSearch && matchesLeague;
+  });
 
   const formatEventTime = (startTime: string) => {
     const date = new Date(startTime);
@@ -159,9 +172,9 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
-        <div className="px-4 py-4 flex flex-col items-center gap-2">
-          <img src={shLogo} alt="Side Huddle" className="h-10 object-contain" />
-          <p className="text-xs text-muted-foreground">Your Team. Your Crew. Live.</p>
+        <div className="px-4 py-4 flex flex-col items-center gap-3">
+          <img src={shLogo} alt="Side Huddle" className="h-12 object-contain" />
+          <p className="text-base font-medium text-muted-foreground">Your Team. Your Crew. Live.</p>
         </div>
       </header>
 
@@ -181,12 +194,13 @@ export default function Home() {
       </div>
 
       <div className="px-4 space-y-8">
-        {liveEvents.length > 0 && (
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Radio className="h-5 w-5 text-destructive animate-pulse" />
-              <h2 className="text-lg font-bold">Live Events</h2>
-            </div>
+        {/* Live Events Section - Always show section, even if empty */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Radio className="h-5 w-5 text-destructive animate-pulse" />
+            <h2 className="text-lg font-bold">Live Events</h2>
+          </div>
+          {liveEvents.length > 0 ? (
             <div className="space-y-3">
               {liveEvents.map((event) => (
                 <button
@@ -216,8 +230,12 @@ export default function Home() {
                 </button>
               ))}
             </div>
-          </section>
-        )}
+          ) : (
+            <div className="bg-card/50 rounded-xl p-6 border border-dashed border-border/50 text-center">
+              <p className="text-sm text-muted-foreground">No live events right now</p>
+            </div>
+          )}
+        </section>
 
         {recentTeams.length > 0 && !searchQuery && (
           <section>
@@ -241,11 +259,24 @@ export default function Home() {
           </section>
         )}
 
+        {/* Teams Section with League Tabs */}
         <section>
           <div className="flex items-center gap-2 mb-4">
             <Flame className="h-5 w-5 text-orange-500" />
             <h2 className="text-lg font-bold">Teams</h2>
           </div>
+          
+          {/* League Filter Tabs */}
+          <Tabs value={selectedLeague} onValueChange={setSelectedLeague} className="mb-4">
+            <TabsList className="w-full justify-start overflow-x-auto flex-nowrap">
+              {LEAGUES.map((league) => (
+                <TabsTrigger key={league.id} value={league.id} className="flex-shrink-0">
+                  {league.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+
           {loading ? (
             <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
               {Array.from({ length: 16 }).map((_, i) => (
