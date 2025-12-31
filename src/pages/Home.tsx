@@ -1,252 +1,272 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { BottomNav } from '@/components/mobile/BottomNav';
-import { Button } from '@/components/ui/button';
+import { Search, Radio, Flame, Clock, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Zap, Users, TrendingUp } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { BottomNav } from '@/components/mobile/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
-import { StartHuddleDialog } from '@/components/StartHuddleDialog';
 import { cn } from '@/lib/utils';
+import shLogo from '@/assets/sh-logo-updated.png';
 
-interface HuddlePreview {
+interface Team {
   id: string;
   name: string;
-  team: {
-    id: string;
-    name: string;
-    city: string;
-    logo_url: string;
-    league: string;
-  };
-  member_count: number;
-  last_message_at: string;
-  is_live?: boolean;
+  city: string;
+  logo_url: string | null;
+  league: string;
 }
 
+interface LiveEvent {
+  id: string;
+  name: string;
+  subtitle: string | null;
+  start_time: string;
+  network: string | null;
+  status: 'upcoming' | 'live' | 'completed';
+  score_team1: number | null;
+  score_team2: number | null;
+  team1_id: string | null;
+  team2_id: string | null;
+}
+
+interface TeamWithActivity extends Team {
+  huddle_id?: string;
+  is_active?: boolean;
+  member_count?: number;
+}
+
+const RECENTLY_VIEWED_KEY = 'sh_recently_viewed';
+
+const getRecentlyViewed = (): string[] => {
+  try {
+    return JSON.parse(localStorage.getItem(RECENTLY_VIEWED_KEY) || '[]');
+  } catch {
+    return [];
+  }
+};
+
+const addRecentlyViewed = (teamId: string) => {
+  const recent = getRecentlyViewed().filter(id => id !== teamId);
+  recent.unshift(teamId);
+  localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(recent.slice(0, 5)));
+};
+
 export default function Home() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const [liveHuddles, setLiveHuddles] = useState<HuddlePreview[]>([]);
-  const [myHuddles, setMyHuddles] = useState<HuddlePreview[]>([]);
-  const [suggestedHuddles, setSuggestedHuddles] = useState<HuddlePreview[]>([]);
+  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
+  const [teams, setTeams] = useState<TeamWithActivity[]>([]);
+  const [recentTeams, setRecentTeams] = useState<TeamWithActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Auto-redirect to last active huddle if returning user
-  useEffect(() => {
-    const lastHuddleId = localStorage.getItem('lastActiveHuddle');
-    if (lastHuddleId && user) {
-      // Check if still a member
-      supabase
-        .from('huddle_members')
-        .select('huddle_id')
-        .eq('user_id', user.id)
-        .eq('huddle_id', lastHuddleId)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data) {
-            navigate(`/huddle/${lastHuddleId}`);
-          }
-        });
-    }
-  }, [user, navigate]);
-
-  // Fetch huddles
-  useEffect(() => {
-    const fetchHuddles = async () => {
-      setLoading(true);
-      
-      // Fetch live/active huddles (recent activity)
-      const { data: active } = await supabase
-        .from('huddles')
-        .select(`
-          id, name, member_count, last_message_at,
-          team:teams(id, name, city, logo_url, league)
-        `)
-        .eq('is_private', false)
-        .order('last_message_at', { ascending: false })
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data: events } = await supabase
+        .from('live_events')
+        .select('*')
+        .in('status', ['live', 'upcoming'])
+        .eq('is_pinned', true)
+        .order('start_time', { ascending: true })
         .limit(5);
 
-      if (active) {
-        setLiveHuddles(active.map(h => ({ ...h, team: h.team as any, is_live: true })));
-      }
+      setLiveEvents((events as unknown as LiveEvent[]) || []);
 
-      // Fetch user's huddles if logged in
-      if (user) {
-        const { data: myData } = await supabase
-          .from('huddle_members')
-          .select(`
-            huddle:huddles(
-              id, name, member_count, last_message_at,
-              team:teams(id, name, city, logo_url, league)
-            )
-          `)
-          .eq('user_id', user.id)
-          .order('joined_at', { ascending: false })
-          .limit(10);
-
-        if (myData) {
-          setMyHuddles(myData.map(m => ({ ...m.huddle as any, team: (m.huddle as any)?.team })).filter(h => h?.id));
-        }
-      }
-
-      // Fetch suggested huddles (popular ones user isn't in)
-      const { data: suggested } = await supabase
-        .from('huddles')
+      const { data: teamsData } = await supabase
+        .from('teams')
         .select(`
-          id, name, member_count, last_message_at,
-          team:teams(id, name, city, logo_url, league)
+          id, name, city, logo_url, league,
+          huddles!inner(id, member_count, last_message_at, is_official_team_huddle)
         `)
-        .eq('is_private', false)
-        .order('member_count', { ascending: false })
-        .limit(8);
+        .eq('is_active', true)
+        .eq('huddles.is_official_team_huddle', true)
+        .order('name');
 
-      if (suggested) {
-        const userHuddleIds = new Set(myHuddles.map(h => h.id));
-        setSuggestedHuddles(
-          suggested
-            .filter(h => !userHuddleIds.has(h.id))
-            .map(h => ({ ...h, team: h.team as any }))
-            .slice(0, 5)
-        );
-      }
+      const formattedTeams: TeamWithActivity[] = (teamsData || []).map((t: any) => {
+        const huddle = t.huddles?.[0];
+        const lastMessage = huddle?.last_message_at ? new Date(huddle.last_message_at) : null;
+        const isActive = lastMessage && (Date.now() - lastMessage.getTime()) < 3600000;
+        return {
+          id: t.id,
+          name: t.name,
+          city: t.city,
+          logo_url: t.logo_url,
+          league: t.league,
+          huddle_id: huddle?.id,
+          is_active: isActive,
+          member_count: huddle?.member_count || 0
+        };
+      });
 
+      setTeams(formattedTeams);
+
+      const recentIds = getRecentlyViewed();
+      const recentTeamsData = formattedTeams.filter(t => recentIds.includes(t.id));
+      recentTeamsData.sort((a, b) => recentIds.indexOf(a.id) - recentIds.indexOf(b.id));
+      setRecentTeams(recentTeamsData.slice(0, 5));
+    } catch (error) {
+      console.error('Error fetching home data:', error);
+    } finally {
       setLoading(false);
-    };
+    }
+  }, []);
 
-    fetchHuddles();
-  }, [user]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      navigate(`/huddle-search?q=${encodeURIComponent(searchQuery)}`);
+  const handleTeamClick = (team: TeamWithActivity) => {
+    addRecentlyViewed(team.id);
+    if (team.huddle_id) {
+      navigate(`/huddle/${team.huddle_id}`);
     }
   };
 
-  const HuddleCard = ({ huddle, isLive = false }: { huddle: HuddlePreview; isLive?: boolean }) => (
-    <button
-      onClick={() => navigate(`/huddle/${huddle.id}`)}
-      className={cn(
-        "w-full p-3 rounded-xl border transition-all duration-200",
-        "bg-card/50 hover:bg-card border-border/50 hover:border-primary/30",
-        "flex items-center gap-3 text-left",
-        isLive && "ring-2 ring-green-500/50 bg-green-500/5"
-      )}
-    >
-      {huddle.team?.logo_url ? (
-        <img 
-          src={huddle.team.logo_url} 
-          alt={huddle.team.name}
-          className="w-12 h-12 rounded-lg object-contain bg-background p-1"
-        />
-      ) : (
-        <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center">
-          <Users className="w-6 h-6 text-primary" />
-        </div>
-      )}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-foreground truncate">{huddle.name}</span>
-          {isLive && (
-            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-green-500/20 rounded text-xs text-green-400">
-              <Zap className="w-3 h-3" /> LIVE
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{huddle.team?.city} {huddle.team?.name}</span>
-          <span>•</span>
-          <span>{huddle.member_count || 0} fans</span>
-        </div>
-      </div>
-    </button>
+  const handleEventClick = (event: LiveEvent) => {
+    if (event.team1_id) {
+      const team = teams.find(t => t.id === event.team1_id);
+      if (team?.huddle_id) {
+        navigate(`/huddle/${team.huddle_id}`);
+      }
+    }
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/huddle-search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  const filteredTeams = teams.filter(t =>
+    t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.city.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const formatEventTime = (startTime: string) => {
+    const date = new Date(startTime);
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  };
+
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Compact Header with Search */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border/50 p-3 safe-area-inset-top">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+    <div className="min-h-screen bg-background pb-24">
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
+        <div className="px-4 py-4 flex flex-col items-center gap-2">
+          <img src={shLogo} alt="Side Huddle" className="h-10 object-contain" />
+          <p className="text-xs text-muted-foreground">Your Team. Your Crew. Live.</p>
+        </div>
+      </header>
+
+      <div className="px-4 py-6">
+        <form onSubmit={handleSearch}>
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
+              type="text"
+              placeholder="Pick a team or live event..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="Find a team or live event..."
-              className="pl-9 bg-muted/50 border-border/50"
+              className="pl-12 pr-4 py-6 text-lg rounded-2xl bg-card border-2 border-primary/20 focus:border-primary/50 transition-all"
             />
           </div>
-        </div>
+        </form>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-auto pb-24 p-4 space-y-6">
-        {/* New Huddle CTA - Large Primary Button */}
-        <StartHuddleDialog
-          trigger={
-            <Button
-              size="lg"
-              className="w-full h-14 text-lg font-bold bg-yellow-400 hover:bg-yellow-500 text-black shadow-lg"
-            >
-              <Plus className="w-6 h-6 mr-2" />
-              New Huddle
-            </Button>
-          }
-        />
-
-        {/* Section 1: Live / Active Events */}
-        {liveHuddles.length > 0 && (
+      <div className="px-4 space-y-8">
+        {liveEvents.length > 0 && (
           <section>
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-green-400" />
-              Live & Active
-            </h2>
-            <div className="space-y-2">
-              {liveHuddles.map(huddle => (
-                <HuddleCard key={huddle.id} huddle={huddle} isLive />
+            <div className="flex items-center gap-2 mb-4">
+              <Radio className="h-5 w-5 text-destructive animate-pulse" />
+              <h2 className="text-lg font-bold">Live Events</h2>
+            </div>
+            <div className="space-y-3">
+              {liveEvents.map((event) => (
+                <button
+                  key={event.id}
+                  onClick={() => handleEventClick(event)}
+                  className="w-full bg-card rounded-xl p-4 border border-border/50 hover:border-primary/50 transition-all text-left"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        {event.status === 'live' && (
+                          <Badge variant="destructive" className="animate-pulse text-xs">LIVE</Badge>
+                        )}
+                        {event.network && <span className="text-sm text-muted-foreground">{event.network}</span>}
+                      </div>
+                      <h3 className="font-semibold">{event.name}</h3>
+                      {event.subtitle && <p className="text-sm text-muted-foreground">{event.subtitle}</p>}
+                      {event.status === 'live' && event.score_team1 !== null && (
+                        <p className="text-lg font-bold text-primary mt-1">{event.score_team1} - {event.score_team2}</p>
+                      )}
+                      {event.status === 'upcoming' && (
+                        <p className="text-sm text-muted-foreground mt-1">{formatEventTime(event.start_time)}</p>
+                      )}
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </button>
               ))}
             </div>
           </section>
         )}
 
-        {/* Section 2: Your Active Teams */}
-        {user && myHuddles.length > 0 && (
+        {recentTeams.length > 0 && !searchQuery && (
           <section>
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              Your Huddles
-            </h2>
-            <div className="space-y-2">
-              {myHuddles.map(huddle => (
-                <HuddleCard key={huddle.id} huddle={huddle} />
+            <div className="flex items-center gap-2 mb-4">
+              <Clock className="h-5 w-5 text-muted-foreground" />
+              <h2 className="text-lg font-bold">Recently Viewed</h2>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
+              {recentTeams.map((team) => (
+                <button key={team.id} onClick={() => handleTeamClick(team)} className="flex-shrink-0 flex flex-col items-center gap-2">
+                  <div className={cn("relative rounded-full p-0.5", team.is_active && "ring-2 ring-green-500 animate-pulse")}>
+                    <Avatar className="h-16 w-16">
+                      <AvatarImage src={team.logo_url || undefined} alt={team.name} />
+                      <AvatarFallback>{team.name.slice(0, 2)}</AvatarFallback>
+                    </Avatar>
+                  </div>
+                  <span className="text-xs text-center max-w-[64px] truncate">{team.name}</span>
+                </button>
               ))}
             </div>
           </section>
         )}
 
-        {/* Section 3: Suggested Teams */}
         <section>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4" />
-            Suggested Huddles
-          </h2>
-          <div className="space-y-2">
-            {loading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-16 bg-muted/30 rounded-xl animate-pulse" />
-              ))
-            ) : suggestedHuddles.length > 0 ? (
-              suggestedHuddles.map(huddle => (
-                <HuddleCard key={huddle.id} huddle={huddle} />
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No suggestions yet. Create your first huddle!
-              </p>
-            )}
+          <div className="flex items-center gap-2 mb-4">
+            <Flame className="h-5 w-5 text-orange-500" />
+            <h2 className="text-lg font-bold">Teams</h2>
           </div>
+          {loading ? (
+            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
+              {Array.from({ length: 16 }).map((_, i) => (
+                <div key={i} className="flex flex-col items-center gap-2 animate-pulse">
+                  <div className="h-14 w-14 rounded-full bg-muted" />
+                  <div className="h-3 w-12 bg-muted rounded" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
+              {filteredTeams.map((team) => (
+                <button key={team.id} onClick={() => handleTeamClick(team)} className="flex flex-col items-center gap-2 group">
+                  <div className={cn("relative rounded-full transition-all duration-200 group-hover:scale-110", team.is_active && "ring-2 ring-green-500")}>
+                    <Avatar className="h-14 w-14">
+                      <AvatarImage src={team.logo_url || undefined} alt={team.name} />
+                      <AvatarFallback className="text-xs">{team.name.slice(0, 2)}</AvatarFallback>
+                    </Avatar>
+                    {team.is_active && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />}
+                  </div>
+                  <span className="text-xs text-center max-w-[56px] truncate text-muted-foreground group-hover:text-foreground transition-colors">{team.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {!loading && filteredTeams.length === 0 && (
+            <p className="text-center text-muted-foreground py-8">No teams found matching "{searchQuery}"</p>
+          )}
         </section>
       </div>
 
