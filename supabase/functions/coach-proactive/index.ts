@@ -19,34 +19,39 @@ interface CoachPromptRequest {
   };
 }
 
-// Coach personality prompts
+// Coach personality prompts - NEW spec: sharp, trash-talky, punchy (1-2 sentences)
 const PERSONALITY = {
   trash_talk: [
-    "That play just changed everything. Who saw that coming?",
-    "The momentum just shifted hard. Anyone fading this?",
-    "👀 Things are getting interesting now...",
-    "That was either genius or disaster. Your call?",
+    "That play just shifted everything 👀 Who's fading this momentum?",
+    "The energy just changed. Anyone else feeling it?",
+    "That was either brilliant or a disaster. Your call? 🔥",
+    "Momentum just swung HARD. Boost if you called it.",
   ],
   score_update: [
-    "SCORE UPDATE! {score} — what's your read on this game?",
-    "{score} right now. This one's heating up 🔥",
-    "Midgame check: {score}. Still feeling your earlier takes?",
+    "{score} — things are getting spicy 🔥",
+    "{score} right now. Still confident or sweating?",
+    "SCORE UPDATE: {score}. Who's winning the fades?",
   ],
   game_end: [
-    "FINAL: {score}. That's a wrap! Thoughts?",
-    "Game over. {score}. Called it or got caught?",
-    "{score} - FINAL. Who nailed the prediction?",
+    "FINAL: {score}. Called it or got caught? 😤",
+    "{score} — FINAL. Fade the losers 💀",
+    "That's a wrap. {score}. Who nailed it?",
   ],
   fade_settle: [
-    "💰 Fade settled! {winner} cashes in from {loser} — {amount} points 🔥",
-    "That fade just hit. {winner} wins {amount} from {loser}!",
-    "💸 {winner} called it! {amount} points from {loser}.",
+    "💰 {winner} CASHES IN! {amount} from {loser}. Brutal.",
+    "Fade settled 🔥 {winner} takes {amount} from {loser}",
+    "{winner} called it. {loser} pays {amount} 💀",
   ],
   daily_prompt: [
-    "Quiet day so far — anyone got a hot take on this week's matchup?",
+    "Quiet in here... anyone got a hot take?",
     "What's the early read on {team}? Over/under expectations?",
-    "Latest buzz: {content}. Anyone buying this?",
-    "Line movement alert — who's fading the public on {team}?",
+    "Line's moving on {team}. Who's fading the public?",
+    "Dead air. Drop your spiciest take 🔥",
+  ],
+  room_entry: [
+    "You're in — something just popped 👀",
+    "Welcome back. The room's been buzzing.",
+    "Just in time. Things are heating up 🔥",
   ],
 };
 

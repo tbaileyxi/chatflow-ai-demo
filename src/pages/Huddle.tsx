@@ -22,6 +22,7 @@ import { SignupPromptModal } from '@/components/SignupPromptModal';
 import { FoundingMemberModal } from '@/components/founding/FoundingMemberModal';
 import { FadesSidebar } from '@/components/fades/FadesSidebar';
 import { GamePulseHeader } from '@/components/game-pulse/GamePulseHeader';
+import { ShareButton } from '@/components/ShareButton';
 
 export const Huddle = () => {
   const { huddleId } = useParams<{ huddleId: string }>();
@@ -39,21 +40,9 @@ export const Huddle = () => {
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [showFoundingModal, setShowFoundingModal] = useState(false);
   const [showFadesSidebar, setShowFadesSidebar] = useState(false);
-  const [replyingToMessage, setReplyingToMessage] = useState<any>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [liveGame, setLiveGame] = useState<any>(null);
-  
-  // Fix 3: Handler to set reply and auto-scroll to top (where input is)
-  const handleReply = useCallback((message: any) => {
-    setReplyingToMessage(message);
-    // Auto-scroll page to top where the chat input is (sticky under header)
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      // Also scroll the messages container to top
-      messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 100);
-  }, []);
   
   // Pagination state
   const [hasMore, setHasMore] = useState(true);
@@ -537,23 +526,10 @@ export const Huddle = () => {
     // Prepend own message at top (newest-first)
     setMessages(prev => [messageWithProfile, ...prev]);
     
-    // Clear reply state
-    setReplyingToMessage(null);
-    
-    // If this was a reply, scroll to the parent message to show the reply beneath it
-    if (replyToId) {
-      setTimeout(() => {
-        const parentElement = document.getElementById(`message-${replyToId}`);
-        if (parentElement) {
-          parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 200);
-    } else {
-      // For non-reply messages, scroll to top to see own message
-      setTimeout(() => {
-        messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 100);
-    }
+    // Scroll to top to see own message
+    setTimeout(() => {
+      messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
 
     // Fire-and-forget insert - errors handled separately
     supabase
@@ -831,7 +807,7 @@ export const Huddle = () => {
         <div className="max-w-4xl mx-auto">
           {user ? (
             <RetroChatInput
-              onSendMessage={(content) => sendMessage(content, replyingToMessage?.id)}
+              onSendMessage={(content) => sendMessage(content)}
               onSendMedia={sendMediaMessage}
               placeholder="Chat here..."
               disabled={loading}
@@ -839,8 +815,6 @@ export const Huddle = () => {
               userId={user.id}
               teamName={teamName}
               isAdmin={isAdmin}
-              replyingTo={replyingToMessage}
-              onCancelReply={() => setReplyingToMessage(null)}
               onTyping={(isTyping) => {
                 if (isTyping && user?.id) {
                   supabase.channel(`typing:${huddleId}`).send({
@@ -920,7 +894,6 @@ export const Huddle = () => {
                       currentUserId={user?.id}
                       isAdmin={isAdmin}
                       isGrouped={isGrouped}
-                      onReply={handleReply}
                       onOpenFades={() => setShowFadesSidebar(true)}
                       replies={replies}
                     />
@@ -1052,6 +1025,9 @@ export const Huddle = () => {
           }
         }}
       />
+
+      {/* Floating Share Button */}
+      <ShareButton huddleId={huddleId!} huddleName={huddle?.name || teamName} />
     </div>
   );
 };
