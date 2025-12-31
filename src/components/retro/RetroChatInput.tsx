@@ -22,8 +22,6 @@ interface RetroChatInputProps {
   showPickEm?: boolean;
   teamName?: string;
   isAdmin?: boolean;
-  replyingTo?: any;
-  onCancelReply?: () => void;
 }
 
 
@@ -40,9 +38,7 @@ export const RetroChatInput = ({
   onPickEm,
   showPickEm = false,
   teamName,
-  isAdmin = false,
-  replyingTo,
-  onCancelReply
+  isAdmin = false
 }: RetroChatInputProps) => {
   const [message, setMessage] = useState('');
   const [mediaOptionsOpen, setMediaOptionsOpen] = useState(false);
@@ -330,24 +326,6 @@ export const RetroChatInput = ({
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
       >
-        {/* Reply preview banner */}
-        {replyingTo && (
-          <div className="px-3 py-2 bg-yellow-400/20 border-b border-yellow-400/30 flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              <span className="text-xs text-yellow-600 font-medium">Replying to {replyingTo.profile?.display_name || 'User'}</span>
-              <p className="text-xs text-muted-foreground truncate">{replyingTo.content}</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onCancelReply}
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
-            >
-              ✕
-            </Button>
-          </div>
-        )}
-        
         <div className="p-3 pb-[calc(env(safe-area-inset-bottom)+8px)]">
         <div className="flex gap-2 items-end max-w-4xl mx-auto">
           {/* Single Media/Action Button - Big Yellow */}

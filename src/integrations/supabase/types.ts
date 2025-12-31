@@ -53,6 +53,41 @@ export type Database = {
         }
         Relationships: []
       }
+      boosts: {
+        Row: {
+          amount: number
+          booster_id: string
+          created_at: string
+          id: string
+          message_id: string
+          stripe_payment_id: string | null
+        }
+        Insert: {
+          amount: number
+          booster_id: string
+          created_at?: string
+          id?: string
+          message_id: string
+          stripe_payment_id?: string | null
+        }
+        Update: {
+          amount?: number
+          booster_id?: string
+          created_at?: string
+          id?: string
+          message_id?: string
+          stripe_payment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "boosts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "huddle_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_admin_teams: {
         Row: {
           created_at: string
@@ -466,6 +501,7 @@ export type Database = {
           id: string
           joined_at: string
           last_read_at: string | null
+          last_seen_at: string | null
           user_id: string
         }
         Insert: {
@@ -473,6 +509,7 @@ export type Database = {
           id?: string
           joined_at?: string
           last_read_at?: string | null
+          last_seen_at?: string | null
           user_id: string
         }
         Update: {
@@ -480,6 +517,7 @@ export type Database = {
           id?: string
           joined_at?: string
           last_read_at?: string | null
+          last_seen_at?: string | null
           user_id?: string
         }
         Relationships: [
@@ -526,6 +564,7 @@ export type Database = {
       }
       huddle_messages: {
         Row: {
+          boost_amount: number | null
           content: string
           created_at: string
           embed_code: string | null
@@ -533,6 +572,7 @@ export type Database = {
           huddle_id: string
           id: string
           is_bot_message: boolean | null
+          is_pulse_moment: boolean | null
           is_team_agent_message: boolean | null
           media_type: string | null
           media_url: string | null
@@ -540,10 +580,13 @@ export type Database = {
           origin_post_id: string | null
           origin_team_id: string | null
           poll_data: Json | null
+          pulse_expires_at: string | null
+          pulse_source: string | null
           reply_to_id: string | null
           user_id: string
         }
         Insert: {
+          boost_amount?: number | null
           content: string
           created_at?: string
           embed_code?: string | null
@@ -551,6 +594,7 @@ export type Database = {
           huddle_id: string
           id?: string
           is_bot_message?: boolean | null
+          is_pulse_moment?: boolean | null
           is_team_agent_message?: boolean | null
           media_type?: string | null
           media_url?: string | null
@@ -558,10 +602,13 @@ export type Database = {
           origin_post_id?: string | null
           origin_team_id?: string | null
           poll_data?: Json | null
+          pulse_expires_at?: string | null
+          pulse_source?: string | null
           reply_to_id?: string | null
           user_id: string
         }
         Update: {
+          boost_amount?: number | null
           content?: string
           created_at?: string
           embed_code?: string | null
@@ -569,6 +616,7 @@ export type Database = {
           huddle_id?: string
           id?: string
           is_bot_message?: boolean | null
+          is_pulse_moment?: boolean | null
           is_team_agent_message?: boolean | null
           media_type?: string | null
           media_url?: string | null
@@ -576,6 +624,8 @@ export type Database = {
           origin_post_id?: string | null
           origin_team_id?: string | null
           poll_data?: Json | null
+          pulse_expires_at?: string | null
+          pulse_source?: string | null
           reply_to_id?: string | null
           user_id?: string
         }

@@ -13,15 +13,12 @@ import { Admin } from "./pages/Admin";
 import { Auth } from "./pages/Auth";
 import { BillsChatDemo } from "./components/BillsChatDemo";
 import { MobileProfile } from "./pages/MobileProfile";
-// TeamDirectory removed - teams discovery now on Home page only
 import { TeamFeed } from "./pages/TeamFeed";
 import { Huddle } from "./pages/Huddle";
 import { JoinHuddle } from "./pages/JoinHuddle";
-import { SpotlightPost } from "./pages/SpotlightPost";
 import { HuddleSearch } from "./pages/HuddleSearch";
 import NotFound from "./pages/NotFound";
 import { MobileHome } from "./pages/MobileHome";
-import { MobileSpotlight } from "./pages/MobileSpotlight";
 import { MobileChat } from "./pages/MobileChat";
 import { HuddleSettings } from "./pages/HuddleSettings";
 import { HuddleCoachSettings } from "./pages/HuddleCoachSettings";
@@ -40,15 +37,8 @@ const AppContent = () => {
   // Initialize global join request notifications
   useJoinRequestNotifications();
 
-  // Use mobile-first layout for all routes now with retro theme
   return (
-    <div className="min-h-screen w-full bg-background crt-effect">
-      {/* Global retro background effects */}
-      <div className="fixed inset-0 pointer-events-none opacity-10">
-        <div className="absolute inset-0 retro-grid"></div>
-        <div className="absolute inset-0 retro-scanlines"></div>
-      </div>
-      
+    <div className="min-h-screen w-full bg-background">
       <div className="relative flex-1 overflow-hidden">
         <Routes>
           <Route path="/" element={<Home />} />
@@ -59,7 +49,6 @@ const AppContent = () => {
           <Route path="/admin" element={<Admin />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/profile" element={<MobileProfile />} />
-          {/* /teams route removed - discovery happens on Home */}
           <Route path="/teams/:teamId" element={<TeamFeed />} />
           <Route path="/huddle/:huddleId" element={<Huddle />} />
           <Route path="/huddle/:huddleId/settings" element={<HuddleSettings />} />
@@ -68,8 +57,7 @@ const AppContent = () => {
           <Route path="/join-huddle/:huddleId" element={<JoinHuddle />} />
           <Route path="/join/:huddleId" element={<JoinHuddleRedirect />} />
           <Route path="/huddle-search" element={<HuddleSearch />} />
-          <Route path="/spotlight" element={<MobileSpotlight />} />
-          <Route path="/spotlight/:id" element={<SpotlightPost />} />
+          {/* Spotlight routes removed - content now lives in huddle stream */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
