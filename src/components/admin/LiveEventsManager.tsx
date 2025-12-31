@@ -68,7 +68,7 @@ export const LiveEventsManager = () => {
       const { data: teamsData } = await supabase
         .from('teams')
         .select('id, name, city, logo_url')
-        .eq('is_active', true)
+        .eq('status', 'active')
         .order('name');
 
       setEvents((eventsData as unknown as LiveEvent[]) || []);

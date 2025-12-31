@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { BottomNav } from '@/components/mobile/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import shLogo from '@/assets/sh-logo-updated.png';
+import shLogo from '@/assets/sh-logo.png';
 
 interface Team {
   id: string;
@@ -77,7 +77,7 @@ export default function Home() {
       const teamsData: Team[] = ((await (supabase as any)
         .from('teams')
         .select('id, name, city, logo_url, league')
-        .eq('is_active', true)
+        .eq('status', 'active')
         .order('name')).data) || [];
 
       // Fetch official huddles
@@ -143,9 +143,7 @@ export default function Home() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/huddle-search?q=${encodeURIComponent(searchQuery.trim())}`);
-    }
+    // Search stays on page, filtering happens inline via filteredTeams
   };
 
   const filteredTeams = teams.filter(t =>
