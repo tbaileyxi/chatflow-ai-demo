@@ -11,7 +11,8 @@ import { ModerationPanel } from '@/components/admin/ModerationPanel';
 import { BearsTrendingManager } from '@/components/admin/BearsTrendingManager';
 import { SocialSourceManager } from '@/components/admin/SocialSourceManager';
 import { CurationQueue } from '@/components/admin/CurationQueue';
-import { BarChart3, Radio, Users, Shield, Flag, TrendingUp, Rss, Filter, ArrowLeft } from 'lucide-react';
+import { LiveEventsManager } from '@/components/admin/LiveEventsManager';
+import { BarChart3, Radio, Users, Shield, Flag, TrendingUp, Rss, Filter, ArrowLeft, Tv } from 'lucide-react';
 
 export const Admin = () => {
   const { isAdmin, isContentAdmin, hasAdminAccess, loading, user } = useAuth();
@@ -62,7 +63,7 @@ export const Admin = () => {
           <FirstAdminSetup />
         ) : (
           <Tabs defaultValue={isContentAdmin ? "broadcast" : "dashboard"} className="space-y-6">
-            <TabsList className={`grid ${isContentAdmin ? 'grid-cols-1' : 'grid-cols-8'} w-full max-w-6xl bg-card/80 backdrop-blur-sm border border-primary/20`}>
+            <TabsList className={`grid ${isContentAdmin ? 'grid-cols-1' : 'grid-cols-9'} w-full max-w-7xl bg-card/80 backdrop-blur-sm border border-primary/20`}>
               {isAdmin && (
                 <TabsTrigger value="dashboard" className="flex items-center gap-2">
                   <BarChart3 className="w-4 h-4" />
@@ -77,6 +78,10 @@ export const Admin = () => {
               
               {isAdmin && (
                 <>
+                  <TabsTrigger value="live-events" className="flex items-center gap-2">
+                    <Tv className="w-4 h-4" />
+                    Live Events
+                  </TabsTrigger>
                   <TabsTrigger value="teams" className="flex items-center gap-2">
                     <Users className="w-4 h-4" />
                     Teams
@@ -117,6 +122,10 @@ export const Admin = () => {
 
             {isAdmin && (
               <>
+                <TabsContent value="live-events">
+                  <LiveEventsManager />
+                </TabsContent>
+
                 <TabsContent value="teams">
                   <TeamManagement />
                 </TabsContent>

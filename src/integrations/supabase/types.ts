@@ -839,6 +839,72 @@ export type Database = {
           },
         ]
       }
+      live_events: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          is_pinned: boolean | null
+          name: string
+          network: string | null
+          score_team1: number | null
+          score_team2: number | null
+          start_time: string
+          status: string
+          subtitle: string | null
+          team1_id: string | null
+          team2_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          is_pinned?: boolean | null
+          name: string
+          network?: string | null
+          score_team1?: number | null
+          score_team2?: number | null
+          start_time: string
+          status?: string
+          subtitle?: string | null
+          team1_id?: string | null
+          team2_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_pinned?: boolean | null
+          name?: string
+          network?: string | null
+          score_team1?: number | null
+          score_team2?: number | null
+          start_time?: string
+          status?: string
+          subtitle?: string | null
+          team1_id?: string | null
+          team2_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_events_team1_id_fkey"
+            columns: ["team1_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_events_team2_id_fkey"
+            columns: ["team2_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_heat_reactions: {
         Row: {
           created_at: string

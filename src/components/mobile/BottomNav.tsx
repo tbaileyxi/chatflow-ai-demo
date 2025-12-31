@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { MessageSquare, Sparkles, User, Compass, Grid } from 'lucide-react';
+import { MessageSquare, User, Compass, Grid } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,20 +19,18 @@ export const BottomNav = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Navigation items for logged-in users
+  // Navigation items for logged-in users (NO SPOTLIGHT)
   const loggedInNavItems: NavItem[] = [
     { icon: Grid, label: 'Teams', to: '/' },
     { icon: MessageSquare, label: 'My Huddles', to: '/app' },
     { icon: Compass, label: 'Discover', to: '/huddle-search' },
-    { icon: Sparkles, label: 'Spotlight', to: '/spotlight' },
     { icon: User, label: 'Profile', to: '/profile', authRequired: true },
   ];
 
-  // Navigation items for anonymous users
+  // Navigation items for anonymous users (NO SPOTLIGHT)
   const anonymousNavItems: NavItem[] = [
     { icon: Grid, label: 'Teams', to: '/' },
     { icon: Compass, label: 'Discover', to: '/huddle-search' },
-    { icon: Sparkles, label: 'Spotlight', to: '/spotlight' },
   ];
 
   const navItems = user ? loggedInNavItems : anonymousNavItems;
