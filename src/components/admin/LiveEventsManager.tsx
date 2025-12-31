@@ -278,12 +278,12 @@ export const LiveEventsManager = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="team1">Team 1 (optional)</Label>
-                  <Select value={formData.team1_id} onValueChange={(v) => setFormData({ ...formData, team1_id: v })}>
+                  <Select value={formData.team1_id || 'none'} onValueChange={(v) => setFormData({ ...formData, team1_id: v === 'none' ? '' : v })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select team" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {teams.map(team => (
                         <SelectItem key={team.id} value={team.id}>
                           {team.city} {team.name}
@@ -294,12 +294,12 @@ export const LiveEventsManager = () => {
                 </div>
                 <div>
                   <Label htmlFor="team2">Team 2 (optional)</Label>
-                  <Select value={formData.team2_id} onValueChange={(v) => setFormData({ ...formData, team2_id: v })}>
+                  <Select value={formData.team2_id || 'none'} onValueChange={(v) => setFormData({ ...formData, team2_id: v === 'none' ? '' : v })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select team" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {teams.map(team => (
                         <SelectItem key={team.id} value={team.id}>
                           {team.city} {team.name}
