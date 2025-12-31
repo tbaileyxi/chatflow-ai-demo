@@ -63,41 +63,50 @@ export default function Home() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: events } = await supabase
+      // Fetch live events
+      const eventsResult = await supabase
         .from('live_events')
         .select('*')
         .in('status', ['live', 'upcoming'])
         .eq('is_pinned', true)
         .order('start_time', { ascending: true })
         .limit(5);
+      setLiveEvents((eventsResult.data as unknown as LiveEvent[]) || []);
 
-      setLiveEvents((events as unknown as LiveEvent[]) || []);
-
-      const { data: teamsData } = await supabase
+      // Fetch teams - explicit cast to avoid TS2589
+      const teamsData: Team[] = ((await (supabase as any)
         .from('teams')
-        .select(`
-          id, name, city, logo_url, league,
-          huddles!inner(id, member_count, last_message_at, is_official_team_huddle)
-        `)
+        .select('id, name, city, logo_url, league')
         .eq('is_active', true)
-        .eq('huddles.is_official_team_huddle', true)
-        .order('name');
+        .order('name')).data) || [];
 
-      const formattedTeams: TeamWithActivity[] = (teamsData || []).map((t: any) => {
-        const huddle = t.huddles?.[0];
+      // Fetch official huddles
+      type HuddleRow = { id: string; team_id: string; member_count: number | null; last_message_at: string | null };
+      const huddlesData: HuddleRow[] = ((await (supabase as any)
+        .from('huddles')
+        .select('id, team_id, member_count, last_message_at')
+        .eq('is_official_team_huddle', true)).data) || [];
+
+      const huddlesByTeam = new Map<string, HuddleRow>();
+      huddlesData.forEach((h) => {
+        if (h.team_id) huddlesByTeam.set(h.team_id, h);
+      });
+      
+      const formattedTeams: TeamWithActivity[] = teamsData.map((t) => {
+        const huddle = huddlesByTeam.get(t.id);
         const lastMessage = huddle?.last_message_at ? new Date(huddle.last_message_at) : null;
-        const isActive = lastMessage && (Date.now() - lastMessage.getTime()) < 3600000;
+        const isActive = lastMessage ? (Date.now() - lastMessage.getTime()) < 3600000 : false;
         return {
           id: t.id,
           name: t.name,
-          city: t.city,
+          city: t.city || '',
           logo_url: t.logo_url,
-          league: t.league,
+          league: t.league || '',
           huddle_id: huddle?.id,
           is_active: isActive,
           member_count: huddle?.member_count || 0
         };
-      });
+      }).filter((t) => t.huddle_id);
 
       setTeams(formattedTeams);
 
