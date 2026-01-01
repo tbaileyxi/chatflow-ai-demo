@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -13,7 +13,8 @@ import { toast } from 'sonner';
 // Hardcoded admin emails for testing (remove after debugging)
 const ADMIN_EMAILS = [
   'admin@sidehuddle.com',
-  'test@test.com'
+  'test@test.com',
+  'collin@sidehuddle.com'
 ];
 
 interface RoomData {
@@ -34,11 +35,14 @@ interface EventData {
   score_team2: number | null;
   team1_id: string | null;
   team2_id: string | null;
+  network: string | null;
 }
 
 interface TeamData {
   id: string;
   name: string;
+  city: string;
+  league: string | null;
 }
 
 export default function Room() {
@@ -48,7 +52,8 @@ export default function Room() {
   
   const [room, setRoom] = useState<RoomData | null>(null);
   const [event, setEvent] = useState<EventData | null>(null);
-  const [team, setTeam] = useState<TeamData | null>(null);
+  const [team1, setTeam1] = useState<TeamData | null>(null);
+  const [team2, setTeam2] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [huddleCreated, setHuddleCreated] = useState(false);
@@ -56,6 +61,7 @@ export default function Room() {
   const [chatHeight, setChatHeight] = useState(60);
   const [lastMessageId, setLastMessageId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const pulseRefreshRef = useRef<(() => void) | null>(null);
 
   // Check if user is admin
   const isAdmin = userEmail ? ADMIN_EMAILS.includes(userEmail) : false;
@@ -92,7 +98,7 @@ export default function Room() {
       
       setEvent(eventData as EventData);
       
-      // Step 2: Determine team ID
+      // Step 2: Determine team IDs and fetch team data
       const teamId = eventData.team1_id || eventData.team2_id;
       if (!teamId) {
         setError('Event missing team IDs');
@@ -100,18 +106,26 @@ export default function Room() {
         return;
       }
 
-      // Step 3: Fetch team data
-      const { data: teamData } = await supabase
-        .from('teams')
-        .select('id, name')
-        .eq('id', teamId)
-        .single();
-      
-      if (teamData) {
-        setTeam(teamData);
+      // Fetch BOTH teams
+      if (eventData.team1_id) {
+        const { data: t1 } = await supabase
+          .from('teams')
+          .select('id, name, city, league')
+          .eq('id', eventData.team1_id)
+          .single();
+        if (t1) setTeam1(t1);
+      }
+
+      if (eventData.team2_id) {
+        const { data: t2 } = await supabase
+          .from('teams')
+          .select('id, name, city, league')
+          .eq('id', eventData.team2_id)
+          .single();
+        if (t2) setTeam2(t2);
       }
       
-      // Step 4: Lookup huddle by event_id (NOT by name!)
+      // Step 3: Lookup huddle by event_id (NOT by name!)
       const { data: existingHuddle } = await supabase
         .from('huddles')
         .select('*')
@@ -130,7 +144,7 @@ export default function Room() {
           is_live: eventData.status === 'live'
         });
       } else if (user) {
-        // Step 5: Create new huddle with event_id
+        // Step 4: Create new huddle with event_id
         console.log('Creating new huddle for event:', eventId);
         
         const { data: newHuddle, error: createError } = await supabase
@@ -163,13 +177,40 @@ export default function Room() {
           is_live: eventData.status === 'live'
         });
 
-        // Also add user as member
+        // Add user as member
         await supabase
           .from('huddle_members')
           .upsert({
             huddle_id: newHuddle.id,
             user_id: user.id
           });
+
+        // Step 5: Insert bot welcome messages for NEW huddles only
+        const { data: systemUser } = await supabase.rpc('get_or_create_system_user');
+        if (systemUser) {
+          const team1Name = team1?.name || eventData.name.split(' vs ')[0] || 'Team 1';
+          const team2Name = team2?.name || eventData.name.split(' vs ')[1] || 'Team 2';
+          
+          // Welcome message
+          await supabase.from('huddle_messages').insert({
+            huddle_id: newHuddle.id,
+            user_id: systemUser,
+            content: `🏟️ ${team1Name} vs ${team2Name}\nYou're in the live room. Drop takes, react, and talk trash responsibly.`,
+            is_bot_message: true,
+            message_type: 'coach_response'
+          });
+
+          // Game state message
+          const score1 = eventData.score_team1 ?? 0;
+          const score2 = eventData.score_team2 ?? 0;
+          await supabase.from('huddle_messages').insert({
+            huddle_id: newHuddle.id,
+            user_id: systemUser,
+            content: `LIVE • ${team1Name} ${score1} – ${team2Name} ${score2}\nGame updates will appear here...`,
+            is_bot_message: true,
+            message_type: 'coach_response'
+          });
+        }
       } else {
         setError('Login required to create room');
       }
@@ -201,18 +242,37 @@ export default function Room() {
       });
   }, [lastMessageId, room, user]);
 
+  // Build canonical search query
+  const buildSearchQuery = useCallback(() => {
+    const t1 = team1?.name || event?.name.split(' vs ')[0] || '';
+    const t2 = team2?.name || event?.name.split(' vs ')[1] || '';
+    const eventName = event?.name || '';
+    const league = team1?.league || team2?.league || 'college football';
+    
+    return `${t1} vs ${t2} ${eventName} highlights ${league} live`;
+  }, [team1, team2, event]);
+
   // Handle DROP PULSE NOW button
   const handleDropPulse = async () => {
-    if (!room || !team) {
-      toast.error('Room or team data missing');
+    if (!room || !event) {
+      toast.error('Room or event data missing');
       return;
     }
 
+    const t1Name = team1?.name || event.name.split(' vs ')[0] || '';
+    const t2Name = team2?.name || event.name.split(' vs ')[1] || '';
+    const league = team1?.league || team2?.league || 'college football';
+    const searchQuery = buildSearchQuery();
+
     const payload = {
       huddle_id: room.id,
-      team_id: room.team_id,
-      team_name: team.name,
-      is_live: room.is_live || false
+      event_id: event.id,
+      team1_name: t1Name,
+      team2_name: t2Name,
+      event_name: event.name,
+      league: league,
+      search_query: searchQuery,
+      is_live: room.is_live || event.status === 'live'
     };
 
     console.log('Pulse drop request payload:', payload);
@@ -228,7 +288,11 @@ export default function Room() {
         toast.error(`Error: ${response.error.message}`);
       } else {
         const data = response.data;
-        toast.success(`Pulse drop OK — Inserted: ${data.inserted} (Found: ${data.total_found})`);
+        const keyStatus = `YT_KEY=${data.has_youtube_key ? 'true' : 'FALSE'} | XAI_KEY=${data.has_xai_key ? 'true' : 'FALSE'}`;
+        toast.success(`Pulse OK — Inserted: ${data.inserted} | Found: ${data.total_found}\n${keyStatus}`);
+        
+        // Trigger pulse feed refresh
+        pulseRefreshRef.current?.();
       }
     } catch (err: any) {
       console.error('Pulse drop error:', err);
@@ -267,6 +331,9 @@ export default function Room() {
     );
   }
 
+  const team1Name = team1?.name || event.name.split(' vs ')[0] || 'Team 1';
+  const team2Name = team2?.name || event.name.split(' vs ')[1] || 'Team 2';
+
   return (
     <div className="min-h-screen bg-background relative overflow-hidden pt-6">
       {/* Layer 1: Pulse Feed Background */}
@@ -276,6 +343,7 @@ export default function Room() {
           teamId={room.team_id}
           isLive={room.is_live || false}
           onItemCountChange={setPulseItemCount}
+          onRefreshRef={(fn) => { pulseRefreshRef.current = fn; }}
         />
       </div>
 
@@ -293,11 +361,10 @@ export default function Room() {
           
           <div className="text-center flex-1 mx-4">
             <h1 className="font-bold text-lg truncate">{event.name}</h1>
-            {event.status === 'live' && event.score_team1 !== null && (
-              <p className="text-sm font-bold text-primary">
-                {event.score_team1} - {event.score_team2}
-              </p>
-            )}
+            {/* CHAT HEADER with live score */}
+            <p className="text-sm font-bold text-primary">
+              {event.status === 'live' ? 'LIVE' : event.status.toUpperCase()} • {team1Name} {event.score_team1 ?? 0} – {team2Name} {event.score_team2 ?? 0}
+            </p>
           </div>
           
           <div className="flex items-center gap-1 bg-background/50 backdrop-blur-sm rounded-full px-2 py-1">
@@ -311,8 +378,8 @@ export default function Room() {
           <span className="text-yellow-400">TEST EVENT:</span>{' '}
           <span>id={event.id.slice(0, 8)}</span>{' '}
           <span>status={event.status}</span>{' '}
-          <span>team1={event.team1_id?.slice(0, 8) || 'null'}</span>{' '}
-          <span>team2={event.team2_id?.slice(0, 8) || 'null'}</span>
+          <span>t1={team1Name}</span>{' '}
+          <span>t2={team2Name}</span>
         </div>
 
         {/* Debug Panel */}
@@ -325,7 +392,7 @@ export default function Room() {
           <span className="text-green-400">created={huddleCreated ? 'yes' : 'no'}</span>
         </div>
 
-        {/* Pulse Items Debug */}
+        {/* Pulse Items Debug + Drop Button */}
         <div className="px-4 py-1 bg-purple-500/20 border-b border-purple-500/30 text-[10px] font-mono flex items-center justify-between">
           <span>
             <span className="text-purple-400">PULSE:</span>{' '}
@@ -354,10 +421,19 @@ export default function Room() {
         onHeightChange={setChatHeight}
         onLastMessageChange={setLastMessageId}
         isLive={room.is_live || false}
+        eventName={event.name}
+        team1Name={team1Name}
+        team2Name={team2Name}
+        score1={event.score_team1}
+        score2={event.score_team2}
       />
 
       {/* Fixed Quick Bar at absolute bottom */}
-      <RoomQuickBar onReaction={handleReaction} />
+      <RoomQuickBar 
+        onReaction={handleReaction} 
+        huddleId={room.id}
+        lastMessageId={lastMessageId}
+      />
     </div>
   );
 }

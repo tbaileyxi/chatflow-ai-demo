@@ -1,19 +1,81 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 interface RoomQuickBarProps {
   onReaction: (emoji: string) => void;
+  huddleId: string;
+  lastMessageId: string | null;
 }
 
 const QUICK_EMOJIS = ['🔥', '😤', '🤯'];
 
-export function RoomQuickBar({ onReaction }: RoomQuickBarProps) {
+export function RoomQuickBar({ onReaction, huddleId, lastMessageId }: RoomQuickBarProps) {
   const [bursts, setBursts] = useState<{ id: number; emoji: string; x: number }[]>([]);
+  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   let burstId = 0;
+
+  // Fetch reaction counts for the last message
+  useEffect(() => {
+    if (!lastMessageId) return;
+
+    const fetchCounts = async () => {
+      const { data } = await supabase
+        .from('huddle_message_reactions')
+        .select('emoji')
+        .eq('message_id', lastMessageId);
+
+      if (data) {
+        const counts: Record<string, number> = {};
+        QUICK_EMOJIS.forEach(e => counts[e] = 0);
+        data.forEach(r => {
+          if (QUICK_EMOJIS.includes(r.emoji)) {
+            counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+          }
+        });
+        setReactionCounts(counts);
+      }
+    };
+
+    fetchCounts();
+
+    // Subscribe to realtime reaction updates
+    const channel = supabase
+      .channel(`reactions-${lastMessageId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'huddle_message_reactions',
+          filter: `message_id=eq.${lastMessageId}`
+        },
+        (payload) => {
+          const emoji = payload.new.emoji;
+          if (QUICK_EMOJIS.includes(emoji)) {
+            setReactionCounts(prev => ({
+              ...prev,
+              [emoji]: (prev[emoji] || 0) + 1
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [lastMessageId]);
 
   const handleTap = (emoji: string, event: React.MouseEvent<HTMLButtonElement>) => {
     onReaction(emoji);
+    
+    // Optimistic increment
+    setReactionCounts(prev => ({
+      ...prev,
+      [emoji]: (prev[emoji] || 0) + 1
+    }));
     
     // Create burst animation
     const rect = event.currentTarget.getBoundingClientRect();
@@ -63,6 +125,23 @@ export function RoomQuickBar({ onReaction }: RoomQuickBarProps) {
           paddingBottom: 'env(safe-area-inset-bottom, 0px)'
         }}
       >
+        {/* Reaction Counters */}
+        <div className="flex justify-center gap-8 pb-1">
+          {QUICK_EMOJIS.map((emoji) => {
+            const count = reactionCounts[emoji] || 0;
+            return count > 0 ? (
+              <motion.div
+                key={`count-${emoji}`}
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-xs font-bold text-muted-foreground"
+              >
+                {emoji} {count}
+              </motion.div>
+            ) : null;
+          })}
+        </div>
+
         <div className="flex justify-center gap-6 py-3 px-6 bg-background/95 backdrop-blur-md border-t border-border/30">
           {QUICK_EMOJIS.map((emoji) => (
             <motion.button
