@@ -144,12 +144,8 @@ export default function Home() {
   };
 
   const handleEventClick = (event: LiveEvent) => {
-    if (event.team1_id) {
-      const team = teams.find(t => t.id === event.team1_id);
-      if (team?.huddle_id) {
-        navigate(`/huddle/${team.huddle_id}`);
-      }
-    }
+    // Navigate to the new room route for events
+    navigate(`/room/${event.id}`);
   };
 
   const handleSearch = (e: React.FormEvent) => {

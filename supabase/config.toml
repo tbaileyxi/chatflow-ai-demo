@@ -87,3 +87,10 @@ verify_jwt = false
 [functions.send-activity-email]
 verify_jwt = false
 on_schedule = "0 10 * * *"
+
+[functions.pulse-drop]
+verify_jwt = false
+
+[functions.pulse-scheduler]
+verify_jwt = false
+on_schedule = "*/10 * * * *"
