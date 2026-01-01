@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -6,6 +6,7 @@ import { useRetroTheme } from '@/hooks/useRetroTheme';
 import { RetroMessageBubble } from '@/components/retro/RetroMessageBubble';
 import { RetroHighlightsSidebar } from '@/components/retro/RetroHighlightsSidebar';
 import { RetroChatInput } from '@/components/retro/RetroChatInput';
+import { EmotionBar } from '@/components/chat/EmotionBar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PickEmView } from '@/components/pickem/PickEmView';
 import { useToast } from '@/hooks/use-toast';
@@ -662,23 +663,8 @@ export const Huddle = () => {
 
   const retroTheme = useRetroTheme(huddle?.team?.name);
 
-  // Group messages with their replies - MUST be before early returns to follow React hooks rules
-  const messagesWithReplies = useMemo(() => {
-    const repliesMap = new Map<string, any[]>();
-    const parentMessages: any[] = [];
-    
-    messages.forEach(msg => {
-      if (msg.reply_to_id) {
-        const replies = repliesMap.get(msg.reply_to_id) || [];
-        replies.push(msg);
-        repliesMap.set(msg.reply_to_id, replies);
-      } else {
-        parentMessages.push(msg);
-      }
-    });
-    
-    return { parentMessages, repliesMap };
-  }, [messages]);
+  // REMOVED: messagesWithReplies grouping - flat stream architecture
+  // Messages are displayed in flat chronological order
 
   if (loading) {
     return (
@@ -802,8 +788,23 @@ export const Huddle = () => {
         </div>
       </div>
 
+      {/* EmotionBar - persistent reaction bar */}
+      {user && (
+        <div className="sticky top-[52px] sm:top-[60px] z-20">
+          <EmotionBar
+            onReaction={(emoji, messageId) => {
+              toast({ title: `${emoji} reaction added!` });
+            }}
+            lastMessageId={messages[0]?.id}
+          />
+        </div>
+      )}
+
       {/* Chat input - STICKY under header for top-down layout */}
-      <div className="sticky top-[52px] sm:top-[60px] z-20 bg-background/95 backdrop-blur-sm border-b border-team-primary/30 shadow-md px-2 sm:px-4 py-2">
+      <div className={cn(
+        "sticky z-20 bg-background/95 backdrop-blur-sm border-b border-team-primary/30 shadow-md px-2 sm:px-4 py-2",
+        user ? "top-[100px] sm:top-[108px]" : "top-[52px] sm:top-[60px]"
+      )}>
         <div className="max-w-4xl mx-auto">
           {user ? (
             <RetroChatInput
@@ -866,8 +867,8 @@ export const Huddle = () => {
             }}
           >
             <div className="max-w-4xl mx-auto space-y-1">
-              {messagesWithReplies.parentMessages.map((message, index) => {
-                const prevMessage = index > 0 ? messagesWithReplies.parentMessages[index - 1] : null;
+              {messages.map((message, index) => {
+                const prevMessage = index > 0 ? messages[index - 1] : null;
                 
                 // Show date divider when date changes (top-down: check if current message's date differs from previous)
                 // First message always shows divider, otherwise compare dates with null safety
@@ -883,8 +884,6 @@ export const Huddle = () => {
                   isSameDay(new Date(message.created_at), new Date(prevMessage.created_at)) &&
                   Math.abs(new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime()) < 60000);
                 
-                const replies = messagesWithReplies.repliesMap.get(message.id) || [];
-                
                 return (
                   <React.Fragment key={message.id}>
                     {showDateDivider && <DateDivider date={new Date(message.created_at)} />}
@@ -895,7 +894,6 @@ export const Huddle = () => {
                       isAdmin={isAdmin}
                       isGrouped={isGrouped}
                       onOpenFades={() => setShowFadesSidebar(true)}
-                      replies={replies}
                     />
                   </React.Fragment>
                 );
