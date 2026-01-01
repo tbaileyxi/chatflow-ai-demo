@@ -37,13 +37,13 @@ export function RoomQuickBar({ onReaction }: RoomQuickBarProps) {
             key={burst.id}
             initial={{ 
               opacity: 1, 
-              y: window.innerHeight - 80,
+              y: window.innerHeight - 120,
               x: burst.x - 20,
               scale: 1
             }}
             animate={{ 
               opacity: 0, 
-              y: window.innerHeight - 200,
+              y: window.innerHeight - 300,
               scale: 1.5
             }}
             exit={{ opacity: 0 }}
@@ -55,9 +55,15 @@ export function RoomQuickBar({ onReaction }: RoomQuickBarProps) {
         ))}
       </AnimatePresence>
 
-      {/* Quick Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 pb-safe">
-        <div className="flex justify-center gap-6 py-4 px-6 bg-background/95 backdrop-blur-md border-t border-border/30">
+      {/* Quick Bar - Fixed at absolute bottom with safe area */}
+      <div 
+        className="fixed left-0 right-0 z-[60]"
+        style={{ 
+          bottom: 0,
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+        }}
+      >
+        <div className="flex justify-center gap-6 py-3 px-6 bg-background/95 backdrop-blur-md border-t border-border/30">
           {QUICK_EMOJIS.map((emoji) => (
             <motion.button
               key={emoji}

@@ -93,4 +93,5 @@ verify_jwt = false
 
 [functions.pulse-scheduler]
 verify_jwt = false
-on_schedule = "*/10 * * * *"
+# TODO: Revert to "*/10 * * * *" after debugging
+on_schedule = "*/5 * * * *"

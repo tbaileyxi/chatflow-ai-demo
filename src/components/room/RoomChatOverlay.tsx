@@ -156,15 +156,21 @@ export function RoomChatOverlay({
     }
   };
 
+  // Account for quick bar height (approx 80px + safe area)
+  const quickBarHeight = 80;
+
   return (
     <motion.div
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-40",
+        "fixed left-0 right-0 z-40",
         "bg-background/95 backdrop-blur-md",
         "rounded-t-3xl border-t border-border/50",
         "shadow-2xl shadow-black/20"
       )}
-      style={{ height: `${height}vh` }}
+      style={{ 
+        height: `${height}vh`,
+        bottom: quickBarHeight
+      }}
       drag="y"
       dragControls={dragControls}
       dragConstraints={{ top: 0, bottom: 0 }}

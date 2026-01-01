@@ -20,9 +20,10 @@ interface PulseFeedBackgroundProps {
   huddleId: string;
   teamId: string;
   isLive: boolean;
+  onItemCountChange?: (count: number) => void;
 }
 
-export function PulseFeedBackground({ huddleId, teamId, isLive }: PulseFeedBackgroundProps) {
+export function PulseFeedBackground({ huddleId, teamId, isLive, onItemCountChange }: PulseFeedBackgroundProps) {
   const [pulseItems, setPulseItems] = useState<PulseItem[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -43,8 +44,17 @@ export function PulseFeedBackground({ huddleId, teamId, isLive }: PulseFeedBackg
     }
 
     const items: PulseItem[] = (data || []).map((msg: any) => {
-      // Extract video ID from YouTube URLs
-      const youtubeMatch = msg.media_url?.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+      // Extract video ID from YouTube URLs or embed_code
+      let videoId: string | undefined;
+      
+      // Check embed_code first (format: youtube:VIDEO_ID)
+      if (msg.embed_code?.startsWith('youtube:')) {
+        videoId = msg.embed_code.replace('youtube:', '');
+      } else if (msg.media_url) {
+        // Try to extract from URL
+        const youtubeMatch = msg.media_url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+        videoId = youtubeMatch?.[1];
+      }
       
       return {
         id: msg.id,
@@ -53,16 +63,17 @@ export function PulseFeedBackground({ huddleId, teamId, isLive }: PulseFeedBackg
               msg.pulse_source === 'reddit' ? 'reddit' : 'curated',
         headline: msg.content?.split('\n')[0] || 'Update',
         body: msg.content?.split('\n').slice(1).join('\n'),
-        thumbnail: msg.media_url && !youtubeMatch ? msg.media_url : undefined,
-        video_id: youtubeMatch?.[1],
-        external_url: msg.embed_code,
+        thumbnail: msg.media_url && !videoId ? msg.media_url : undefined,
+        video_id: videoId,
+        external_url: msg.embed_code && !msg.embed_code.startsWith('youtube:') ? msg.embed_code : undefined,
         created_at: msg.created_at,
         sponsor: undefined
       };
     });
 
     setPulseItems(items);
-  }, [huddleId]);
+    onItemCountChange?.(items.length);
+  }, [huddleId, onItemCountChange]);
 
   useEffect(() => {
     fetchPulseItems();
@@ -105,7 +116,7 @@ export function PulseFeedBackground({ huddleId, teamId, isLive }: PulseFeedBackg
   return (
     <div 
       ref={containerRef}
-      className="h-full overflow-y-auto px-4 pt-20 pb-[50vh] scrollbar-hide"
+      className="h-full overflow-y-auto px-4 pt-48 pb-[60vh] scrollbar-hide"
     >
       <AnimatePresence mode="popLayout">
         {pulseItems.map((item, index) => (
@@ -147,6 +158,12 @@ interface PulseCardProps {
 }
 
 function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
+  // ALWAYS show thumbnail for YouTube videos
+  const hasYouTubeVideo = !!item.video_id;
+  const thumbnailUrl = hasYouTubeVideo 
+    ? `https://img.youtube.com/vi/${item.video_id}/hqdefault.jpg`
+    : item.thumbnail;
+
   return (
     <motion.button
       onClick={onExpand}
@@ -160,27 +177,26 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
     >
       {/* Compact View */}
       <div className="p-3 flex gap-3">
-        {/* Thumbnail */}
-        {(item.thumbnail || item.video_id) && (
+        {/* Thumbnail - ALWAYS show for YouTube */}
+        {thumbnailUrl && (
           <div className="relative w-24 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
-            {item.video_id ? (
-              <>
-                <img
-                  src={`https://img.youtube.com/vi/${item.video_id}/mqdefault.jpg`}
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                  <Play className="h-6 w-6 text-white fill-white" />
+            <img
+              src={thumbnailUrl}
+              alt=""
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // Fallback if thumbnail fails
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+            {/* Play overlay for videos */}
+            {hasYouTubeVideo && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center">
+                  <Play className="h-4 w-4 text-white fill-white ml-0.5" />
                 </div>
-              </>
-            ) : item.thumbnail ? (
-              <img
-                src={item.thumbnail}
-                alt=""
-                className="w-full h-full object-cover"
-              />
-            ) : null}
+              </div>
+            )}
           </div>
         )}
         
@@ -206,8 +222,8 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            {/* YouTube Embed */}
-            {item.video_id && (
+            {/* YouTube Embed - show when expanded */}
+            {hasYouTubeVideo && (
               <div className="aspect-video w-full bg-black">
                 <iframe
                   src={`https://www.youtube.com/embed/${item.video_id}?playsinline=1&autoplay=1&mute=1`}

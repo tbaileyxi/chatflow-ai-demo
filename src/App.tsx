@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/hooks/useAuth";
 import { HelmetProvider } from "react-helmet-async";
 import { useJoinRequestNotifications } from "@/hooks/useJoinRequestNotifications";
+import { DevBanner } from "@/components/debug/DevBanner";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
 import { Admin } from "./pages/Admin";
@@ -40,7 +41,10 @@ const AppContent = () => {
 
   return (
     <div className="min-h-screen w-full bg-background">
-      <div className="relative flex-1 overflow-hidden">
+      {/* DEV BANNER - Remove after debugging */}
+      <DevBanner />
+      
+      <div className="relative flex-1 overflow-hidden pt-6">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/bills-demo" element={<BillsChatDemo />} />
