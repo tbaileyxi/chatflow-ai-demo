@@ -26,7 +26,7 @@ interface RetroMessageBubbleProps {
     is_bot_message?: boolean;
     is_team_agent_message?: boolean;
     origin_team_id?: string;
-  origin_teams?: {
+    origin_teams?: {
       id: string;
       name: string;
       city?: string;
@@ -38,6 +38,7 @@ interface RetroMessageBubbleProps {
     media_type?: string;
     embed_code?: string;
     message_type?: string;
+    boost_amount?: number;
     poll_data?: {
       question: string;
       options: Array<{
@@ -50,7 +51,9 @@ interface RetroMessageBubbleProps {
       embed_code: string;
       embed_type: 'x' | 'iframe' | 'youtube';
     }>;
-    reply_to_id?: string;
+    is_pulse_moment?: boolean;
+    pulse_source?: string;
+    pulse_expires_at?: string;
   };
   user: {
     id: string;
@@ -66,10 +69,9 @@ interface RetroMessageBubbleProps {
   onMegaphone?: (messageId: string) => void;
   onHighlight?: (messageId: string) => void;
   onCopyCallout?: (messageId: string, content: string) => void;
-  onReply?: (message: any) => void;
   onPollVote?: (messageId: string, optionIndex: number) => void;
   onOpenFades?: () => void;
-  replies?: any[];
+  onBoost?: (messageId: string) => void;
   className?: string;
 }
 
@@ -85,10 +87,9 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   onMegaphone,
   onHighlight,
   onCopyCallout,
-  onReply,
   onPollVote,
   onOpenFades,
-  replies = [],
+  onBoost,
   className
 }) => {
   const { user: currentUser } = useAuth();
@@ -263,6 +264,26 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
   }, [isBot, user, message.user_id]);
 
   const isSocialBuzz = message.message_type === 'social_buzz';
+  const isPulse = message.is_pulse_moment || message.message_type === 'pulse' || message.message_type === 'highlight';
+  const isCoachMessage = message.message_type === 'coach_response';
+  const isBoosted = (message.boost_amount || 0) > 0;
+  
+  // Calculate pulse opacity based on age (dims after 15 mins)
+  const pulseOpacity = useMemo(() => {
+    if (!isPulse) return 1;
+    const expiresAt = message.pulse_expires_at ? new Date(message.pulse_expires_at) : null;
+    if (expiresAt) {
+      const now = new Date();
+      if (now > expiresAt) return 0.5;
+      const totalDuration = 15 * 60 * 1000; // 15 minutes
+      const remaining = expiresAt.getTime() - now.getTime();
+      return Math.max(0.5, remaining / totalDuration);
+    }
+    // Fallback: dim after 15 mins based on created_at
+    const age = Date.now() - new Date(message.created_at).getTime();
+    if (age > 15 * 60 * 1000) return 0.6;
+    return 1;
+  }, [isPulse, message.pulse_expires_at, message.created_at]);
 
   const renderSocialBuzzContent = useCallback((content: string) => {
     const lines = String(content || '').split('\n');
@@ -407,14 +428,98 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
     }
   }, [currentUser, message.id, message.user_id, hasGivenHeat, isGivingHeat, toast]);
 
+  // Pulse messages - ephemeral curated content
+  if (isPulse && !isBot) {
+    return (
+      <motion.div
+        id={`message-${message.id}`}
+        className="w-full px-2 py-1"
+        initial={{ opacity: 0, y: 15, scale: 0.98 }}
+        animate={{ opacity: pulseOpacity, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+      >
+        <div className={cn(
+          "rounded-lg border p-3 relative overflow-hidden",
+          "border-team-primary/20 bg-gradient-to-br from-background/60 to-team-primary/5",
+          "backdrop-blur-sm transition-opacity duration-300"
+        )}>
+          {/* PULSE badge */}
+          <div className="flex items-center gap-1.5 mb-2">
+            <Zap className="h-3 w-3 text-yellow-400" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-yellow-400">
+              PULSE
+            </span>
+            {message.pulse_source && (
+              <span className="text-[10px] text-muted-foreground">
+                • {message.pulse_source}
+              </span>
+            )}
+            <span className="text-[10px] text-muted-foreground ml-auto">
+              {formattedTime}
+            </span>
+          </div>
+
+          {/* Media thumbnail - 16:9 aspect */}
+          {message.media_url && (
+            <div className="relative aspect-video rounded-md overflow-hidden mb-2 border border-team-primary/10">
+              {message.media_type === 'video' ? (
+                <div className="relative w-full h-full bg-black/80">
+                  <img 
+                    src={message.media_url} 
+                    alt="Pulse content"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-yellow-400/90 flex items-center justify-center">
+                      <svg className="w-5 h-5 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <img 
+                  src={message.media_url} 
+                  alt="Pulse content"
+                  className="w-full h-full object-cover"
+                />
+              )}
+            </div>
+          )}
+
+          {/* Content - one line headline */}
+          <p className="text-sm text-foreground/90 line-clamp-2">
+            {message.content}
+          </p>
+
+          {/* Boost glow */}
+          {isBoosted && (
+            <div className="absolute inset-0 rounded-lg pointer-events-none">
+              <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 via-orange-500/10 to-yellow-500/10 animate-pulse" />
+            </div>
+          )}
+        </div>
+      </motion.div>
+    );
+  }
+
   // Bot messages = full-width updates with solid text
   if (isBot) {
     return (
       <div className="w-full px-2 py-1">
         <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="retro-megaphone p-3 sm:p-4 rounded-lg border-2 border-yellow-600/60 bg-gradient-to-r from-yellow-400 to-amber-500 shadow-lg"
+          initial={{ opacity: 0, y: 15, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          className={cn(
+            "retro-megaphone p-3 sm:p-4 rounded-lg border-2 shadow-lg relative overflow-hidden",
+            // Coach messages get distinct styling
+            isCoachMessage 
+              ? "border-cyan-500/60 bg-gradient-to-r from-cyan-500 to-blue-500"
+              : "border-yellow-600/60 bg-gradient-to-r from-yellow-400 to-amber-500",
+            // Boost glow
+            isBoosted && "ring-2 ring-yellow-400/50 shadow-yellow-400/30 shadow-xl"
+          )}
         >
           {/* Header - Bot name on first line */}
           <div className="flex items-center gap-2 mb-1">
@@ -763,17 +868,6 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
               <Copy className="h-3 w-3 mr-1" />
               Copy
             </Button>
-            {/* Reply button for bot messages */}
-            {onReply && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onReply(message)}
-                className="h-7 px-2 text-xs hover:bg-black/10 text-gray-700 rounded-lg"
-              >
-                Reply
-              </Button>
-            )}
             {/* View Fades button for fade notifications */}
             {message.message_type === 'fade_notification' && onOpenFades && (
               <Button
@@ -787,33 +881,6 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
               </Button>
             )}
           </div>
-
-          {/* Fix 3: Render replies for bot messages (one level deep only) */}
-          {replies.length > 0 && (
-            <div className="ml-4 mt-3 space-y-1 border-l-2 border-black/20 pl-2">
-              {replies.map((reply) => (
-                <div key={reply.id} className="flex gap-2 p-1.5 rounded bg-black/10">
-                  <Avatar className="h-5 w-5 shrink-0">
-                    <AvatarImage src={reply.profile?.avatar_url} />
-                    <AvatarFallback className="bg-black/20 text-black text-xs">
-                      {(reply.profile?.display_name || 'U').slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-black truncate">
-                        {reply.profile?.display_name || 'User'}
-                      </span>
-                      <span className="text-xs text-gray-600">
-                        {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
-                      </span>
-                    </div>
-                    <p className="text-xs text-black">{reply.content}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </motion.div>
       </div>
     );
@@ -838,10 +905,13 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
       id={`message-${message.id}`}
       className={cn(
         "group flex gap-2 sm:gap-3 hover:bg-team-primary/5 p-1 sm:p-2 rounded-lg transition-colors",
-        "relative touch-manipulation"
+        "relative touch-manipulation",
+        // Boost glow for user messages
+        isBoosted && "ring-1 ring-yellow-400/40 bg-yellow-400/5"
       )}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, y: 15, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: "spring", stiffness: 400, damping: 25 }}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
       onTouchStart={handleLongPressStart}
@@ -876,7 +946,16 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
         )}
 
         {/* Message content - mobile optimized padding */}
-        <div className="retro-bubble p-2 rounded-lg border border-team-primary/30 bg-gradient-to-br from-background/80 to-team-primary/5 backdrop-blur-sm relative">
+        <div className={cn(
+          "retro-bubble p-2 rounded-lg border bg-gradient-to-br from-background/80 to-team-primary/5 backdrop-blur-sm relative",
+          isBoosted ? "border-yellow-400/50" : "border-team-primary/30"
+        )}>
+          {/* Boosted badge */}
+          {isBoosted && (
+            <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 bg-yellow-400 text-black text-[10px] font-bold rounded-full shadow-lg">
+              🔥 +${message.boost_amount}
+            </div>
+          )}
           {/* Interactive Poll for user messages */}
           {message.poll_data && (
             <div className="mb-3 p-3 rounded-lg border border-team-primary/30 bg-team-primary/5">
@@ -1075,18 +1154,6 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                 <span className="hidden sm:inline">Copy</span>
               </Button>
 
-              {/* Reply button */}
-              {onReply && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onReply(message)}
-                  className="h-8 px-2 sm:px-3 text-xs hover:bg-team-primary/20 text-muted-foreground rounded-full touch-manipulation"
-                >
-                  <span>Reply</span>
-                </Button>
-              )}
-
               {/* Lightning Heat Button - Only show if not own message */}
               {message.user_id !== currentUser?.id && (
                 <Button
@@ -1148,33 +1215,6 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
             </motion.div>
           )}
         </AnimatePresence>
-        
-        {/* Render replies (one level deep only) */}
-        {replies.length > 0 && (
-          <div className="ml-8 sm:ml-10 mt-2 space-y-1 border-l-2 border-team-primary/30 pl-2">
-            {replies.map((reply) => (
-              <div key={reply.id} className="flex gap-2 p-1.5 rounded bg-team-primary/5">
-                <Avatar className="h-5 w-5 shrink-0">
-                  <AvatarImage src={reply.profile?.avatar_url} />
-                  <AvatarFallback className="bg-team-primary/20 text-team-primary text-xs">
-                    {(reply.profile?.display_name || 'U').slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-semibold text-team-primary truncate">
-                      {reply.profile?.display_name || 'User'}
-                    </span>
-                    <span className="text-xs text-muted-foreground/60">
-                      {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
-                    </span>
-                  </div>
-                  <p className="text-xs text-foreground">{reply.content}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </motion.div>
   );
