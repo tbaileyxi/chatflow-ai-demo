@@ -24,6 +24,7 @@ import { HuddleSettings } from "./pages/HuddleSettings";
 import { HuddleCoachSettings } from "./pages/HuddleCoachSettings";
 import FAQ from "./pages/FAQ";
 import { RetroDemo } from "./pages/RetroDemo";
+import Room from "./pages/Room";
 
 const queryClient = new QueryClient();
 
@@ -57,7 +58,7 @@ const AppContent = () => {
           <Route path="/join-huddle/:huddleId" element={<JoinHuddle />} />
           <Route path="/join/:huddleId" element={<JoinHuddleRedirect />} />
           <Route path="/huddle-search" element={<HuddleSearch />} />
-          {/* Spotlight routes removed - content now lives in huddle stream */}
+          <Route path="/room/:eventId" element={<Room />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
