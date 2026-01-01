@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, useDragControls, PanInfo } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { RetroChatInput } from '@/components/retro/RetroChatInput';
+import { RoomChatInput } from '@/components/room/RoomChatInput';
 import { RoomMessageBubble } from '@/components/room/RoomMessageBubble';
 import { cn } from '@/lib/utils';
 
@@ -23,11 +23,16 @@ interface Message {
   };
 }
 
+interface ReactionCount {
+  [emoji: string]: number;
+}
+
 interface RoomChatOverlayProps {
   huddleId: string;
   height: number;
   onHeightChange: (height: number) => void;
   onLastMessageChange: (messageId: string | null) => void;
+  onSelectedTargetChange?: (messageId: string | null) => void;
   isLive: boolean;
   eventName?: string;
   team1Name?: string;
@@ -41,6 +46,7 @@ export function RoomChatOverlay({
   height,
   onHeightChange,
   onLastMessageChange,
+  onSelectedTargetChange,
   isLive,
   eventName,
   team1Name,
@@ -51,8 +57,13 @@ export function RoomChatOverlay({
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [profiles, setProfiles] = useState<Record<string, any>>({});
+  const [reactionCounts, setReactionCounts] = useState<Record<string, ReactionCount>>({});
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const dragControls = useDragControls();
+
+  // Quick bar height for padding
+  const quickBarHeight = 80;
 
   // Fetch messages (newest at top = descending order)
   const fetchMessages = useCallback(async () => {
@@ -60,7 +71,7 @@ export function RoomChatOverlay({
       .from('huddle_messages')
       .select('*')
       .eq('huddle_id', huddleId)
-      .not('message_type', 'in', '("social_buzz","highlight","pulse")') // Exclude pulse items
+      .not('message_type', 'in', '("social_buzz","highlight","pulse")')
       .order('created_at', { ascending: false })
       .limit(100);
 
@@ -71,12 +82,16 @@ export function RoomChatOverlay({
 
     setMessages(data || []);
     
-    // Update last message ID
+    // Update last message ID and set as default selected
     if (data && data.length > 0) {
       onLastMessageChange(data[0].id);
+      if (!selectedMessageId) {
+        setSelectedMessageId(data[0].id);
+        onSelectedTargetChange?.(data[0].id);
+      }
     }
 
-    // Fetch profiles for all unique user_ids
+    // Fetch profiles
     const userIds = [...new Set((data || []).map(m => m.user_id))];
     if (userIds.length > 0) {
       const { data: profilesData } = await supabase
@@ -90,13 +105,29 @@ export function RoomChatOverlay({
       });
       setProfiles(profileMap);
     }
-  }, [huddleId, onLastMessageChange]);
+
+    // Fetch reaction counts for all messages
+    const messageIds = (data || []).map(m => m.id);
+    if (messageIds.length > 0) {
+      const { data: reactions } = await supabase
+        .from('huddle_message_reactions')
+        .select('message_id, emoji')
+        .in('message_id', messageIds);
+
+      const counts: Record<string, ReactionCount> = {};
+      (reactions || []).forEach(r => {
+        if (!counts[r.message_id]) counts[r.message_id] = {};
+        counts[r.message_id][r.emoji] = (counts[r.message_id][r.emoji] || 0) + 1;
+      });
+      setReactionCounts(counts);
+    }
+  }, [huddleId, onLastMessageChange, onSelectedTargetChange, selectedMessageId]);
 
   useEffect(() => {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Realtime subscription
+  // Realtime subscription for messages
   useEffect(() => {
     const channel = supabase
       .channel(`room-chat-${huddleId}`)
@@ -109,12 +140,14 @@ export function RoomChatOverlay({
           filter: `huddle_id=eq.${huddleId}`
         },
         (payload) => {
-          // Only add if not a pulse message
           if (!['social_buzz', 'highlight', 'pulse'].includes(payload.new.message_type)) {
             setMessages(prev => [payload.new as Message, ...prev]);
             onLastMessageChange(payload.new.id);
             
-            // Fetch profile if not cached
+            // Auto-select newest message as reaction target
+            setSelectedMessageId(payload.new.id);
+            onSelectedTargetChange?.(payload.new.id);
+            
             const userId = payload.new.user_id;
             if (!profiles[userId]) {
               supabase
@@ -136,7 +169,36 @@ export function RoomChatOverlay({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [huddleId, profiles, onLastMessageChange]);
+  }, [huddleId, profiles, onLastMessageChange, onSelectedTargetChange]);
+
+  // Realtime subscription for reactions
+  useEffect(() => {
+    const channel = supabase
+      .channel(`room-reactions-${huddleId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'huddle_message_reactions'
+        },
+        (payload) => {
+          const { message_id, emoji } = payload.new;
+          setReactionCounts(prev => ({
+            ...prev,
+            [message_id]: {
+              ...(prev[message_id] || {}),
+              [emoji]: ((prev[message_id]?.[emoji]) || 0) + 1
+            }
+          }));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [huddleId]);
 
   // Handle drag to resize
   const handleDrag = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
@@ -145,6 +207,12 @@ export function RoomChatOverlay({
     const newHeight = Math.max(30, Math.min(90, height + deltaPercent));
     onHeightChange(newHeight);
   };
+
+  // Handle message selection for reactions
+  const handleMessageSelect = useCallback((messageId: string) => {
+    setSelectedMessageId(messageId);
+    onSelectedTargetChange?.(messageId);
+  }, [onSelectedTargetChange]);
 
   // Send message
   const handleSendMessage = async (content: string, mediaUrl?: string) => {
@@ -164,9 +232,6 @@ export function RoomChatOverlay({
       console.error('Error sending message:', error);
     }
   };
-
-  // Account for quick bar height (approx 80px + safe area)
-  const quickBarHeight = 80;
 
   return (
     <motion.div
@@ -201,13 +266,22 @@ export function RoomChatOverlay({
         className="flex-1 overflow-y-auto px-4 py-2 min-h-0"
       >
         {messages.map((msg) => (
-          <RoomMessageBubble
+          <div 
             key={msg.id}
-            message={msg}
-            profile={profiles[msg.user_id]}
-            isOwn={msg.user_id === user?.id}
-            isCoach={msg.message_type === 'coach_response'}
-          />
+            onClick={() => handleMessageSelect(msg.id)}
+            className={cn(
+              "cursor-pointer transition-all",
+              selectedMessageId === msg.id && "ring-2 ring-primary/50 rounded-xl"
+            )}
+          >
+            <RoomMessageBubble
+              message={msg}
+              profile={profiles[msg.user_id]}
+              isOwn={msg.user_id === user?.id}
+              isCoach={msg.message_type === 'coach_response'}
+              reactionCounts={reactionCounts[msg.id]}
+            />
+          </div>
         ))}
         
         {messages.length === 0 && (
@@ -219,12 +293,12 @@ export function RoomChatOverlay({
 
       {/* Chat Input - PINNED AT BOTTOM of overlay */}
       <div className="flex-shrink-0 px-4 py-3 border-t border-border/30 bg-background/80">
-        <RetroChatInput
-          onSendMessage={handleSendMessage}
-          placeholder="Say something..."
-          disabled={!user}
+        <RoomChatInput
           huddleId={huddleId}
           userId={user?.id}
+          onSendMessage={handleSendMessage}
+          disabled={!user}
+          placeholder="Say something..."
         />
       </div>
     </motion.div>

@@ -6,25 +6,28 @@ import { cn } from '@/lib/utils';
 interface RoomQuickBarProps {
   onReaction: (emoji: string) => void;
   huddleId: string;
-  lastMessageId: string | null;
+  selectedTargetId: string | null;
 }
 
-const QUICK_EMOJIS = ['🔥', '😤', '🤯'];
+const QUICK_EMOJIS = ['🔥', '😤', '🤯', '😂', '💀'];
 
-export function RoomQuickBar({ onReaction, huddleId, lastMessageId }: RoomQuickBarProps) {
+export function RoomQuickBar({ onReaction, huddleId, selectedTargetId }: RoomQuickBarProps) {
   const [bursts, setBursts] = useState<{ id: number; emoji: string; x: number }[]>([]);
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   let burstId = 0;
 
-  // Fetch reaction counts for the last message
+  // Fetch reaction counts for the selected target
   useEffect(() => {
-    if (!lastMessageId) return;
+    if (!selectedTargetId) {
+      setReactionCounts({});
+      return;
+    }
 
     const fetchCounts = async () => {
       const { data } = await supabase
         .from('huddle_message_reactions')
         .select('emoji')
-        .eq('message_id', lastMessageId);
+        .eq('message_id', selectedTargetId);
 
       if (data) {
         const counts: Record<string, number> = {};
@@ -42,14 +45,14 @@ export function RoomQuickBar({ onReaction, huddleId, lastMessageId }: RoomQuickB
 
     // Subscribe to realtime reaction updates
     const channel = supabase
-      .channel(`reactions-${lastMessageId}`)
+      .channel(`reactions-${selectedTargetId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'huddle_message_reactions',
-          filter: `message_id=eq.${lastMessageId}`
+          filter: `message_id=eq.${selectedTargetId}`
         },
         (payload) => {
           const emoji = payload.new.emoji;
@@ -66,7 +69,7 @@ export function RoomQuickBar({ onReaction, huddleId, lastMessageId }: RoomQuickB
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [lastMessageId]);
+  }, [selectedTargetId]);
 
   const handleTap = (emoji: string, event: React.MouseEvent<HTMLButtonElement>) => {
     onReaction(emoji);
@@ -89,6 +92,9 @@ export function RoomQuickBar({ onReaction, huddleId, lastMessageId }: RoomQuickB
       setBursts(prev => prev.filter(b => b.id !== newBurst.id));
     }, 1000);
   };
+
+  // Check if any emoji has reactions
+  const hasAnyReactions = Object.values(reactionCounts).some(c => c > 0);
 
   return (
     <>
@@ -125,38 +131,44 @@ export function RoomQuickBar({ onReaction, huddleId, lastMessageId }: RoomQuickB
           paddingBottom: 'env(safe-area-inset-bottom, 0px)'
         }}
       >
-        {/* Reaction Counters */}
-        <div className="flex justify-center gap-8 pb-1">
-          {QUICK_EMOJIS.map((emoji) => {
-            const count = reactionCounts[emoji] || 0;
-            return count > 0 ? (
-              <motion.div
-                key={`count-${emoji}`}
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-xs font-bold text-muted-foreground"
-              >
-                {emoji} {count}
-              </motion.div>
-            ) : null;
-          })}
-        </div>
+        {/* Reaction Counters (shown above buttons when there are reactions) */}
+        {hasAnyReactions && (
+          <div className="flex justify-center gap-6 pb-1 px-6">
+            {QUICK_EMOJIS.map((emoji) => {
+              const count = reactionCounts[emoji] || 0;
+              return count > 0 ? (
+                <motion.div
+                  key={`count-${emoji}`}
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="text-xs font-bold text-muted-foreground min-w-[40px] text-center"
+                >
+                  {emoji} {count}
+                </motion.div>
+              ) : (
+                <div key={`count-${emoji}`} className="min-w-[40px]" />
+              );
+            })}
+          </div>
+        )}
 
-        <div className="flex justify-center gap-6 py-3 px-6 bg-background/95 backdrop-blur-md border-t border-border/30">
+        <div className="flex justify-center gap-4 py-3 px-6 bg-background/95 backdrop-blur-md border-t border-border/30">
           {QUICK_EMOJIS.map((emoji) => (
             <motion.button
               key={emoji}
               onClick={(e) => handleTap(emoji, e)}
               whileTap={{ scale: 0.85 }}
               whileHover={{ scale: 1.1 }}
+              disabled={!selectedTargetId}
               className={cn(
-                "w-14 h-14 rounded-full",
+                "w-12 h-12 rounded-full",
                 "bg-card border-2 border-border/50",
                 "flex items-center justify-center",
-                "text-3xl",
+                "text-2xl",
                 "shadow-lg shadow-black/10",
                 "hover:border-primary/50 transition-colors",
-                "active:bg-primary/10"
+                "active:bg-primary/10",
+                "disabled:opacity-50 disabled:cursor-not-allowed"
               )}
             >
               {emoji}
