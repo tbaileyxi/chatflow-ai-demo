@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, useDragControls, PanInfo } from 'framer-motion';
-import { GripHorizontal } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { RetroChatInput } from '@/components/retro/RetroChatInput';
@@ -52,7 +51,7 @@ export function RoomChatOverlay({
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [profiles, setProfiles] = useState<Record<string, any>>({});
-  const containerRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const dragControls = useDragControls();
 
   // Fetch messages (newest at top = descending order)
@@ -175,7 +174,8 @@ export function RoomChatOverlay({
         "fixed left-0 right-0 z-40",
         "bg-background/95 backdrop-blur-md",
         "rounded-t-3xl border-t border-border/50",
-        "shadow-2xl shadow-black/20"
+        "shadow-2xl shadow-black/20",
+        "flex flex-col"
       )}
       style={{ 
         height: `${height}vh`,
@@ -189,30 +189,18 @@ export function RoomChatOverlay({
     >
       {/* Drag Handle */}
       <div 
-        className="flex justify-center py-2 cursor-grab active:cursor-grabbing"
+        className="flex justify-center py-2 cursor-grab active:cursor-grabbing flex-shrink-0"
         onPointerDown={(e) => dragControls.start(e)}
       >
         <div className="w-12 h-1 rounded-full bg-muted-foreground/30" />
       </div>
 
-      {/* Pinned Input at Top */}
-      <div className="px-4 pb-2 border-b border-border/30">
-        <RetroChatInput
-          onSendMessage={handleSendMessage}
-          placeholder="Say something..."
-          disabled={!user}
-          huddleId={huddleId}
-          userId={user?.id}
-        />
-      </div>
-
-      {/* Messages (Newest at Top) */}
+      {/* Messages Area (scrollable, takes remaining space) */}
       <div 
-        ref={containerRef}
-        className="flex-1 overflow-y-auto px-4 py-2"
-        style={{ height: `calc(100% - 100px)` }}
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-2 min-h-0"
       >
-        {messages.map((msg, index) => (
+        {messages.map((msg) => (
           <RoomMessageBubble
             key={msg.id}
             message={msg}
@@ -227,6 +215,17 @@ export function RoomChatOverlay({
             Be the first to say something!
           </div>
         )}
+      </div>
+
+      {/* Chat Input - PINNED AT BOTTOM of overlay */}
+      <div className="flex-shrink-0 px-4 py-3 border-t border-border/30 bg-background/80">
+        <RetroChatInput
+          onSendMessage={handleSendMessage}
+          placeholder="Say something..."
+          disabled={!user}
+          huddleId={huddleId}
+          userId={user?.id}
+        />
       </div>
     </motion.div>
   );

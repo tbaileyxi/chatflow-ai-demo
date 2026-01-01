@@ -242,14 +242,19 @@ export default function Room() {
       });
   }, [lastMessageId, room, user]);
 
-  // Build canonical search query
-  const buildSearchQuery = useCallback(() => {
+  // Build query ladder for pulse-drop
+  const buildQueryLadder = useCallback(() => {
     const t1 = team1?.name || event?.name.split(' vs ')[0] || '';
     const t2 = team2?.name || event?.name.split(' vs ')[1] || '';
     const eventName = event?.name || '';
-    const league = team1?.league || team2?.league || 'college football';
+    const lg = team1?.league || team2?.league || 'college football';
     
-    return `${t1} vs ${t2} ${eventName} highlights ${league} live`;
+    return [
+      `${t1} vs ${t2} ${eventName} highlights ${lg} live`,
+      `${t1} ${t2} ${eventName} live`,
+      `${t1} ${t2} big play OR touchdown OR interception OR highlight`,
+      `${eventName} ${t1} ${t2} highlights`
+    ].filter(q => q.trim().length > 10);
   }, [team1, team2, event]);
 
   // Handle DROP PULSE NOW button
@@ -262,7 +267,7 @@ export default function Room() {
     const t1Name = team1?.name || event.name.split(' vs ')[0] || '';
     const t2Name = team2?.name || event.name.split(' vs ')[1] || '';
     const league = team1?.league || team2?.league || 'college football';
-    const searchQuery = buildSearchQuery();
+    const queries = buildQueryLadder();
 
     const payload = {
       huddle_id: room.id,
@@ -271,8 +276,9 @@ export default function Room() {
       team2_name: t2Name,
       event_name: event.name,
       league: league,
-      search_query: searchQuery,
-      is_live: room.is_live || event.status === 'live'
+      queries: queries,
+      is_live: room.is_live || event.status === 'live',
+      bypass_rate_limit: true // Admin bypass
     };
 
     console.log('Pulse drop request payload:', payload);
@@ -288,8 +294,10 @@ export default function Room() {
         toast.error(`Error: ${response.error.message}`);
       } else {
         const data = response.data;
-        const keyStatus = `YT_KEY=${data.has_youtube_key ? 'true' : 'FALSE'} | XAI_KEY=${data.has_xai_key ? 'true' : 'FALSE'}`;
-        toast.success(`Pulse OK — Inserted: ${data.inserted} | Found: ${data.total_found}\n${keyStatus}`);
+        const bySource = data.inserted_by_source || {};
+        toast.success(
+          `Inserted: ${data.inserted} (X: ${bySource.x || 0}, Reddit: ${bySource.reddit || 0}, YT: ${bySource.youtube || 0})\nYT_KEY=${data.has_youtube_key} | XAI_KEY=${data.has_xai_key}`
+        );
         
         // Trigger pulse feed refresh
         pulseRefreshRef.current?.();
