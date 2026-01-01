@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, ExternalLink, Loader2, Zap, MessageCircle, Twitter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { useRenderCount } from '@/components/debug/RenderCounter';
 
 interface PulseItem {
   id: string;
@@ -25,7 +26,7 @@ interface PulseFeedBackgroundProps {
   onRefreshRef?: (fn: () => void) => void;
 }
 
-export function PulseFeedBackground({ 
+export const PulseFeedBackground = memo(function PulseFeedBackground({ 
   huddleId, 
   teamId, 
   isLive, 
@@ -36,10 +37,77 @@ export function PulseFeedBackground({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Performance: Track renders
+  useRenderCount('pulse');
+  
+  // Performance: Refs for preventing redundant updates
+  const didInitRef = useRef(false);
+  const lastIdsRef = useRef('');
+  const lastFetchRef = useRef(0);
+  const THROTTLE_MS = 1500;
 
-  // Fetch pulse items from huddle_messages with pulse types
+  // Parse message to pulse item
+  const parseMessage = useCallback((msg: any): PulseItem => {
+    let videoId: string | undefined;
+    let itemType: PulseItem['type'] = 'curated';
+    
+    if (msg.embed_code?.startsWith('youtube:')) {
+      videoId = msg.embed_code.replace('youtube:', '');
+      itemType = 'youtube';
+    } else if (msg.embed_code?.startsWith('x:')) {
+      itemType = 'x';
+    } else if (msg.embed_code?.startsWith('reddit:')) {
+      itemType = 'reddit';
+    } else if (msg.embed_code?.startsWith('grok:')) {
+      itemType = 'grok';
+    } else if (msg.pulse_source === 'youtube') {
+      itemType = 'youtube';
+      const youtubeMatch = msg.media_url?.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+      videoId = youtubeMatch?.[1];
+    } else if (msg.pulse_source === 'x') {
+      itemType = 'x';
+    } else if (msg.pulse_source === 'reddit') {
+      itemType = 'reddit';
+    } else if (msg.pulse_source === 'grok') {
+      itemType = 'grok';
+    }
+    
+    let headline = msg.content?.split('\n')[0] || 'Update';
+    let author: string | undefined;
+    const authorMatch = headline.match(/^@?(\w+):\s*/);
+    if (authorMatch) {
+      author = authorMatch[1];
+      headline = headline.replace(authorMatch[0], '');
+    }
+    
+    return {
+      id: msg.id,
+      type: itemType,
+      headline,
+      body: msg.content?.split('\n').slice(1).join('\n'),
+      thumbnail: msg.media_url && !videoId ? msg.media_url : undefined,
+      video_id: videoId,
+      external_url: msg.media_url,
+      created_at: msg.created_at,
+      author,
+      sponsor: undefined
+    };
+  }, []);
+
+  // Fetch pulse items with throttle and smart diffing
   const fetchPulseItems = useCallback(async () => {
-    setIsLoading(true);
+    // Throttle: skip if called too recently
+    const now = Date.now();
+    if (now - lastFetchRef.current < THROTTLE_MS) {
+      return;
+    }
+    lastFetchRef.current = now;
+    
+    // Only show loading on first fetch
+    if (!didInitRef.current) {
+      setIsLoading(true);
+    }
     
     const { data, error } = await supabase
       .from('huddle_messages')
@@ -51,71 +119,34 @@ export function PulseFeedBackground({
 
     if (error) {
       console.error('Error fetching pulse items:', error);
+      didInitRef.current = true;
       setIsLoading(false);
       return;
     }
 
-    const items: PulseItem[] = (data || []).map((msg: any) => {
-      // Extract video ID from YouTube URLs or embed_code
-      let videoId: string | undefined;
-      let itemType: PulseItem['type'] = 'curated';
-      
-      // Determine source type from embed_code or pulse_source
-      if (msg.embed_code?.startsWith('youtube:')) {
-        videoId = msg.embed_code.replace('youtube:', '');
-        itemType = 'youtube';
-      } else if (msg.embed_code?.startsWith('x:')) {
-        itemType = 'x';
-      } else if (msg.embed_code?.startsWith('reddit:')) {
-        itemType = 'reddit';
-      } else if (msg.embed_code?.startsWith('grok:')) {
-        itemType = 'grok';
-      } else if (msg.pulse_source === 'youtube') {
-        itemType = 'youtube';
-        // Try to extract from URL
-        const youtubeMatch = msg.media_url?.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
-        videoId = youtubeMatch?.[1];
-      } else if (msg.pulse_source === 'x') {
-        itemType = 'x';
-      } else if (msg.pulse_source === 'reddit') {
-        itemType = 'reddit';
-      } else if (msg.pulse_source === 'grok') {
-        itemType = 'grok';
-      }
-      
-      // Extract author from content if format is "Author: headline"
-      let headline = msg.content?.split('\n')[0] || 'Update';
-      let author: string | undefined;
-      const authorMatch = headline.match(/^@?(\w+):\s*/);
-      if (authorMatch) {
-        author = authorMatch[1];
-        headline = headline.replace(authorMatch[0], '');
-      }
-      
-      return {
-        id: msg.id,
-        type: itemType,
-        headline,
-        body: msg.content?.split('\n').slice(1).join('\n'),
-        thumbnail: msg.media_url && !videoId ? msg.media_url : undefined,
-        video_id: videoId,
-        external_url: msg.media_url,
-        created_at: msg.created_at,
-        author,
-        sponsor: undefined
-      };
-    });
+    // Smart diffing: only update state if data changed
+    const newIds = (data || []).map(d => d.id).join(',');
+    if (newIds === lastIdsRef.current) {
+      didInitRef.current = true;
+      setIsLoading(false);
+      return;
+    }
+    lastIdsRef.current = newIds;
 
+    const items: PulseItem[] = (data || []).map(parseMessage);
     setPulseItems(items);
     onItemCountChange?.(items.length);
+    
+    didInitRef.current = true;
     setIsLoading(false);
-  }, [huddleId, onItemCountChange]);
+  }, [huddleId, onItemCountChange, parseMessage]);
 
   // Expose refresh function to parent
   useEffect(() => {
     onRefreshRef?.(fetchPulseItems);
   }, [fetchPulseItems, onRefreshRef]);
 
+  // Initial fetch + polling
   useEffect(() => {
     fetchPulseItems();
     
@@ -125,7 +156,7 @@ export function PulseFeedBackground({
     return () => clearInterval(interval);
   }, [fetchPulseItems, isLive]);
 
-  // Subscribe to realtime pulse updates
+  // Subscribe to realtime pulse updates - APPEND instead of refetch
   useEffect(() => {
     const channel = supabase
       .channel(`pulse-${huddleId}`)
@@ -139,7 +170,21 @@ export function PulseFeedBackground({
         },
         (payload) => {
           if (['social_buzz', 'highlight', 'pulse'].includes(payload.new.message_type)) {
-            fetchPulseItems();
+            // Append new item directly instead of full refetch
+            try {
+              const newItem = parseMessage(payload.new);
+              setPulseItems(prev => {
+                // Dedupe check
+                if (prev.some(p => p.id === newItem.id)) return prev;
+                const updated = [newItem, ...prev].slice(0, 20);
+                lastIdsRef.current = updated.map(p => p.id).join(',');
+                onItemCountChange?.(updated.length);
+                return updated;
+              });
+            } catch (e) {
+              // Fallback to refetch if parsing fails
+              fetchPulseItems();
+            }
           }
         }
       )
@@ -148,11 +193,11 @@ export function PulseFeedBackground({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [huddleId, fetchPulseItems]);
+  }, [huddleId, parseMessage, fetchPulseItems, onItemCountChange]);
 
-  const handleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id);
-  };
+  const handleExpand = useCallback((id: string) => {
+    setExpandedId(prev => prev === id ? null : id);
+  }, []);
 
   return (
     <div 
@@ -183,7 +228,7 @@ export function PulseFeedBackground({
         ))}
       </AnimatePresence>
       
-      {/* Placeholder cards when empty - more descriptive */}
+      {/* Placeholder cards when empty */}
       {pulseItems.length === 0 && !isLoading && (
         <div className="space-y-4">
           <PlaceholderCard 
@@ -194,7 +239,7 @@ export function PulseFeedBackground({
           <PlaceholderCard 
             icon={<Play className="h-5 w-5" />}
             title="No clips yet"
-            subtitle="Tap 'Drop Pulse Now' (admin) to fetch highlights"
+            subtitle="Tap 'Drop Pulse' (admin) to fetch highlights"
           />
         </div>
       )}
@@ -207,7 +252,7 @@ export function PulseFeedBackground({
       )}
     </div>
   );
-}
+});
 
 // Placeholder card component
 function PlaceholderCard({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
@@ -228,14 +273,12 @@ interface PulseCardProps {
   onExpand: () => void;
 }
 
-function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
-  // ALWAYS show thumbnail for YouTube videos
+const PulseCard = memo(function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
   const hasYouTubeVideo = !!item.video_id;
   const thumbnailUrl = hasYouTubeVideo 
     ? `https://img.youtube.com/vi/${item.video_id}/hqdefault.jpg`
     : item.thumbnail;
 
-  // Source icon based on type
   const SourceIcon = () => {
     switch (item.type) {
       case 'x':
@@ -249,7 +292,6 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
     }
   };
 
-  // Format timestamp
   const timeAgo = (date: string) => {
     const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
     if (seconds < 60) return 'just now';
@@ -271,7 +313,6 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
     >
       {/* Compact View */}
       <div className="p-3 flex gap-3">
-        {/* Thumbnail - ALWAYS show for YouTube, and for others with media */}
         {(thumbnailUrl || hasYouTubeVideo) && (
           <div className="relative w-24 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
             {thumbnailUrl ? (
@@ -286,7 +327,6 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-muted to-muted-foreground/20" />
             )}
-            {/* Play overlay for videos */}
             {hasYouTubeVideo && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                 <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center">
@@ -297,9 +337,7 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
           </div>
         )}
         
-        {/* Content */}
         <div className="flex-1 min-w-0">
-          {/* Header row with source + timestamp */}
           <div className="flex items-center gap-2 mb-1">
             <SourceIcon />
             {item.author && (
@@ -332,7 +370,6 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            {/* YouTube Embed - show when expanded */}
             {hasYouTubeVideo && (
               <div className="aspect-video w-full bg-black">
                 <iframe
@@ -344,14 +381,12 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
               </div>
             )}
             
-            {/* Full body text */}
             {item.body && (
               <div className="px-3 py-2">
                 <p className="text-sm text-muted-foreground">{item.body}</p>
               </div>
             )}
             
-            {/* External link */}
             {item.external_url && (
               <a
                 href={item.external_url}
@@ -369,4 +404,4 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
       </AnimatePresence>
     </motion.button>
   );
-}
+});

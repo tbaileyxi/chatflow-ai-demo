@@ -33,30 +33,30 @@ export function DevBanner({
 
   return (
     <>
-      {/* DEV Pill - Always visible, top-left */}
+      {/* DEV Pill - Bottom-left, unobtrusive */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "fixed top-8 left-2 z-[9999]",
-          "bg-destructive text-destructive-foreground",
-          "text-[10px] px-2 py-0.5 rounded-full font-mono font-bold",
-          "flex items-center gap-1 shadow-lg",
-          "hover:opacity-90 transition-opacity"
+          "fixed bottom-28 left-2 z-[9998]",
+          "bg-muted/80 text-muted-foreground",
+          "text-[9px] px-1.5 py-0.5 rounded font-mono",
+          "flex items-center gap-0.5 opacity-50 hover:opacity-100",
+          "transition-opacity"
         )}
       >
         DEV
-        {isOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        {isOpen ? <ChevronUp className="h-2 w-2" /> : <ChevronDown className="h-2 w-2" />}
       </button>
 
-      {/* Debug Drawer Overlay */}
+      {/* Debug Drawer Overlay - Opens upward from bottom */}
       {isOpen && (
         <div 
           className={cn(
-            "fixed top-14 left-2 z-[9998]",
-            "bg-background/95 backdrop-blur-md",
-            "border border-border rounded-lg shadow-xl",
-            "p-3 max-w-xs text-[10px] font-mono",
-            "animate-in fade-in slide-in-from-top-2"
+            "fixed bottom-36 left-2 z-[9997]",
+            "bg-background/90 backdrop-blur-sm",
+            "border border-border rounded-lg shadow-lg",
+            "p-2 max-w-[200px] text-[9px] font-mono",
+            "animate-in fade-in slide-in-from-bottom-2"
           )}
         >
           <button
