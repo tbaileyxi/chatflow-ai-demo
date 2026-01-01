@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, ExternalLink } from 'lucide-react';
+import { Play, ExternalLink, Loader2, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -21,15 +21,25 @@ interface PulseFeedBackgroundProps {
   teamId: string;
   isLive: boolean;
   onItemCountChange?: (count: number) => void;
+  onRefreshRef?: (fn: () => void) => void;
 }
 
-export function PulseFeedBackground({ huddleId, teamId, isLive, onItemCountChange }: PulseFeedBackgroundProps) {
+export function PulseFeedBackground({ 
+  huddleId, 
+  teamId, 
+  isLive, 
+  onItemCountChange,
+  onRefreshRef 
+}: PulseFeedBackgroundProps) {
   const [pulseItems, setPulseItems] = useState<PulseItem[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Fetch pulse items from huddle_messages with pulse types
   const fetchPulseItems = useCallback(async () => {
+    setIsLoading(true);
+    
     const { data, error } = await supabase
       .from('huddle_messages')
       .select('*')
@@ -40,6 +50,7 @@ export function PulseFeedBackground({ huddleId, teamId, isLive, onItemCountChang
 
     if (error) {
       console.error('Error fetching pulse items:', error);
+      setIsLoading(false);
       return;
     }
 
@@ -65,7 +76,7 @@ export function PulseFeedBackground({ huddleId, teamId, isLive, onItemCountChang
         body: msg.content?.split('\n').slice(1).join('\n'),
         thumbnail: msg.media_url && !videoId ? msg.media_url : undefined,
         video_id: videoId,
-        external_url: msg.embed_code && !msg.embed_code.startsWith('youtube:') ? msg.embed_code : undefined,
+        external_url: msg.media_url && videoId ? msg.media_url : undefined,
         created_at: msg.created_at,
         sponsor: undefined
       };
@@ -73,7 +84,13 @@ export function PulseFeedBackground({ huddleId, teamId, isLive, onItemCountChang
 
     setPulseItems(items);
     onItemCountChange?.(items.length);
+    setIsLoading(false);
   }, [huddleId, onItemCountChange]);
+
+  // Expose refresh function to parent
+  useEffect(() => {
+    onRefreshRef?.(fetchPulseItems);
+  }, [fetchPulseItems, onRefreshRef]);
 
   useEffect(() => {
     fetchPulseItems();
@@ -142,11 +159,41 @@ export function PulseFeedBackground({ huddleId, teamId, isLive, onItemCountChang
         ))}
       </AnimatePresence>
       
-      {pulseItems.length === 0 && (
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          <p>Waiting for pulse updates...</p>
+      {/* Placeholder cards when empty */}
+      {pulseItems.length === 0 && !isLoading && (
+        <div className="space-y-4">
+          <PlaceholderCard 
+            icon={<Zap className="h-5 w-5" />}
+            title="Game Pulse warming up..."
+            subtitle="Highlights and updates will appear here"
+          />
+          <PlaceholderCard 
+            icon={<Play className="h-5 w-5" />}
+            title="Waiting for highlights..."
+            subtitle="Click 'Drop Pulse Now' to fetch content"
+          />
         </div>
       )}
+      
+      {isLoading && pulseItems.length === 0 && (
+        <div className="flex items-center justify-center h-64 text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin mr-2" />
+          <p>Loading pulse feed...</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Placeholder card component
+function PlaceholderCard({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
+  return (
+    <div className="w-full bg-card/50 backdrop-blur-sm rounded-2xl border border-border/20 border-dashed p-6 text-center">
+      <div className="flex justify-center mb-3 text-muted-foreground/50">
+        {icon}
+      </div>
+      <h3 className="font-medium text-sm text-muted-foreground">{title}</h3>
+      <p className="text-xs text-muted-foreground/70 mt-1">{subtitle}</p>
     </div>
   );
 }
@@ -241,7 +288,7 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
               </div>
             )}
             
-            {/* External link */}
+            {/* External link - link to watch URL, NOT embed */}
             {item.external_url && (
               <a
                 href={item.external_url}
@@ -251,7 +298,7 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
                 className="flex items-center gap-1 px-3 py-2 text-xs text-primary hover:underline"
               >
                 <ExternalLink className="h-3 w-3" />
-                View source
+                View on YouTube
               </a>
             )}
             

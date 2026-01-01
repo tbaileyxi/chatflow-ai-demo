@@ -30,6 +30,11 @@ interface RoomChatOverlayProps {
   onHeightChange: (height: number) => void;
   onLastMessageChange: (messageId: string | null) => void;
   isLive: boolean;
+  eventName?: string;
+  team1Name?: string;
+  team2Name?: string;
+  score1?: number | null;
+  score2?: number | null;
 }
 
 export function RoomChatOverlay({
@@ -37,7 +42,12 @@ export function RoomChatOverlay({
   height,
   onHeightChange,
   onLastMessageChange,
-  isLive
+  isLive,
+  eventName,
+  team1Name,
+  team2Name,
+  score1,
+  score2
 }: RoomChatOverlayProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
