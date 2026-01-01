@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, ExternalLink, Loader2, Zap } from 'lucide-react';
+import { Play, ExternalLink, Loader2, Zap, MessageCircle, Twitter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 interface PulseItem {
   id: string;
-  type: 'youtube' | 'grok' | 'reddit' | 'curated';
+  type: 'youtube' | 'grok' | 'reddit' | 'x' | 'curated';
   headline: string;
   body?: string;
   thumbnail?: string;
   video_id?: string;
   external_url?: string;
   created_at: string;
+  author?: string;
   sponsor?: string;
 }
 
@@ -57,27 +58,50 @@ export function PulseFeedBackground({
     const items: PulseItem[] = (data || []).map((msg: any) => {
       // Extract video ID from YouTube URLs or embed_code
       let videoId: string | undefined;
+      let itemType: PulseItem['type'] = 'curated';
       
-      // Check embed_code first (format: youtube:VIDEO_ID)
+      // Determine source type from embed_code or pulse_source
       if (msg.embed_code?.startsWith('youtube:')) {
         videoId = msg.embed_code.replace('youtube:', '');
-      } else if (msg.media_url) {
+        itemType = 'youtube';
+      } else if (msg.embed_code?.startsWith('x:')) {
+        itemType = 'x';
+      } else if (msg.embed_code?.startsWith('reddit:')) {
+        itemType = 'reddit';
+      } else if (msg.embed_code?.startsWith('grok:')) {
+        itemType = 'grok';
+      } else if (msg.pulse_source === 'youtube') {
+        itemType = 'youtube';
         // Try to extract from URL
-        const youtubeMatch = msg.media_url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+        const youtubeMatch = msg.media_url?.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
         videoId = youtubeMatch?.[1];
+      } else if (msg.pulse_source === 'x') {
+        itemType = 'x';
+      } else if (msg.pulse_source === 'reddit') {
+        itemType = 'reddit';
+      } else if (msg.pulse_source === 'grok') {
+        itemType = 'grok';
+      }
+      
+      // Extract author from content if format is "Author: headline"
+      let headline = msg.content?.split('\n')[0] || 'Update';
+      let author: string | undefined;
+      const authorMatch = headline.match(/^@?(\w+):\s*/);
+      if (authorMatch) {
+        author = authorMatch[1];
+        headline = headline.replace(authorMatch[0], '');
       }
       
       return {
         id: msg.id,
-        type: msg.pulse_source === 'youtube' ? 'youtube' : 
-              msg.pulse_source === 'grok' ? 'grok' :
-              msg.pulse_source === 'reddit' ? 'reddit' : 'curated',
-        headline: msg.content?.split('\n')[0] || 'Update',
+        type: itemType,
+        headline,
         body: msg.content?.split('\n').slice(1).join('\n'),
         thumbnail: msg.media_url && !videoId ? msg.media_url : undefined,
         video_id: videoId,
-        external_url: msg.media_url && videoId ? msg.media_url : undefined,
+        external_url: msg.media_url,
         created_at: msg.created_at,
+        author,
         sponsor: undefined
       };
     });
@@ -159,18 +183,18 @@ export function PulseFeedBackground({
         ))}
       </AnimatePresence>
       
-      {/* Placeholder cards when empty */}
+      {/* Placeholder cards when empty - more descriptive */}
       {pulseItems.length === 0 && !isLoading && (
         <div className="space-y-4">
           <PlaceholderCard 
             icon={<Zap className="h-5 w-5" />}
-            title="Game Pulse warming up..."
-            subtitle="Highlights and updates will appear here"
+            title="Pulse warming up..."
+            subtitle="Fetching X + Reddit + YouTube content"
           />
           <PlaceholderCard 
             icon={<Play className="h-5 w-5" />}
-            title="Waiting for highlights..."
-            subtitle="Click 'Drop Pulse Now' to fetch content"
+            title="No clips yet"
+            subtitle="Tap 'Drop Pulse Now' (admin) to fetch highlights"
           />
         </div>
       )}
@@ -211,6 +235,29 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
     ? `https://img.youtube.com/vi/${item.video_id}/hqdefault.jpg`
     : item.thumbnail;
 
+  // Source icon based on type
+  const SourceIcon = () => {
+    switch (item.type) {
+      case 'x':
+        return <Twitter className="h-3 w-3 text-sky-400" />;
+      case 'reddit':
+        return <MessageCircle className="h-3 w-3 text-orange-500" />;
+      case 'youtube':
+        return <Play className="h-3 w-3 text-red-500" />;
+      default:
+        return null;
+    }
+  };
+
+  // Format timestamp
+  const timeAgo = (date: string) => {
+    const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+  };
+
   return (
     <motion.button
       onClick={onExpand}
@@ -224,18 +271,21 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
     >
       {/* Compact View */}
       <div className="p-3 flex gap-3">
-        {/* Thumbnail - ALWAYS show for YouTube */}
-        {thumbnailUrl && (
+        {/* Thumbnail - ALWAYS show for YouTube, and for others with media */}
+        {(thumbnailUrl || hasYouTubeVideo) && (
           <div className="relative w-24 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
-            <img
-              src={thumbnailUrl}
-              alt=""
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                // Fallback if thumbnail fails
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
+            {thumbnailUrl ? (
+              <img
+                src={thumbnailUrl}
+                alt=""
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-muted to-muted-foreground/20" />
+            )}
             {/* Play overlay for videos */}
             {hasYouTubeVideo && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/40">
@@ -249,6 +299,19 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
         
         {/* Content */}
         <div className="flex-1 min-w-0">
+          {/* Header row with source + timestamp */}
+          <div className="flex items-center gap-2 mb-1">
+            <SourceIcon />
+            {item.author && (
+              <span className="text-[10px] font-medium text-muted-foreground">
+                @{item.author}
+              </span>
+            )}
+            <span className="text-[10px] text-muted-foreground/60 ml-auto">
+              {timeAgo(item.created_at)}
+            </span>
+          </div>
+          
           <h3 className="font-bold text-sm leading-tight line-clamp-2">
             {item.headline}
           </h3>
@@ -288,7 +351,7 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
               </div>
             )}
             
-            {/* External link - link to watch URL, NOT embed */}
+            {/* External link */}
             {item.external_url && (
               <a
                 href={item.external_url}
@@ -298,17 +361,8 @@ function PulseCard({ item, isExpanded, onExpand }: PulseCardProps) {
                 className="flex items-center gap-1 px-3 py-2 text-xs text-primary hover:underline"
               >
                 <ExternalLink className="h-3 w-3" />
-                View on YouTube
+                View source
               </a>
-            )}
-            
-            {/* Sponsor (very small, muted) */}
-            {item.sponsor && (
-              <div className="px-3 pb-2">
-                <span className="text-[10px] text-muted-foreground/50">
-                  Sponsored by {item.sponsor}
-                </span>
-              </div>
             )}
           </motion.div>
         )}

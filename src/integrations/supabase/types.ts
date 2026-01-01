@@ -1562,6 +1562,54 @@ export type Database = {
         }
         Relationships: []
       }
+      pulse_runs: {
+        Row: {
+          event_id: string | null
+          huddle_id: string
+          id: string
+          items_found: number
+          items_inserted: number
+          queries_used: string[] | null
+          ran_at: string
+          source: string
+        }
+        Insert: {
+          event_id?: string | null
+          huddle_id: string
+          id?: string
+          items_found?: number
+          items_inserted?: number
+          queries_used?: string[] | null
+          ran_at?: string
+          source?: string
+        }
+        Update: {
+          event_id?: string | null
+          huddle_id?: string
+          id?: string
+          items_found?: number
+          items_inserted?: number
+          queries_used?: string[] | null
+          ran_at?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulse_runs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "live_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulse_runs_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reddit_daily_counts: {
         Row: {
           huddle_id: string
