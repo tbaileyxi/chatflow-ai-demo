@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { motion, useDragControls, PanInfo } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { RoomChatInput } from '@/components/room/RoomChatInput';
 import { RoomMessageBubble } from '@/components/room/RoomMessageBubble';
 import { cn } from '@/lib/utils';
+import { useRenderCount } from '@/components/debug/RenderCounter';
 
 interface Message {
   id: string;
@@ -41,7 +42,7 @@ interface RoomChatOverlayProps {
   score2?: number | null;
 }
 
-export function RoomChatOverlay({
+export const RoomChatOverlay = memo(function RoomChatOverlay({
   huddleId,
   height,
   onHeightChange,
@@ -56,17 +57,29 @@ export function RoomChatOverlay({
 }: RoomChatOverlayProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [profiles, setProfiles] = useState<Record<string, any>>({});
   const [reactionCounts, setReactionCounts] = useState<Record<string, ReactionCount>>({});
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const dragControls = useDragControls();
+  
+  // Performance: Track renders
+  useRenderCount('chat');
+  
+  // Performance: Cache profiles in a ref to avoid refetching
+  const profilesCacheRef = useRef<Record<string, any>>({});
+  const lastMessageIdsRef = useRef('');
+  const lastFetchRef = useRef(0);
+  const THROTTLE_MS = 1000;
 
   // Quick bar height for padding
   const quickBarHeight = 80;
 
-  // Fetch messages (newest at top = descending order)
+  // Fetch messages with caching and throttling
   const fetchMessages = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastFetchRef.current < THROTTLE_MS) return;
+    lastFetchRef.current = now;
+    
     const { data, error } = await supabase
       .from('huddle_messages')
       .select('*')
@@ -80,33 +93,39 @@ export function RoomChatOverlay({
       return;
     }
 
+    // Smart diffing: only update if data changed
+    const newIds = (data || []).map(m => m.id).join(',');
+    if (newIds === lastMessageIdsRef.current) return;
+    lastMessageIdsRef.current = newIds;
+
     setMessages(data || []);
     
-    // Update last message ID and set as default selected
+    // Update last message ID
     if (data && data.length > 0) {
       onLastMessageChange(data[0].id);
+      // Only auto-select if nothing is currently selected
       if (!selectedMessageId) {
         setSelectedMessageId(data[0].id);
         onSelectedTargetChange?.(data[0].id);
       }
     }
 
-    // Fetch profiles
+    // Fetch profiles only for unknown users
     const userIds = [...new Set((data || []).map(m => m.user_id))];
-    if (userIds.length > 0) {
+    const unknownUserIds = userIds.filter(id => !profilesCacheRef.current[id]);
+    
+    if (unknownUserIds.length > 0) {
       const { data: profilesData } = await supabase
         .from('profiles')
         .select('user_id, display_name, username, avatar_url')
-        .in('user_id', userIds);
+        .in('user_id', unknownUserIds);
       
-      const profileMap: Record<string, any> = {};
       (profilesData || []).forEach(p => {
-        profileMap[p.user_id] = p;
+        profilesCacheRef.current[p.user_id] = p;
       });
-      setProfiles(profileMap);
     }
 
-    // Fetch reaction counts for all messages
+    // Batch fetch reaction counts
     const messageIds = (data || []).map(m => m.id);
     if (messageIds.length > 0) {
       const { data: reactions } = await supabase
@@ -127,7 +146,7 @@ export function RoomChatOverlay({
     fetchMessages();
   }, [fetchMessages]);
 
-  // Realtime subscription for messages
+  // Realtime subscription for messages - APPEND instead of refetch
   useEffect(() => {
     const channel = supabase
       .channel(`room-chat-${huddleId}`)
@@ -141,15 +160,28 @@ export function RoomChatOverlay({
         },
         (payload) => {
           if (!['social_buzz', 'highlight', 'pulse'].includes(payload.new.message_type)) {
-            setMessages(prev => [payload.new as Message, ...prev]);
+            // Append directly instead of refetch
+            setMessages(prev => {
+              if (prev.some(m => m.id === payload.new.id)) return prev;
+              const updated = [payload.new as Message, ...prev];
+              lastMessageIdsRef.current = updated.map(m => m.id).join(',');
+              return updated;
+            });
+            
             onLastMessageChange(payload.new.id);
             
-            // Auto-select newest message as reaction target
-            setSelectedMessageId(payload.new.id);
-            onSelectedTargetChange?.(payload.new.id);
+            // Only auto-select if nothing is selected
+            setSelectedMessageId(prev => {
+              if (prev === null) {
+                onSelectedTargetChange?.(payload.new.id);
+                return payload.new.id;
+              }
+              return prev;
+            });
             
+            // Fetch profile for new user if unknown
             const userId = payload.new.user_id;
-            if (!profiles[userId]) {
+            if (!profilesCacheRef.current[userId]) {
               supabase
                 .from('profiles')
                 .select('user_id, display_name, username, avatar_url')
@@ -157,7 +189,7 @@ export function RoomChatOverlay({
                 .single()
                 .then(({ data }) => {
                   if (data) {
-                    setProfiles(prev => ({ ...prev, [userId]: data }));
+                    profilesCacheRef.current[userId] = data;
                   }
                 });
             }
@@ -169,18 +201,21 @@ export function RoomChatOverlay({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [huddleId, profiles, onLastMessageChange, onSelectedTargetChange]);
+  }, [huddleId, onLastMessageChange, onSelectedTargetChange]);
 
-  // Realtime subscription for reactions
+  // Realtime subscription for reactions - ONLY for selected message
   useEffect(() => {
+    if (!selectedMessageId) return;
+    
     const channel = supabase
-      .channel(`room-reactions-${huddleId}`)
+      .channel(`room-reactions-${selectedMessageId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'huddle_message_reactions'
+          table: 'huddle_message_reactions',
+          filter: `message_id=eq.${selectedMessageId}`
         },
         (payload) => {
           const { message_id, emoji } = payload.new;
@@ -198,15 +233,15 @@ export function RoomChatOverlay({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [huddleId]);
+  }, [selectedMessageId]);
 
   // Handle drag to resize
-  const handleDrag = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+  const handleDrag = useCallback((event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const viewportHeight = window.innerHeight;
     const deltaPercent = (info.delta.y / viewportHeight) * -100;
     const newHeight = Math.max(30, Math.min(90, height + deltaPercent));
     onHeightChange(newHeight);
-  };
+  }, [height, onHeightChange]);
 
   // Handle message selection for reactions
   const handleMessageSelect = useCallback((messageId: string) => {
@@ -215,7 +250,7 @@ export function RoomChatOverlay({
   }, [onSelectedTargetChange]);
 
   // Send message
-  const handleSendMessage = async (content: string, mediaUrl?: string) => {
+  const handleSendMessage = useCallback(async (content: string, mediaUrl?: string) => {
     if (!user || !content.trim()) return;
 
     const { error } = await supabase
@@ -231,7 +266,7 @@ export function RoomChatOverlay({
     if (error) {
       console.error('Error sending message:', error);
     }
-  };
+  }, [huddleId, user]);
 
   return (
     <motion.div
@@ -276,7 +311,7 @@ export function RoomChatOverlay({
           >
             <RoomMessageBubble
               message={msg}
-              profile={profiles[msg.user_id]}
+              profile={profilesCacheRef.current[msg.user_id]}
               isOwn={msg.user_id === user?.id}
               isCoach={msg.message_type === 'coach_response'}
               reactionCounts={reactionCounts[msg.id]}
@@ -303,4 +338,4 @@ export function RoomChatOverlay({
       </div>
     </motion.div>
   );
-}
+});

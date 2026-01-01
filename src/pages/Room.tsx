@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,13 +8,15 @@ import { PulseFeedBackground } from '@/components/room/PulseFeedBackground';
 import { RoomChatOverlay } from '@/components/room/RoomChatOverlay';
 import { RoomQuickBar } from '@/components/room/RoomQuickBar';
 import { DevBanner } from '@/components/debug/DevBanner';
+import { RenderCounterOverlay, useRenderCount } from '@/components/debug/RenderCounter';
 import { toast } from 'sonner';
 
 // Hardcoded admin emails for testing
 const ADMIN_EMAILS = [
   'admin@sidehuddle.com',
   'test@test.com',
-  'collin@sidehuddle.com'
+  'collin@sidehuddle.com',
+  'tbaileyxi@gmail.com'
 ];
 
 // Sport-specific keywords for query building
@@ -74,6 +76,13 @@ export default function Room() {
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const pulseRefreshRef = useRef<(() => void) | null>(null);
+  
+  // Performance: Track renders
+  useRenderCount('room');
+  
+  // Performance: Stable refs for team data to avoid dependency loops
+  const team1Ref = useRef<TeamData | null>(null);
+  const team2Ref = useRef<TeamData | null>(null);
 
   // Get user email reliably from Supabase auth
   useEffect(() => {
@@ -125,7 +134,10 @@ export default function Room() {
           .select('id, name, city, league')
           .eq('id', eventData.team1_id)
           .single();
-        if (t1) setTeam1(t1);
+        if (t1) {
+          setTeam1(t1);
+          team1Ref.current = t1;
+        }
       }
 
       if (eventData.team2_id) {
@@ -134,7 +146,10 @@ export default function Room() {
           .select('id, name, city, league')
           .eq('id', eventData.team2_id)
           .single();
-        if (t2) setTeam2(t2);
+        if (t2) {
+          setTeam2(t2);
+          team2Ref.current = t2;
+        }
       }
       
       // Step 3: Lookup huddle by event_id
@@ -200,8 +215,8 @@ export default function Room() {
         // Insert bot welcome messages for NEW huddles only
         const { data: systemUser } = await supabase.rpc('get_or_create_system_user');
         if (systemUser) {
-          const t1Name = team1?.name || eventData.name.split(' vs ')[0] || 'Team 1';
-          const t2Name = team2?.name || eventData.name.split(' vs ')[1] || 'Team 2';
+          const t1Name = team1Ref.current?.name || eventData.name.split(' vs ')[0] || 'Team 1';
+          const t2Name = team2Ref.current?.name || eventData.name.split(' vs ')[1] || 'Team 2';
           
           // Welcome message
           await supabase.from('huddle_messages').insert({
@@ -232,7 +247,7 @@ export default function Room() {
     } finally {
       setLoading(false);
     }
-  }, [eventId, user, team1, team2]);
+  }, [eventId, user]); // Remove team1, team2 from dependencies to prevent loops
 
   useEffect(() => {
     initializeRoom();
@@ -359,8 +374,16 @@ export default function Room() {
   const team1Name = team1?.name || event.name.split(' vs ')[0] || 'Team 1';
   const team2Name = team2?.name || event.name.split(' vs ')[1] || 'Team 2';
 
+  // Stable callback for refresh ref
+  const handleRefreshRef = useCallback((fn: () => void) => {
+    pulseRefreshRef.current = fn;
+  }, []);
+
   return (
     <div className="min-h-screen bg-background relative overflow-hidden pt-6">
+      {/* Render Counter - Temporary for debugging */}
+      <RenderCounterOverlay />
+      
       {/* Collapsible DEV Banner */}
       <DevBanner
         eventId={event.id}
@@ -379,7 +402,7 @@ export default function Room() {
           teamId={room.team_id}
           isLive={room.is_live || false}
           onItemCountChange={setPulseItemCount}
-          onRefreshRef={(fn) => { pulseRefreshRef.current = fn; }}
+          onRefreshRef={handleRefreshRef}
         />
       </div>
 
