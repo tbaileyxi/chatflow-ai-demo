@@ -777,6 +777,7 @@ export type Database = {
         Row: {
           bio: string | null
           created_at: string
+          event_id: string | null
           id: string
           is_official_team_huddle: boolean | null
           is_private: boolean | null
@@ -793,6 +794,7 @@ export type Database = {
         Insert: {
           bio?: string | null
           created_at?: string
+          event_id?: string | null
           id?: string
           is_official_team_huddle?: boolean | null
           is_private?: boolean | null
@@ -809,6 +811,7 @@ export type Database = {
         Update: {
           bio?: string | null
           created_at?: string
+          event_id?: string | null
           id?: string
           is_official_team_huddle?: boolean | null
           is_private?: boolean | null
@@ -823,6 +826,13 @@ export type Database = {
           verification_expires_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "huddles_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "live_events"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "huddles_parent_team_id_fkey"
             columns: ["parent_team_id"]
