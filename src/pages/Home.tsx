@@ -311,48 +311,40 @@ export default function Home() {
       return (
         <button
           onClick={() => onHuddleClick(huddle)}
-          className="flex flex-col items-center gap-2 group"
+          className="relative flex flex-col items-center gap-2 p-3 rounded-xl bg-card border border-border/50 hover:border-primary/50 hover:bg-card/80 transition-all group min-w-[80px]"
         >
-          <div className={cn(
-            "relative rounded-full transition-all duration-200 group-hover:scale-110",
-            isVerified && "ring-2 ring-emerald-500",
-            isPublic && !isVerified && "ring-2 ring-primary/50"
-          )}>
-            <Avatar className="h-14 w-14">
-              <AvatarImage src={huddle.team_logo_url} alt={huddle.name} />
-              <AvatarFallback className="text-xs bg-muted">
-                {isPublic ? (
-                  <Globe className="h-5 w-5 text-primary" />
-                ) : isVerified ? (
-                  <ShieldCheck className="h-5 w-5 text-emerald-500" />
-                ) : (
-                  <Lock className="h-5 w-5 text-muted-foreground" />
-                )}
-              </AvatarFallback>
-            </Avatar>
-            {/* Unread badge */}
-            {huddle.unread_count && huddle.unread_count > 0 && (
-              <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive flex items-center justify-center">
-                <span className="text-[10px] font-bold text-destructive-foreground">
-                  {huddle.unread_count > 9 ? '9+' : huddle.unread_count}
-                </span>
-              </div>
-            )}
-            {/* Type indicator */}
-            {isVerified && (
-              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full border-2 border-background flex items-center justify-center">
-                <ShieldCheck className="h-2.5 w-2.5 text-white" />
-              </div>
-            )}
-            {!isPublic && !isVerified && (
-              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-muted-foreground rounded-full border-2 border-background flex items-center justify-center">
-                <Lock className="h-2 w-2 text-white" />
-              </div>
-            )}
+          {/* Unread badge - top right of card */}
+          {huddle.unread_count && huddle.unread_count > 0 && (
+            <div className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive flex items-center justify-center z-10">
+              <span className="text-[10px] font-bold text-destructive-foreground">
+                {huddle.unread_count > 9 ? '9+' : huddle.unread_count}
+              </span>
+            </div>
+          )}
+          
+          <Avatar className="h-12 w-12 ring-2 ring-border/30 group-hover:ring-primary/50 transition-all">
+            <AvatarImage src={huddle.team_logo_url} alt={huddle.name} />
+            <AvatarFallback className="text-xs bg-muted">
+              {huddle.name.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          
+          {/* Huddle name - ALWAYS visible */}
+          <div className="text-center w-full">
+            <p className="text-xs font-medium truncate max-w-[72px] mx-auto text-foreground">
+              {huddle.name}
+            </p>
+            <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground mt-0.5">
+              {isPublic ? (
+                <Globe className="h-2.5 w-2.5" />
+              ) : isVerified ? (
+                <ShieldCheck className="h-2.5 w-2.5 text-emerald-500" />
+              ) : (
+                <Lock className="h-2.5 w-2.5" />
+              )}
+              <span>{huddle.participant_count}</span>
+            </div>
           </div>
-          <span className="text-xs text-center max-w-[56px] truncate text-muted-foreground group-hover:text-foreground transition-colors">
-            {isPublic ? huddle.team_name.split(' ').pop() : huddle.name}
-          </span>
         </button>
       );
     };
