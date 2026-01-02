@@ -11,10 +11,11 @@ interface PulseItem {
   huddle_id: string;
   content: string;
   media_url?: string;
-  message_type: 'pulse';
+  message_type: string;
   pulse_source: 'youtube' | 'grok' | 'reddit' | 'x';
   embed_code?: string;
   is_pulse_moment: boolean;
+  origin_team_id?: string; // For sponsorship
 }
 
 interface InsertedBySource {
@@ -22,6 +23,23 @@ interface InsertedBySource {
   x: number;
   reddit: number;
   grok: number;
+}
+
+// Detect if content is about a specific team (for sponsorship)
+function detectTeamTarget(content: string, team1Name: string, team2Name: string, team1Id?: string, team2Id?: string): string | undefined {
+  const contentLower = content.toLowerCase();
+  const t1Lower = team1Name.toLowerCase();
+  const t2Lower = team2Name.toLowerCase();
+  
+  const mentionsT1 = contentLower.includes(t1Lower) || contentLower.includes(t1Lower.split(' ').pop() || '');
+  const mentionsT2 = contentLower.includes(t2Lower) || contentLower.includes(t2Lower.split(' ').pop() || '');
+  
+  // Only attach team if content is about ONE team specifically
+  if (mentionsT1 && !mentionsT2 && team1Id) return team1Id;
+  if (mentionsT2 && !mentionsT1 && team2Id) return team2Id;
+  
+  // Neutral content - no sponsor
+  return undefined;
 }
 
 serve(async (req) => {
@@ -49,12 +67,13 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     
-    // Get request body with enhanced payload
     const { 
       huddle_id, 
       event_id,
       team1_name, 
       team2_name,
+      team1_id,
+      team2_id,
       event_name,
       league,
       queries,
@@ -67,11 +86,10 @@ serve(async (req) => {
       throw new Error('Missing huddle_id');
     }
 
-    console.log('Pulse drop received:', { huddle_id, event_id, team1_name, team2_name, event_name, league, is_live });
+    console.log('Pulse drop received:', { huddle_id, event_id, team1_name, team2_name, team1_id, team2_id, event_name, league, is_live });
 
     // Rate limiting check (unless bypassed by admin)
     if (!bypass_rate_limit && event_id) {
-      // Check last run time
       const { data: lastRun } = await supabase
         .from('pulse_runs')
         .select('ran_at')
@@ -101,7 +119,6 @@ serve(async (req) => {
         }
       }
 
-      // Check daily run count
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
@@ -135,7 +152,7 @@ serve(async (req) => {
 
     const pulseItems: PulseItem[] = [];
 
-    // Build search queries in priority order (use provided queries or build our own)
+    // Build search queries
     const searchQueries: string[] = queries || [];
     
     if (searchQueries.length === 0) {
@@ -157,7 +174,7 @@ serve(async (req) => {
 
     console.log('Search queries:', searchQueries);
 
-    // 1. Fetch X content via xAI Live Search (lowest cost - X only)
+    // 1. Fetch X content via xAI - format as @coach messages
     if (XAI_API_KEY && searchQueries.length > 0) {
       try {
         const xQuery = searchQueries[0];
@@ -176,11 +193,11 @@ serve(async (req) => {
             messages: [
               {
                 role: 'system',
-                content: `You are a sports content aggregator with access to X (Twitter) search. Search for the latest tweets about the query. Return ONLY a JSON array of 5-8 posts. Each item must have: { "headline": "the tweet text (max 100 chars)", "body": "full tweet if longer", "author": "username without @", "url": "tweet url if known or null", "media_url": "image url if any or null", "created_at": "ISO date string" }. No markdown, no explanation, just the JSON array.`
+                content: `You are a sports content aggregator. Search X/Twitter for trending takes about the query. Return ONLY a JSON array of the top 5 posts. Each item: { "headline": "tweet text (max 120 chars)", "author": "username", "media_url": "image url if available" }. No markdown.`
               },
               {
                 role: 'user',
-                content: `Search X/Twitter for: ${xQuery}`
+                content: `Find the hottest takes on X about: ${xQuery}`
               }
             ],
             tools: [
@@ -191,9 +208,7 @@ serve(async (req) => {
                   description: "Search X/Twitter for recent posts",
                   parameters: {
                     type: "object",
-                    properties: {
-                      query: { type: "string", description: "Search query" }
-                    },
+                    properties: { query: { type: "string" } },
                     required: ["query"]
                   }
                 }
@@ -217,10 +232,10 @@ serve(async (req) => {
               
               console.log(`X returned ${items.length} posts`);
               
-              for (const item of items.slice(0, 5)) {
+              // Take only best 2 items for the chat
+              for (const item of items.slice(0, 2)) {
                 const uniqueId = btoa(`${item.author || 'anon'}-${item.headline?.slice(0, 30) || ''}`).replace(/[^a-zA-Z0-9]/g, '').slice(0, 20);
                 
-                // Check if we already posted this
                 const { data: existing } = await supabase
                   .from('huddle_messages')
                   .select('id')
@@ -229,14 +244,17 @@ serve(async (req) => {
                   .limit(1);
                 
                 if (!existing || existing.length === 0) {
+                  const messageContent = `🔥 @${item.author || 'X'}: "${item.headline}"`;
+                  
                   pulseItems.push({
                     huddle_id,
-                    content: `@${item.author || 'anon'}: ${item.headline}\n${item.body || ''}`.trim(),
-                    media_url: item.media_url || item.url || undefined,
-                    message_type: 'pulse',
+                    content: messageContent,
+                    media_url: item.media_url || undefined,
+                    message_type: 'coach_content',
                     pulse_source: 'x',
                     embed_code: `x:${uniqueId}`,
-                    is_pulse_moment: true
+                    is_pulse_moment: true,
+                    origin_team_id: detectTeamTarget(item.headline || '', team1_name || '', team2_name || '', team1_id, team2_id)
                   });
                 }
               }
@@ -252,7 +270,7 @@ serve(async (req) => {
       }
     }
 
-    // 2. Fetch Reddit content
+    // 2. Fetch Reddit content - format as @coach messages
     if (searchQueries.length > 0) {
       try {
         const redditQuery = encodeURIComponent(searchQueries[0]);
@@ -262,11 +280,7 @@ serve(async (req) => {
         
         const redditResponse = await fetch(
           `https://www.reddit.com/search.json?q=${redditQuery}&sort=new&t=day&limit=10`,
-          {
-            headers: {
-              'User-Agent': 'SideHuddle/1.0'
-            }
-          }
+          { headers: { 'User-Agent': 'SideHuddle/1.0' } }
         );
 
         if (redditResponse.ok) {
@@ -275,11 +289,11 @@ serve(async (req) => {
           
           console.log(`Reddit returned ${posts.length} posts`);
           
-          for (const post of posts.slice(0, 5)) {
+          // Take only best 2 items
+          for (const post of posts.slice(0, 2)) {
             const p = post.data;
             const postId = p.id;
             
-            // Check if we already posted this
             const { data: existing } = await supabase
               .from('huddle_messages')
               .select('id')
@@ -288,20 +302,22 @@ serve(async (req) => {
               .limit(1);
             
             if (!existing || existing.length === 0) {
-              // Determine media URL (prefer images/videos)
               let mediaUrl = p.url;
               if (p.preview?.images?.[0]?.source?.url) {
                 mediaUrl = p.preview.images[0].source.url.replace(/&amp;/g, '&');
               }
               
+              const messageContent = `📰 ${p.title}`;
+              
               pulseItems.push({
                 huddle_id,
-                content: `${p.title}\n${p.selftext?.slice(0, 100) || ''}`.trim(),
+                content: messageContent,
                 media_url: mediaUrl,
-                message_type: 'pulse',
+                message_type: 'coach_content',
                 pulse_source: 'reddit',
                 embed_code: `reddit:${postId}`,
-                is_pulse_moment: true
+                is_pulse_moment: true,
+                origin_team_id: detectTeamTarget(p.title || '', team1_name || '', team2_name || '', team1_id, team2_id)
               });
             }
           }
@@ -313,35 +329,34 @@ serve(async (req) => {
       }
     }
 
-    // 3. Fetch YouTube highlights (query ladder - stop once we have 3+ items)
+    // 3. Fetch YouTube highlights - format as @coach messages
     if (YOUTUBE_API_KEY && searchQueries.length > 0) {
       let ytInserted = 0;
       
       for (const query of searchQueries) {
-        if (ytInserted >= 3) break;
+        if (ytInserted >= 1) break; // Only 1 YouTube video
         
         try {
           queriesUsed.push(`YT: ${query}`);
           
           const searchQueryEncoded = encodeURIComponent(query);
-          const maxResults = is_live ? 5 : 3;
           
-          console.log(`YouTube search: "${query}" (maxResults: ${maxResults})`);
+          console.log(`YouTube search: "${query}"`);
           
           const ytResponse = await fetch(
-            `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${searchQueryEncoded}&type=video&order=date&maxResults=${maxResults}&key=${YOUTUBE_API_KEY}`
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${searchQueryEncoded}&type=video&order=date&maxResults=3&key=${YOUTUBE_API_KEY}`
           );
           
           if (ytResponse.ok) {
             const ytData = await ytResponse.json();
-            console.log(`YouTube returned ${ytData.items?.length || 0} videos for query "${query}"`);
+            console.log(`YouTube returned ${ytData.items?.length || 0} videos`);
             
             for (const item of ytData.items || []) {
+              if (ytInserted >= 1) break;
+              
               const videoId = item.id.videoId;
               const title = item.snippet.title;
-              const description = item.snippet.description?.slice(0, 100) || '';
               
-              // Check if we already posted this video
               const { data: existing } = await supabase
                 .from('huddle_messages')
                 .select('id')
@@ -350,14 +365,17 @@ serve(async (req) => {
                 .limit(1);
               
               if (!existing || existing.length === 0) {
+                const messageContent = `🎬 ${title}`;
+                
                 pulseItems.push({
                   huddle_id,
-                  content: `${title}\n${description}`,
+                  content: messageContent,
                   media_url: `https://www.youtube.com/watch?v=${videoId}`,
-                  message_type: 'pulse',
+                  message_type: 'coach_content',
                   pulse_source: 'youtube',
                   embed_code: `youtube:${videoId}`,
-                  is_pulse_moment: true
+                  is_pulse_moment: true,
+                  origin_team_id: detectTeamTarget(title, team1_name || '', team2_name || '', team1_id, team2_id)
                 });
                 ytInserted++;
               }
@@ -369,11 +387,9 @@ serve(async (req) => {
           console.error('YouTube API error:', ytError);
         }
       }
-    } else if (!YOUTUBE_API_KEY) {
-      console.warn('YOUTUBE_API_KEY not set - skipping YouTube fetch');
     }
 
-    // 4. Insert pulse items into huddle_messages
+    // 4. Insert as @coach messages
     let insertedCount = 0;
     for (const item of pulseItems) {
       const { error } = await supabase
@@ -392,7 +408,7 @@ serve(async (req) => {
       }
     }
 
-    // Log the run to pulse_runs
+    // Log the run
     await supabase.from('pulse_runs').insert({
       huddle_id,
       event_id: event_id || null,
