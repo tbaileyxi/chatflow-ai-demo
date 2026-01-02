@@ -28,7 +28,7 @@ interface ChatBottomBarProps {
   teamId?: string;
   eventId?: string;
   onOpenFades?: () => void;
-  onOpenFoundingModal?: () => void;
+  onOpenBadgesModal?: () => void;
   className?: string;
 }
 
@@ -38,7 +38,7 @@ export const ChatBottomBar = memo(function ChatBottomBar({
   teamId,
   eventId,
   onOpenFades,
-  onOpenFoundingModal,
+  onOpenBadgesModal,
   className
 }: ChatBottomBarProps) {
   const { user } = useAuth();
@@ -71,12 +71,12 @@ export const ChatBottomBar = memo(function ChatBottomBar({
 
   // Handle badges
   const handleBadges = useCallback(() => {
-    if (onOpenFoundingModal) {
-      onOpenFoundingModal();
+    if (onOpenBadgesModal) {
+      onOpenBadgesModal();
     } else {
-      toast.info('Founding Member badges available!');
+      toast.info('Get team badges!');
     }
-  }, [onOpenFoundingModal]);
+  }, [onOpenBadgesModal]);
 
   // Handle private - opens create side huddle dialog
   const handlePrivate = useCallback(async () => {

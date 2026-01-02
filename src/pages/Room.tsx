@@ -8,7 +8,7 @@ import { UnifiedChat } from '@/components/room/UnifiedChat';
 import { ChatBottomBar } from '@/components/room/ChatBottomBar';
 import { RoomChatInput } from '@/components/room/RoomChatInput';
 import { FadesSidebar } from '@/components/fades/FadesSidebar';
-import { FoundingMemberModal } from '@/components/founding/FoundingMemberModal';
+import { BadgesModal } from '@/components/badges/BadgesModal';
 import { toast } from 'sonner';
 
 // Hardcoded admin emails for testing
@@ -72,7 +72,7 @@ export default function Room() {
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showFadesSidebar, setShowFadesSidebar] = useState(false);
-  const [showFoundingModal, setShowFoundingModal] = useState(false);
+  const [showBadgesModal, setShowBadgesModal] = useState(false);
   
   // Refs
   const team1Ref = useRef<TeamData | null>(null);
@@ -450,7 +450,7 @@ export default function Room() {
               huddleId={room.id}
               huddleName={event.name}
               onOpenFades={() => setShowFadesSidebar(true)}
-              onOpenFoundingModal={() => setShowFoundingModal(true)}
+              onOpenBadgesModal={() => setShowBadgesModal(true)}
             />
             <div className="px-4 py-2">
               <RoomChatInput
@@ -489,10 +489,12 @@ export default function Room() {
         onClose={() => setShowFadesSidebar(false)}
       />
 
-      {/* Founding Member Modal */}
-      <FoundingMemberModal 
-        open={showFoundingModal}
-        onClose={() => setShowFoundingModal(false)}
+      {/* Badges Modal */}
+      <BadgesModal 
+        open={showBadgesModal}
+        onClose={() => setShowBadgesModal(false)}
+        team1={team1}
+        team2={team2}
       />
     </div>
   );
