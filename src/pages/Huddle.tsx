@@ -2,19 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useRetroTheme } from '@/hooks/useRetroTheme';
-import { RetroMessageBubble } from '@/components/retro/RetroMessageBubble';
-import { RetroHighlightsSidebar } from '@/components/retro/RetroHighlightsSidebar';
-import { RetroChatInput } from '@/components/retro/RetroChatInput';
-import { EmotionBar } from '@/components/chat/EmotionBar';
+import { UnifiedChat } from '@/components/room/UnifiedChat';
+import { ChatBottomBar } from '@/components/room/ChatBottomBar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PickEmView } from '@/components/pickem/PickEmView';
 import { useToast } from '@/hooks/use-toast';
-import { useAutoScroll } from '@/hooks/useAutoScroll';
-import { JumpToLatest } from '@/components/JumpToLatest';
-import { DateDivider } from '@/components/chat/DateDivider';
 import { Zap, ArrowLeft, MoreVertical, UserPlus, UsersRound, Lock, Heart, Check } from 'lucide-react';
-import { isSameDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { HuddlePeopleSheet } from '@/components/HuddlePeopleSheet';
@@ -32,40 +25,26 @@ export const Huddle = () => {
   const { toast } = useToast();
   
   const [huddle, setHuddle] = useState<any>(null);
-  const [messages, setMessages] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [pickEmDialog, setPickEmDialog] = useState<{ open: boolean; instanceId?: string }>({ open: false });
   const [teamName, setTeamName] = useState<string>('');
-  const [showHighlights, setShowHighlights] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [showFoundingModal, setShowFoundingModal] = useState(false);
   const [showFadesSidebar, setShowFadesSidebar] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [liveGame, setLiveGame] = useState<any>(null);
-  
-  // Pagination state
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [oldestCreatedAt, setOldestCreatedAt] = useState<string | null>(null);
-  
-  // Auto-scroll functionality (top-down layout)
-  const { showJumpToNewest, scrollRef, handleScrollPosition, jumpToNewest, isNearTop } = useAutoScroll();
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Check if current user is owner
   const isOwner = user?.id === huddle?.owner_id;
 
-  // Load huddle function (extracted so we can call it after payment)
+  // Load huddle function
   const loadHuddle = useCallback(async () => {
     if (!huddleId) return;
     
-    console.log('🔄 Starting huddle load for ID:', huddleId);
-    
     // Set timeout to prevent infinite loading
     const timeoutId = setTimeout(() => {
-      console.error('⏱️ Huddle loading timeout after 10 seconds');
       setLoading(false);
       toast({
         title: "Timeout",
@@ -76,14 +55,13 @@ export const Huddle = () => {
 
     try {
       // Step 1: Load huddle - Allow anonymous viewing of public huddles
-      console.log('📍 Step 1: Fetching huddle data...');
-      const { data: huddle, error: huddleError } = await supabase
+      const { data: huddleData, error: huddleError } = await supabase
         .from('huddles')
         .select('*, teams!team_id(*)')
         .eq('id', huddleId)
         .maybeSingle();
 
-      if (huddleError || !huddle) {
+      if (huddleError || !huddleData) {
         clearTimeout(timeoutId);
         setLoading(false);
         navigate('/not-found');
@@ -91,7 +69,7 @@ export const Huddle = () => {
       }
 
       // Check if it's a private huddle and user is not authenticated
-      if (huddle.is_private && !user) {
+      if (huddleData.is_private && !user) {
         clearTimeout(timeoutId);
         setLoading(false);
         toast({
@@ -103,45 +81,9 @@ export const Huddle = () => {
         return;
       }
 
-      const team = huddle.teams;
-      setHuddle({ ...huddle, team });
+      const team = huddleData.teams;
+      setHuddle({ ...huddleData, team });
       setTeamName(team?.name || 'Team');
-
-      const { data: rawMessages } = await supabase
-        .from('huddle_messages')
-        .select(`
-          *, 
-          poll_data, 
-          message_type,
-          origin_teams:teams!origin_team_id(id, name, city, logo_url, sponsor, sponsor_url)
-        `)
-        .eq('huddle_id', huddleId)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (rawMessages && rawMessages.length > 0) {
-        const messageUserIds = [...new Set(rawMessages.map((m: any) => m.user_id))];
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('user_id, display_name, username, avatar_url, is_founding_member, founding_tier')
-          .in('user_id', messageUserIds);
-
-        const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-        const messagesWithProfiles = rawMessages.map((m: any) => ({
-          ...m,
-          profile: profilesMap.get(m.user_id) || {
-            user_id: m.user_id,
-            display_name: 'User',
-            username: 'user',
-            is_founding_member: false,
-            founding_tier: null
-          }
-        }));
-
-        setMessages(messagesWithProfiles); // Keep newest-first order (no reverse)
-        setOldestCreatedAt(rawMessages[rawMessages.length - 1]?.created_at || null);
-        setHasMore(rawMessages.length === 50);
-      }
 
       const { data: membersData } = await supabase
         .from('huddle_members')
@@ -162,17 +104,12 @@ export const Huddle = () => {
       clearTimeout(timeoutId);
       setLoading(false);
       
-      // Scroll to top (newest messages) after loading
-      setTimeout(() => {
-        messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
-      }, 100);
-      
     } catch (error) {
-      console.error('❌ Critical error loading huddle:', error);
+      console.error('Error loading huddle:', error);
       clearTimeout(timeoutId);
       setLoading(false);
     }
-  }, [huddleId, navigate, toast]);
+  }, [huddleId, navigate, toast, user]);
 
   // Handle membership payment success callback
   useEffect(() => {
@@ -183,7 +120,6 @@ export const Huddle = () => {
     if (membershipStatus === 'success' && sessionId && user) {
       const finalizeMembership = async () => {
         try {
-          console.log('💳 Finalizing membership payment...');
           const { error } = await supabase.functions.invoke('check-huddle-membership', {
             body: { sessionId, huddleId }
           });
@@ -195,13 +131,10 @@ export const Huddle = () => {
             description: "Your membership is now active.",
           });
 
-          // Clean up URL params
           window.history.replaceState({}, '', `/huddle/${huddleId}`);
-          
-          // Reload huddle data to show user as member
           loadHuddle();
         } catch (error) {
-          console.error('❌ Error finalizing membership:', error);
+          console.error('Error finalizing membership:', error);
           toast({
             title: "Membership Error",
             description: "Payment processed but membership not activated. Please contact support.",
@@ -254,7 +187,6 @@ export const Huddle = () => {
         .eq('huddle_id', huddleId)
         .eq('user_id', user.id);
       
-      // Dispatch event to notify other components that huddle was read
       window.dispatchEvent(new CustomEvent('huddleRead'));
     };
 
@@ -303,7 +235,7 @@ export const Huddle = () => {
     };
 
     checkLiveGame();
-    const interval = setInterval(checkLiveGame, 30000); // Poll every 30s
+    const interval = setInterval(checkLiveGame, 30000);
 
     return () => clearInterval(interval);
   }, [huddle?.team?.highlightly_id, huddle?.team?.id]);
@@ -315,7 +247,6 @@ export const Huddle = () => {
     setFollowLoading(true);
     try {
       if (isFollowing) {
-        // Unfollow - remove from huddle_members
         const { error } = await supabase
           .from('huddle_members')
           .delete()
@@ -330,7 +261,6 @@ export const Huddle = () => {
           description: `Removed from your huddles`,
         });
       } else {
-        // Follow - add to huddle_members
         const { error } = await supabase
           .from('huddle_members')
           .insert({ huddle_id: huddleId, user_id: user.id });
@@ -355,295 +285,6 @@ export const Huddle = () => {
     }
   }, [user, huddleId, huddle, isFollowing, toast]);
 
-  // Load older messages function
-  const loadMoreMessages = useCallback(async () => {
-    if (!hasMore || loadingMore || !oldestCreatedAt || !huddleId) return;
-    
-    setLoadingMore(true);
-    try {
-      const { data: olderMessages } = await supabase
-        .from('huddle_messages')
-        .select(`
-          *, 
-          poll_data, 
-          message_type,
-          origin_teams:teams!origin_team_id(id, name, city, logo_url, sponsor, sponsor_url)
-        `)
-        .eq('huddle_id', huddleId)
-        .lt('created_at', oldestCreatedAt)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (olderMessages && olderMessages.length > 0) {
-        // Fetch profiles for older messages
-        const messageUserIds = [...new Set(olderMessages.map((m: any) => m.user_id))];
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('user_id, display_name, username, avatar_url, is_founding_member, founding_tier')
-          .in('user_id', messageUserIds);
-
-        const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-        const messagesWithProfiles = olderMessages.map((m: any) => ({
-          ...m,
-          profile: profilesMap.get(m.user_id) || {
-            user_id: m.user_id,
-            display_name: 'User',
-            username: 'user',
-            is_founding_member: false,
-            founding_tier: null
-          }
-        }));
-
-        // Append older messages to the end (they appear below in top-down view)
-        setMessages(prev => [...prev, ...messagesWithProfiles]);
-        setOldestCreatedAt(olderMessages[olderMessages.length - 1].created_at);
-        setHasMore(olderMessages.length === 50);
-      } else {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error('Error loading older messages:', error);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [hasMore, loadingMore, oldestCreatedAt, huddleId]);
-
-  // Real-time subscriptions (only for authenticated users)
-  useEffect(() => {
-    if (!huddleId || !user) return;
-
-    const messagesChannel = supabase
-      .channel(`messages:${huddleId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'huddle_messages',
-        filter: `huddle_id=eq.${huddleId}`
-      }, async (payload) => {
-        if (payload.new) {
-          const newMessage = payload.new as any;
-          
-          // Fetch profile for the new message
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('user_id', newMessage.user_id)
-            .single();
-          
-          const messageWithProfile = {
-            ...newMessage,
-            profile: profile || {
-              user_id: newMessage.user_id,
-              display_name: 'User',
-              username: 'user',
-              is_founding_member: false,
-              founding_tier: null
-            }
-          };
-          
-          // Prepend new message at the top (newest-first order)
-          setMessages(prev => {
-            if (prev.some(m => m.id === newMessage.id)) return prev;
-            return [messageWithProfile, ...prev];
-          });
-          
-          // Auto-scroll to top if user is near the top (following live conversation)
-          if (isNearTop) {
-            setTimeout(() => {
-              messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-            }, 100);
-          }
-        }
-      })
-      .subscribe();
-
-    return () => {
-      messagesChannel.unsubscribe();
-    };
-  }, [huddleId, user, isNearTop]);
-
-  // Send message (requires authentication)
-  const sendMessage = useCallback(async (content: string, replyToId?: string) => {
-    if (!huddleId || !content.trim()) return;
-    
-    if (!user) {
-      setShowSignupModal(true);
-      return;
-    }
-
-    // For public huddles, check if user is a member - but DON'T auto-join
-    // Users must explicitly follow to join My Huddles
-    if (huddle && huddle.is_private === false) {
-      // Just check membership, don't auto-add
-      const { data: existingMember } = await supabase
-        .from('huddle_members')
-        .select('id')
-        .eq('huddle_id', huddleId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      // Non-members can still send messages to public huddles (read + write)
-      // but they won't appear in "My Huddles" until they explicitly follow
-      if (!existingMember) {
-        console.log('📝 User sending message to public huddle they haven\'t followed yet');
-      }
-    }
-
-    // Try to fetch profile, but don't fail if it errors (network issues, token refresh, etc.)
-    let profile = null;
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('user_id, display_name, username, avatar_url')
-        .eq('user_id', user.id)
-        .single();
-      profile = data;
-    } catch (profileError) {
-      console.warn('Could not fetch profile, using fallback:', profileError);
-    }
-    
-    const messageData: any = {
-      id: crypto.randomUUID(),
-      content: content.trim(),
-      huddle_id: huddleId,
-      user_id: user.id,
-      created_at: new Date().toISOString()
-    };
-    
-    // Add reply_to_id if replying
-    if (replyToId) {
-      messageData.reply_to_id = replyToId;
-    }
-
-    const messageWithProfile = {
-      ...messageData,
-      profile: profile || {
-        user_id: user.id,
-        display_name: user.email?.split('@')[0] || 'User',
-        username: 'user',
-        avatar_url: null
-      }
-    };
-    // Prepend own message at top (newest-first)
-    setMessages(prev => [messageWithProfile, ...prev]);
-    
-    // Scroll to top to see own message
-    setTimeout(() => {
-      messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 100);
-
-    // Fire-and-forget insert - errors handled separately
-    supabase
-      .from('huddle_messages')
-      .insert([messageData])
-      .then(({ error }) => {
-        if (error) {
-          console.error('Error persisting message:', error);
-          setMessages(prev => prev.filter(m => m.id !== messageData.id));
-          toast({
-            title: "Error",
-            description: "Failed to send message",
-            variant: "destructive",
-          });
-        } else {
-          // Successfully sent - check if this is user's first message
-          checkFirstMessageAndShowModal();
-        }
-      });
-  }, [huddleId, user, toast, huddle]);
-
-  // Check if this is the user's first message and show founding modal
-  const checkFirstMessageAndShowModal = useCallback(async () => {
-    if (!user?.id) return;
-    
-    const FIRST_MSG_KEY = `sh_first_message_sent_${user.id}`;
-    const DISMISSED_KEY = `sh_founding_dismissed_${user.id}`;
-    
-    if (localStorage.getItem(FIRST_MSG_KEY)) return; // Already sent first message before
-    
-    localStorage.setItem(FIRST_MSG_KEY, 'true');
-    
-    // Check if user is already a founding member
-    const { data } = await supabase
-      .from('profiles')
-      .select('is_founding_member')
-      .eq('user_id', user.id)
-      .single();
-    
-    if (!data?.is_founding_member && !localStorage.getItem(DISMISSED_KEY)) {
-      // Small delay to let the message appear first
-      setTimeout(() => {
-        setShowFoundingModal(true);
-      }, 1500);
-    }
-  }, [user?.id]);
-
-  // Send media message (requires authentication)
-  const sendMediaMessage = useCallback(async (url: string, type: 'image' | 'video') => {
-    if (!huddleId) return;
-    
-    if (!user) {
-      setShowSignupModal(true);
-      return;
-    }
-
-    // Try to fetch profile, but don't fail if it errors (network issues, token refresh, etc.)
-    let profile = null;
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('user_id, display_name, username, avatar_url')
-        .eq('user_id', user.id)
-        .single();
-      profile = data;
-    } catch (profileError) {
-      console.warn('Could not fetch profile for media message, using fallback:', profileError);
-    }
-    
-    const messageData = {
-      id: crypto.randomUUID(),
-      content: `[Shared ${type}]`,
-      huddle_id: huddleId,
-      user_id: user.id,
-      media_url: url,
-      media_type: type,
-      created_at: new Date().toISOString()
-    };
-
-    const messageWithProfile = {
-      ...messageData,
-      profile: profile || {
-        user_id: user.id,
-        display_name: user.email?.split('@')[0] || 'User',
-        username: 'user',
-        avatar_url: null
-      }
-    };
-    // Prepend media message at top (newest-first)
-    setMessages(prev => [messageWithProfile, ...prev]);
-    
-    // Scroll to top to see own message
-    setTimeout(() => {
-      messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 100);
-
-    // Fire-and-forget insert - errors handled separately
-    supabase
-      .from('huddle_messages')
-      .insert([messageData])
-      .then(({ error }) => {
-        if (error) {
-          console.error('Error persisting media message:', error);
-          setMessages(prev => prev.filter(m => m.id !== messageData.id));
-          toast({
-            title: "Error",
-            description: "Failed to send media",
-            variant: "destructive",
-          });
-        }
-      });
-  }, [huddleId, user, toast]);
-
   // Handle invite - copies invite link to clipboard
   const handleInvite = useCallback(async () => {
     const inviteUrl = `${window.location.origin}/join-huddle/${huddleId}`;
@@ -660,11 +301,6 @@ export const Huddle = () => {
       });
     }
   }, [huddleId, toast]);
-
-  const retroTheme = useRetroTheme(huddle?.team?.name);
-
-  // REMOVED: messagesWithReplies grouping - flat stream architecture
-  // Messages are displayed in flat chronological order
 
   if (loading) {
     return (
@@ -702,32 +338,33 @@ export const Huddle = () => {
       {/* Game Pulse Header - shows when a live game is detected */}
       {liveGame && <GamePulseHeader {...liveGame} />}
       
-      {/* Mobile-first header - sticky at top with integrated back button */}
-      <div className="retro-header sticky top-0 z-20 px-3 sm:px-4 py-2 sm:py-3 border-b border-team-primary/30 bg-background/95 backdrop-blur-sm safe-area-inset-top">
+      {/* Mobile-first header - sticky at top */}
+      <div className="sticky top-0 z-20 px-3 sm:px-4 py-2 sm:py-3 border-b border-border/30 bg-background/95 backdrop-blur-sm safe-area-inset-top">
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Back button - integrated in header */}
+          {/* Back button */}
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate('/app')}
-            className="h-9 w-9 p-0 rounded-full bg-team-primary/10 hover:bg-team-primary/20 shrink-0"
+            className="h-9 w-9 p-0 rounded-full bg-muted/30 hover:bg-muted shrink-0"
             aria-label="Back to huddles"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          {/* Team logo - smaller on mobile */}
+          
+          {/* Team logo */}
           {teamLogo && (
             <img 
               src={teamLogo} 
               alt={teamName}
-              className="h-6 w-6 sm:h-8 sm:w-8 rounded-full object-cover ring-2 ring-team-primary/40"
+              className="h-6 w-6 sm:h-8 sm:w-8 rounded-full object-cover ring-2 ring-primary/40"
             />
           )}
           
           {/* Huddle name with public/private badge */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-sm sm:text-base md:text-lg font-bold neon-text truncate">
+              <h1 className="text-sm sm:text-base md:text-lg font-bold truncate">
                 {huddle?.is_official_team_huddle 
                   ? (huddle?.name?.replace(' Community', '') || 'Loading...')
                   : (huddle?.name || 'Loading...')}
@@ -743,7 +380,7 @@ export const Huddle = () => {
             </div>
           </div>
           
-          {/* Follow button for authenticated users on public huddles - icon only */}
+          {/* Follow button for authenticated users on public huddles */}
           {user && !huddle?.is_private && (
             <Button
               variant="ghost"
@@ -753,8 +390,8 @@ export const Huddle = () => {
               className={cn(
                 "h-9 w-9 rounded-full shrink-0",
                 isFollowing 
-                  ? "bg-yellow-400 hover:bg-yellow-500 text-black" 
-                  : "border border-yellow-400/50 text-yellow-400 hover:bg-yellow-400/10"
+                  ? "bg-primary hover:bg-primary/90 text-primary-foreground" 
+                  : "border border-primary/50 text-primary hover:bg-primary/10"
               )}
               title={isFollowing ? "Following" : "Follow"}
             >
@@ -768,19 +405,19 @@ export const Huddle = () => {
             </Button>
           )}
           
-          {/* Single People icon - opens bottom sheet */}
+          {/* People sheet */}
           <HuddlePeopleSheet
             huddleId={huddleId!}
             huddle={huddle}
             members={members}
             isOwner={isOwner}
-            onShowHighlights={() => setShowHighlights(true)}
             onInvite={handleInvite}
+            onShowHighlights={() => {}}
           >
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 rounded-full hover:bg-team-primary/20"
+              className="h-9 w-9 rounded-full hover:bg-muted"
             >
               <MoreVertical className="h-5 w-5" />
             </Button>
@@ -788,174 +425,62 @@ export const Huddle = () => {
         </div>
       </div>
 
-{/* EmotionBar moved to bottom */}
-
-      {/* Chat input - STICKY under header for top-down layout */}
-      <div className={cn(
-        "sticky z-20 bg-background/95 backdrop-blur-sm border-b border-team-primary/30 shadow-md px-2 sm:px-4 py-2",
-        user ? "top-[100px] sm:top-[108px]" : "top-[52px] sm:top-[60px]"
-      )}>
-        <div className="max-w-4xl mx-auto">
-          {user ? (
-            <RetroChatInput
-              onSendMessage={(content) => sendMessage(content)}
-              onSendMedia={sendMediaMessage}
-              placeholder="Chat here..."
-              disabled={loading}
-              huddleId={huddleId!}
-              userId={user.id}
-              teamName={teamName}
-              isAdmin={isAdmin}
-              onTyping={(isTyping) => {
-                if (isTyping && user?.id) {
-                  supabase.channel(`typing:${huddleId}`).send({
-                    type: 'broadcast',
-                    event: 'typing',
-                    payload: { userId: user.id, isTyping: true }
-                  });
-                }
+      {/* Signup prompt for non-authenticated users */}
+      {!user && (
+        <div className="px-3 sm:px-4 py-3 bg-muted/30 border-b border-border/30">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-sm text-foreground text-center sm:text-left">
+              <span className="font-semibold text-primary">Join</span> to chat with fellow fans
+            </p>
+            <Button 
+              onClick={() => {
+                localStorage.setItem('intended_huddle_id', huddleId!);
+                localStorage.setItem('intended_team_id', huddle?.team_id || '');
+                navigate('/auth?signup=true');
               }}
-            />
-          ) : (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-yellow-400/10 border border-yellow-400/30 rounded-lg p-3">
-              <p className="text-sm text-foreground text-center sm:text-left">
-                <span className="font-semibold text-yellow-400">Join</span> to chat with fellow fans
-              </p>
-              <Button 
-                onClick={() => {
-                  localStorage.setItem('intended_huddle_id', huddleId!);
-                  localStorage.setItem('intended_team_id', huddle?.team_id || '');
-                  navigate('/auth?signup=true');
-                }}
-                className="bg-yellow-400 hover:bg-yellow-500 text-black font-semibold shrink-0 w-full sm:w-auto"
-              >
-                Join the Huddle
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main chat area - mobile-first flex layout */}
-      <div className="flex-1 flex flex-col sm:flex-row relative overflow-hidden">
-        {/* Messages container - full width on mobile */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Messages - mobile optimized scrolling */}
-          <div 
-            ref={(el) => {
-              messagesContainerRef.current = el;
-              if (el && scrollRef.current) {
-                scrollRef.current.scrollToTop = (behavior: ScrollBehavior = 'smooth') => {
-                  el.scrollTo({ top: 0, behavior });
-                };
-              }
-            }}
-            className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-4 py-3 sm:py-4 retro-chat-column touch-pan-y"
-            onScroll={(e) => {
-              const target = e.target as HTMLDivElement;
-              handleScrollPosition(target.scrollTop);
-            }}
-          >
-            <div className="max-w-4xl mx-auto space-y-1">
-              {messages.map((message, index) => {
-                const prevMessage = index > 0 ? messages[index - 1] : null;
-                
-                // Show date divider when date changes (top-down: check if current message's date differs from previous)
-                // First message always shows divider, otherwise compare dates with null safety
-                const showDateDivider = index === 0 || 
-                  (prevMessage?.created_at && message.created_at && 
-                   !isSameDay(new Date(message.created_at), new Date(prevMessage.created_at)));
-                
-                // Group consecutive messages from same user within 1 minute, with full null safety
-                const isGrouped = !!(prevMessage?.created_at && message.created_at &&
-                  prevMessage.user_id === message.user_id && 
-                  !prevMessage.is_bot_message && 
-                  !message.is_bot_message &&
-                  isSameDay(new Date(message.created_at), new Date(prevMessage.created_at)) &&
-                  Math.abs(new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime()) < 60000);
-                
-                return (
-                  <React.Fragment key={message.id}>
-                    {showDateDivider && <DateDivider date={new Date(message.created_at)} />}
-                    <RetroMessageBubble
-                      message={message}
-                      user={message.profile}
-                      currentUserId={user?.id}
-                      isAdmin={isAdmin}
-                      isGrouped={isGrouped}
-                      onOpenFades={() => setShowFadesSidebar(true)}
-                    />
-                  </React.Fragment>
-                );
-              })}
-              
-              {/* Load older messages button - at bottom for top-down layout */}
-              {hasMore && (
-                <div className="flex justify-center py-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={loadMoreMessages}
-                    disabled={loadingMore}
-                    className="text-sm bg-background/80 backdrop-blur-sm"
-                  >
-                    {loadingMore ? 'Loading...' : 'Load Older Messages'}
-                  </Button>
-                </div>
-              )}
-            </div>
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shrink-0 w-full sm:w-auto"
+            >
+              Join the Huddle
+            </Button>
           </div>
-          
-          {/* Jump to newest button */}
-          <JumpToLatest visible={showJumpToNewest} onClick={jumpToNewest} />
         </div>
+      )}
 
-        {/* Collapsible highlights sidebar - slide over on mobile */}
-        <div className={cn(
-          "fixed sm:relative inset-y-0 right-0 w-full sm:w-80 max-w-sm",
-          "border-l border-team-primary/20 bg-background/95 backdrop-blur-sm",
-          "transition-transform duration-300 z-30",
-          "safe-area-inset-top safe-area-inset-bottom",
-          showHighlights ? "translate-x-0" : "translate-x-full"
-        )}>
-          <RetroHighlightsSidebar
-            huddleId={huddleId!}
-            onClose={() => setShowHighlights(false)}
-            onJumpToMessage={(messageId) => {
-              const element = document.getElementById(`message-${messageId}`);
-              element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }}
-          />
-        </div>
-      </div>
+      {/* Main Chat Area - UnifiedChat component handles everything */}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        <UnifiedChat 
+          huddleId={huddleId!}
+          team1Id={huddle?.team_id}
+          team2Id={null}
+        />
+      </main>
 
-      {/* EmotionBar - fixed at bottom, above FABs */}
+      {/* ChatBottomBar - fixed at bottom, above input */}
       {user && (
         <div className="fixed bottom-0 left-0 right-0 z-20 pb-safe">
-          <EmotionBar
-            onReaction={(emoji, messageId) => {
-              toast({ title: `${emoji} reaction added!` });
-            }}
-            lastMessageId={messages[0]?.id}
+          <ChatBottomBar
+            huddleId={huddleId!}
+            huddleName={huddle?.name}
+            onOpenFades={() => setShowFadesSidebar(true)}
+            onOpenFoundingModal={() => setShowFoundingModal(true)}
           />
         </div>
       )}
 
-      {/* Yellow FAB - bottom right, adapts to huddle type */}
+      {/* Yellow FABs - bottom right */}
       {user && (
-        <div className="fixed bottom-20 right-4 z-30 flex flex-col gap-3">
+        <div className="fixed bottom-24 right-4 z-30 flex flex-col gap-3">
           {/* Fades Lightning FAB - for private huddles AND verified huddles */}
           {(huddle?.is_private || huddle?.is_verified) && !huddle?.is_official_team_huddle && (
             <Button 
               onClick={() => setShowFadesSidebar(true)}
-              className="h-14 w-14 rounded-full bg-yellow-400 hover:bg-yellow-500 shadow-lg shadow-yellow-400/30"
+              className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90 shadow-lg"
             >
-              <Zap className="h-6 w-6 text-black" />
+              <Zap className="h-6 w-6 text-primary-foreground" />
             </Button>
           )}
           
-        {huddle?.is_official_team_huddle ? (
-            // Public huddle → Start Side Huddle (group + lock icon)
+          {huddle?.is_official_team_huddle ? (
             <StartHuddleDialog
               onHuddleCreated={() => {
                 toast({
@@ -966,19 +491,18 @@ export const Huddle = () => {
               parentTeamId={huddle.team_id}
               isCreatingSideHuddle={true}
               trigger={
-                <Button className="h-14 w-14 rounded-full bg-yellow-400 hover:bg-yellow-500 shadow-lg shadow-yellow-400/30 relative">
-                  <UsersRound className="h-6 w-6 text-black" />
-                  <Lock className="h-3 w-3 text-black absolute bottom-3 right-3" />
+                <Button className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90 shadow-lg relative">
+                  <UsersRound className="h-6 w-6 text-primary-foreground" />
+                  <Lock className="h-3 w-3 text-primary-foreground absolute bottom-3 right-3" />
                 </Button>
               }
             />
           ) : (
-            // Private huddle → Invite Friends
             <Button 
               onClick={handleInvite}
-              className="h-14 w-14 rounded-full bg-yellow-400 hover:bg-yellow-500 shadow-lg shadow-yellow-400/30"
+              className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90 shadow-lg"
             >
-              <UserPlus className="h-6 w-6 text-black" />
+              <UserPlus className="h-6 w-6 text-primary-foreground" />
             </Button>
           )}
         </div>
@@ -1015,7 +539,7 @@ export const Huddle = () => {
         huddleId={huddleId}
       />
 
-      {/* Founding Member Modal - shows after first message */}
+      {/* Founding Member Modal */}
       <FoundingMemberModal 
         open={showFoundingModal}
         onClose={() => {

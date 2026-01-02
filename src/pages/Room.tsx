@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { UnifiedChat } from '@/components/room/UnifiedChat';
-import { EmotionBar } from '@/components/chat/EmotionBar';
+import { ChatBottomBar } from '@/components/room/ChatBottomBar';
+import { FadesSidebar } from '@/components/fades/FadesSidebar';
+import { FoundingMemberModal } from '@/components/founding/FoundingMemberModal';
 import { toast } from 'sonner';
 
 // Hardcoded admin emails for testing
@@ -68,6 +70,8 @@ export default function Room() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showFadesSidebar, setShowFadesSidebar] = useState(false);
+  const [showFoundingModal, setShowFoundingModal] = useState(false);
   
   // Refs
   const team1Ref = useRef<TeamData | null>(null);
@@ -378,7 +382,7 @@ export default function Room() {
       </header>
 
       {/* Main Chat Area - Single unified stream */}
-      <main className="flex-1 pt-16 pb-14">
+      <main className="flex-1 pt-16 pb-20">
         <UnifiedChat 
           huddleId={room.id}
           team1Id={event.team1_id}
@@ -386,16 +390,32 @@ export default function Room() {
         />
       </main>
 
-      {/* EmotionBar - fixed at bottom */}
+      {/* ChatBottomBar - fixed at bottom */}
       {user && (
         <div className="fixed bottom-0 left-0 right-0 z-20 pb-safe">
-          <EmotionBar
-            onReaction={(emoji) => {
-              toast.success(`${emoji} reaction added!`);
-            }}
+          <ChatBottomBar
+            huddleId={room.id}
+            huddleName={event.name}
+            onOpenFades={() => setShowFadesSidebar(true)}
+            onOpenFoundingModal={() => setShowFoundingModal(true)}
           />
         </div>
       )}
+
+      {/* Fades Sidebar */}
+      <FadesSidebar
+        huddleId={room.id}
+        teamName={team1Name}
+        teamLeague={team1?.league || 'NCAA'}
+        open={showFadesSidebar}
+        onClose={() => setShowFadesSidebar(false)}
+      />
+
+      {/* Founding Member Modal */}
+      <FoundingMemberModal 
+        open={showFoundingModal}
+        onClose={() => setShowFoundingModal(false)}
+      />
     </div>
   );
 }
