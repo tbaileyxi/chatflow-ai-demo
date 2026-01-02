@@ -63,14 +63,17 @@ export const ChatMessage = memo(function ChatMessage({
   const isCoach = message.is_bot_message || message.message_type === 'coach_response';
   const isPulse = message.pulse_source || message.message_type === 'pulse';
   
-  // Extract media from pulse content
+  // Extract media from pulse content OR user uploads
   const hasInlineMedia = message.media_url && (
     message.media_url.includes('youtube.com') ||
     message.media_url.includes('youtu.be') ||
     message.media_url.includes('.jpg') ||
     message.media_url.includes('.png') ||
     message.media_url.includes('.gif') ||
-    message.media_url.includes('preview.redd.it')
+    message.media_url.includes('.jpeg') ||
+    message.media_url.includes('.webp') ||
+    message.media_url.includes('preview.redd.it') ||
+    message.media_url.includes('supabase.co/storage') // Supabase storage uploads
   );
 
   // Extract YouTube video ID

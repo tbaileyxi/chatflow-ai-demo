@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { UnifiedChat } from '@/components/room/UnifiedChat';
 import { ChatBottomBar } from '@/components/room/ChatBottomBar';
+import { RoomChatInput } from '@/components/room/RoomChatInput';
 import { FadesSidebar } from '@/components/fades/FadesSidebar';
 import { FoundingMemberModal } from '@/components/founding/FoundingMemberModal';
 import { toast } from 'sonner';
@@ -237,6 +238,57 @@ export default function Room() {
     initializeRoom();
   }, [initializeRoom]);
 
+  // Auto-trigger pulse on room entry for live events
+  useEffect(() => {
+    if (!room || !event || !user) return;
+    
+    const isLive = event.status === 'live' || event.status === 'in_progress';
+    if (!isLive) return;
+
+    const triggerAutoPulse = async () => {
+      try {
+        // Check if pulse was triggered recently (last 5 minutes)
+        const { data: recentPulse } = await supabase
+          .from('pulse_runs')
+          .select('ran_at')
+          .eq('huddle_id', room.id)
+          .order('ran_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const lastPulseTime = recentPulse?.ran_at ? new Date(recentPulse.ran_at).getTime() : 0;
+        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+
+        if (lastPulseTime < fiveMinutesAgo) {
+          console.log('🔄 Auto-triggering pulse on room entry...');
+          
+          const t1Name = team1Ref.current?.name || event.name.split(' vs ')[0] || '';
+          const t2Name = team2Ref.current?.name || event.name.split(' vs ')[1] || '';
+          const league = team1Ref.current?.league || team2Ref.current?.league || 'football';
+          
+          await supabase.functions.invoke('pulse-drop', {
+            body: {
+              huddle_id: room.id,
+              event_id: event.id,
+              team1_name: t1Name,
+              team2_name: t2Name,
+              team1_id: team1Ref.current?.id,
+              team2_id: team2Ref.current?.id,
+              event_name: event.name,
+              league: league,
+              is_live: true,
+              bypass_rate_limit: false // Respect rate limits for auto-trigger
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Auto-pulse error:', err);
+      }
+    };
+
+    triggerAutoPulse();
+  }, [room?.id, event?.id, event?.status, user]);
+
   // Build query ladder for pulse drop
   const buildQueryLadder = useCallback(() => {
     const t1 = team1?.name || event?.name.split(' vs ')[0] || '';
@@ -382,7 +434,7 @@ export default function Room() {
       </header>
 
       {/* Main Chat Area - Single unified stream */}
-      <main className="flex-1 pt-16 pb-20">
+      <main className="flex-1 pt-16">
         <UnifiedChat 
           huddleId={room.id}
           team1Id={event.team1_id}
@@ -390,17 +442,43 @@ export default function Room() {
         />
       </main>
 
-      {/* ChatBottomBar - fixed at bottom */}
-      {user && (
-        <div className="fixed bottom-0 left-0 right-0 z-20 pb-safe">
-          <ChatBottomBar
-            huddleId={room.id}
-            huddleName={event.name}
-            onOpenFades={() => setShowFadesSidebar(true)}
-            onOpenFoundingModal={() => setShowFoundingModal(true)}
-          />
-        </div>
-      )}
+      {/* Fixed Bottom Section - ChatBottomBar + RoomChatInput */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-md border-t border-border/30 pb-safe">
+        {user && (
+          <>
+            <ChatBottomBar
+              huddleId={room.id}
+              huddleName={event.name}
+              onOpenFades={() => setShowFadesSidebar(true)}
+              onOpenFoundingModal={() => setShowFoundingModal(true)}
+            />
+            <div className="px-4 py-2">
+              <RoomChatInput
+                huddleId={room.id}
+                userId={user.id}
+                onSendMessage={async (content, mediaUrl) => {
+                  // Send message via Supabase
+                  await supabase.from('huddle_messages').insert({
+                    huddle_id: room.id,
+                    user_id: user.id,
+                    content,
+                    media_url: mediaUrl,
+                    media_type: mediaUrl ? 'image' : 'text'
+                  });
+                }}
+                placeholder="Say something..."
+              />
+            </div>
+          </>
+        )}
+        {!user && (
+          <div className="px-4 py-3 text-center">
+            <Button onClick={() => navigate('/auth')} variant="default" size="sm">
+              Sign in to chat
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Fades Sidebar */}
       <FadesSidebar
