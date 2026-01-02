@@ -270,7 +270,7 @@ serve(async (req) => {
       }
     }
 
-    // 2. Fetch Reddit content - format as @coach messages
+    // 2. Fetch Reddit content - format as @coach messages (with proper user-agent)
     if (searchQueries.length > 0) {
       try {
         const redditQuery = encodeURIComponent(searchQueries[0]);
@@ -280,7 +280,12 @@ serve(async (req) => {
         
         const redditResponse = await fetch(
           `https://www.reddit.com/search.json?q=${redditQuery}&sort=new&t=day&limit=10`,
-          { headers: { 'User-Agent': 'SideHuddle/1.0' } }
+          { 
+            headers: { 
+              'User-Agent': 'web:sidehuddle:v1.0 (by /u/sidehuddle_app)',
+              'Accept': 'application/json'
+            } 
+          }
         );
 
         if (redditResponse.ok) {
@@ -302,11 +307,15 @@ serve(async (req) => {
               .limit(1);
             
             if (!existing || existing.length === 0) {
-              let mediaUrl = p.url;
-              if (p.preview?.images?.[0]?.source?.url) {
+              let mediaUrl = undefined;
+              // Only use media_url for actual images/videos, NOT for link posts
+              if (p.post_hint === 'image' && p.url) {
+                mediaUrl = p.url;
+              } else if (p.preview?.images?.[0]?.source?.url) {
                 mediaUrl = p.preview.images[0].source.url.replace(/&amp;/g, '&');
               }
               
+              // Clean title - just the headline, no subreddit or URL
               const messageContent = `📰 ${p.title}`;
               
               pulseItems.push({
@@ -322,16 +331,19 @@ serve(async (req) => {
             }
           }
         } else {
-          console.error('Reddit API error:', redditResponse.status);
+          console.error('Reddit API error:', redditResponse.status, await redditResponse.text());
         }
       } catch (redditError) {
         console.error('Reddit API error:', redditError);
       }
     }
 
-    // 3. Fetch YouTube highlights - format as @coach messages
-    if (YOUTUBE_API_KEY && searchQueries.length > 0) {
+    // 3. Fetch YouTube highlights - SKIP DURING LIVE EVENTS (per memory doc)
+    // YouTube returns irrelevant old content during live games
+    if (YOUTUBE_API_KEY && searchQueries.length > 0 && !is_live) {
       let ytInserted = 0;
+      
+      console.log('YouTube search enabled (not a live event)');
       
       for (const query of searchQueries) {
         if (ytInserted >= 1) break; // Only 1 YouTube video
@@ -355,7 +367,14 @@ serve(async (req) => {
               if (ytInserted >= 1) break;
               
               const videoId = item.id.videoId;
-              const title = item.snippet.title;
+              // Decode HTML entities in title
+              const rawTitle = item.snippet.title;
+              const title = rawTitle
+                .replace(/&quot;/g, '"')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&#39;/g, "'");
               
               const { data: existing } = await supabase
                 .from('huddle_messages')
@@ -387,6 +406,8 @@ serve(async (req) => {
           console.error('YouTube API error:', ytError);
         }
       }
+    } else if (is_live) {
+      console.log('Skipping YouTube - live event (YouTube returns irrelevant old content during games)');
     }
 
     // 4. Insert as @coach messages
@@ -406,6 +427,28 @@ serve(async (req) => {
       } else {
         console.error('Error inserting pulse item:', error);
       }
+    }
+
+    // 5. Fallback: If no content found during live event, post a welcome/hype message
+    if (pulseItems.length === 0 && is_live) {
+      console.log('No external content found - posting fallback hype message');
+      
+      const fallbackMessage = event_name 
+        ? `🔥 ${event_name} is LIVE! What are you seeing? Drop your takes!`
+        : `🔥 Game is LIVE! What are you seeing? Drop your hot takes!`;
+      
+      await supabase.from('huddle_messages').insert({
+        huddle_id,
+        user_id: systemUser,
+        is_bot_message: true,
+        message_type: 'coach_content',
+        content: fallbackMessage,
+        is_pulse_moment: true,
+        pulse_source: 'grok'
+      });
+      
+      insertedCount = 1;
+      insertedBySource.grok = 1;
     }
 
     // Log the run
