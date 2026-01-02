@@ -49,8 +49,8 @@ const AppContent = () => {
           <Route path="/" element={<Home />} />
           <Route path="/bills-demo" element={<BillsChatDemo />} />
           <Route path="/retro-demo" element={<RetroDemo />} />
-          <Route path="/onboard" element={<MobileHome />} />
-          <Route path="/app" element={<MobileHome />} />
+          <Route path="/onboard" element={<Home />} />
+          <Route path="/app" element={<Home />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/profile" element={<MobileProfile />} />
