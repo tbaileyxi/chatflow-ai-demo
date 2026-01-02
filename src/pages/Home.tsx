@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Radio, Flame, Clock, ChevronRight } from 'lucide-react';
+import { Search, Radio, Flame, Clock, ChevronRight, Users, Globe, Lock, ShieldCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BottomNav } from '@/components/mobile/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import shLogo from '@/assets/sh-logo.png';
 
@@ -37,6 +38,21 @@ interface TeamWithActivity extends Team {
   member_count?: number;
 }
 
+interface Huddle {
+  id: string;
+  name: string;
+  team_name: string;
+  team_logo_url: string;
+  participant_count: number;
+  is_verified?: boolean;
+  is_official_team_huddle?: boolean;
+  unread_count?: number;
+  latest_message?: {
+    content: string;
+    created_at: string;
+  };
+}
+
 const RECENTLY_VIEWED_KEY = 'sh_recently_viewed';
 
 const getRecentlyViewed = (): string[] => {
@@ -64,12 +80,112 @@ const LEAGUES = [
 
 export default function Home() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLeague, setSelectedLeague] = useState('all');
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
   const [teams, setTeams] = useState<TeamWithActivity[]>([]);
   const [recentTeams, setRecentTeams] = useState<TeamWithActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // My Huddles state
+  const [publicHuddles, setPublicHuddles] = useState<Huddle[]>([]);
+  const [privateHuddles, setPrivateHuddles] = useState<Huddle[]>([]);
+  const [huddlesLoading, setHuddlesLoading] = useState(true);
+
+  const fetchHuddles = useCallback(async () => {
+    if (!user) {
+      setPublicHuddles([]);
+      setPrivateHuddles([]);
+      setHuddlesLoading(false);
+      return;
+    }
+
+    try {
+      const { data: membershipData, error: membershipError } = await supabase
+        .from('huddle_members')
+        .select(`
+          huddle_id,
+          last_read_at,
+          huddles (
+            id,
+            name,
+            member_count,
+            last_message_at,
+            is_verified,
+            is_official_team_huddle,
+            is_private,
+            teams!team_id (
+              name,
+              city,
+              logo_url
+            )
+          )
+        `)
+        .eq('user_id', user.id);
+
+      if (membershipError) throw membershipError;
+
+      const huddles = membershipData?.map(m => m.huddles).filter(Boolean) || [];
+      const huddleIds = huddles.map(h => h.id);
+
+      // Get latest messages
+      const { data: latestMessages } = await supabase
+        .from('huddle_messages')
+        .select('huddle_id, content, created_at')
+        .in('huddle_id', huddleIds)
+        .order('created_at', { ascending: false });
+
+      // Get member counts
+      const { data: memberCounts } = await supabase
+        .from('huddle_members')
+        .select('huddle_id')
+        .in('huddle_id', huddleIds);
+
+      // Calculate unread counts
+      const unreadCounts: Record<string, number> = {};
+      const { data: unreadMessages } = await supabase
+        .from('huddle_messages')
+        .select('huddle_id, created_at')
+        .in('huddle_id', huddleIds);
+
+      membershipData?.forEach(member => {
+        const lastReadTime = member.last_read_at ? new Date(member.last_read_at) : new Date(0);
+        const unreadCount = unreadMessages?.filter(msg => 
+          msg.huddle_id === member.huddle_id && 
+          new Date(msg.created_at) > lastReadTime
+        ).length || 0;
+        unreadCounts[member.huddle_id] = unreadCount;
+      });
+
+      const transformedHuddles: Huddle[] = huddles.map(huddle => {
+        const actualMemberCount = memberCounts?.filter(mc => mc.huddle_id === huddle.id).length || 1;
+        const latestMessage = latestMessages?.find(msg => msg.huddle_id === huddle.id);
+        
+        return {
+          id: huddle.id,
+          name: huddle.name,
+          team_name: `${huddle.teams?.city} ${huddle.teams?.name}`,
+          team_logo_url: huddle.teams?.logo_url || '/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png',
+          participant_count: actualMemberCount,
+          is_verified: huddle.is_verified,
+          is_official_team_huddle: huddle.is_official_team_huddle,
+          unread_count: unreadCounts[huddle.id] || 0,
+          latest_message: latestMessage ? {
+            content: latestMessage.content,
+            created_at: latestMessage.created_at
+          } : undefined
+        };
+      });
+
+      setPublicHuddles(transformedHuddles.filter(h => h.is_official_team_huddle));
+      setPrivateHuddles(transformedHuddles.filter(h => !h.is_official_team_huddle));
+    } catch (error) {
+      console.error('Error fetching huddles:', error);
+    } finally {
+      setHuddlesLoading(false);
+    }
+  }, [user]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -84,7 +200,7 @@ export default function Home() {
         .limit(5);
       setLiveEvents((eventsResult.data as unknown as LiveEvent[]) || []);
 
-      // Fetch teams - explicit cast to avoid TS2589
+      // Fetch teams
       const teamsData: Team[] = ((await (supabase as any)
         .from('teams')
         .select('id, name, city, logo_url, league')
@@ -134,7 +250,8 @@ export default function Home() {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    fetchHuddles();
+  }, [fetchData, fetchHuddles]);
 
   const handleTeamClick = (team: TeamWithActivity) => {
     addRecentlyViewed(team.id);
@@ -144,15 +261,17 @@ export default function Home() {
   };
 
   const handleEventClick = (event: LiveEvent) => {
-    // Navigate to the new room route for events
     navigate(`/room/${event.id}`);
+  };
+
+  const handleHuddleClick = (huddle: Huddle) => {
+    navigate(`/huddle/${huddle.id}`);
   };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
   };
 
-  // Filter teams by search and selected league
   const filteredTeams = teams.filter(t => {
     const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.city.toLowerCase().includes(searchQuery.toLowerCase());
@@ -164,6 +283,8 @@ export default function Home() {
     const date = new Date(startTime);
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   };
+
+  const hasHuddles = publicHuddles.length > 0 || privateHuddles.length > 0;
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -190,7 +311,7 @@ export default function Home() {
       </div>
 
       <div className="px-4 space-y-8">
-        {/* Live Events Section - Always show section, even if empty */}
+        {/* Live Events Section */}
         <section>
           <div className="flex items-center gap-2 mb-4">
             <Radio className="h-5 w-5 text-destructive animate-pulse" />
@@ -233,6 +354,111 @@ export default function Home() {
           )}
         </section>
 
+        {/* My Huddles Section - Only for logged in users */}
+        {user && (
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-bold">My Huddles</h2>
+            </div>
+            
+            {huddlesLoading ? (
+              <div className="bg-card/50 rounded-xl p-6 border border-dashed border-border/50 text-center">
+                <p className="text-sm text-muted-foreground">Loading huddles...</p>
+              </div>
+            ) : !hasHuddles ? (
+              <div className="bg-card/50 rounded-xl p-6 border border-dashed border-border/50 text-center">
+                <p className="text-sm text-muted-foreground">Follow teams below to join their huddles</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Public huddles */}
+                {publicHuddles.length > 0 && (
+                  <div className="space-y-2">
+                    {publicHuddles.map(huddle => (
+                      <div 
+                        key={huddle.id}
+                        onClick={() => handleHuddleClick(huddle)}
+                        className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20 cursor-pointer hover:bg-primary/10 transition-all"
+                      >
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={huddle.team_logo_url} alt={huddle.team_name} />
+                          <AvatarFallback className="bg-primary/20 text-xs">
+                            {huddle.team_name.substring(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Globe className="h-4 w-4 text-primary" />
+                            <span className="font-medium text-foreground truncate">{huddle.team_name}</span>
+                            {huddle.unread_count && huddle.unread_count > 0 && (
+                              <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
+                                {huddle.unread_count > 99 ? '99+' : huddle.unread_count}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Private huddles */}
+                {privateHuddles.length > 0 && (
+                  <div className="space-y-2">
+                    {privateHuddles.map(huddle => (
+                      <div 
+                        key={huddle.id}
+                        onClick={() => handleHuddleClick(huddle)}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all",
+                          huddle.is_verified 
+                            ? 'bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20' 
+                            : 'bg-muted/5 border border-border/40 hover:bg-muted/10'
+                        )}
+                      >
+                        <div className={cn(
+                          "h-10 w-10 rounded-full flex items-center justify-center",
+                          huddle.is_verified ? 'bg-emerald-500/20' : 'bg-muted/20'
+                        )}>
+                          {huddle.is_verified ? (
+                            <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                          ) : (
+                            <Lock className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-foreground truncate">{huddle.name}</span>
+                            {huddle.is_verified && (
+                              <Badge variant="outline" className="h-5 px-1.5 text-[10px] border-emerald-500/50 text-emerald-500">
+                                VERIFIED
+                              </Badge>
+                            )}
+                            {huddle.unread_count && huddle.unread_count > 0 && (
+                              <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
+                                {huddle.unread_count > 99 ? '99+' : huddle.unread_count}
+                              </Badge>
+                            )}
+                          </div>
+                          {huddle.latest_message && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {huddle.latest_message.content}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          ({huddle.participant_count})
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
         {recentTeams.length > 0 && !searchQuery && (
           <section>
             <div className="flex items-center gap-2 mb-4">
@@ -262,7 +488,6 @@ export default function Home() {
             <h2 className="text-lg font-bold">Teams</h2>
           </div>
           
-          {/* League Filter Tabs */}
           <Tabs value={selectedLeague} onValueChange={setSelectedLeague} className="mb-4">
             <TabsList className="w-full justify-start overflow-x-auto flex-nowrap">
               {LEAGUES.map((league) => (

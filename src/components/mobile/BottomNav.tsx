@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { MessageSquare, User, Compass, Grid } from 'lucide-react';
+import { User, Compass, Grid } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,17 +19,16 @@ export const BottomNav = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Navigation items for logged-in users (NO SPOTLIGHT)
+  // Navigation items for logged-in users (Teams, Discover, Profile)
   const loggedInNavItems: NavItem[] = [
-    { icon: Grid, label: 'Teams', to: '/' },
-    { icon: MessageSquare, label: 'My Huddles', to: '/app' },
+    { icon: Grid, label: 'Home', to: '/' },
     { icon: Compass, label: 'Discover', to: '/huddle-search' },
     { icon: User, label: 'Profile', to: '/profile', authRequired: true },
   ];
 
-  // Navigation items for anonymous users (NO SPOTLIGHT)
+  // Navigation items for anonymous users
   const anonymousNavItems: NavItem[] = [
-    { icon: Grid, label: 'Teams', to: '/' },
+    { icon: Grid, label: 'Home', to: '/' },
     { icon: Compass, label: 'Discover', to: '/huddle-search' },
   ];
 
@@ -40,8 +39,7 @@ export const BottomNav = () => {
       <div className="glass-header border-t border-white/10">
         <div className="flex items-center justify-around px-2 py-2">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.to || 
-              (item.to === '/app' && location.pathname === '/app');
+            const isActive = location.pathname === item.to;
             
             return (
               <NavLink
