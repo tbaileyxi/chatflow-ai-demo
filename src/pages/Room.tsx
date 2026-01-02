@@ -95,8 +95,18 @@ export default function Room() {
   }, []);
 
   // Fetch or create room for this event using event_id
+  // Track if we've already initialized
+  const initRef = useRef(false);
+  
   const initializeRoom = useCallback(async () => {
     if (!eventId) return;
+    
+    // Prevent double initialization
+    if (initRef.current && room) {
+      setLoading(false);
+      return;
+    }
+    initRef.current = true;
     
     setLoading(true);
     setError(null);
@@ -152,13 +162,16 @@ export default function Room() {
         }
       }
       
-      // Step 3: Lookup huddle by event_id
-      const { data: existingHuddle } = await supabase
+      // Step 3: Lookup huddle by event_id (use maybeSingle to avoid error when not found)
+      const { data: existingHuddle, error: huddleError } = await supabase
         .from('huddles')
         .select('*')
         .eq('event_id', eventId)
-        .limit(1)
-        .single();
+        .maybeSingle();
+      
+      if (huddleError) {
+        console.error('Error looking up huddle:', huddleError);
+      }
       
       if (existingHuddle) {
         console.log('Found existing huddle by event_id:', existingHuddle.id);
@@ -247,7 +260,7 @@ export default function Room() {
     } finally {
       setLoading(false);
     }
-  }, [eventId, user]); // Remove team1, team2 from dependencies to prevent loops
+  }, [eventId, user, room]); // Include room to prevent re-run if already loaded
 
   useEffect(() => {
     initializeRoom();
