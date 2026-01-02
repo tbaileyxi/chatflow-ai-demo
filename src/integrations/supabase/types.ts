@@ -2010,6 +2010,47 @@ export type Database = {
         }
         Relationships: []
       }
+      user_badges: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          purchased_at: string
+          stripe_payment_id: string | null
+          team_id: string
+          tier: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          purchased_at?: string
+          stripe_payment_id?: string | null
+          team_id: string
+          tier: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          purchased_at?: string
+          stripe_payment_id?: string | null
+          team_id?: string
+          tier?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_badges_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_email_notifications: {
         Row: {
           created_at: string
@@ -2180,6 +2221,15 @@ export type Database = {
           display_name: string
           user_id: string
           username: string
+        }[]
+      }
+      get_user_active_badge: {
+        Args: { target_user_id: string }
+        Returns: {
+          team_id: string
+          team_logo_url: string
+          team_name: string
+          tier: string
         }[]
       }
       has_role: {
