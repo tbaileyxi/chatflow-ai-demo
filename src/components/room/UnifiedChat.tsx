@@ -3,7 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { ChatMessage } from '@/components/room/ChatMessage';
 import { RoomChatInput } from '@/components/room/RoomChatInput';
+import { DateDivider } from '@/components/chat/DateDivider';
+import { Button } from '@/components/ui/button';
+import { ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isSameDay } from 'date-fns';
 
 interface Message {
   id: string;
@@ -46,7 +50,7 @@ export const UnifiedChat = memo(function UnifiedChat({
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [reactionCounts, setReactionCounts] = useState<Record<string, Record<string, number>>>({});
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showNewMessages, setShowNewMessages] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   
   // Cache profiles and team sponsors
@@ -56,6 +60,26 @@ export const UnifiedChat = memo(function UnifiedChat({
   const lastMessageIdsRef = useRef('');
   const lastFetchRef = useRef(0);
   const THROTTLE_MS = 1000;
+  const NEAR_TOP_THRESHOLD = 120;
+
+  // Check if user is near top of chat
+  const isNearTop = useCallback(() => {
+    if (!messagesContainerRef.current) return true;
+    return messagesContainerRef.current.scrollTop < NEAR_TOP_THRESHOLD;
+  }, []);
+
+  // Scroll to top (where newest messages are)
+  const scrollToTop = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    messagesContainerRef.current?.scrollTo({ top: 0, behavior });
+    setShowNewMessages(false);
+  }, []);
+
+  // Handle scroll position
+  const handleScroll = useCallback(() => {
+    if (isNearTop()) {
+      setShowNewMessages(false);
+    }
+  }, [isNearTop]);
 
   // Fetch team sponsors
   useEffect(() => {
@@ -89,7 +113,7 @@ export const UnifiedChat = memo(function UnifiedChat({
     fetchSponsors();
   }, [team1Id, team2Id]);
 
-  // Fetch messages - ALL message types in one stream
+  // Fetch messages - DESCENDING ORDER (newest first)
   const fetchMessages = useCallback(async () => {
     const now = Date.now();
     if (now - lastFetchRef.current < THROTTLE_MS) return;
@@ -99,7 +123,7 @@ export const UnifiedChat = memo(function UnifiedChat({
       .from('huddle_messages')
       .select('*')
       .eq('huddle_id', huddleId)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(200);
 
     if (error) {
@@ -114,9 +138,9 @@ export const UnifiedChat = memo(function UnifiedChat({
 
     setMessages(data || []);
     
-    // Scroll to bottom on initial load
+    // Scroll to top on initial load (newest messages at top)
     setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      scrollToTop('auto');
     }, 100);
 
     // Fetch profiles for unknown users
@@ -149,13 +173,13 @@ export const UnifiedChat = memo(function UnifiedChat({
       });
       setReactionCounts(counts);
     }
-  }, [huddleId]);
+  }, [huddleId, scrollToTop]);
 
   useEffect(() => {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Realtime subscription - APPEND new messages
+  // Realtime subscription - PREPEND new messages (newest at top)
   useEffect(() => {
     const channel = supabase
       .channel(`unified-chat-${huddleId}`)
@@ -170,15 +194,20 @@ export const UnifiedChat = memo(function UnifiedChat({
         (payload) => {
           setMessages(prev => {
             if (prev.some(m => m.id === payload.new.id)) return prev;
-            const updated = [...prev, payload.new as Message];
+            // PREPEND new message at the beginning (newest first)
+            const updated = [payload.new as Message, ...prev];
             lastMessageIdsRef.current = updated.map(m => m.id).join(',');
             return updated;
           });
           
-          // Scroll to bottom for new messages
-          setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
+          // Auto-scroll to top if user is near top, otherwise show pill
+          if (isNearTop()) {
+            setTimeout(() => {
+              scrollToTop();
+            }, 100);
+          } else {
+            setShowNewMessages(true);
+          }
           
           // Fetch profile for new user
           const userId = payload.new.user_id;
@@ -199,7 +228,7 @@ export const UnifiedChat = memo(function UnifiedChat({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [huddleId]);
+  }, [huddleId, isNearTop, scrollToTop]);
 
   // Handle reaction
   const handleReaction = useCallback(async (messageId: string, emoji: string) => {
@@ -274,30 +303,55 @@ export const UnifiedChat = memo(function UnifiedChat({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Messages Area - scrollable */}
+      {/* New Messages Pill - shows when scrolled away from top */}
+      {showNewMessages && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20">
+          <Button
+            size="sm"
+            onClick={() => scrollToTop()}
+            className="bg-primary text-primary-foreground shadow-lg rounded-full px-4 py-2 text-sm font-medium animate-in fade-in slide-in-from-bottom-2"
+          >
+            <ChevronUp className="h-4 w-4 mr-1" />
+            New messages
+          </Button>
+        </div>
+      )}
+
+      {/* Messages Area - scrollable, TOP-DOWN (newest at top) */}
       <div 
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto px-4 py-2"
+        onScroll={handleScroll}
       >
-        {messages.map((msg) => (
-          <ChatMessage
-            key={msg.id}
-            message={msg}
-            profile={profilesCacheRef.current[msg.user_id]}
-            isOwn={msg.user_id === user?.id}
-            reactionCounts={reactionCounts[msg.id] || {}}
-            onReaction={(emoji) => handleReaction(msg.id, emoji)}
-            sponsor={getSponsorForMessage(msg)}
-          />
-        ))}
+        {messages.map((msg, index) => {
+          const prevMessage = index > 0 ? messages[index - 1] : null;
+          
+          // Show date divider when date changes (top-down: check if current differs from previous)
+          // Since newest is first, we show divider when date changes going DOWN the list
+          const showDateDivider = index === 0 || 
+            (prevMessage?.created_at && msg.created_at && 
+             !isSameDay(new Date(msg.created_at), new Date(prevMessage.created_at)));
+
+          return (
+            <React.Fragment key={msg.id}>
+              {showDateDivider && <DateDivider date={new Date(msg.created_at)} />}
+              <ChatMessage
+                message={msg}
+                profile={profilesCacheRef.current[msg.user_id]}
+                isOwn={msg.user_id === user?.id}
+                reactionCounts={reactionCounts[msg.id] || {}}
+                onReaction={(emoji) => handleReaction(msg.id, emoji)}
+                sponsor={getSponsorForMessage(msg)}
+              />
+            </React.Fragment>
+          );
+        })}
         
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
             Be the first to say something!
           </div>
         )}
-        
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Chat Input - fixed at bottom */}

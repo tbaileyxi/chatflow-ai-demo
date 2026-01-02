@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { UnifiedChat } from '@/components/room/UnifiedChat';
+import { EmotionBar } from '@/components/chat/EmotionBar';
 import { toast } from 'sonner';
 
 // Hardcoded admin emails for testing
@@ -377,13 +378,24 @@ export default function Room() {
       </header>
 
       {/* Main Chat Area - Single unified stream */}
-      <main className="flex-1 pt-16">
+      <main className="flex-1 pt-16 pb-14">
         <UnifiedChat 
           huddleId={room.id}
           team1Id={event.team1_id}
           team2Id={event.team2_id}
         />
       </main>
+
+      {/* EmotionBar - fixed at bottom */}
+      {user && (
+        <div className="fixed bottom-0 left-0 right-0 z-20 pb-safe">
+          <EmotionBar
+            onReaction={(emoji) => {
+              toast.success(`${emoji} reaction added!`);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -788,17 +788,7 @@ export const Huddle = () => {
         </div>
       </div>
 
-      {/* EmotionBar - persistent reaction bar */}
-      {user && (
-        <div className="sticky top-[52px] sm:top-[60px] z-20">
-          <EmotionBar
-            onReaction={(emoji, messageId) => {
-              toast({ title: `${emoji} reaction added!` });
-            }}
-            lastMessageId={messages[0]?.id}
-          />
-        </div>
-      )}
+{/* EmotionBar moved to bottom */}
 
       {/* Chat input - STICKY under header for top-down layout */}
       <div className={cn(
@@ -939,9 +929,21 @@ export const Huddle = () => {
         </div>
       </div>
 
+      {/* EmotionBar - fixed at bottom, above FABs */}
+      {user && (
+        <div className="fixed bottom-0 left-0 right-0 z-20 pb-safe">
+          <EmotionBar
+            onReaction={(emoji, messageId) => {
+              toast({ title: `${emoji} reaction added!` });
+            }}
+            lastMessageId={messages[0]?.id}
+          />
+        </div>
+      )}
+
       {/* Yellow FAB - bottom right, adapts to huddle type */}
       {user && (
-        <div className="fixed bottom-24 right-4 z-30 flex flex-col gap-3">
+        <div className="fixed bottom-20 right-4 z-30 flex flex-col gap-3">
           {/* Fades Lightning FAB - for private huddles AND verified huddles */}
           {(huddle?.is_private || huddle?.is_verified) && !huddle?.is_official_team_huddle && (
             <Button 
