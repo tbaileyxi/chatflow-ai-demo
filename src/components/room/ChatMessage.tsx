@@ -265,6 +265,8 @@ export const ChatMessage = memo(function ChatMessage({
   return (
     prevProps.message.id === nextProps.message.id &&
     prevProps.isOwn === nextProps.isOwn &&
+    prevProps.profile?.display_name === nextProps.profile?.display_name &&
+    prevProps.profile?.avatar_url === nextProps.profile?.avatar_url &&
     JSON.stringify(prevProps.reactionCounts) === JSON.stringify(nextProps.reactionCounts) &&
     prevProps.sponsor?.name === nextProps.sponsor?.name
   );
