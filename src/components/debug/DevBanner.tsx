@@ -27,9 +27,12 @@ export function DevBanner({
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Determine environment
+  // Determine environment - HIDE on production
   const isDev = window.location.hostname.includes('localhost') || 
                 window.location.hostname.includes('lovableproject.com');
+  
+  // Don't render on production
+  if (!isDev) return null;
 
   return (
     <>

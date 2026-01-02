@@ -12,14 +12,13 @@ interface PulseItem {
   content: string;
   media_url?: string;
   message_type: string;
-  pulse_source: 'youtube' | 'grok' | 'reddit' | 'x';
-  embed_code?: string;
+  pulse_source: 'x' | 'reddit' | 'grok';
+  embed_code: string;
   is_pulse_moment: boolean;
-  origin_team_id?: string; // For sponsorship
+  origin_team_id?: string;
 }
 
 interface InsertedBySource {
-  youtube: number;
   x: number;
   reddit: number;
   grok: number;
@@ -34,12 +33,39 @@ function detectTeamTarget(content: string, team1Name: string, team2Name: string,
   const mentionsT1 = contentLower.includes(t1Lower) || contentLower.includes(t1Lower.split(' ').pop() || '');
   const mentionsT2 = contentLower.includes(t2Lower) || contentLower.includes(t2Lower.split(' ').pop() || '');
   
-  // Only attach team if content is about ONE team specifically
   if (mentionsT1 && !mentionsT2 && team1Id) return team1Id;
   if (mentionsT2 && !mentionsT1 && team2Id) return team2Id;
   
-  // Neutral content - no sponsor
   return undefined;
+}
+
+// Generate stable hash for deduplication
+function generateStableHash(text: string, mediaUrl?: string): string {
+  const combined = `${text.slice(0, 50)}${mediaUrl || ''}`;
+  let hash = 0;
+  for (let i = 0; i < combined.length; i++) {
+    const char = combined.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(36).slice(0, 16);
+}
+
+// Decode HTML entities
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'");
+}
+
+// Truncate text to max chars
+function truncateText(text: string, maxLength: number = 180): string {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength - 3) + '...';
 }
 
 serve(async (req) => {
@@ -48,17 +74,14 @@ serve(async (req) => {
   }
 
   const queriesUsed: string[] = [];
-  let hasYoutubeKey = false;
   let hasXaiKey = false;
-  const insertedBySource: InsertedBySource = { youtube: 0, x: 0, reddit: 0, grok: 0 };
+  const insertedBySource: InsertedBySource = { x: 0, reddit: 0, grok: 0 };
 
   try {
-    const YOUTUBE_API_KEY = Deno.env.get('YOUTUBE_API_KEY');
     const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    hasYoutubeKey = !!YOUTUBE_API_KEY;
     hasXaiKey = !!XAI_API_KEY;
 
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -86,7 +109,7 @@ serve(async (req) => {
       throw new Error('Missing huddle_id');
     }
 
-    console.log('Pulse drop received:', { huddle_id, event_id, team1_name, team2_name, team1_id, team2_id, event_name, league, is_live });
+    console.log('Pulse drop received:', { huddle_id, event_id, team1_name, team2_name, is_live });
 
     // Rate limiting check (unless bypassed by admin)
     if (!bypass_rate_limit && event_id) {
@@ -111,7 +134,6 @@ serve(async (req) => {
               error: 'Rate limited - wait 3 minutes between auto-runs',
               inserted: 0,
               inserted_by_source: insertedBySource,
-              has_youtube_key: hasYoutubeKey,
               has_xai_key: hasXaiKey
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -136,7 +158,6 @@ serve(async (req) => {
             error: 'Daily limit reached (20 runs per event)',
             inserted: 0,
             inserted_by_source: insertedBySource,
-            has_youtube_key: hasYoutubeKey,
             has_xai_key: hasXaiKey
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -152,7 +173,7 @@ serve(async (req) => {
 
     const pulseItems: PulseItem[] = [];
 
-    // Build search queries
+    // Build search query
     const searchQueries: string[] = queries || [];
     
     if (searchQueries.length === 0) {
@@ -160,27 +181,25 @@ serve(async (req) => {
         searchQueries.push(search_query);
       }
       if (team1_name && team2_name) {
-        searchQueries.push(`${team1_name} vs ${team2_name} ${event_name || ''} highlights ${league || 'football'} live`);
-        searchQueries.push(`${team1_name} ${team2_name} ${event_name || ''} live`);
-        searchQueries.push(`${team1_name} ${team2_name} big play OR touchdown OR interception OR highlight`);
+        searchQueries.push(`${team1_name} vs ${team2_name} ${event_name || ''} live`);
+        searchQueries.push(`${team1_name} ${team2_name} highlights`);
       }
       if (event_name) {
-        searchQueries.push(`${event_name} ${team1_name || ''} ${team2_name || ''} highlights`);
-      }
-      if (team1_name) {
-        searchQueries.push(`${team1_name} highlights`);
+        searchQueries.push(`${event_name} ${team1_name || ''} ${team2_name || ''}`);
       }
     }
 
-    console.log('Search queries:', searchQueries);
+    const primaryQuery = searchQueries[0] || `${team1_name || 'sports'} ${team2_name || 'game'}`;
+    console.log('Primary search query:', primaryQuery);
 
-    // 1. Fetch X content via xAI - format as @coach messages
-    if (XAI_API_KEY && searchQueries.length > 0) {
+    // ============================================
+    // 1. FETCH X CONTENT via xAI Agent Tools API
+    // Using grok-4-1-fast with x_search tool
+    // ============================================
+    if (XAI_API_KEY) {
       try {
-        const xQuery = searchQueries[0];
-        queriesUsed.push(`X: ${xQuery}`);
-        
-        console.log(`X search via xAI: "${xQuery}"`);
+        queriesUsed.push(`X: ${primaryQuery}`);
+        console.log(`Calling xAI Agent Tools with x_search for: "${primaryQuery}"`);
         
         const xResponse = await fetch('https://api.x.ai/v1/chat/completions', {
           method: 'POST',
@@ -189,33 +208,35 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'grok-3-latest',
+            model: 'grok-4-1-fast',
             messages: [
               {
                 role: 'system',
-                content: `You are a sports content aggregator. Search X/Twitter for trending takes about the query. Return ONLY a JSON array of the top 5 posts. Each item: { "headline": "tweet text (max 120 chars)", "author": "username", "media_url": "image url if available" }. No markdown.`
+                content: `You are a sports content aggregator. Use x_search to find trending posts about the query. Return ONLY a valid JSON array (no markdown, no explanation). Each item: {"text":"post text max 180 chars","media_url":"image url or null"}. Return 6-10 items.`
               },
               {
                 role: 'user',
-                content: `Find the hottest takes on X about: ${xQuery}`
+                content: `Search X for the hottest takes about: ${primaryQuery}`
               }
             ],
             tools: [
               {
-                type: "function",
+                type: 'function',
                 function: {
-                  name: "x_search",
-                  description: "Search X/Twitter for recent posts",
+                  name: 'x_search',
+                  description: 'Search X/Twitter for recent posts',
                   parameters: {
-                    type: "object",
-                    properties: { query: { type: "string" } },
-                    required: ["query"]
+                    type: 'object',
+                    properties: {
+                      query: { type: 'string', description: 'Search query' }
+                    },
+                    required: ['query']
                   }
                 }
               }
             ],
-            tool_choice: "auto",
-            temperature: 0.2
+            tool_choice: 'auto',
+            temperature: 0.3
           })
         });
 
@@ -223,63 +244,76 @@ serve(async (req) => {
           const xData = await xResponse.json();
           const content = xData.choices?.[0]?.message?.content;
           
-          console.log('X/xAI raw response:', content?.slice(0, 300));
+          console.log('xAI response received, parsing...');
           
           if (content) {
             try {
-              const cleanedContent = content.replace(/```json\n?|\n?```/g, '').trim();
+              // Clean any markdown formatting
+              const cleanedContent = content
+                .replace(/```json\n?/g, '')
+                .replace(/```\n?/g, '')
+                .trim();
+              
               const items = JSON.parse(cleanedContent);
               
-              console.log(`X returned ${items.length} posts`);
-              
-              // Take only best 2 items for the chat
-              for (const item of items.slice(0, 2)) {
-                const uniqueId = btoa(`${item.author || 'anon'}-${item.headline?.slice(0, 30) || ''}`).replace(/[^a-zA-Z0-9]/g, '').slice(0, 20);
+              if (Array.isArray(items)) {
+                console.log(`X returned ${items.length} posts`);
                 
-                const { data: existing } = await supabase
-                  .from('huddle_messages')
-                  .select('id')
-                  .eq('huddle_id', huddle_id)
-                  .eq('embed_code', `x:${uniqueId}`)
-                  .limit(1);
-                
-                if (!existing || existing.length === 0) {
-                  const messageContent = `🔥 @${item.author || 'X'}: "${item.headline}"`;
+                // Take 6-10 items as @coach messages
+                for (const item of items.slice(0, 8)) {
+                  const text = truncateText(decodeHtmlEntities(item.text || ''), 180);
+                  if (!text) continue;
                   
-                  pulseItems.push({
-                    huddle_id,
-                    content: messageContent,
-                    media_url: item.media_url || undefined,
-                    message_type: 'coach_content',
-                    pulse_source: 'x',
-                    embed_code: `x:${uniqueId}`,
-                    is_pulse_moment: true,
-                    origin_team_id: detectTeamTarget(item.headline || '', team1_name || '', team2_name || '', team1_id, team2_id)
-                  });
+                  const embedCode = `x:${generateStableHash(text, item.media_url)}`;
+                  
+                  // Check for duplicates
+                  const { data: existing } = await supabase
+                    .from('huddle_messages')
+                    .select('id')
+                    .eq('huddle_id', huddle_id)
+                    .eq('embed_code', embedCode)
+                    .limit(1);
+                  
+                  if (!existing || existing.length === 0) {
+                    pulseItems.push({
+                      huddle_id,
+                      content: text,
+                      media_url: item.media_url || undefined,
+                      message_type: 'coach_content',
+                      pulse_source: 'x',
+                      embed_code: embedCode,
+                      is_pulse_moment: true,
+                      origin_team_id: detectTeamTarget(text, team1_name || '', team2_name || '', team1_id, team2_id)
+                    });
+                  }
                 }
               }
             } catch (parseError) {
-              console.error('Error parsing X response:', parseError);
+              console.error('Error parsing xAI response:', parseError, content?.slice(0, 200));
             }
           }
         } else {
-          console.error('X/xAI API error:', xResponse.status, await xResponse.text());
+          const errorText = await xResponse.text();
+          console.error('xAI API error:', xResponse.status, errorText);
         }
       } catch (xError) {
         console.error('X API error:', xError);
       }
     }
 
-    // 2. Fetch Reddit content - format as @coach messages (with proper user-agent)
-    if (searchQueries.length > 0) {
+    // ============================================
+    // 2. FETCH REDDIT CONTENT (backup source)
+    // Keep it simple, prioritize X
+    // ============================================
+    if (pulseItems.length < 4) {
       try {
-        const redditQuery = encodeURIComponent(searchQueries[0]);
-        queriesUsed.push(`Reddit: ${searchQueries[0]}`);
+        const redditQuery = encodeURIComponent(primaryQuery);
+        queriesUsed.push(`Reddit: ${primaryQuery}`);
         
-        console.log(`Reddit search: "${searchQueries[0]}"`);
+        console.log(`Reddit search: "${primaryQuery}"`);
         
         const redditResponse = await fetch(
-          `https://www.reddit.com/search.json?q=${redditQuery}&sort=new&t=day&limit=10`,
+          `https://www.reddit.com/search.json?q=${redditQuery}&sort=new&t=day&limit=5`,
           { 
             headers: { 
               'User-Agent': 'web:sidehuddle:v1.0 (by /u/sidehuddle_app)',
@@ -294,123 +328,51 @@ serve(async (req) => {
           
           console.log(`Reddit returned ${posts.length} posts`);
           
-          // Take only best 2 items
-          for (const post of posts.slice(0, 2)) {
+          for (const post of posts.slice(0, 3)) {
             const p = post.data;
-            const postId = p.id;
+            const title = decodeHtmlEntities(p.title || '');
+            if (!title) continue;
+            
+            const embedCode = `reddit:${p.id}`;
             
             const { data: existing } = await supabase
               .from('huddle_messages')
               .select('id')
               .eq('huddle_id', huddle_id)
-              .eq('embed_code', `reddit:${postId}`)
+              .eq('embed_code', embedCode)
               .limit(1);
             
             if (!existing || existing.length === 0) {
               let mediaUrl = undefined;
-              // Only use media_url for actual images/videos, NOT for link posts
               if (p.post_hint === 'image' && p.url) {
                 mediaUrl = p.url;
               } else if (p.preview?.images?.[0]?.source?.url) {
                 mediaUrl = p.preview.images[0].source.url.replace(/&amp;/g, '&');
               }
               
-              // Clean title - just the headline, no subreddit or URL
-              const messageContent = `📰 ${p.title}`;
-              
               pulseItems.push({
                 huddle_id,
-                content: messageContent,
+                content: truncateText(title, 180),
                 media_url: mediaUrl,
                 message_type: 'coach_content',
                 pulse_source: 'reddit',
-                embed_code: `reddit:${postId}`,
+                embed_code: embedCode,
                 is_pulse_moment: true,
-                origin_team_id: detectTeamTarget(p.title || '', team1_name || '', team2_name || '', team1_id, team2_id)
+                origin_team_id: detectTeamTarget(title, team1_name || '', team2_name || '', team1_id, team2_id)
               });
             }
           }
         } else {
-          console.error('Reddit API error:', redditResponse.status, await redditResponse.text());
+          console.error('Reddit API error:', redditResponse.status);
         }
       } catch (redditError) {
         console.error('Reddit API error:', redditError);
       }
     }
 
-    // 3. Fetch YouTube highlights - SKIP DURING LIVE EVENTS (per memory doc)
-    // YouTube returns irrelevant old content during live games
-    if (YOUTUBE_API_KEY && searchQueries.length > 0 && !is_live) {
-      let ytInserted = 0;
-      
-      console.log('YouTube search enabled (not a live event)');
-      
-      for (const query of searchQueries) {
-        if (ytInserted >= 1) break; // Only 1 YouTube video
-        
-        try {
-          queriesUsed.push(`YT: ${query}`);
-          
-          const searchQueryEncoded = encodeURIComponent(query);
-          
-          console.log(`YouTube search: "${query}"`);
-          
-          const ytResponse = await fetch(
-            `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${searchQueryEncoded}&type=video&order=date&maxResults=3&key=${YOUTUBE_API_KEY}`
-          );
-          
-          if (ytResponse.ok) {
-            const ytData = await ytResponse.json();
-            console.log(`YouTube returned ${ytData.items?.length || 0} videos`);
-            
-            for (const item of ytData.items || []) {
-              if (ytInserted >= 1) break;
-              
-              const videoId = item.id.videoId;
-              // Decode HTML entities in title
-              const rawTitle = item.snippet.title;
-              const title = rawTitle
-                .replace(/&quot;/g, '"')
-                .replace(/&amp;/g, '&')
-                .replace(/&lt;/g, '<')
-                .replace(/&gt;/g, '>')
-                .replace(/&#39;/g, "'");
-              
-              const { data: existing } = await supabase
-                .from('huddle_messages')
-                .select('id')
-                .eq('huddle_id', huddle_id)
-                .eq('embed_code', `youtube:${videoId}`)
-                .limit(1);
-              
-              if (!existing || existing.length === 0) {
-                const messageContent = `🎬 ${title}`;
-                
-                pulseItems.push({
-                  huddle_id,
-                  content: messageContent,
-                  media_url: `https://www.youtube.com/watch?v=${videoId}`,
-                  message_type: 'coach_content',
-                  pulse_source: 'youtube',
-                  embed_code: `youtube:${videoId}`,
-                  is_pulse_moment: true,
-                  origin_team_id: detectTeamTarget(title, team1_name || '', team2_name || '', team1_id, team2_id)
-                });
-                ytInserted++;
-              }
-            }
-          } else {
-            console.error('YouTube API error:', ytResponse.status, await ytResponse.text());
-          }
-        } catch (ytError) {
-          console.error('YouTube API error:', ytError);
-        }
-      }
-    } else if (is_live) {
-      console.log('Skipping YouTube - live event (YouTube returns irrelevant old content during games)');
-    }
-
-    // 4. Insert as @coach messages
+    // ============================================
+    // 3. INSERT AS @COACH MESSAGES
+    // ============================================
     let insertedCount = 0;
     for (const item of pulseItems) {
       const { error } = await supabase
@@ -429,7 +391,9 @@ serve(async (req) => {
       }
     }
 
-    // 5. Fallback: If no content found during live event, post a welcome/hype message
+    // ============================================
+    // 4. FALLBACK: Post hype message if no content
+    // ============================================
     if (pulseItems.length === 0 && is_live) {
       console.log('No external content found - posting fallback hype message');
       
@@ -444,7 +408,8 @@ serve(async (req) => {
         message_type: 'coach_content',
         content: fallbackMessage,
         is_pulse_moment: true,
-        pulse_source: 'grok'
+        pulse_source: 'grok',
+        embed_code: `fallback:${Date.now()}`
       });
       
       insertedCount = 1;
@@ -461,7 +426,7 @@ serve(async (req) => {
       queries_used: queriesUsed
     });
 
-    console.log(`Pulse drop complete: ${insertedCount}/${pulseItems.length} items for huddle ${huddle_id}`);
+    console.log(`Pulse drop complete: ${insertedCount}/${pulseItems.length} items`);
 
     return new Response(
       JSON.stringify({ 
@@ -469,7 +434,6 @@ serve(async (req) => {
         inserted: insertedCount,
         inserted_by_source: insertedBySource,
         total_found: pulseItems.length,
-        has_youtube_key: hasYoutubeKey,
         has_xai_key: hasXaiKey,
         queries_used: queriesUsed
       }),
@@ -483,7 +447,6 @@ serve(async (req) => {
         error: error.message,
         inserted: 0,
         inserted_by_source: insertedBySource,
-        has_youtube_key: hasYoutubeKey,
         has_xai_key: hasXaiKey,
         queries_used: queriesUsed
       }),

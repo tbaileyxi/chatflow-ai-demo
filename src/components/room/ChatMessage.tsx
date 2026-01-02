@@ -84,17 +84,7 @@ export const ChatMessage = memo(function ChatMessage({
 
   const youtubeId = message.media_url ? getYouTubeId(message.media_url) : null;
 
-  // Format source badge
-  const getSourceBadge = () => {
-    if (!message.pulse_source) return null;
-    const labels: Record<string, string> = {
-      x: 'via X',
-      reddit: 'via Reddit',
-      youtube: 'via YouTube',
-      grok: 'via X'
-    };
-    return labels[message.pulse_source] || null;
-  };
+  // REMOVED: Source badges - no longer showing "via X" etc per spec
 
   const handleReactionClick = useCallback((emoji: string) => {
     onReaction(emoji);
@@ -157,11 +147,6 @@ export const ChatMessage = memo(function ChatMessage({
               {isCoach ? '@coach' : displayName}
             </span>
             
-            {getSourceBadge() && (
-              <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
-                {getSourceBadge()}
-              </span>
-            )}
             
             <span className={cn(
               "text-[10px]",
