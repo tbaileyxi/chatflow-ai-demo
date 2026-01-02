@@ -63,6 +63,7 @@ export default function Room() {
   const navigate = useNavigate();
   const { user } = useAuth();
   
+  // ALL HOOKS MUST BE AT THE TOP - before any conditional returns
   const [room, setRoom] = useState<RoomData | null>(null);
   const [event, setEvent] = useState<EventData | null>(null);
   const [team1, setTeam1] = useState<TeamData | null>(null);
@@ -75,14 +76,20 @@ export default function Room() {
   const [lastMessageId, setLastMessageId] = useState<string | null>(null);
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  
+  // ALL REFS
   const pulseRefreshRef = useRef<(() => void) | null>(null);
+  const team1Ref = useRef<TeamData | null>(null);
+  const team2Ref = useRef<TeamData | null>(null);
+  const initRef = useRef(false);
   
   // Performance: Track renders
   useRenderCount('room');
-  
-  // Performance: Stable refs for team data to avoid dependency loops
-  const team1Ref = useRef<TeamData | null>(null);
-  const team2Ref = useRef<TeamData | null>(null);
+
+  // Stable callback for refresh ref - MUST BE BEFORE conditional returns
+  const handleRefreshRef = useCallback((fn: () => void) => {
+    pulseRefreshRef.current = fn;
+  }, []);
 
   // Get user email reliably from Supabase auth
   useEffect(() => {
@@ -95,15 +102,11 @@ export default function Room() {
   }, []);
 
   // Fetch or create room for this event using event_id
-  // Track if we've already initialized
-  const initRef = useRef(false);
-  
   const initializeRoom = useCallback(async () => {
     if (!eventId) return;
     
-    // Prevent double initialization
-    if (initRef.current && room) {
-      setLoading(false);
+    // Prevent double initialization - check initRef AND room state
+    if (initRef.current) {
       return;
     }
     initRef.current = true;
@@ -129,7 +132,7 @@ export default function Room() {
       
       setEvent(eventData as EventData);
       
-      // Step 2: Determine team IDs and fetch team data
+      // Step 2: Determine team IDs and fetch team data into LOCAL variables first
       const teamId = eventData.team1_id || eventData.team2_id;
       if (!teamId) {
         setError('Event missing team IDs');
@@ -137,7 +140,10 @@ export default function Room() {
         return;
       }
 
-      // Fetch BOTH teams
+      // Fetch teams into local vars, then set state ONCE
+      let localTeam1: TeamData | null = null;
+      let localTeam2: TeamData | null = null;
+
       if (eventData.team1_id) {
         const { data: t1 } = await supabase
           .from('teams')
@@ -145,7 +151,7 @@ export default function Room() {
           .eq('id', eventData.team1_id)
           .single();
         if (t1) {
-          setTeam1(t1);
+          localTeam1 = t1;
           team1Ref.current = t1;
         }
       }
@@ -157,10 +163,14 @@ export default function Room() {
           .eq('id', eventData.team2_id)
           .single();
         if (t2) {
-          setTeam2(t2);
+          localTeam2 = t2;
           team2Ref.current = t2;
         }
       }
+
+      // Set team state ONCE after fetching
+      setTeam1(localTeam1);
+      setTeam2(localTeam2);
       
       // Step 3: Lookup huddle by event_id (use maybeSingle to avoid error when not found)
       const { data: existingHuddle, error: huddleError } = await supabase
@@ -228,8 +238,9 @@ export default function Room() {
         // Insert bot welcome messages for NEW huddles only
         const { data: systemUser } = await supabase.rpc('get_or_create_system_user');
         if (systemUser) {
-          const t1Name = team1Ref.current?.name || eventData.name.split(' vs ')[0] || 'Team 1';
-          const t2Name = team2Ref.current?.name || eventData.name.split(' vs ')[1] || 'Team 2';
+          // Use LOCAL variables, not state (state won't be updated yet)
+          const t1Name = localTeam1?.name || eventData.name.split(' vs ')[0] || 'Team 1';
+          const t2Name = localTeam2?.name || eventData.name.split(' vs ')[1] || 'Team 2';
           
           // Welcome message
           await supabase.from('huddle_messages').insert({
@@ -260,7 +271,7 @@ export default function Room() {
     } finally {
       setLoading(false);
     }
-  }, [eventId, user, room]); // Include room to prevent re-run if already loaded
+  }, [eventId, user]); // REMOVED room from dependencies - prevents re-run loops
 
   useEffect(() => {
     initializeRoom();
@@ -303,7 +314,7 @@ export default function Room() {
   }, [team1, team2, event]);
 
   // Handle DROP PULSE button
-  const handleDropPulse = async () => {
+  const handleDropPulse = useCallback(async () => {
     if (!room || !event) {
       toast.error('Room or event data missing');
       return;
@@ -351,8 +362,13 @@ export default function Room() {
       console.error('Pulse drop error:', err);
       toast.error(`Error: ${err.message}`);
     }
-  };
+  }, [room, event, team1, team2, buildQueryLadder]);
 
+  // Derived values for rendering - computed BEFORE conditional returns
+  const team1Name = team1?.name || event?.name?.split(' vs ')[0] || 'Team 1';
+  const team2Name = team2?.name || event?.name?.split(' vs ')[1] || 'Team 2';
+
+  // CONDITIONAL RETURNS - ALL HOOKS MUST BE ABOVE THIS LINE
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center pt-6">
@@ -384,20 +400,12 @@ export default function Room() {
     );
   }
 
-  const team1Name = team1?.name || event.name.split(' vs ')[0] || 'Team 1';
-  const team2Name = team2?.name || event.name.split(' vs ')[1] || 'Team 2';
-
-  // Stable callback for refresh ref
-  const handleRefreshRef = useCallback((fn: () => void) => {
-    pulseRefreshRef.current = fn;
-  }, []);
-
   return (
     <div className="min-h-screen bg-background relative overflow-hidden pt-6">
       {/* Render Counter - Temporary for debugging */}
       <RenderCounterOverlay />
       
-      {/* Collapsible DEV Banner */}
+      {/* Collapsible DEV Banner - only in dev */}
       <DevBanner
         eventId={event.id}
         huddleId={room.id}
@@ -439,7 +447,7 @@ export default function Room() {
           </div>
           
           <div className="flex items-center gap-2">
-            {/* Drop Pulse Button - Admin only, always visible */}
+            {/* Drop Pulse Button - Admin only, always visible in header */}
             {isAdmin && (
               <Button
                 size="sm"
