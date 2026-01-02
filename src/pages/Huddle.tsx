@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { UnifiedChat } from '@/components/room/UnifiedChat';
 import { ChatBottomBar } from '@/components/room/ChatBottomBar';
+import { RoomChatInput } from '@/components/room/RoomChatInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PickEmView } from '@/components/pickem/PickEmView';
 import { useToast } from '@/hooks/use-toast';
@@ -446,7 +447,7 @@ export const Huddle = () => {
         </div>
       )}
 
-      {/* Main Chat Area - UnifiedChat component handles everything */}
+      {/* Main Chat Area - UnifiedChat component handles messages only */}
       <main className="flex-1 flex flex-col overflow-hidden">
         <UnifiedChat 
           huddleId={huddleId!}
@@ -455,17 +456,50 @@ export const Huddle = () => {
         />
       </main>
 
-      {/* ChatBottomBar - fixed at bottom, above input */}
-      {user && (
-        <div className="fixed bottom-0 left-0 right-0 z-20 pb-safe">
-          <ChatBottomBar
-            huddleId={huddleId!}
-            huddleName={huddle?.name}
-            onOpenFades={() => setShowFadesSidebar(true)}
-            onOpenFoundingModal={() => setShowFoundingModal(true)}
-          />
-        </div>
-      )}
+      {/* Fixed Bottom Section - ChatBottomBar + RoomChatInput */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-md border-t border-border/30 pb-safe">
+        {user && (
+          <>
+            <ChatBottomBar
+              huddleId={huddleId!}
+              huddleName={huddle?.name}
+              onOpenFades={() => setShowFadesSidebar(true)}
+              onOpenFoundingModal={() => setShowFoundingModal(true)}
+            />
+            <div className="px-4 py-2">
+              <RoomChatInput
+                huddleId={huddleId!}
+                userId={user.id}
+                onSendMessage={async (content, mediaUrl) => {
+                  await supabase.from('huddle_messages').insert({
+                    huddle_id: huddleId,
+                    user_id: user.id,
+                    content,
+                    media_url: mediaUrl,
+                    media_type: mediaUrl ? 'image' : 'text'
+                  });
+                }}
+                placeholder="Say something..."
+              />
+            </div>
+          </>
+        )}
+        {!user && (
+          <div className="px-4 py-3 text-center">
+            <Button 
+              onClick={() => {
+                localStorage.setItem('intended_huddle_id', huddleId!);
+                localStorage.setItem('intended_team_id', huddle?.team_id || '');
+                navigate('/auth?signup=true');
+              }}
+              variant="default" 
+              size="sm"
+            >
+              Sign in to chat
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Yellow FABs - bottom right */}
       {user && (

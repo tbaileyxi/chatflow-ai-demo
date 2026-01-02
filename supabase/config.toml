@@ -93,5 +93,8 @@ verify_jwt = false
 
 [functions.pulse-scheduler]
 verify_jwt = false
-# TODO: Revert to "*/10 * * * *" after debugging
 on_schedule = "*/5 * * * *"
+
+[functions.sync-live-scores]
+verify_jwt = false
+on_schedule = "*/2 * * * *"

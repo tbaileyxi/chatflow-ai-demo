@@ -131,18 +131,6 @@ export function RoomChatInput({
       />
 
       <div className="flex gap-2 items-end">
-        {/* Mic Button (stub) */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-10 w-10 p-0 rounded-full border border-muted-foreground/30 text-muted-foreground hover:text-primary hover:border-primary"
-          onClick={() => setShowVoiceModal(true)}
-          disabled={disabled}
-          aria-label="Voice drop"
-        >
-          <Mic className="w-5 h-5" />
-        </Button>
-
         {/* Camera Button */}
         <Button
           variant="ghost"

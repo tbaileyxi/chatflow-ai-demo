@@ -320,7 +320,7 @@ export const UnifiedChat = memo(function UnifiedChat({
       {/* Messages Area - scrollable, TOP-DOWN (newest at top) */}
       <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-2"
+        className="flex-1 overflow-y-auto px-4 py-2 pb-36"
         onScroll={handleScroll}
       >
         {messages.map((msg, index) => {
@@ -353,17 +353,9 @@ export const UnifiedChat = memo(function UnifiedChat({
           </div>
         )}
       </div>
-
-      {/* Chat Input - fixed at bottom */}
-      <div className="flex-shrink-0 px-4 py-3 border-t border-border/30 bg-background/95 backdrop-blur-md pb-safe">
-        <RoomChatInput
-          huddleId={huddleId}
-          userId={user?.id}
-          onSendMessage={handleSendMessage}
-          disabled={!user}
-          placeholder="Say something..."
-        />
-      </div>
     </div>
   );
 });
+
+// Export the handleSendMessage for external use
+export type { Message, Profile };
