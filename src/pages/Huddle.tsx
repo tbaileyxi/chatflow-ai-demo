@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { HuddlePeopleSheet } from '@/components/HuddlePeopleSheet';
 import { StartHuddleDialog } from '@/components/StartHuddleDialog';
 import { SignupPromptModal } from '@/components/SignupPromptModal';
-import { FoundingMemberModal } from '@/components/founding/FoundingMemberModal';
+import { BadgesModal } from '@/components/badges/BadgesModal';
 import { FadesSidebar } from '@/components/fades/FadesSidebar';
 import { GamePulseHeader } from '@/components/game-pulse/GamePulseHeader';
 import { ShareButton } from '@/components/ShareButton';
@@ -31,7 +31,7 @@ export const Huddle = () => {
   const [pickEmDialog, setPickEmDialog] = useState<{ open: boolean; instanceId?: string }>({ open: false });
   const [teamName, setTeamName] = useState<string>('');
   const [showSignupModal, setShowSignupModal] = useState(false);
-  const [showFoundingModal, setShowFoundingModal] = useState(false);
+  const [showBadgesModal, setShowBadgesModal] = useState(false);
   const [showFadesSidebar, setShowFadesSidebar] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
@@ -464,7 +464,7 @@ export const Huddle = () => {
               huddleId={huddleId!}
               huddleName={huddle?.name}
               onOpenFades={() => setShowFadesSidebar(true)}
-              onOpenFoundingModal={() => setShowFoundingModal(true)}
+              onOpenBadgesModal={() => setShowBadgesModal(true)}
             />
             <div className="px-4 py-2">
               <RoomChatInput
@@ -573,15 +573,10 @@ export const Huddle = () => {
         huddleId={huddleId}
       />
 
-      {/* Founding Member Modal */}
-      <FoundingMemberModal 
-        open={showFoundingModal}
-        onClose={() => {
-          setShowFoundingModal(false);
-          if (user?.id) {
-            localStorage.setItem(`sh_founding_dismissed_${user.id}`, 'true');
-          }
-        }}
+      {/* Badges Modal */}
+      <BadgesModal 
+        open={showBadgesModal}
+        onClose={() => setShowBadgesModal(false)}
       />
 
       {/* Floating Share Button */}
