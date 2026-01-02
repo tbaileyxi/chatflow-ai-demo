@@ -49,12 +49,12 @@ export const UnifiedChat = memo(function UnifiedChat({
 }: UnifiedChatProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [reactionCounts, setReactionCounts] = useState<Record<string, Record<string, number>>>({});
   const [showNewMessages, setShowNewMessages] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   
-  // Cache profiles and team sponsors
-  const profilesCacheRef = useRef<Record<string, Profile>>({});
+  // Cache team sponsors (profiles now in state for reactivity)
   const sponsorsCacheRef = useRef<Record<string, TeamSponsor | null>>({});
   const [sponsors, setSponsors] = useState<Record<string, TeamSponsor | null>>({});
   const lastMessageIdsRef = useRef('');
@@ -143,20 +143,34 @@ export const UnifiedChat = memo(function UnifiedChat({
       scrollToTop('auto');
     }, 100);
 
-    // Fetch profiles for unknown users
+    // Fetch profiles for unknown users - update state for reactivity
     const userIds = [...new Set((data || []).map(m => m.user_id))];
-    const unknownUserIds = userIds.filter(id => !profilesCacheRef.current[id]);
     
-    if (unknownUserIds.length > 0) {
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('user_id, display_name, username, avatar_url')
-        .in('user_id', unknownUserIds);
+    // Use functional update to get current profiles without adding to deps
+    setProfiles(currentProfiles => {
+      const unknownUserIds = userIds.filter(id => !currentProfiles[id]);
       
-      (profilesData || []).forEach(p => {
-        profilesCacheRef.current[p.user_id] = p;
-      });
-    }
+      if (unknownUserIds.length > 0) {
+        // Async fetch, then update
+        supabase
+          .from('profiles')
+          .select('user_id, display_name, username, avatar_url')
+          .in('user_id', unknownUserIds)
+          .then(({ data: profilesData }) => {
+            if (profilesData && profilesData.length > 0) {
+              setProfiles(prev => {
+                const updated = { ...prev };
+                profilesData.forEach(p => {
+                  updated[p.user_id] = p;
+                });
+                return updated;
+              });
+            }
+          });
+      }
+      
+      return currentProfiles; // Return unchanged for now
+    });
 
     // Batch fetch reaction counts
     const messageIds = (data || []).map(m => m.id);
@@ -209,16 +223,18 @@ export const UnifiedChat = memo(function UnifiedChat({
             setShowNewMessages(true);
           }
           
-          // Fetch profile for new user
+          // Fetch profile for new user - update state for reactivity
           const userId = payload.new.user_id;
-          if (!profilesCacheRef.current[userId]) {
+          if (!profiles[userId]) {
             supabase
               .from('profiles')
               .select('user_id, display_name, username, avatar_url')
               .eq('user_id', userId)
               .single()
               .then(({ data }) => {
-                if (data) profilesCacheRef.current[userId] = data;
+                if (data) {
+                  setProfiles(prev => ({ ...prev, [userId]: data }));
+                }
               });
           }
         }
@@ -337,7 +353,7 @@ export const UnifiedChat = memo(function UnifiedChat({
               {showDateDivider && <DateDivider date={new Date(msg.created_at)} />}
               <ChatMessage
                 message={msg}
-                profile={profilesCacheRef.current[msg.user_id]}
+                profile={profiles[msg.user_id]}
                 isOwn={msg.user_id === user?.id}
                 reactionCounts={reactionCounts[msg.id] || {}}
                 onReaction={(emoji) => handleReaction(msg.id, emoji)}
