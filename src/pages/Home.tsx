@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Radio, Flame, Clock, ChevronRight, Users, Globe, Lock, ShieldCheck } from 'lucide-react';
+import { Search, Radio, Flame, Clock, ChevronRight, Users, Globe, Lock, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BottomNav } from '@/components/mobile/BottomNav';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -284,6 +285,131 @@ export default function Home() {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   };
 
+  // My Huddles Section Component with expandable grid
+  const MyHuddlesSection = ({
+    publicHuddles,
+    privateHuddles,
+    huddlesLoading,
+    onHuddleClick
+  }: {
+    publicHuddles: Huddle[];
+    privateHuddles: Huddle[];
+    huddlesLoading: boolean;
+    onHuddleClick: (huddle: Huddle) => void;
+  }) => {
+    const [expanded, setExpanded] = useState(false);
+    const allHuddles = [...publicHuddles, ...privateHuddles];
+    const hasHuddles = allHuddles.length > 0;
+    const INITIAL_VISIBLE = 8; // 2 rows of 4
+    const showExpand = allHuddles.length > INITIAL_VISIBLE;
+    const visibleHuddles = expanded ? allHuddles : allHuddles.slice(0, INITIAL_VISIBLE);
+
+    const HuddleCard = ({ huddle }: { huddle: Huddle }) => {
+      const isPublic = huddle.is_official_team_huddle;
+      const isVerified = huddle.is_verified;
+
+      return (
+        <button
+          onClick={() => onHuddleClick(huddle)}
+          className="flex flex-col items-center gap-2 group"
+        >
+          <div className={cn(
+            "relative rounded-full transition-all duration-200 group-hover:scale-110",
+            isVerified && "ring-2 ring-emerald-500",
+            isPublic && !isVerified && "ring-2 ring-primary/50"
+          )}>
+            <Avatar className="h-14 w-14">
+              <AvatarImage src={huddle.team_logo_url} alt={huddle.name} />
+              <AvatarFallback className="text-xs bg-muted">
+                {isPublic ? (
+                  <Globe className="h-5 w-5 text-primary" />
+                ) : isVerified ? (
+                  <ShieldCheck className="h-5 w-5 text-emerald-500" />
+                ) : (
+                  <Lock className="h-5 w-5 text-muted-foreground" />
+                )}
+              </AvatarFallback>
+            </Avatar>
+            {/* Unread badge */}
+            {huddle.unread_count && huddle.unread_count > 0 && (
+              <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive flex items-center justify-center">
+                <span className="text-[10px] font-bold text-destructive-foreground">
+                  {huddle.unread_count > 9 ? '9+' : huddle.unread_count}
+                </span>
+              </div>
+            )}
+            {/* Type indicator */}
+            {isVerified && (
+              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full border-2 border-background flex items-center justify-center">
+                <ShieldCheck className="h-2.5 w-2.5 text-white" />
+              </div>
+            )}
+            {!isPublic && !isVerified && (
+              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-muted-foreground rounded-full border-2 border-background flex items-center justify-center">
+                <Lock className="h-2 w-2 text-white" />
+              </div>
+            )}
+          </div>
+          <span className="text-xs text-center max-w-[56px] truncate text-muted-foreground group-hover:text-foreground transition-colors">
+            {isPublic ? huddle.team_name.split(' ').pop() : huddle.name}
+          </span>
+        </button>
+      );
+    };
+
+    return (
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <Users className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-bold">My Huddles</h2>
+        </div>
+        
+        {huddlesLoading ? (
+          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex flex-col items-center gap-2 animate-pulse">
+                <div className="h-14 w-14 rounded-full bg-muted" />
+                <div className="h-3 w-12 bg-muted rounded" />
+              </div>
+            ))}
+          </div>
+        ) : !hasHuddles ? (
+          <div className="bg-card/50 rounded-xl p-6 border border-dashed border-border/50 text-center">
+            <p className="text-sm text-muted-foreground">Follow teams below to join their huddles</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
+              {visibleHuddles.map((huddle) => (
+                <HuddleCard key={huddle.id} huddle={huddle} />
+              ))}
+            </div>
+            {showExpand && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setExpanded(!expanded)}
+                className="w-full text-muted-foreground hover:text-foreground"
+              >
+                {expanded ? (
+                  <>
+                    <ChevronUp className="h-4 w-4 mr-1" />
+                    Show Less
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4 mr-1" />
+                    Show All ({allHuddles.length})
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        )}
+      </section>
+    );
+  };
+
   const hasHuddles = publicHuddles.length > 0 || privateHuddles.length > 0;
 
   return (
@@ -356,107 +482,12 @@ export default function Home() {
 
         {/* My Huddles Section - Only for logged in users */}
         {user && (
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Users className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-bold">My Huddles</h2>
-            </div>
-            
-            {huddlesLoading ? (
-              <div className="bg-card/50 rounded-xl p-6 border border-dashed border-border/50 text-center">
-                <p className="text-sm text-muted-foreground">Loading huddles...</p>
-              </div>
-            ) : !hasHuddles ? (
-              <div className="bg-card/50 rounded-xl p-6 border border-dashed border-border/50 text-center">
-                <p className="text-sm text-muted-foreground">Follow teams below to join their huddles</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Public huddles */}
-                {publicHuddles.length > 0 && (
-                  <div className="space-y-2">
-                    {publicHuddles.map(huddle => (
-                      <div 
-                        key={huddle.id}
-                        onClick={() => handleHuddleClick(huddle)}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20 cursor-pointer hover:bg-primary/10 transition-all"
-                      >
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={huddle.team_logo_url} alt={huddle.team_name} />
-                          <AvatarFallback className="bg-primary/20 text-xs">
-                            {huddle.team_name.substring(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <Globe className="h-4 w-4 text-primary" />
-                            <span className="font-medium text-foreground truncate">{huddle.team_name}</span>
-                            {huddle.unread_count && huddle.unread_count > 0 && (
-                              <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
-                                {huddle.unread_count > 99 ? '99+' : huddle.unread_count}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Private huddles */}
-                {privateHuddles.length > 0 && (
-                  <div className="space-y-2">
-                    {privateHuddles.map(huddle => (
-                      <div 
-                        key={huddle.id}
-                        onClick={() => handleHuddleClick(huddle)}
-                        className={cn(
-                          "flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all",
-                          huddle.is_verified 
-                            ? 'bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20' 
-                            : 'bg-muted/5 border border-border/40 hover:bg-muted/10'
-                        )}
-                      >
-                        <div className={cn(
-                          "h-10 w-10 rounded-full flex items-center justify-center",
-                          huddle.is_verified ? 'bg-emerald-500/20' : 'bg-muted/20'
-                        )}>
-                          {huddle.is_verified ? (
-                            <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                          ) : (
-                            <Lock className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-foreground truncate">{huddle.name}</span>
-                            {huddle.is_verified && (
-                              <Badge variant="outline" className="h-5 px-1.5 text-[10px] border-emerald-500/50 text-emerald-500">
-                                VERIFIED
-                              </Badge>
-                            )}
-                            {huddle.unread_count && huddle.unread_count > 0 && (
-                              <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
-                                {huddle.unread_count > 99 ? '99+' : huddle.unread_count}
-                              </Badge>
-                            )}
-                          </div>
-                          {huddle.latest_message && (
-                            <p className="text-xs text-muted-foreground truncate">
-                              {huddle.latest_message.content}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          ({huddle.participant_count})
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
+          <MyHuddlesSection
+            publicHuddles={publicHuddles}
+            privateHuddles={privateHuddles}
+            huddlesLoading={huddlesLoading}
+            onHuddleClick={handleHuddleClick}
+          />
         )}
 
         {recentTeams.length > 0 && !searchQuery && (
