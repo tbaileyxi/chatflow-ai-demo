@@ -1572,6 +1572,12 @@ export type Database = {
           queries_used: string[] | null
           ran_at: string
           source: string
+          xai_debug: Json
+          xai_has_key: boolean
+          xai_model: string | null
+          xai_tool_calls_total: number
+          xai_web_search_calls: number
+          xai_x_search_calls: number
         }
         Insert: {
           event_id?: string | null
@@ -1582,6 +1588,12 @@ export type Database = {
           queries_used?: string[] | null
           ran_at?: string
           source?: string
+          xai_debug?: Json
+          xai_has_key?: boolean
+          xai_model?: string | null
+          xai_tool_calls_total?: number
+          xai_web_search_calls?: number
+          xai_x_search_calls?: number
         }
         Update: {
           event_id?: string | null
@@ -1592,6 +1604,12 @@ export type Database = {
           queries_used?: string[] | null
           ran_at?: string
           source?: string
+          xai_debug?: Json
+          xai_has_key?: boolean
+          xai_model?: string | null
+          xai_tool_calls_total?: number
+          xai_web_search_calls?: number
+          xai_x_search_calls?: number
         }
         Relationships: [
           {
