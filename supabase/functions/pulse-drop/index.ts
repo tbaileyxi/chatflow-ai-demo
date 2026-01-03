@@ -266,44 +266,61 @@ serve(async (req) => {
         if (!xResponse.ok) {
           const errorText = await xResponse.text();
           console.error('xAI API error:', xResponse.status, errorText);
+          xaiDebug = { error: xResponse.status, error_text: errorText.slice(0, 500) };
         } else {
           const xData = await xResponse.json();
+          console.log('xAI raw response keys:', Object.keys(xData || {}));
 
-          // Prefer Responses API fields
-          const rawContent: string | undefined =
-            typeof xData?.output_text === 'string'
-              ? xData.output_text
-              : (xData?.choices?.[0]?.message?.content as string | undefined);
+          // Responses API structure: output[].content[].text (type="output_text")
+          // Also check for legacy output_text and choices format
+          let rawContent: string | undefined;
+          
+          // Try Responses API format first
+          if (Array.isArray(xData?.output)) {
+            for (const outputItem of xData.output) {
+              if (outputItem?.type === 'message' && Array.isArray(outputItem?.content)) {
+                for (const contentItem of outputItem.content) {
+                  if (contentItem?.type === 'output_text' && typeof contentItem?.text === 'string') {
+                    rawContent = contentItem.text;
+                    break;
+                  }
+                }
+              }
+              if (rawContent) break;
+            }
+          }
+          
+          // Fallback to direct output_text
+          if (!rawContent && typeof xData?.output_text === 'string') {
+            rawContent = xData.output_text;
+          }
+          
+          // Fallback to legacy chat completions format
+          if (!rawContent && xData?.choices?.[0]?.message?.content) {
+            rawContent = xData.choices[0].message.content;
+          }
 
+          // Count sources used from usage
+          const sourcesUsed = xData?.usage?.num_sources_used ?? 0;
+          
           // Best-effort: log whatever the API returns so we can prove tool usage
           xaiDebug = {
             response_keys: xData && typeof xData === 'object' ? Object.keys(xData) : [],
             model: xData?.model ?? xaiModel,
+            status: xData?.status ?? 'unknown',
             has_content: !!rawContent,
-            server_side_tool_usage: xData?.server_side_tool_usage ?? null,
-            tool_calls: xData?.tool_calls ?? null,
+            content_length: rawContent?.length ?? 0,
+            num_sources_used: sourcesUsed,
             usage: xData?.usage ?? null,
-            citations_present: Array.isArray(xData?.citations)
-              ? xData.citations.length
-              : xData?.citations
-                ? true
-                : false,
+            has_output_array: Array.isArray(xData?.output),
+            output_types: Array.isArray(xData?.output) ? xData.output.map((o: any) => o?.type) : [],
           };
-
-          // Try to count server-side tool calls if provided
-          const toolCalls: any[] = Array.isArray(xData?.tool_calls) ? xData.tool_calls : [];
-          if (toolCalls.length) {
-            xaiToolCallsTotal = toolCalls.length;
-            xaiXSearchCalls = toolCalls.filter((t) => t?.function?.name === 'x_search' || t?.name === 'x_search').length;
-            xaiWebSearchCalls = toolCalls.filter((t) => t?.function?.name === 'web_search' || t?.name === 'web_search').length;
-          } else if (xData?.server_side_tool_usage && typeof xData.server_side_tool_usage === 'object') {
-            // Some responses return aggregated counts instead of a list
-            const usage = xData.server_side_tool_usage;
-            const xs = Number((usage?.x_search?.calls ?? usage?.x_search ?? usage?.x_search_calls) || 0);
-            const ws = Number((usage?.web_search?.calls ?? usage?.web_search ?? usage?.web_search_calls) || 0);
-            xaiXSearchCalls = Number.isFinite(xs) ? xs : 0;
-            xaiWebSearchCalls = Number.isFinite(ws) ? ws : 0;
-            xaiToolCallsTotal = xaiXSearchCalls + xaiWebSearchCalls;
+          
+          // The Responses API executes x_search server-side automatically
+          // We can infer tool usage from num_sources_used > 0
+          if (sourcesUsed > 0) {
+            xaiXSearchCalls = 1; // At least one x_search was executed
+            xaiToolCallsTotal = 1;
           }
 
           if (rawContent) {
