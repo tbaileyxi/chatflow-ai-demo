@@ -68,6 +68,29 @@ function truncateText(text: string, maxLength: number = 180): string {
   return text.slice(0, maxLength - 3) + '...';
 }
 
+function safeParseJsonArray(raw: string): unknown[] | null {
+  const cleaned = raw
+    .replace(/```json\n?/g, '')
+    .replace(/```\n?/g, '')
+    .trim();
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    // Try extracting the first JSON array in the string
+    const start = cleaned.indexOf('[');
+    const end = cleaned.lastIndexOf(']');
+    if (start === -1 || end === -1 || end <= start) return null;
+    try {
+      const parsed = JSON.parse(cleaned.slice(start, end + 1));
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -75,6 +98,11 @@ serve(async (req) => {
 
   const queriesUsed: string[] = [];
   let hasXaiKey = false;
+  const xaiModel = 'grok-4-1-fast';
+  let xaiToolCallsTotal = 0;
+  let xaiXSearchCalls = 0;
+  let xaiWebSearchCalls = 0;
+  let xaiDebug: Record<string, unknown> = {};
   const insertedBySource: InsertedBySource = { x: 0, reddit: 0, grok: 0 };
 
   try {
@@ -193,181 +221,134 @@ serve(async (req) => {
     console.log('Primary search query:', primaryQuery);
 
     // ============================================
-    // 1. FETCH X CONTENT via xAI Agent Tools API
-    // Using grok-3-mini-fast with x_search tool
-    // Properly handle tool_calls loop
+    // 1. FETCH X CONTENT via xAI Agent Tools (server-side)
+    // - Use grok-4-1-fast
+    // - Enable built-in x_search (optionally web_search)
+    // - No client-side tool loop, no fake tool ACKs
+    // - Final output must be ONLY a JSON array:
+    //   [{"text":"max 180 chars","media_url":null|"url"}]
     // ============================================
     if (XAI_API_KEY) {
       try {
         queriesUsed.push(`X: ${primaryQuery}`);
-        console.log(`Calling xAI Agent Tools with x_search for: "${primaryQuery}"`);
-        
-        // Agent Tools API loop - handle tool_calls properly
-        const messages: any[] = [
+        console.log(`Calling xAI Agent Tools (server-side x_search) for: "${primaryQuery}"`);
+
+        const input: any[] = [
           {
             role: 'system',
-            content: `You are a sports content aggregator. Search X for trending posts about the query. After receiving search results, return ONLY a valid JSON array (no markdown, no explanation). Each item must have exactly these fields: {"text":"post text max 180 chars","media_url":"image url or null"}. Return 6-10 items. Do not include author names, URLs, timestamps, or any other metadata.`
+            content:
+              'You are a sports content aggregator. Use x_search to fetch recent/trending X posts for the query. Return ONLY a valid JSON array (no markdown, no prose). Each item must have exactly: {"text":"max 180 chars","media_url":null|"url"}. Return 6-10 items. Do NOT include author, url, created_at, or citations in the JSON.',
           },
           {
             role: 'user',
-            content: `Find the hottest takes and trending posts on X about: ${primaryQuery}`
-          }
+            content: `Pull the freshest X buzz (takes, memes, reactions) about: ${primaryQuery}`,
+          },
         ];
 
-        const tools = [
-          {
-            type: 'function',
-            function: {
-              name: 'x_search',
-              description: 'Search X/Twitter for recent posts matching a query',
-              parameters: {
-                type: 'object',
-                properties: {
-                  query: { type: 'string', description: 'The search query for X' }
-                },
-                required: ['query']
-              }
-            }
-          }
-        ];
+        // Built-in server-side tools (Agent Tools)
+        const tools: any[] = [{ type: 'x_search' }];
 
-        let finalContent: string | null = null;
-        let loopCount = 0;
-        const maxLoops = 3;
+        // NOTE: x_search is supported on the Responses API (Agent Tools), not legacy chat completions.
+        const xResponse = await fetch('https://api.x.ai/v1/responses', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${XAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: xaiModel,
+            input,
+            tools,
+            temperature: 0.3,
+          }),
+        });
 
-        while (loopCount < maxLoops && !finalContent) {
-          loopCount++;
-          console.log(`xAI Agent Tools loop ${loopCount}/${maxLoops}`);
-
-          const xResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${XAI_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'grok-3-mini-fast',
-              messages,
-              tools,
-              tool_choice: 'auto',
-              temperature: 0.3
-            })
-          });
-
-          if (!xResponse.ok) {
-            const errorText = await xResponse.text();
-            console.error('xAI API error:', xResponse.status, errorText);
-            break;
-          }
-
+        if (!xResponse.ok) {
+          const errorText = await xResponse.text();
+          console.error('xAI API error:', xResponse.status, errorText);
+        } else {
           const xData = await xResponse.json();
-          const choice = xData.choices?.[0];
-          const message = choice?.message;
 
-          if (!message) {
-            console.error('No message in xAI response');
-            break;
+          // Prefer Responses API fields
+          const rawContent: string | undefined =
+            typeof xData?.output_text === 'string'
+              ? xData.output_text
+              : (xData?.choices?.[0]?.message?.content as string | undefined);
+
+          // Best-effort: log whatever the API returns so we can prove tool usage
+          xaiDebug = {
+            response_keys: xData && typeof xData === 'object' ? Object.keys(xData) : [],
+            model: xData?.model ?? xaiModel,
+            has_content: !!rawContent,
+            server_side_tool_usage: xData?.server_side_tool_usage ?? null,
+            tool_calls: xData?.tool_calls ?? null,
+            usage: xData?.usage ?? null,
+            citations_present: Array.isArray(xData?.citations)
+              ? xData.citations.length
+              : xData?.citations
+                ? true
+                : false,
+          };
+
+          // Try to count server-side tool calls if provided
+          const toolCalls: any[] = Array.isArray(xData?.tool_calls) ? xData.tool_calls : [];
+          if (toolCalls.length) {
+            xaiToolCallsTotal = toolCalls.length;
+            xaiXSearchCalls = toolCalls.filter((t) => t?.function?.name === 'x_search' || t?.name === 'x_search').length;
+            xaiWebSearchCalls = toolCalls.filter((t) => t?.function?.name === 'web_search' || t?.name === 'web_search').length;
+          } else if (xData?.server_side_tool_usage && typeof xData.server_side_tool_usage === 'object') {
+            // Some responses return aggregated counts instead of a list
+            const usage = xData.server_side_tool_usage;
+            const xs = Number((usage?.x_search?.calls ?? usage?.x_search ?? usage?.x_search_calls) || 0);
+            const ws = Number((usage?.web_search?.calls ?? usage?.web_search ?? usage?.web_search_calls) || 0);
+            xaiXSearchCalls = Number.isFinite(xs) ? xs : 0;
+            xaiWebSearchCalls = Number.isFinite(ws) ? ws : 0;
+            xaiToolCallsTotal = xaiXSearchCalls + xaiWebSearchCalls;
           }
 
-          console.log('xAI response:', JSON.stringify({
-            has_content: !!message.content,
-            has_tool_calls: !!message.tool_calls,
-            tool_calls_count: message.tool_calls?.length || 0,
-            finish_reason: choice.finish_reason
-          }));
+          if (rawContent) {
+            console.log('xAI debug:', JSON.stringify(xaiDebug));
+            const items = safeParseJsonArray(rawContent);
 
-          // Check if Grok wants to call a tool
-          if (message.tool_calls && message.tool_calls.length > 0) {
-            console.log('Grok requested tool calls:', message.tool_calls.length);
-            
-            // Add assistant message with tool_calls
-            messages.push({
-              role: 'assistant',
-              content: message.content || null,
-              tool_calls: message.tool_calls
-            });
+            if (items) {
+              console.log(`X returned ${items.length} items`);
 
-            // Process each tool call
-            for (const toolCall of message.tool_calls) {
-              const toolName = toolCall.function?.name;
-              const toolArgs = JSON.parse(toolCall.function?.arguments || '{}');
-              
-              console.log(`Tool call: ${toolName}`, toolArgs);
-
-              // x_search is handled internally by xAI - we just acknowledge it
-              // The xAI API with Agent Tools executes x_search server-side
-              // We send back a confirmation that the tool was executed
-              messages.push({
-                role: 'tool',
-                tool_call_id: toolCall.id,
-                content: JSON.stringify({ 
-                  status: 'success',
-                  message: `x_search executed for query: ${toolArgs.query}` 
-                })
-              });
-            }
-          } else if (message.content) {
-            // No tool calls, we have final content
-            console.log('Received final content from xAI');
-            finalContent = message.content;
-          } else {
-            console.log('No content and no tool calls - breaking loop');
-            break;
-          }
-        }
-        
-        if (finalContent) {
-          try {
-            // Clean any markdown formatting
-            const cleanedContent = finalContent
-              .replace(/```json\n?/g, '')
-              .replace(/```\n?/g, '')
-              .trim();
-            
-            console.log('Parsing xAI content:', cleanedContent.slice(0, 200));
-            
-            const items = JSON.parse(cleanedContent);
-            
-            if (Array.isArray(items)) {
-              console.log(`X returned ${items.length} posts`);
-              
-              // Take 6-10 items as @coach messages
-              for (const item of items.slice(0, 8)) {
-                const text = truncateText(decodeHtmlEntities(item.text || ''), 180);
+              for (const item of items.slice(0, 10)) {
+                const text = truncateText(decodeHtmlEntities(String((item as any)?.text || '')), 180);
                 if (!text) continue;
-                
-                const embedCode = `x:${generateStableHash(text, item.media_url)}`;
-                
-                // Check for duplicates
+
+                const mediaUrl = (item as any)?.media_url ? String((item as any).media_url) : undefined;
+                const embedCode = `x:${generateStableHash(text, mediaUrl)}`;
+
                 const { data: existing } = await supabase
                   .from('huddle_messages')
                   .select('id')
                   .eq('huddle_id', huddle_id)
                   .eq('embed_code', embedCode)
                   .limit(1);
-                
+
                 if (!existing || existing.length === 0) {
                   pulseItems.push({
                     huddle_id,
                     content: text,
-                    media_url: item.media_url || undefined,
+                    media_url: mediaUrl,
                     message_type: 'coach_content',
                     pulse_source: 'x',
                     embed_code: embedCode,
                     is_pulse_moment: true,
-                    origin_team_id: detectTeamTarget(text, team1_name || '', team2_name || '', team1_id, team2_id)
+                    origin_team_id: detectTeamTarget(text, team1_name || '', team2_name || '', team1_id, team2_id),
                   });
                 }
               }
+            } else {
+              console.error('xAI JSON parse failed. First 400 chars:', rawContent.slice(0, 400));
             }
-          } catch (parseError) {
-            console.error('Error parsing xAI response:', parseError, finalContent?.slice(0, 200));
+          } else {
+            console.error('xAI response missing message.content');
           }
-        } else {
-          console.log('No final content from xAI after tool calls loop');
         }
       } catch (xError) {
-        console.error('X API error:', xError);
+        console.error('xAI fetch error:', xError);
       }
     }
 
@@ -493,19 +474,31 @@ serve(async (req) => {
       source: bypass_rate_limit ? 'admin' : 'auto',
       items_inserted: insertedCount,
       items_found: pulseItems.length,
-      queries_used: queriesUsed
+      queries_used: queriesUsed,
+      xai_model: xaiModel,
+      xai_tool_calls_total: xaiToolCallsTotal,
+      xai_x_search_calls: xaiXSearchCalls,
+      xai_web_search_calls: xaiWebSearchCalls,
+      xai_has_key: hasXaiKey,
+      xai_debug: xaiDebug,
     });
 
     console.log(`Pulse drop complete: ${insertedCount}/${pulseItems.length} items`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         inserted: insertedCount,
         inserted_by_source: insertedBySource,
         total_found: pulseItems.length,
         has_xai_key: hasXaiKey,
-        queries_used: queriesUsed
+        queries_used: queriesUsed,
+        debug: {
+          xai_model: xaiModel,
+          xai_tool_calls_total: xaiToolCallsTotal,
+          xai_x_search_calls: xaiXSearchCalls,
+          xai_web_search_calls: xaiWebSearchCalls,
+        },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

@@ -205,34 +205,13 @@ function meetsSpotlightQuality(post: RedditPost): boolean {
   return hasSocialSignal;
 }
 
-// Generate a curated caption using simple templates
-function generateCaption(post: RedditPost, teamName: string, includeSource: boolean = true): string {
-  const title = post.title;
-  const emojis = ['🔥', '👀', '📰', '🏈', '💪', '🗣️', '📱', '⚡'];
-  const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-  
-  // Create engaging caption - shorter for media posts
-  const maxLen = post.mediaUrl ? 80 : 100;
-  const truncatedTitle = title.length > maxLen ? title.substring(0, maxLen) + '...' : title;
-  
-  let caption = '';
-  
-  if (title.toLowerCase().includes('tweet') || title.toLowerCase().includes('twitter')) {
-    caption = `${randomEmoji} ${teamName} fan buzz: "${truncatedTitle}"`;
-  } else if (title.toLowerCase().includes('video') || title.toLowerCase().includes('clip')) {
-    caption = `🎬 ${teamName}: "${truncatedTitle}"`;
-  } else if (title.toLowerCase().includes('breaking') || title.toLowerCase().includes('news')) {
-    caption = `📢 ${teamName} News: "${truncatedTitle}"`;
-  } else {
-    caption = `${randomEmoji} From r/${teamName}: "${truncatedTitle}"`;
-  }
-  
-  // Add clean source link at the end
-  if (includeSource && post.url) {
-    caption += `\n\n🔗 [Source](${post.url})`;
-  }
-  
-  return caption;
+// Generate a caption for chat display.
+// MOBILE RULE: content must be headline/title only (no URL in text).
+function generateCaption(post: RedditPost, _teamName: string, _includeSource: boolean = true): string {
+  const maxLen = 180;
+  const title = (post.title || '').trim();
+  if (title.length <= maxLen) return title;
+  return title.substring(0, maxLen - 3) + '...';
 }
 
 // Create hash of content for deduplication
@@ -359,16 +338,23 @@ Deno.serve(async (req) => {
           // Get or create system user for bot messages
           const { data: systemUserId } = await supabase.rpc('get_or_create_system_user');
 
-          // Generate curated caption (includes source link)
-          const messageContent = generateCaption(post, teamName, true);
+          // Generate caption (title only; no URL in text)
+          const messageContent = generateCaption(post, teamName, false);
 
-          // Prepare base message data - for videos, store thumbnail + post URL for tap-to-open
+          // Prepare base message data
+          // Store link separately (embed_code + embeds) so UI never shows raw URL in text.
           const baseMessageData: Record<string, unknown> = {
             user_id: systemUserId,
             content: messageContent,
             is_bot_message: true,
             message_type: 'social_buzz',
-            origin_team_id: teamId  // Link to team for sponsor display
+            origin_team_id: teamId,
+            embed_code: `reddit:${post.id}`,
+            embeds: {
+              type: 'reddit',
+              post_url: post.url,
+              subreddit: teamSub.subreddit_name,
+            },
           };
 
           // Add media if available
