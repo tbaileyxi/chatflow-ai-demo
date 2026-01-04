@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useLiveContext, getStatusDisplay } from '@/hooks/useLiveContext';
 import { Button } from '@/components/ui/button';
 import { UnifiedChat } from '@/components/room/UnifiedChat';
 import { ChatBottomBar } from '@/components/room/ChatBottomBar';
@@ -10,6 +11,7 @@ import { RoomChatInput } from '@/components/room/RoomChatInput';
 import { FadesSidebar } from '@/components/fades/FadesSidebar';
 import { BadgesModal } from '@/components/badges/BadgesModal';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 // Hardcoded admin emails for testing
 const ADMIN_EMAILS = [
@@ -73,6 +75,9 @@ export default function Room() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showFadesSidebar, setShowFadesSidebar] = useState(false);
   const [showBadgesModal, setShowBadgesModal] = useState(false);
+  
+  // Live Context Engine - automatically detects if team is in a live game
+  const { context: liveContext } = useLiveContext(room?.id, event?.team1_id || event?.team2_id);
   
   // Refs
   const team1Ref = useRef<TeamData | null>(null);
@@ -403,8 +408,33 @@ export default function Room() {
           </Button>
           
           <div className="text-center flex-1 mx-4">
-            <h1 className="font-bold text-lg truncate">{event.name}</h1>
-            {event.status === 'live' && (
+            <div className="flex items-center justify-center gap-2">
+              <h1 className="font-bold text-lg truncate">{event.name}</h1>
+              {/* Live Context Mode Badge */}
+              {liveContext.mode === 'live' && (
+                <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground animate-pulse">
+                  {getStatusDisplay(liveContext) || 'LIVE'}
+                </span>
+              )}
+              {liveContext.mode === 'cooldown' && (
+                <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-orange-500 text-white">
+                  FINAL
+                </span>
+              )}
+            </div>
+            {/* Score display when in live/cooldown mode */}
+            {liveContext.mode !== 'normal' && liveContext.game && 
+             liveContext.game.home_score !== null && liveContext.game.away_score !== null && (
+              <p className={cn(
+                "text-sm font-bold",
+                liveContext.mode === 'live' ? "text-destructive" : "text-orange-500"
+              )}>
+                {liveContext.game.home_score} - {liveContext.game.away_score}
+                {liveContext.game.clock && ` • ${liveContext.game.clock}`}
+              </p>
+            )}
+            {/* Fallback to event status when no live context */}
+            {liveContext.mode === 'normal' && event.status === 'live' && (
               <p className="text-sm font-bold text-primary">
                 LIVE
               </p>
