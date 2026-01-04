@@ -61,7 +61,7 @@ serve(async (req) => {
       }
     }
 
-    // Create Stripe Checkout session
+    // Create Stripe Checkout session with promo code support
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -80,6 +80,7 @@ serve(async (req) => {
         },
       ],
       mode: 'payment',
+      allow_promotion_codes: true, // Enable promo codes on checkout
       success_url: `${req.headers.get('origin') || 'https://sidehuddle.com'}/?badge_success=true`,
       cancel_url: `${req.headers.get('origin') || 'https://sidehuddle.com'}/?badge_canceled=true`,
       metadata: {

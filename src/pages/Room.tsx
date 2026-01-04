@@ -404,9 +404,9 @@ export default function Room() {
           
           <div className="text-center flex-1 mx-4">
             <h1 className="font-bold text-lg truncate">{event.name}</h1>
-            {(event.status === 'live' || event.score_team1 !== null) && (
+            {event.status === 'live' && (
               <p className="text-sm font-bold text-primary">
-                {event.status === 'live' ? 'LIVE' : event.status.toUpperCase()} • {team1Name} {event.score_team1 ?? 0} – {team2Name} {event.score_team2 ?? 0}
+                LIVE
               </p>
             )}
           </div>
@@ -442,16 +442,10 @@ export default function Room() {
         />
       </main>
 
-      {/* Fixed Bottom Section - ChatBottomBar + RoomChatInput */}
+      {/* Fixed Bottom Section - RoomChatInput ABOVE ChatBottomBar */}
       <div className="fixed bottom-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-md border-t border-border/30 pb-safe">
         {user && (
           <>
-            <ChatBottomBar
-              huddleId={room.id}
-              huddleName={event.name}
-              onOpenFades={() => setShowFadesSidebar(true)}
-              onOpenBadgesModal={() => setShowBadgesModal(true)}
-            />
             <div className="px-4 py-2">
               <RoomChatInput
                 huddleId={room.id}
@@ -469,6 +463,12 @@ export default function Room() {
                 placeholder="Say something..."
               />
             </div>
+            <ChatBottomBar
+              huddleId={room.id}
+              huddleName={event.name}
+              onOpenFades={() => setShowFadesSidebar(true)}
+              onOpenBadgesModal={() => setShowBadgesModal(true)}
+            />
           </>
         )}
         {!user && (

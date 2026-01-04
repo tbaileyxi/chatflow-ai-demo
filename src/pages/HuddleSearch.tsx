@@ -2,10 +2,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -115,85 +112,69 @@ export const HuddleSearch = () => {
   };
 
   const renderHuddleCard = (huddle: Huddle) => (
-    <Card key={huddle.id} className="hover:shadow-md transition-shadow">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Avatar className="w-10 h-10">
-              <AvatarImage src={huddle.team.logo_url} />
-              <AvatarFallback>
-                {huddle.team.name.substring(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <div className="flex items-center gap-2">
-                <CardTitle className="text-base">{huddle.name}</CardTitle>
-                {huddle.is_verified && <VerifiedBadge size="sm" />}
-              </div>
-              <p className="text-sm text-muted-foreground">{huddle.team.name}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                by {huddle.owner_profile?.display_name || huddle.owner_profile?.username || "Unknown"}
-              </p>
-              {huddle.bio && (
-                <div className="mt-2">
-                  <p className={`text-xs text-muted-foreground ${expandedBio !== huddle.id ? 'line-clamp-2' : ''}`}>
-                    {huddle.bio}
-                  </p>
-                  {huddle.bio.length > 100 && (
-                    <button 
-                      onClick={() => setExpandedBio(expandedBio === huddle.id ? null : huddle.id)}
-                      className="text-xs text-primary hover:underline mt-1 font-medium"
-                    >
-                      {expandedBio === huddle.id ? 'Show less' : 'About this huddle...'}
-                    </button>
-                  )}
-                </div>
+    <div 
+      key={huddle.id} 
+      className="bg-card/50 border border-border/30 rounded-xl p-4 hover:bg-card/70 transition-all"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <Avatar className="w-12 h-12 rounded-xl ring-2 ring-primary/20">
+            <AvatarImage src={huddle.team.logo_url} />
+            <AvatarFallback className="rounded-xl bg-muted text-sm font-bold">
+              {huddle.team.name.substring(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-foreground truncate">{huddle.name}</h3>
+              {huddle.is_verified && <VerifiedBadge size="sm" />}
+            </div>
+            <p className="text-sm text-muted-foreground truncate">{huddle.team.name}</p>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Users className="w-3 h-3" />
+                {huddle.member_count}
+              </span>
+              {huddle.pricing?.is_enabled ? (
+                <span className="text-xs font-medium text-green-500">
+                  ${(huddle.pricing.price_per_month / 100).toFixed(2)}/mo
+                </span>
+              ) : (
+                <span className="text-xs font-medium text-primary">FREE</span>
               )}
             </div>
+            {huddle.bio && (
+              <div className="mt-2">
+                <p className={`text-xs text-muted-foreground ${expandedBio !== huddle.id ? 'line-clamp-2' : ''}`}>
+                  {huddle.bio}
+                </p>
+                {huddle.bio.length > 100 && (
+                  <button 
+                    onClick={() => setExpandedBio(expandedBio === huddle.id ? null : huddle.id)}
+                    className="text-xs text-primary hover:underline mt-1 font-medium"
+                  >
+                    {expandedBio === huddle.id ? 'Show less' : 'More...'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-          <HuddleJoinButton 
-            huddle={huddle} 
-            onJoinSuccess={fetchHuddles}
-            membershipRequired={huddle.pricing?.is_enabled || false}
-            membershipPrice={huddle.pricing?.price_per_month || 0}
-          />
         </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Users className="w-3 h-3" />
-            <span>{huddle.member_count} members</span>
-          </div>
-          {huddle.is_verified && (
-            <Badge variant="secondary" className="text-xs">
-              <Shield className="w-3 h-3 mr-1" />
-              Verified
-            </Badge>
-          )}
-          {huddle.pricing?.is_enabled ? (
-            <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-700 dark:text-green-400">
-              ${(huddle.pricing.price_per_month / 100).toFixed(2)}/mo
-            </Badge>
-          ) : (
-            <Badge variant="secondary" className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-400">
-              FREE
-            </Badge>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        <HuddleJoinButton 
+          huddle={huddle} 
+          onJoinSuccess={fetchHuddles}
+          membershipRequired={huddle.pricing?.is_enabled || false}
+          membershipPrice={huddle.pricing?.price_per_month || 0}
+        />
+      </div>
+    </div>
   );
 
   return (
-    <div className="min-h-screen bg-background crt-effect flex flex-col">
-      <div className="fixed inset-0 pointer-events-none opacity-10">
-        <div className="absolute inset-0 retro-grid"></div>
-        <div className="absolute inset-0 retro-scanlines"></div>
-      </div>
+    <div className="min-h-screen bg-background flex flex-col">
       <div className="relative flex flex-col h-screen">
         <GlassHeader 
-          title="Discover Verified Huddles"
+          title="Discover Huddles"
           onBack={() => window.history.back()}
         />
         
@@ -215,60 +196,60 @@ export const HuddleSearch = () => {
           </div>
         )}
         
-        <div className="flex-1 overflow-auto font-arcade pb-20">
+        <div className="flex-1 overflow-auto pb-20">
           <div className="container mx-auto p-4 max-w-4xl">
-          <div className="mb-4">
-            <p className="text-muted-foreground text-sm">
-              Browse verified team huddles. {!user && "Sign in to join and participate in conversations."}
-            </p>
-          </div>
+            <div className="mb-6">
+              <p className="text-muted-foreground text-sm">
+                Browse verified team huddles. {!user && "Sign in to join and participate in conversations."}
+              </p>
+            </div>
 
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search verified huddles or teams..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          <div className="mb-4 p-4 bg-verified-background border border-verified-border rounded-lg">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <Shield className="w-4 h-4 text-verified-primary" />
-                  <span className="font-medium text-verified-primary text-sm">Verified Huddles Only</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  These huddles have been verified and are open for join requests. All other huddles are invite-only.
-                </p>
-              </div>
-              <CreateVerifiedHuddleDialog 
-                onHuddleCreated={fetchHuddles}
-                trigger={
-                  <Button className="bg-verified-primary hover:bg-verified-primary/90 shrink-0">
-                    <Shield className="w-4 h-4 mr-2" />
-                    Create Verified
-                  </Button>
-                }
+            <div className="relative mb-6">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search verified huddles or teams..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 h-12 bg-muted/30 border-border/50 rounded-xl text-base"
               />
             </div>
-          </div>
 
-          {loading ? (
-            <div className="text-center py-8">Loading verified huddles...</div>
-          ) : (
-            <div className="grid gap-3 pb-4">
-              {filteredHuddles().length > 0 ? (
-                filteredHuddles().map(renderHuddleCard)
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  {searchQuery ? "No verified huddles found matching your search" : "No verified huddles available yet"}
+            <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-xl">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Shield className="w-4 h-4 text-primary" />
+                    <span className="font-semibold text-foreground text-sm">Verified Huddles</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    These huddles have been verified and are open for join requests.
+                  </p>
                 </div>
-              )}
+                <CreateVerifiedHuddleDialog 
+                  onHuddleCreated={fetchHuddles}
+                  trigger={
+                    <Button className="bg-primary hover:bg-primary/90 shrink-0 rounded-xl">
+                      <Shield className="w-4 h-4 mr-2" />
+                      Create
+                    </Button>
+                  }
+                />
+              </div>
             </div>
-          )}
+
+            {loading ? (
+              <div className="text-center py-8 text-muted-foreground">Loading verified huddles...</div>
+            ) : (
+              <div className="grid gap-3 pb-4">
+                {filteredHuddles().length > 0 ? (
+                  filteredHuddles().map(renderHuddleCard)
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    {searchQuery ? "No verified huddles found matching your search" : "No verified huddles available yet"}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <BottomNav />
