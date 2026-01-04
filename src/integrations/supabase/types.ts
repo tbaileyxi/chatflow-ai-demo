@@ -369,6 +369,69 @@ export type Database = {
         }
         Relationships: []
       }
+      games: {
+        Row: {
+          away_score: number | null
+          away_team_id: string | null
+          clock: string | null
+          created_at: string
+          home_score: number | null
+          home_team_id: string | null
+          id: string
+          last_synced_at: string | null
+          odds_game_id: string
+          period: string | null
+          sport_key: string
+          start_time: string
+          status: string
+        }
+        Insert: {
+          away_score?: number | null
+          away_team_id?: string | null
+          clock?: string | null
+          created_at?: string
+          home_score?: number | null
+          home_team_id?: string | null
+          id?: string
+          last_synced_at?: string | null
+          odds_game_id: string
+          period?: string | null
+          sport_key: string
+          start_time: string
+          status?: string
+        }
+        Update: {
+          away_score?: number | null
+          away_team_id?: string | null
+          clock?: string | null
+          created_at?: string
+          home_score?: number | null
+          home_team_id?: string | null
+          id?: string
+          last_synced_at?: string | null
+          odds_game_id?: string
+          period?: string | null
+          sport_key?: string
+          start_time?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "games_away_team_id_fkey"
+            columns: ["away_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "games_home_team_id_fkey"
+            columns: ["home_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       huddle_chatbot_settings: {
         Row: {
           created_at: string | null
@@ -853,8 +916,11 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          end_time: string | null
           id: string
           is_pinned: boolean | null
+          is_special_event: boolean | null
+          linked_team_ids: string[] | null
           name: string
           network: string | null
           score_team1: number | null
@@ -869,8 +935,11 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
+          end_time?: string | null
           id?: string
           is_pinned?: boolean | null
+          is_special_event?: boolean | null
+          linked_team_ids?: string[] | null
           name: string
           network?: string | null
           score_team1?: number | null
@@ -885,8 +954,11 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          end_time?: string | null
           id?: string
           is_pinned?: boolean | null
+          is_special_event?: boolean | null
+          linked_team_ids?: string[] | null
           name?: string
           network?: string | null
           score_team1?: number | null
@@ -2028,6 +2100,64 @@ export type Database = {
         }
         Relationships: []
       }
+      teams_live_state: {
+        Row: {
+          active_game_id: string | null
+          active_opponent_team_id: string | null
+          away_score: number | null
+          cooldown_ends_at: string | null
+          home_score: number | null
+          is_home_team: boolean | null
+          state: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          active_game_id?: string | null
+          active_opponent_team_id?: string | null
+          away_score?: number | null
+          cooldown_ends_at?: string | null
+          home_score?: number | null
+          is_home_team?: boolean | null
+          state?: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          active_game_id?: string | null
+          active_opponent_team_id?: string | null
+          away_score?: number | null
+          cooldown_ends_at?: string | null
+          home_score?: number | null
+          is_home_team?: boolean | null
+          state?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teams_live_state_active_game_id_fkey"
+            columns: ["active_game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_live_state_active_opponent_team_id_fkey"
+            columns: ["active_opponent_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_live_state_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_badges: {
         Row: {
           created_at: string
@@ -2241,6 +2371,7 @@ export type Database = {
           username: string
         }[]
       }
+      get_room_live_context: { Args: { p_room_id: string }; Returns: Json }
       get_user_active_badge: {
         Args: { target_user_id: string }
         Returns: {

@@ -33,10 +33,21 @@ interface LiveEvent {
   team2_id: string | null;
 }
 
+interface TeamLiveState {
+  team_id: string;
+  state: 'normal' | 'live' | 'cooldown';
+  active_opponent_team_id: string | null;
+  home_score: number | null;
+  away_score: number | null;
+  is_home_team: boolean;
+}
+
 interface TeamWithActivity extends Team {
   huddle_id?: string;
   is_active?: boolean;
   member_count?: number;
+  live_state?: TeamLiveState;
+  opponent_name?: string;
 }
 
 interface Huddle {
@@ -215,6 +226,21 @@ export default function Home() {
         .select('id, team_id, member_count, last_message_at')
         .eq('is_official_team_huddle', true)).data) || [];
 
+      // Fetch team live states
+      const { data: liveStatesData } = await supabase
+        .from('teams_live_state')
+        .select('*')
+        .in('state', ['live', 'cooldown']);
+      
+      const liveStatesMap = new Map<string, TeamLiveState>();
+      (liveStatesData || []).forEach((ls: any) => {
+        liveStatesMap.set(ls.team_id, ls);
+      });
+
+      // Create team name lookup for opponent display
+      const teamNamesMap = new Map<string, string>();
+      teamsData.forEach(t => teamNamesMap.set(t.id, t.name));
+
       const huddlesByTeam = new Map<string, HuddleRow>();
       huddlesData.forEach((h) => {
         if (h.team_id) huddlesByTeam.set(h.team_id, h);
@@ -224,6 +250,11 @@ export default function Home() {
         const huddle = huddlesByTeam.get(t.id);
         const lastMessage = huddle?.last_message_at ? new Date(huddle.last_message_at) : null;
         const isActive = lastMessage ? (Date.now() - lastMessage.getTime()) < 3600000 : false;
+        const liveState = liveStatesMap.get(t.id);
+        const opponentName = liveState?.active_opponent_team_id 
+          ? teamNamesMap.get(liveState.active_opponent_team_id) 
+          : undefined;
+        
         return {
           id: t.id,
           name: t.name,
@@ -231,8 +262,10 @@ export default function Home() {
           logo_url: t.logo_url,
           league: t.league || '',
           huddle_id: huddle?.id,
-          is_active: isActive,
-          member_count: huddle?.member_count || 0
+          is_active: isActive || liveState?.state === 'live',
+          member_count: huddle?.member_count || 0,
+          live_state: liveState,
+          opponent_name: opponentName
         };
       }).filter((t) => t.huddle_id);
 
@@ -429,11 +462,11 @@ export default function Home() {
       </div>
 
       <div className="px-4 space-y-8">
-        {/* Live Events Section */}
+        {/* Special Events Section */}
         <section>
           <div className="flex items-center gap-2 mb-4">
             <Radio className="h-5 w-5 text-destructive animate-pulse" />
-            <h2 className="text-lg font-bold">Live Events</h2>
+            <h2 className="text-lg font-bold">Special Events</h2>
           </div>
           {liveEvents.length > 0 ? (
             <div className="space-y-3">
@@ -532,18 +565,50 @@ export default function Home() {
             </div>
           ) : (
             <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
-              {filteredTeams.map((team) => (
-                <button key={team.id} onClick={() => handleTeamClick(team)} className="flex flex-col items-center gap-2 group">
-                  <div className={cn("relative rounded-full transition-all duration-200 group-hover:scale-110", team.is_active && "ring-2 ring-green-500")}>
-                    <Avatar className="h-14 w-14">
-                      <AvatarImage src={team.logo_url || undefined} alt={team.name} />
-                      <AvatarFallback className="text-xs">{team.name.slice(0, 2)}</AvatarFallback>
-                    </Avatar>
-                    {team.is_active && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />}
-                  </div>
-                  <span className="text-xs text-center max-w-[56px] truncate text-muted-foreground group-hover:text-foreground transition-colors">{team.name}</span>
-                </button>
-              ))}
+              {filteredTeams.map((team) => {
+                const isLive = team.live_state?.state === 'live';
+                const isCooldown = team.live_state?.state === 'cooldown';
+                
+                return (
+                  <button key={team.id} onClick={() => handleTeamClick(team)} className="flex flex-col items-center gap-2 group relative">
+                    <div className={cn(
+                      "relative rounded-full transition-all duration-200 group-hover:scale-110", 
+                      isLive && "ring-2 ring-destructive",
+                      isCooldown && "ring-2 ring-orange-500",
+                      team.is_active && !isLive && !isCooldown && "ring-2 ring-green-500"
+                    )}>
+                      <Avatar className="h-14 w-14">
+                        <AvatarImage src={team.logo_url || undefined} alt={team.name} />
+                        <AvatarFallback className="text-xs">{team.name.slice(0, 2)}</AvatarFallback>
+                      </Avatar>
+                      {isLive && (
+                        <div className="absolute -top-1 -right-1 px-1.5 py-0.5 bg-destructive rounded text-[8px] font-bold text-destructive-foreground animate-pulse">
+                          LIVE
+                        </div>
+                      )}
+                      {isCooldown && (
+                        <div className="absolute -top-1 -right-1 px-1 py-0.5 bg-orange-500 rounded text-[7px] font-bold text-white">
+                          FINAL
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <span className="text-xs max-w-[56px] truncate text-muted-foreground group-hover:text-foreground transition-colors block">{team.name}</span>
+                      {(isLive || isCooldown) && team.opponent_name && (
+                        <span className="text-[9px] text-muted-foreground">vs {team.opponent_name}</span>
+                      )}
+                      {(isLive || isCooldown) && team.live_state?.home_score !== null && team.live_state?.away_score !== null && (
+                        <span className={cn("text-[9px] font-semibold block", isLive ? "text-destructive" : "text-orange-500")}>
+                          {team.live_state.is_home_team 
+                            ? `${team.live_state.home_score}-${team.live_state.away_score}`
+                            : `${team.live_state.away_score}-${team.live_state.home_score}`
+                          }
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
           {!loading && filteredTeams.length === 0 && (

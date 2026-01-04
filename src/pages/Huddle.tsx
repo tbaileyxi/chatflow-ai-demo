@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useLiveContext, getStatusDisplay } from '@/hooks/useLiveContext';
 import { UnifiedChat } from '@/components/room/UnifiedChat';
 import { ChatBottomBar } from '@/components/room/ChatBottomBar';
 import { RoomChatInput } from '@/components/room/RoomChatInput';
@@ -36,6 +37,9 @@ export const Huddle = () => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [liveGame, setLiveGame] = useState<any>(null);
+
+  // Live Context Engine - automatically detects if team is in a live game
+  const { context: liveContext } = useLiveContext(huddleId, huddle?.team_id);
 
   // Check if current user is owner
   const isOwner = user?.id === huddle?.owner_id;
@@ -362,7 +366,7 @@ export const Huddle = () => {
             />
           )}
           
-          {/* Huddle name with public/private badge */}
+          {/* Huddle name with live/public/private badges */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="text-sm sm:text-base md:text-lg font-bold truncate">
@@ -370,6 +374,20 @@ export const Huddle = () => {
                   ? (huddle?.name?.replace(' Community', '') || 'Loading...')
                   : (huddle?.name || 'Loading...')}
               </h1>
+              
+              {/* Live Context Mode Badge - shows LIVE/FINAL based on game state */}
+              {liveContext.mode === 'live' && (
+                <span className="text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground animate-pulse shrink-0">
+                  {getStatusDisplay(liveContext) || 'LIVE'}
+                </span>
+              )}
+              {liveContext.mode === 'cooldown' && (
+                <span className="text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded bg-orange-500 text-white shrink-0">
+                  FINAL
+                </span>
+              )}
+              
+              {/* Public/Private badge */}
               <span className={cn(
                 "text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide shrink-0",
                 huddle?.is_private 
@@ -379,6 +397,23 @@ export const Huddle = () => {
                 {huddle?.is_private ? 'Private' : 'Public'}
               </span>
             </div>
+            
+            {/* Game info subtitle when live */}
+            {liveContext.mode !== 'normal' && liveContext.game && (
+              <div className="flex items-center gap-2 text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                {liveContext.game.home_score !== null && liveContext.game.away_score !== null && (
+                  <span className={cn(
+                    "font-bold",
+                    liveContext.mode === 'live' ? "text-destructive" : "text-orange-500"
+                  )}>
+                    {liveContext.game.home_score} - {liveContext.game.away_score}
+                  </span>
+                )}
+                {liveContext.game.clock && (
+                  <span>{liveContext.game.clock}</span>
+                )}
+              </div>
+            )}
           </div>
           
           {/* Follow button for authenticated users on public huddles */}
