@@ -7,6 +7,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
 };
 
+// Helper to get or create system user
+async function getOrCreateSystemUser(supabase: any): Promise<string> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('user_id')
+    .eq('username', 'system_bot')
+    .limit(1)
+    .single();
+  
+  return data?.user_id || '00000000-0000-0000-0000-000000000000';
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -70,6 +82,24 @@ serve(async (req) => {
 
       console.log('Processing badge purchase:', { userId, teamId, tier });
 
+      // Get team info for announcement
+      const { data: team } = await supabase
+        .from('teams')
+        .select('name, city')
+        .eq('id', teamId)
+        .single();
+
+      // Get user profile for announcement
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name, username')
+        .eq('user_id', userId)
+        .single();
+
+      const userName = profile?.display_name || profile?.username || 'A fan';
+      const teamName = team ? `${team.city} ${team.name}` : 'their team';
+      const badgeType = tier === 'superfan' ? 'Superfan' : 'Fan';
+
       // Check if user already has this badge
       const { data: existingBadge } = await supabase
         .from('user_badges')
@@ -78,6 +108,7 @@ serve(async (req) => {
         .eq('team_id', teamId)
         .single();
 
+      let isUpgrade = false;
       if (existingBadge) {
         // Upgrade existing badge if new tier is higher
         if (tier === 'superfan' && existingBadge.tier === 'basic') {
@@ -89,6 +120,7 @@ serve(async (req) => {
             })
             .eq('id', existingBadge.id);
           
+          isUpgrade = true;
           console.log('Upgraded badge to superfan');
         } else {
           console.log('Badge already exists, no update needed');
@@ -120,6 +152,33 @@ serve(async (req) => {
         }
 
         console.log('Badge created successfully, is_active:', shouldBeActive);
+      }
+
+      // Post announcement to the team's official huddle
+      const { data: officialHuddle } = await supabase
+        .from('huddles')
+        .select('id')
+        .eq('team_id', teamId)
+        .eq('is_official_team_huddle', true)
+        .limit(1)
+        .single();
+
+      if (officialHuddle) {
+        const systemUserId = await getOrCreateSystemUser(supabase);
+        const announcementText = isUpgrade 
+          ? `🏆 ${userName} just upgraded to ${teamName} ${badgeType}!`
+          : `🎉 ${userName} just got the ${teamName} ${badgeType} badge!`;
+
+        await supabase
+          .from('huddle_messages')
+          .insert({
+            huddle_id: officialHuddle.id,
+            user_id: systemUserId,
+            content: announcementText,
+            is_bot_message: true
+          });
+
+        console.log('Posted badge announcement to huddle:', officialHuddle.id);
       }
     }
 

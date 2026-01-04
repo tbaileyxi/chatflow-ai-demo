@@ -116,8 +116,11 @@ export function BadgesModal({ open, onClose, team1, team2, currentTeamId }: Badg
 
     setCheckoutLoading(`${teamId}-${tier}`);
     try {
+      // Pass the current URL so user returns here after checkout
+      const returnUrl = window.location.href.split('?')[0]; // Remove existing query params
+      
       const { data, error } = await supabase.functions.invoke('create-badge-checkout', {
-        body: { teamId, tier, userId: user.id }
+        body: { teamId, tier, userId: user.id, returnUrl }
       });
 
       if (error) throw error;
