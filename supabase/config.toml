@@ -98,3 +98,10 @@ on_schedule = "*/5 * * * *"
 [functions.sync-live-scores]
 verify_jwt = false
 on_schedule = "*/2 * * * *"
+
+[functions.create-badge-checkout]
+verify_jwt = true
+
+[functions.stripe-badge-webhook]
+verify_jwt = false
+
