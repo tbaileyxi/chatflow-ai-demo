@@ -31,7 +31,7 @@ serve(async (req) => {
       apiVersion: '2023-10-16',
     });
 
-    const { teamId, tier, userId } = await req.json();
+    const { teamId, tier, userId, returnUrl } = await req.json();
 
     if (!teamId || !tier || !userId) {
       throw new Error('Missing required fields: teamId, tier, userId');
@@ -40,6 +40,11 @@ serve(async (req) => {
     if (!BADGE_PRICES[tier]) {
       throw new Error('Invalid badge tier');
     }
+
+    // Use provided returnUrl or fallback to origin
+    const origin = req.headers.get('origin') || 'https://sidehuddle.com';
+    const successRedirect = returnUrl || origin;
+    const cancelRedirect = returnUrl || origin;
 
     // Get team name for description
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
@@ -81,8 +86,8 @@ serve(async (req) => {
       ],
       mode: 'payment',
       allow_promotion_codes: true, // Enable promo codes on checkout
-      success_url: `${req.headers.get('origin') || 'https://sidehuddle.com'}/?badge_success=true`,
-      cancel_url: `${req.headers.get('origin') || 'https://sidehuddle.com'}/?badge_canceled=true`,
+      success_url: `${successRedirect}${successRedirect.includes('?') ? '&' : '?'}badge_success=true`,
+      cancel_url: `${cancelRedirect}${cancelRedirect.includes('?') ? '&' : '?'}badge_canceled=true`,
       metadata: {
         userId,
         teamId,
