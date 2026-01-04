@@ -456,16 +456,10 @@ export const Huddle = () => {
         />
       </main>
 
-      {/* Fixed Bottom Section - ChatBottomBar + RoomChatInput */}
+      {/* Fixed Bottom Section - RoomChatInput ABOVE ChatBottomBar */}
       <div className="fixed bottom-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-md border-t border-border/30 pb-safe">
         {user && (
           <>
-            <ChatBottomBar
-              huddleId={huddleId!}
-              huddleName={huddle?.name}
-              onOpenFades={() => setShowFadesSidebar(true)}
-              onOpenBadgesModal={() => setShowBadgesModal(true)}
-            />
             <div className="px-4 py-2">
               <RoomChatInput
                 huddleId={huddleId!}
@@ -482,6 +476,12 @@ export const Huddle = () => {
                 placeholder="Say something..."
               />
             </div>
+            <ChatBottomBar
+              huddleId={huddleId!}
+              huddleName={huddle?.name}
+              onOpenFades={() => setShowFadesSidebar(true)}
+              onOpenBadgesModal={() => setShowBadgesModal(true)}
+            />
           </>
         )}
         {!user && (

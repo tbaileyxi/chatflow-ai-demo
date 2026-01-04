@@ -145,11 +145,13 @@ export function classifyRedditMedia(
     const thumbnail = embeds?.thumbnail || mediaUrl;
     const hasValidThumb = hasValidVideoThumbnail(thumbnail);
     
+    // For Reddit videos, always allow rendering even without valid thumbnail
+    // We'll show a neutral video card instead of Snoo
     return {
       type: 'video',
-      hasGuaranteedMedia: hasValidThumb,
+      hasGuaranteedMedia: true, // Always render video cards
       isExternalLink: false,
-      mediaUrl: hasValidThumb ? thumbnail : null,
+      mediaUrl: hasValidThumb ? thumbnail : null, // null = use gradient placeholder
       postUrl: embeds?.post_url || postUrl || null
     };
   }

@@ -578,9 +578,10 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
               return null;
             }
             
-            // Render video with valid thumbnail
+            // Render video - with thumbnail or gradient placeholder
             if (mediaClassification.type === 'video') {
               const postUrl = embedData?.post_url || sourceUrl;
+              const hasThumbnail = !!mediaClassification.mediaUrl;
               
               return (
                 <div className="w-full max-w-full my-3">
@@ -597,19 +598,27 @@ export const RetroMessageBubble = memo<RetroMessageBubbleProps>(({
                         "relative w-full aspect-video rounded-lg overflow-hidden border-2 cursor-pointer transition-all duration-200",
                         "border-yellow-500/40 hover:border-yellow-400/70",
                         "shadow-lg hover:shadow-yellow-500/20 hover:shadow-xl",
-                        "active:scale-[0.98]",
-                        "bg-black/90"
+                        "active:scale-[0.98]"
                       )}
                     >
-                      <img
-                        src={mediaClassification.mediaUrl || ''}
-                        alt="Video thumbnail"
-                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
-                        onError={(e) => {
-                          // On error, hide the entire container
-                          (e.target as HTMLImageElement).parentElement?.parentElement?.parentElement?.remove();
-                        }}
-                      />
+                      {hasThumbnail ? (
+                        <img
+                          src={mediaClassification.mediaUrl || ''}
+                          alt="Video thumbnail"
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                          onError={(e) => {
+                            // On error, replace with gradient
+                            const parent = (e.target as HTMLImageElement).parentElement;
+                            if (parent) {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                              parent.classList.add('bg-gradient-to-br', 'from-zinc-800', 'to-zinc-900');
+                            }
+                          }}
+                        />
+                      ) : (
+                        // Gradient placeholder for videos without thumbnail
+                        <div className="absolute inset-0 bg-gradient-to-br from-zinc-700 via-zinc-800 to-zinc-900" />
+                      )}
                       
                       {/* Dark overlay for contrast */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
