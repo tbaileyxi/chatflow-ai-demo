@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, memo, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { ChatMessage } from '@/components/room/ChatMessage';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isSameDay } from 'date-fns';
+import { useUserBadges } from '@/hooks/useUserBadges';
 
 interface Message {
   id: string;
@@ -61,6 +62,10 @@ export const UnifiedChat = memo(function UnifiedChat({
   const lastFetchRef = useRef(0);
   const THROTTLE_MS = 1000;
   const NEAR_TOP_THRESHOLD = 120;
+
+  // Fetch user badges for all message authors
+  const userIds = useMemo(() => [...new Set(messages.map(m => m.user_id))], [messages]);
+  const userBadges = useUserBadges(userIds);
 
   // Check if user is near top of chat
   const isNearTop = useCallback(() => {
@@ -358,6 +363,7 @@ export const UnifiedChat = memo(function UnifiedChat({
                 reactionCounts={reactionCounts[msg.id] || {}}
                 onReaction={(emoji) => handleReaction(msg.id, emoji)}
                 sponsor={getSponsorForMessage(msg)}
+                badge={userBadges[msg.user_id] || null}
               />
             </React.Fragment>
           );
