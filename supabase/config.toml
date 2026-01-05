@@ -109,3 +109,6 @@ verify_jwt = false
 verify_jwt = false
 on_schedule = "*/2 * * * *"
 
+[functions.xai-healthcheck]
+verify_jwt = false
+

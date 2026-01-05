@@ -4,11 +4,18 @@ import { ThumbsUp, Laugh, Eye } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { UserBadgeIcon } from '@/components/badges/UserBadgeIcon';
 
 interface Profile {
   display_name: string;
   username: string;
   avatar_url: string;
+}
+
+interface UserBadge {
+  team_id: string;
+  tier: 'basic' | 'superfan';
+  team_name?: string;
 }
 
 interface Message {
@@ -48,6 +55,7 @@ interface ChatMessageProps {
   reactionCounts: ReactionCount;
   onReaction: (emoji: string) => void;
   sponsor?: TeamSponsor | null;
+  badge?: UserBadge | null;
 }
 
 export const ChatMessage = memo(function ChatMessage({
@@ -56,7 +64,8 @@ export const ChatMessage = memo(function ChatMessage({
   isOwn,
   reactionCounts,
   onReaction,
-  sponsor
+  sponsor,
+  badge
 }: ChatMessageProps) {
   const displayName = profile?.display_name || profile?.username || 'Anonymous';
   const avatarUrl = profile?.avatar_url;
@@ -134,9 +143,9 @@ export const ChatMessage = memo(function ChatMessage({
           isCoach && "bg-gradient-to-br from-cyan-500/10 to-blue-600/10 border-2 border-cyan-500/30 shadow-lg shadow-cyan-500/10",
           isPulse && !isCoach && "bg-muted/50 border border-border/30"
         )}>
-          {/* Name + Source + Time */}
+          {/* Name + Badge + Time */}
           <div className={cn(
-            "flex items-center gap-2 mb-1 flex-wrap",
+            "flex items-center gap-1.5 mb-1 flex-wrap",
             isOwn && "justify-end"
           )}>
             <span className={cn(
@@ -147,6 +156,14 @@ export const ChatMessage = memo(function ChatMessage({
               {isCoach ? '@coach' : displayName}
             </span>
             
+            {/* Badge Icon */}
+            {badge && !isCoach && (
+              <UserBadgeIcon 
+                tier={badge.tier} 
+                teamName={badge.team_name}
+                size="sm"
+              />
+            )}
             
             <span className={cn(
               "text-[10px]",

@@ -5,6 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const XAI_BASE_URL = 'https://api.x.ai/v1';
+
 interface GrokAnalysisRequest {
   tweetContent: string;
   tweetUrl: string;
@@ -28,6 +30,82 @@ interface GrokAnalysisResponse {
   reasoning: string;
 }
 
+// Dynamically discover and choose best available model
+async function discoverBestModel(apiKey: string): Promise<{ model: string; error?: string }> {
+  const listModelsUrl = `${XAI_BASE_URL}/models`;
+  
+  console.log('[analyze-x-content-grok] Discovering models from:', listModelsUrl);
+  
+  try {
+    const response = await fetch(listModelsUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[analyze-x-content-grok] Models API error:', response.status, errorText.slice(0, 300));
+      return { model: '', error: `Models API ${response.status}: ${errorText.slice(0, 100)}` };
+    }
+
+    const modelsData = await response.json();
+    
+    // Extract model IDs
+    let modelIds: string[] = [];
+    if (Array.isArray(modelsData)) {
+      modelIds = modelsData.map((m: any) => m.id || m.name).filter(Boolean);
+    } else if (modelsData.data && Array.isArray(modelsData.data)) {
+      modelIds = modelsData.data.map((m: any) => m.id || m.name).filter(Boolean);
+    } else if (modelsData.models && Array.isArray(modelsData.models)) {
+      modelIds = modelsData.models.map((m: any) => m.id || m.name).filter(Boolean);
+    }
+
+    console.log('[analyze-x-content-grok] Available models:', modelIds);
+
+    // Filter for grok models
+    const grokModels = modelIds.filter(id => id.toLowerCase().includes('grok'));
+    
+    // Preference order for analysis tasks (prefer capable models)
+    const modelPreference = [
+      'grok-2-latest',
+      'grok-2',
+      'grok-2-1212',
+      'grok-3',
+      'grok-3-fast',
+      'grok-2-mini',
+      'grok-1',
+    ];
+
+    for (const preferred of modelPreference) {
+      const found = grokModels.find(m => m.toLowerCase().includes(preferred.toLowerCase()));
+      if (found) {
+        console.log('[analyze-x-content-grok] Chosen model:', found);
+        return { model: found };
+      }
+    }
+
+    // Fallback to any grok model
+    if (grokModels.length > 0) {
+      console.log('[analyze-x-content-grok] Fallback to first grok model:', grokModels[0]);
+      return { model: grokModels[0] };
+    }
+
+    // Fallback to any model
+    if (modelIds.length > 0) {
+      console.log('[analyze-x-content-grok] Fallback to first available model:', modelIds[0]);
+      return { model: modelIds[0] };
+    }
+
+    return { model: '', error: 'No models available' };
+  } catch (error: any) {
+    console.error('[analyze-x-content-grok] Model discovery error:', error);
+    return { model: '', error: error.message };
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -46,6 +124,14 @@ serve(async (req) => {
     const now = Date.now();
     const hoursOld = (now - tweetTime) / (1000 * 60 * 60);
     const recencyBonus = hoursOld < 6 ? 15 : hoursOld < 24 ? 10 : 0;
+
+    // Discover best available model dynamically
+    const { model: chosenModel, error: modelError } = await discoverBestModel(xaiApiKey);
+    
+    if (!chosenModel) {
+      console.error('[analyze-x-content-grok] No model available:', modelError);
+      throw new Error(`No xAI model available: ${modelError}`);
+    }
 
     // Build analysis prompt
     const systemPrompt = `You are an NFL/NCAA sports content analyzer. Analyze tweets and return ONLY valid JSON (no markdown, no code blocks).
@@ -98,33 +184,40 @@ Age: ${Math.round(hoursOld)} hours old
 
 Apply quality scoring rules (media posts get higher base scores). Return JSON only.`;
 
-    console.log('[Grok] Analyzing tweet:', {
+    console.log('[analyze-x-content-grok] Analyzing tweet:', {
       author: requestData.authorUsername,
       hasMedia: requestData.hasMedia,
       mediaType: requestData.mediaType,
-      hoursOld: Math.round(hoursOld)
+      hoursOld: Math.round(hoursOld),
+      chosenModel
     });
 
-    const response = await fetch('https://api.x.ai/v1/chat/completions', {
+    const chatUrl = `${XAI_BASE_URL}/chat/completions`;
+    console.log('[analyze-x-content-grok] Chat URL:', chatUrl, 'Model:', chosenModel);
+
+    const response = await fetch(chatUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${xaiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'grok-2-1212',
+        model: chosenModel,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.3,
-        response_format: { type: "json_object" }
+        // Only use response_format if model supports it (grok-2+ models)
+        ...(chosenModel.includes('grok-2') || chosenModel.includes('grok-3') 
+          ? { response_format: { type: "json_object" } } 
+          : {})
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[Grok] API Error:', response.status, errorText);
+      console.error('[analyze-x-content-grok] API Error:', response.status, errorText.slice(0, 300));
       throw new Error(`Grok API error: ${response.status}`);
     }
 
@@ -135,14 +228,19 @@ Apply quality scoring rules (media posts get higher base scores). Return JSON on
       throw new Error('No content in Grok response');
     }
 
-    console.log('[Grok] Raw response:', grokContent);
+    console.log('[analyze-x-content-grok] Raw response:', grokContent.slice(0, 500));
 
     // Parse Grok response
     let analysis: GrokAnalysisResponse;
     try {
-      analysis = JSON.parse(grokContent);
+      // Try to extract JSON from response (handle potential markdown wrapping)
+      let jsonStr = grokContent.trim();
+      if (jsonStr.startsWith('```')) {
+        jsonStr = jsonStr.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
+      }
+      analysis = JSON.parse(jsonStr);
     } catch (parseError) {
-      console.error('[Grok] Failed to parse response:', grokContent);
+      console.error('[analyze-x-content-grok] Failed to parse response:', grokContent.slice(0, 200));
       // Return default low-quality score on parse error
       analysis = {
         team_ids: [],
@@ -157,11 +255,12 @@ Apply quality scoring rules (media posts get higher base scores). Return JSON on
     // Apply recency bonus
     analysis.quality_score = Math.min(100, analysis.quality_score + recencyBonus);
 
-    console.log('[Grok] Final analysis:', {
+    console.log('[analyze-x-content-grok] Final analysis:', {
       quality_score: analysis.quality_score,
       has_teams: analysis.team_ids.length > 0,
       highlight_worthy: analysis.highlight_worthy,
-      topics: analysis.topics
+      topics: analysis.topics,
+      model_used: chosenModel
     });
 
     return new Response(JSON.stringify(analysis), {
@@ -169,7 +268,7 @@ Apply quality scoring rules (media posts get higher base scores). Return JSON on
     });
 
   } catch (error: any) {
-    console.error('[Grok] Error:', error);
+    console.error('[analyze-x-content-grok] Error:', error);
     return new Response(JSON.stringify({ 
       error: error.message,
       team_ids: [],
