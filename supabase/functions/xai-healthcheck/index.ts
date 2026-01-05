@@ -7,26 +7,25 @@ const corsHeaders = {
 
 const XAI_BASE_URL = 'https://api.x.ai/v1';
 
-// Priority order for model selection
+// Priority order for model selection - EXACT match preference
 const MODEL_PRIORITY = [
   'grok-3.1-fast',
-  'grok-4',
   'grok-3.1',
   'grok-3-fast',
   'grok-3',
-  'grok-2-latest',
-  'grok-2',
 ];
 
 function selectBestModel(modelIds: string[]): string | null {
-  const lowerModels = modelIds.map(id => id.toLowerCase());
-  
-  // Check priority list first
+  // First pass: exact match from priority list
   for (const preferred of MODEL_PRIORITY) {
-    const idx = lowerModels.findIndex(m => m === preferred.toLowerCase() || m.includes(preferred.toLowerCase()));
-    if (idx !== -1) {
-      return modelIds[idx];
-    }
+    const exact = modelIds.find(m => m.toLowerCase() === preferred.toLowerCase());
+    if (exact) return exact;
+  }
+  
+  // Second pass: partial match from priority list
+  for (const preferred of MODEL_PRIORITY) {
+    const partial = modelIds.find(m => m.toLowerCase().includes(preferred.toLowerCase()));
+    if (partial) return partial;
   }
   
   // Fallback: any model containing "grok"
@@ -44,9 +43,10 @@ serve(async (req) => {
 
   const results: Record<string, any> = {
     timestamp: new Date().toISOString(),
+    ok: false,
     xai_api_key_present: false,
     models_status: null,
-    model_ids: [],
+    models: [],
     chosen_model: null,
     chat_status: null,
     chat_snippet: null,
@@ -58,7 +58,8 @@ serve(async (req) => {
     results.xai_api_key_present = !!xaiApiKey;
 
     if (!xaiApiKey) {
-      results.errors.push('XAI_API_KEY not configured');
+      results.errors.push('XAI_API_KEY is not configured in Supabase secrets. Add it at: Supabase Dashboard > Settings > Secrets');
+      console.error('[xai-healthcheck] XAI_API_KEY missing');
       return new Response(JSON.stringify(results), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -69,20 +70,31 @@ serve(async (req) => {
     const listModelsUrl = `${XAI_BASE_URL}/models`;
     console.log('[xai-healthcheck] Fetching models from:', listModelsUrl);
 
-    const modelsResponse = await fetch(listModelsUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${xaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    let modelsResponse: Response;
+    try {
+      modelsResponse = await fetch(listModelsUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${xaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (fetchError: any) {
+      results.errors.push(`Network error fetching models: ${fetchError.message}`);
+      console.error('[xai-healthcheck] Network error:', fetchError);
+      return new Response(JSON.stringify(results), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     results.models_status = modelsResponse.status;
 
     if (!modelsResponse.ok) {
       const errorText = await modelsResponse.text();
-      console.error('[xai-healthcheck] Models API error:', modelsResponse.status, errorText.slice(0, 500));
-      results.errors.push(`Models API error: ${modelsResponse.status} - ${errorText.slice(0, 300)}`);
+      const errorSnippet = errorText.slice(0, 1500);
+      console.error('[xai-healthcheck] Models API error:', modelsResponse.status, errorSnippet);
+      results.errors.push(`Models API error ${modelsResponse.status}: ${errorSnippet}`);
       
       return new Response(JSON.stringify(results), {
         status: 200,
@@ -91,9 +103,9 @@ serve(async (req) => {
     }
 
     const modelsData = await modelsResponse.json();
-    console.log('[xai-healthcheck] Models response:', JSON.stringify(modelsData).slice(0, 800));
+    console.log('[xai-healthcheck] Models response structure:', Object.keys(modelsData));
 
-    // Extract model IDs - handle both array and object with data property
+    // Extract model IDs - handle different API response formats
     let modelIds: string[] = [];
     if (Array.isArray(modelsData)) {
       modelIds = modelsData.map((m: any) => m.id || m.name).filter(Boolean);
@@ -103,7 +115,7 @@ serve(async (req) => {
       modelIds = modelsData.models.map((m: any) => m.id || m.name).filter(Boolean);
     }
 
-    results.model_ids = modelIds;
+    results.models = modelIds;
     console.log('[xai-healthcheck] Available models:', modelIds);
 
     // Step 2: Choose the best model using priority list
@@ -112,7 +124,7 @@ serve(async (req) => {
     console.log('[xai-healthcheck] Chosen model:', chosenModel);
 
     if (!chosenModel) {
-      results.errors.push('No suitable model found in available models');
+      results.errors.push('No suitable model found. Available models: ' + modelIds.join(', '));
       return new Response(JSON.stringify(results), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -123,32 +135,46 @@ serve(async (req) => {
     const chatUrl = `${XAI_BASE_URL}/chat/completions`;
     console.log('[xai-healthcheck] Testing chat at:', chatUrl, 'with model:', chosenModel);
 
-    const chatResponse = await fetch(chatUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${xaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: chosenModel,
-        messages: [
-          { role: 'user', content: 'Say OK.' }
-        ],
-        max_tokens: 5
-      }),
-    });
+    let chatResponse: Response;
+    try {
+      chatResponse = await fetch(chatUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${xaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: chosenModel,
+          messages: [
+            { role: 'user', content: 'Say OK.' }
+          ],
+          max_tokens: 5
+        }),
+      });
+    } catch (fetchError: any) {
+      results.errors.push(`Network error during chat test: ${fetchError.message}`);
+      console.error('[xai-healthcheck] Chat network error:', fetchError);
+      return new Response(JSON.stringify(results), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     results.chat_status = chatResponse.status;
 
     if (!chatResponse.ok) {
       const errorText = await chatResponse.text();
-      console.error('[xai-healthcheck] Chat API error:', chatResponse.status, errorText.slice(0, 500));
-      results.errors.push(`Chat API error: ${chatResponse.status} - ${errorText.slice(0, 300)}`);
+      const errorSnippet = errorText.slice(0, 1500);
+      console.error('[xai-healthcheck] Chat API error:', chatResponse.status, errorSnippet);
+      results.errors.push(`Chat API error ${chatResponse.status}: ${errorSnippet}`);
     } else {
       const chatData = await chatResponse.json();
       const content = chatData.choices?.[0]?.message?.content || '';
       results.chat_snippet = content.slice(0, 200);
       console.log('[xai-healthcheck] Chat response:', content);
+      
+      // Mark as OK only if both models and chat succeeded
+      results.ok = true;
     }
 
     return new Response(JSON.stringify(results), {
@@ -158,7 +184,7 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('[xai-healthcheck] Unexpected error:', error);
-    results.errors.push(error.message || 'Unknown error');
+    results.errors.push(`Unexpected error: ${error.message || 'Unknown error'}`);
     
     return new Response(JSON.stringify(results), {
       status: 200,

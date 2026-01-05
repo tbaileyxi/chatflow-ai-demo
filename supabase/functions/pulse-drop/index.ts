@@ -7,6 +7,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const XAI_BASE_URL = 'https://api.x.ai/v1';
+
+// Priority order for model selection
+// For Responses API with tools (x_search), only grok-4 family is supported
+const MODEL_PRIORITY_WITH_TOOLS = [
+  'grok-4-1-fast',
+  'grok-4-0709',
+  'grok-4',
+];
+
+// For chat completions without tools
+const MODEL_PRIORITY = [
+  'grok-3.1-fast',
+  'grok-3.1',
+  'grok-3-fast',
+  'grok-3',
+];
+
 interface PulseItem {
   huddle_id: string;
   content: string;
@@ -24,7 +42,76 @@ interface InsertedBySource {
   grok: number;
 }
 
-// Detect if content is about a specific team (for sponsorship)
+// Model selection with priority (for tools, prefer grok-4 family)
+function selectBestModel(modelIds: string[], forTools: boolean = false): string | null {
+  const priorityList = forTools ? MODEL_PRIORITY_WITH_TOOLS : MODEL_PRIORITY;
+  
+  for (const preferred of priorityList) {
+    const exact = modelIds.find(m => m.toLowerCase() === preferred.toLowerCase());
+    if (exact) return exact;
+  }
+  for (const preferred of priorityList) {
+    const partial = modelIds.find(m => m.toLowerCase().includes(preferred.toLowerCase()));
+    if (partial) return partial;
+  }
+  
+  // For tools, must use grok-4 family
+  if (forTools) {
+    const grok4Model = modelIds.find(id => id.toLowerCase().includes('grok-4'));
+    if (grok4Model) return grok4Model;
+    return null; // Cannot use tools without grok-4
+  }
+  
+  const grokModel = modelIds.find(id => id.toLowerCase().includes('grok'));
+  if (grokModel) return grokModel;
+  return modelIds.length > 0 ? modelIds[0] : null;
+}
+
+// In-memory cache for models
+let cachedModels: { models: string[]; chosenModel: string | null; timestamp: number } | null = null;
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+async function discoverModels(apiKey: string, forTools: boolean = false): Promise<{ models: string[]; chosenModel: string | null; error?: string }> {
+  // Check cache
+  if (cachedModels && (Date.now() - cachedModels.timestamp) < CACHE_TTL_MS) {
+    const chosenModel = selectBestModel(cachedModels.models, forTools);
+    return { models: cachedModels.models, chosenModel };
+  }
+
+  try {
+    const response = await fetch(`${XAI_BASE_URL}/models`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[pulse-drop] Models API error:', response.status, errorText.slice(0, 1000));
+      return { models: [], chosenModel: null, error: `Models API ${response.status}: ${errorText.slice(0, 500)}` };
+    }
+
+    const data = await response.json();
+    let modelIds: string[] = [];
+    if (Array.isArray(data)) {
+      modelIds = data.map((m: any) => m.id || m.name).filter(Boolean);
+    } else if (data.data && Array.isArray(data.data)) {
+      modelIds = data.data.map((m: any) => m.id || m.name).filter(Boolean);
+    }
+
+    const chosenModel = selectBestModel(modelIds, forTools);
+    cachedModels = { models: modelIds, chosenModel, timestamp: Date.now() };
+    console.log('[pulse-drop] Discovered models:', modelIds.length, 'Chosen:', chosenModel, 'forTools:', forTools);
+    return { models: modelIds, chosenModel };
+  } catch (e: any) {
+    console.error('[pulse-drop] Model discovery error:', e);
+    return { models: [], chosenModel: null, error: e.message };
+  }
+}
+
+// Detect if content is about a specific team
 function detectTeamTarget(content: string, team1Name: string, team2Name: string, team1Id?: string, team2Id?: string): string | undefined {
   const contentLower = content.toLowerCase();
   const t1Lower = team1Name.toLowerCase();
@@ -78,7 +165,6 @@ function safeParseJsonArray(raw: string): unknown[] | null {
     const parsed = JSON.parse(cleaned);
     return Array.isArray(parsed) ? parsed : null;
   } catch {
-    // Try extracting the first JSON array in the string
     const start = cleaned.indexOf('[');
     const end = cleaned.lastIndexOf(']');
     if (start === -1 || end === -1 || end <= start) return null;
@@ -98,7 +184,7 @@ serve(async (req) => {
 
   const queriesUsed: string[] = [];
   let hasXaiKey = false;
-  const xaiModel = 'grok-4-1-fast';
+  let xaiModel: string | null = null;
   let xaiToolCallsTotal = 0;
   let xaiXSearchCalls = 0;
   let xaiWebSearchCalls = 0;
@@ -137,7 +223,7 @@ serve(async (req) => {
       throw new Error('Missing huddle_id');
     }
 
-    console.log('Pulse drop received:', { huddle_id, event_id, team1_name, team2_name, is_live });
+    console.log('[pulse-drop] Received:', { huddle_id, event_id, team1_name, team2_name, is_live });
 
     // Rate limiting check (unless bypassed by admin)
     if (!bypass_rate_limit && event_id) {
@@ -155,7 +241,7 @@ serve(async (req) => {
         const threeMinutes = 3 * 60 * 1000;
         
         if (now - lastRunTime < threeMinutes) {
-          console.log('Rate limited - last run was less than 3 minutes ago');
+          console.log('[pulse-drop] Rate limited');
           return new Response(
             JSON.stringify({ 
               success: false, 
@@ -179,7 +265,7 @@ serve(async (req) => {
         .gte('ran_at', today.toISOString());
 
       if ((dailyRuns || 0) >= 20) {
-        console.log('Rate limited - max 20 runs per day reached');
+        console.log('[pulse-drop] Daily limit reached');
         return new Response(
           JSON.stringify({ 
             success: false, 
@@ -218,167 +304,187 @@ serve(async (req) => {
     }
 
     const primaryQuery = searchQueries[0] || `${team1_name || 'sports'} ${team2_name || 'game'}`;
-    console.log('Primary search query:', primaryQuery);
+    console.log('[pulse-drop] Primary query:', primaryQuery);
 
     // ============================================
-    // 1. FETCH X CONTENT via xAI Agent Tools (server-side)
-    // - Use grok-4-1-fast
-    // - Enable built-in x_search (optionally web_search)
-    // - No client-side tool loop, no fake tool ACKs
-    // - Final output must be ONLY a JSON array:
-    //   [{"text":"max 180 chars","media_url":null|"url"}]
+    // 1. FETCH BUZZ via xAI (dynamic model selection)
     // ============================================
     if (XAI_API_KEY) {
-      try {
-        queriesUsed.push(`X: ${primaryQuery}`);
-        console.log(`Calling xAI Agent Tools (server-side x_search) for: "${primaryQuery}"`);
+      // Discover models dynamically - use forTools=true for Responses API with x_search
+      const { models, chosenModel, error: modelError } = await discoverModels(XAI_API_KEY, true);
+      
+      if (modelError) {
+        console.error('[pulse-drop] Model discovery failed:', modelError);
+        xaiDebug = { model_error: modelError };
+      } else if (!chosenModel) {
+        console.error('[pulse-drop] No suitable model found');
+        xaiDebug = { model_error: 'No suitable model', available_models: models };
+      } else {
+        xaiModel = chosenModel;
+        console.log('[pulse-drop] Using model:', chosenModel);
 
-        const input: any[] = [
-          {
-            role: 'system',
-            content:
-              'You are a sports content aggregator. Use x_search to fetch recent/trending X posts for the query. Return ONLY a valid JSON array (no markdown, no prose). Each item must have exactly: {"text":"max 180 chars","media_url":null|"url"}. Return 6-10 items. Do NOT include author, url, created_at, or citations in the JSON.',
-          },
-          {
-            role: 'user',
-            content: `Pull the freshest X buzz (takes, memes, reactions) about: ${primaryQuery}`,
-          },
-        ];
+        try {
+          queriesUsed.push(`X: ${primaryQuery}`);
 
-        // Built-in server-side tools (Agent Tools)
-        const tools: any[] = [{ type: 'x_search' }];
-
-        // NOTE: x_search is supported on the Responses API (Agent Tools), not legacy chat completions.
-        const xResponse = await fetch('https://api.x.ai/v1/responses', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${XAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: xaiModel,
-            input,
-            tools,
+          // Use Responses API with x_search tool
+          const xaiPayload = {
+            model: chosenModel,
+            input: [
+              {
+                role: 'system',
+                content: 'You are a sports content aggregator. Use x_search to fetch recent/trending X posts for the query. Return ONLY a valid JSON array (no markdown, no prose). Each item must have exactly: {"text":"max 180 chars","media_url":null|"url"}. Return 6-10 items. Do NOT include author, url, created_at, or citations in the JSON.',
+              },
+              {
+                role: 'user',
+                content: `Pull the freshest X buzz (takes, memes, reactions) about: ${primaryQuery}`,
+              },
+            ],
+            tools: [{ type: 'x_search' }],
             temperature: 0.3,
-          }),
-        });
-
-        if (!xResponse.ok) {
-          const errorText = await xResponse.text();
-          console.error('xAI API error:', xResponse.status, errorText);
-          xaiDebug = { error: xResponse.status, error_text: errorText.slice(0, 500) };
-        } else {
-          const xData = await xResponse.json();
-          console.log('xAI raw response keys:', Object.keys(xData || {}));
-
-          // Responses API structure: output[].content[].text (type="output_text")
-          // Also check for legacy output_text and choices format
-          let rawContent: string | undefined;
-          
-          // Try Responses API format first
-          if (Array.isArray(xData?.output)) {
-            for (const outputItem of xData.output) {
-              if (outputItem?.type === 'message' && Array.isArray(outputItem?.content)) {
-                for (const contentItem of outputItem.content) {
-                  if (contentItem?.type === 'output_text' && typeof contentItem?.text === 'string') {
-                    rawContent = contentItem.text;
-                    break;
-                  }
-                }
-              }
-              if (rawContent) break;
-            }
-          }
-          
-          // Fallback to direct output_text
-          if (!rawContent && typeof xData?.output_text === 'string') {
-            rawContent = xData.output_text;
-          }
-          
-          // Fallback to legacy chat completions format
-          if (!rawContent && xData?.choices?.[0]?.message?.content) {
-            rawContent = xData.choices[0].message.content;
-          }
-
-          // Count sources used from usage
-          const sourcesUsed = xData?.usage?.num_sources_used ?? 0;
-          
-          // Best-effort: log whatever the API returns so we can prove tool usage
-          xaiDebug = {
-            response_keys: xData && typeof xData === 'object' ? Object.keys(xData) : [],
-            model: xData?.model ?? xaiModel,
-            status: xData?.status ?? 'unknown',
-            has_content: !!rawContent,
-            content_length: rawContent?.length ?? 0,
-            num_sources_used: sourcesUsed,
-            usage: xData?.usage ?? null,
-            has_output_array: Array.isArray(xData?.output),
-            output_types: Array.isArray(xData?.output) ? xData.output.map((o: any) => o?.type) : [],
           };
+
+          console.log('[pulse-drop] Calling xAI Responses API...');
           
-          // The Responses API executes x_search server-side automatically
-          // We can infer tool usage from num_sources_used > 0
-          if (sourcesUsed > 0) {
-            xaiXSearchCalls = 1; // At least one x_search was executed
-            xaiToolCallsTotal = 1;
-          }
+          const xResponse = await fetch(`${XAI_BASE_URL}/responses`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${XAI_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(xaiPayload),
+          });
 
-          if (rawContent) {
-            console.log('xAI debug:', JSON.stringify(xaiDebug));
-            const items = safeParseJsonArray(rawContent);
+          if (!xResponse.ok) {
+            const errorText = await xResponse.text();
+            console.error('[pulse-drop] xAI API error:', xResponse.status, errorText.slice(0, 1000));
+            xaiDebug = { 
+              error: xResponse.status, 
+              error_text: errorText.slice(0, 1500),
+              model_used: chosenModel 
+            };
 
-            if (items) {
-              console.log(`X returned ${items.length} items`);
-
-              for (const item of items.slice(0, 10)) {
-                const text = truncateText(decodeHtmlEntities(String((item as any)?.text || '')), 180);
-                if (!text) continue;
-
-                const mediaUrl = (item as any)?.media_url ? String((item as any).media_url) : undefined;
-                const embedCode = `x:${generateStableHash(text, mediaUrl)}`;
-
-                const { data: existing } = await supabase
-                  .from('huddle_messages')
-                  .select('id')
-                  .eq('huddle_id', huddle_id)
-                  .eq('embed_code', embedCode)
-                  .limit(1);
-
-                if (!existing || existing.length === 0) {
-                  pulseItems.push({
-                    huddle_id,
-                    content: text,
-                    media_url: mediaUrl,
-                    message_type: 'coach_content',
-                    pulse_source: 'x',
-                    embed_code: embedCode,
-                    is_pulse_moment: true,
-                    origin_team_id: detectTeamTarget(text, team1_name || '', team2_name || '', team1_id, team2_id),
-                  });
-                }
-              }
-            } else {
-              console.error('xAI JSON parse failed. First 400 chars:', rawContent.slice(0, 400));
+            // Insert error item if live room
+            if (is_live) {
+              await supabase.from('huddle_messages').insert({
+                huddle_id,
+                user_id: systemUser,
+                is_bot_message: true,
+                content: `⚠️ Buzz temporarily unavailable (xAI error: ${xResponse.status})`,
+                message_type: 'coach_content',
+                is_pulse_moment: true,
+                pulse_source: 'grok',
+                embed_code: `buzz_error:${Date.now()}`
+              });
+              insertedBySource.grok++;
             }
           } else {
-            console.error('xAI response missing message.content');
+            const xData = await xResponse.json();
+            console.log('[pulse-drop] xAI response keys:', Object.keys(xData || {}));
+
+            // Extract content from Responses API format
+            let rawContent: string | undefined;
+            
+            if (Array.isArray(xData?.output)) {
+              for (const outputItem of xData.output) {
+                if (outputItem?.type === 'message' && Array.isArray(outputItem?.content)) {
+                  for (const contentItem of outputItem.content) {
+                    if (contentItem?.type === 'output_text' && typeof contentItem?.text === 'string') {
+                      rawContent = contentItem.text;
+                      break;
+                    }
+                  }
+                }
+                if (rawContent) break;
+              }
+            }
+            
+            if (!rawContent && typeof xData?.output_text === 'string') {
+              rawContent = xData.output_text;
+            }
+            
+            if (!rawContent && xData?.choices?.[0]?.message?.content) {
+              rawContent = xData.choices[0].message.content;
+            }
+
+            const sourcesUsed = xData?.usage?.num_sources_used ?? 0;
+            
+            xaiDebug = {
+              response_keys: xData && typeof xData === 'object' ? Object.keys(xData) : [],
+              model: chosenModel,
+              status: xData?.status ?? 'unknown',
+              has_content: !!rawContent,
+              content_length: rawContent?.length ?? 0,
+              num_sources_used: sourcesUsed,
+              usage: xData?.usage ?? null,
+            };
+            
+            if (sourcesUsed > 0) {
+              xaiXSearchCalls = 1;
+              xaiToolCallsTotal = 1;
+            }
+
+            if (rawContent) {
+              console.log('[pulse-drop] Raw content length:', rawContent.length);
+              const items = safeParseJsonArray(rawContent);
+
+              if (items) {
+                console.log(`[pulse-drop] X returned ${items.length} items`);
+
+                for (const item of items.slice(0, 10)) {
+                  const text = truncateText(decodeHtmlEntities(String((item as any)?.text || '')), 180);
+                  if (!text) continue;
+
+                  const mediaUrl = (item as any)?.media_url ? String((item as any).media_url) : undefined;
+                  const embedCode = `x:${generateStableHash(text, mediaUrl)}`;
+
+                  const { data: existing } = await supabase
+                    .from('huddle_messages')
+                    .select('id')
+                    .eq('huddle_id', huddle_id)
+                    .eq('embed_code', embedCode)
+                    .limit(1);
+
+                  if (!existing || existing.length === 0) {
+                    pulseItems.push({
+                      huddle_id,
+                      content: text,
+                      media_url: mediaUrl,
+                      message_type: 'coach_content',
+                      pulse_source: 'x',
+                      embed_code: embedCode,
+                      is_pulse_moment: true,
+                      origin_team_id: detectTeamTarget(text, team1_name || '', team2_name || '', team1_id, team2_id),
+                    });
+                  }
+                }
+              } else {
+                console.error('[pulse-drop] JSON parse failed. First 400 chars:', rawContent.slice(0, 400));
+                xaiDebug.parse_error = rawContent.slice(0, 400);
+              }
+            } else {
+              console.error('[pulse-drop] No content in response');
+              xaiDebug.no_content = true;
+            }
           }
+        } catch (xError: any) {
+          console.error('[pulse-drop] xAI fetch error:', xError);
+          xaiDebug = { fetch_error: xError.message, model_used: chosenModel };
         }
-      } catch (xError) {
-        console.error('xAI fetch error:', xError);
       }
+    } else {
+      console.log('[pulse-drop] XAI_API_KEY not configured');
+      xaiDebug = { error: 'XAI_API_KEY not configured' };
     }
 
     // ============================================
     // 2. FETCH REDDIT CONTENT (backup source)
-    // Keep it simple, prioritize X
     // ============================================
     if (pulseItems.length < 4) {
       try {
         const redditQuery = encodeURIComponent(primaryQuery);
         queriesUsed.push(`Reddit: ${primaryQuery}`);
         
-        console.log(`Reddit search: "${primaryQuery}"`);
+        console.log(`[pulse-drop] Reddit search: "${primaryQuery}"`);
         
         const redditResponse = await fetch(
           `https://www.reddit.com/search.json?q=${redditQuery}&sort=new&t=day&limit=5`,
@@ -394,7 +500,7 @@ serve(async (req) => {
           const redditData = await redditResponse.json();
           const posts = redditData.data?.children || [];
           
-          console.log(`Reddit returned ${posts.length} posts`);
+          console.log(`[pulse-drop] Reddit returned ${posts.length} posts`);
           
           for (const post of posts.slice(0, 3)) {
             const p = post.data;
@@ -431,10 +537,10 @@ serve(async (req) => {
             }
           }
         } else {
-          console.error('Reddit API error:', redditResponse.status);
+          console.error('[pulse-drop] Reddit API error:', redditResponse.status);
         }
       } catch (redditError) {
-        console.error('Reddit API error:', redditError);
+        console.error('[pulse-drop] Reddit error:', redditError);
       }
     }
 
@@ -455,7 +561,7 @@ serve(async (req) => {
         insertedCount++;
         insertedBySource[item.pulse_source]++;
       } else {
-        console.error('Error inserting pulse item:', error);
+        console.error('[pulse-drop] Insert error:', error);
       }
     }
 
@@ -463,7 +569,7 @@ serve(async (req) => {
     // 4. FALLBACK: Post hype message if no content
     // ============================================
     if (pulseItems.length === 0 && is_live) {
-      console.log('No external content found - posting fallback hype message');
+      console.log('[pulse-drop] No external content - posting fallback');
       
       const fallbackMessage = event_name 
         ? `🔥 ${event_name} is LIVE! What are you seeing? Drop your takes!`
@@ -500,35 +606,33 @@ serve(async (req) => {
       xai_debug: xaiDebug,
     });
 
-    console.log(`Pulse drop complete: ${insertedCount}/${pulseItems.length} items`);
+    console.log('[pulse-drop] Complete:', { 
+      inserted: insertedCount, 
+      by_source: insertedBySource,
+      model: xaiModel 
+    });
 
     return new Response(
-      JSON.stringify({
-        success: true,
+      JSON.stringify({ 
+        success: true, 
         inserted: insertedCount,
         inserted_by_source: insertedBySource,
-        total_found: pulseItems.length,
         has_xai_key: hasXaiKey,
-        queries_used: queriesUsed,
-        debug: {
-          xai_model: xaiModel,
-          xai_tool_calls_total: xaiToolCallsTotal,
-          xai_x_search_calls: xaiXSearchCalls,
-          xai_web_search_calls: xaiWebSearchCalls,
-        },
+        model_used: xaiModel,
+        xai_debug: xaiDebug
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
-    console.error('Pulse drop error:', error);
+  } catch (error: any) {
+    console.error('[pulse-drop] Error:', error);
     return new Response(
       JSON.stringify({ 
         error: error.message,
         inserted: 0,
         inserted_by_source: insertedBySource,
         has_xai_key: hasXaiKey,
-        queries_used: queriesUsed
+        xai_debug: xaiDebug
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

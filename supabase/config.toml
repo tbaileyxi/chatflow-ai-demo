@@ -112,3 +112,6 @@ on_schedule = "*/2 * * * *"
 [functions.xai-healthcheck]
 verify_jwt = false
 
+[functions.pulse-test]
+verify_jwt = false
+
