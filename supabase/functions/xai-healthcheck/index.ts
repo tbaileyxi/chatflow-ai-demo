@@ -5,8 +5,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// xAI API base URL
 const XAI_BASE_URL = 'https://api.x.ai/v1';
+
+// Priority order for model selection
+const MODEL_PRIORITY = [
+  'grok-3.1-fast',
+  'grok-4',
+  'grok-3.1',
+  'grok-3-fast',
+  'grok-3',
+  'grok-2-latest',
+  'grok-2',
+];
+
+function selectBestModel(modelIds: string[]): string | null {
+  const lowerModels = modelIds.map(id => id.toLowerCase());
+  
+  // Check priority list first
+  for (const preferred of MODEL_PRIORITY) {
+    const idx = lowerModels.findIndex(m => m === preferred.toLowerCase() || m.includes(preferred.toLowerCase()));
+    if (idx !== -1) {
+      return modelIds[idx];
+    }
+  }
+  
+  // Fallback: any model containing "grok"
+  const grokModel = modelIds.find(id => id.toLowerCase().includes('grok'));
+  if (grokModel) return grokModel;
+  
+  // Last resort: first model
+  return modelIds.length > 0 ? modelIds[0] : null;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -15,20 +44,18 @@ serve(async (req) => {
 
   const results: Record<string, any> = {
     timestamp: new Date().toISOString(),
-    xai_api_key_set: false,
-    list_models_url_used: null,
-    list_models_status: null,
-    available_models: [],
+    xai_api_key_present: false,
+    models_status: null,
+    model_ids: [],
     chosen_model: null,
-    chat_url_used: null,
     chat_status: null,
-    chat_response_snippet: null,
+    chat_snippet: null,
     errors: []
   };
 
   try {
     const xaiApiKey = Deno.env.get('XAI_API_KEY');
-    results.xai_api_key_set = !!xaiApiKey;
+    results.xai_api_key_present = !!xaiApiKey;
 
     if (!xaiApiKey) {
       results.errors.push('XAI_API_KEY not configured');
@@ -40,8 +67,6 @@ serve(async (req) => {
 
     // Step 1: List available models
     const listModelsUrl = `${XAI_BASE_URL}/models`;
-    results.list_models_url_used = listModelsUrl;
-
     console.log('[xai-healthcheck] Fetching models from:', listModelsUrl);
 
     const modelsResponse = await fetch(listModelsUrl, {
@@ -52,11 +77,11 @@ serve(async (req) => {
       },
     });
 
-    results.list_models_status = modelsResponse.status;
+    results.models_status = modelsResponse.status;
 
     if (!modelsResponse.ok) {
       const errorText = await modelsResponse.text();
-      console.error('[xai-healthcheck] Models API error:', modelsResponse.status, errorText.slice(0, 300));
+      console.error('[xai-healthcheck] Models API error:', modelsResponse.status, errorText.slice(0, 500));
       results.errors.push(`Models API error: ${modelsResponse.status} - ${errorText.slice(0, 300)}`);
       
       return new Response(JSON.stringify(results), {
@@ -66,7 +91,7 @@ serve(async (req) => {
     }
 
     const modelsData = await modelsResponse.json();
-    console.log('[xai-healthcheck] Models response:', JSON.stringify(modelsData).slice(0, 500));
+    console.log('[xai-healthcheck] Models response:', JSON.stringify(modelsData).slice(0, 800));
 
     // Extract model IDs - handle both array and object with data property
     let modelIds: string[] = [];
@@ -78,59 +103,25 @@ serve(async (req) => {
       modelIds = modelsData.models.map((m: any) => m.id || m.name).filter(Boolean);
     }
 
-    results.available_models = modelIds;
+    results.model_ids = modelIds;
     console.log('[xai-healthcheck] Available models:', modelIds);
 
-    // Step 2: Choose the best grok model
-    // Prefer newer models, avoid deprecated ones
-    const grokModels = modelIds.filter(id => id.toLowerCase().includes('grok'));
-    
-    // Sort by preference: grok-3 > grok-2 > grok-1, prefer non-mini, prefer fast
-    const modelPreference = [
-      'grok-3-fast',
-      'grok-3',
-      'grok-2-latest',
-      'grok-2',
-      'grok-2-1212',
-      'grok-2-mini',
-      'grok-1',
-    ];
-
-    let chosenModel: string | null = null;
-    for (const preferred of modelPreference) {
-      const found = grokModels.find(m => m.toLowerCase().includes(preferred.toLowerCase()));
-      if (found) {
-        chosenModel = found;
-        break;
-      }
-    }
-
-    // Fallback to any grok model
-    if (!chosenModel && grokModels.length > 0) {
-      chosenModel = grokModels[0];
-    }
-
-    // Fallback to any available model
-    if (!chosenModel && modelIds.length > 0) {
-      chosenModel = modelIds[0];
-    }
-
+    // Step 2: Choose the best model using priority list
+    const chosenModel = selectBestModel(modelIds);
     results.chosen_model = chosenModel;
     console.log('[xai-healthcheck] Chosen model:', chosenModel);
 
     if (!chosenModel) {
-      results.errors.push('No suitable model found');
+      results.errors.push('No suitable model found in available models');
       return new Response(JSON.stringify(results), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Step 3: Test chat completion
+    // Step 3: Test chat completion with minimal tokens
     const chatUrl = `${XAI_BASE_URL}/chat/completions`;
-    results.chat_url_used = chatUrl;
-
-    console.log('[xai-healthcheck] Testing chat with model:', chosenModel);
+    console.log('[xai-healthcheck] Testing chat at:', chatUrl, 'with model:', chosenModel);
 
     const chatResponse = await fetch(chatUrl, {
       method: 'POST',
@@ -141,10 +132,9 @@ serve(async (req) => {
       body: JSON.stringify({
         model: chosenModel,
         messages: [
-          { role: 'user', content: 'Say OK in one word.' }
+          { role: 'user', content: 'Say OK.' }
         ],
-        temperature: 0.3,
-        max_tokens: 10
+        max_tokens: 5
       }),
     });
 
@@ -152,12 +142,12 @@ serve(async (req) => {
 
     if (!chatResponse.ok) {
       const errorText = await chatResponse.text();
-      console.error('[xai-healthcheck] Chat API error:', chatResponse.status, errorText.slice(0, 300));
+      console.error('[xai-healthcheck] Chat API error:', chatResponse.status, errorText.slice(0, 500));
       results.errors.push(`Chat API error: ${chatResponse.status} - ${errorText.slice(0, 300)}`);
     } else {
       const chatData = await chatResponse.json();
       const content = chatData.choices?.[0]?.message?.content || '';
-      results.chat_response_snippet = content.slice(0, 200);
+      results.chat_snippet = content.slice(0, 200);
       console.log('[xai-healthcheck] Chat response:', content);
     }
 
@@ -167,7 +157,7 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('[xai-healthcheck] Error:', error);
+    console.error('[xai-healthcheck] Unexpected error:', error);
     results.errors.push(error.message || 'Unknown error');
     
     return new Response(JSON.stringify(results), {

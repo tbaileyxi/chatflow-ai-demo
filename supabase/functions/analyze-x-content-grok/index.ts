@@ -7,6 +7,21 @@ const corsHeaders = {
 
 const XAI_BASE_URL = 'https://api.x.ai/v1';
 
+// Priority order for model selection
+const MODEL_PRIORITY = [
+  'grok-3.1-fast',
+  'grok-4',
+  'grok-3.1',
+  'grok-3-fast',
+  'grok-3',
+  'grok-2-latest',
+  'grok-2',
+];
+
+// In-memory cache for models (10 minute TTL)
+let cachedModels: { models: string[]; timestamp: number } | null = null;
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
 interface GrokAnalysisRequest {
   tweetContent: string;
   tweetUrl: string;
@@ -30,10 +45,33 @@ interface GrokAnalysisResponse {
   reasoning: string;
 }
 
-// Dynamically discover and choose best available model
-async function discoverBestModel(apiKey: string): Promise<{ model: string; error?: string }> {
-  const listModelsUrl = `${XAI_BASE_URL}/models`;
+function selectBestModel(modelIds: string[]): string | null {
+  const lowerModels = modelIds.map(id => id.toLowerCase());
   
+  // Check priority list first
+  for (const preferred of MODEL_PRIORITY) {
+    const idx = lowerModels.findIndex(m => m === preferred.toLowerCase() || m.includes(preferred.toLowerCase()));
+    if (idx !== -1) {
+      return modelIds[idx];
+    }
+  }
+  
+  // Fallback: any model containing "grok"
+  const grokModel = modelIds.find(id => id.toLowerCase().includes('grok'));
+  if (grokModel) return grokModel;
+  
+  // Last resort: first model
+  return modelIds.length > 0 ? modelIds[0] : null;
+}
+
+async function discoverModels(apiKey: string): Promise<{ models: string[]; error?: string }> {
+  // Check cache first
+  if (cachedModels && (Date.now() - cachedModels.timestamp) < CACHE_TTL_MS) {
+    console.log('[analyze-x-content-grok] Using cached models:', cachedModels.models);
+    return { models: cachedModels.models };
+  }
+
+  const listModelsUrl = `${XAI_BASE_URL}/models`;
   console.log('[analyze-x-content-grok] Discovering models from:', listModelsUrl);
   
   try {
@@ -47,8 +85,8 @@ async function discoverBestModel(apiKey: string): Promise<{ model: string; error
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[analyze-x-content-grok] Models API error:', response.status, errorText.slice(0, 300));
-      return { model: '', error: `Models API ${response.status}: ${errorText.slice(0, 100)}` };
+      console.error('[analyze-x-content-grok] Models API error:', response.status, errorText.slice(0, 1000));
+      return { models: [], error: `Models API ${response.status}: ${errorText.slice(0, 300)}` };
     }
 
     const modelsData = await response.json();
@@ -64,45 +102,14 @@ async function discoverBestModel(apiKey: string): Promise<{ model: string; error
     }
 
     console.log('[analyze-x-content-grok] Available models:', modelIds);
-
-    // Filter for grok models
-    const grokModels = modelIds.filter(id => id.toLowerCase().includes('grok'));
     
-    // Preference order for analysis tasks (prefer capable models)
-    const modelPreference = [
-      'grok-2-latest',
-      'grok-2',
-      'grok-2-1212',
-      'grok-3',
-      'grok-3-fast',
-      'grok-2-mini',
-      'grok-1',
-    ];
-
-    for (const preferred of modelPreference) {
-      const found = grokModels.find(m => m.toLowerCase().includes(preferred.toLowerCase()));
-      if (found) {
-        console.log('[analyze-x-content-grok] Chosen model:', found);
-        return { model: found };
-      }
-    }
-
-    // Fallback to any grok model
-    if (grokModels.length > 0) {
-      console.log('[analyze-x-content-grok] Fallback to first grok model:', grokModels[0]);
-      return { model: grokModels[0] };
-    }
-
-    // Fallback to any model
-    if (modelIds.length > 0) {
-      console.log('[analyze-x-content-grok] Fallback to first available model:', modelIds[0]);
-      return { model: modelIds[0] };
-    }
-
-    return { model: '', error: 'No models available' };
+    // Update cache
+    cachedModels = { models: modelIds, timestamp: Date.now() };
+    
+    return { models: modelIds };
   } catch (error: any) {
     console.error('[analyze-x-content-grok] Model discovery error:', error);
-    return { model: '', error: error.message };
+    return { models: [], error: error.message };
   }
 }
 
@@ -117,21 +124,71 @@ serve(async (req) => {
       throw new Error('XAI_API_KEY not configured');
     }
 
-    const requestData: GrokAnalysisRequest = await req.json();
+    // Parse request body
+    let requestData: GrokAnalysisRequest;
+    try {
+      requestData = await req.json();
+    } catch (e) {
+      // Return helpful error for testing
+      return new Response(JSON.stringify({
+        error: 'Invalid or missing request body',
+        expected_format: {
+          tweetContent: 'string (required)',
+          tweetUrl: 'string',
+          authorUsername: 'string',
+          hasMedia: 'boolean',
+          mediaType: 'string (optional)',
+          metrics: { likes: 0, retweets: 0, replies: 0 },
+          createdAt: 'ISO date string'
+        },
+        example: {
+          tweetContent: 'Josh Allen throws a 50-yard TD pass! #Bills',
+          tweetUrl: 'https://x.com/user/status/123',
+          authorUsername: 'nfl_highlights',
+          hasMedia: true,
+          mediaType: 'video',
+          metrics: { likes: 500, retweets: 100, replies: 25 },
+          createdAt: new Date().toISOString()
+        }
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate required field
+    if (!requestData.tweetContent) {
+      return new Response(JSON.stringify({
+        error: 'Missing required field: tweetContent',
+        help: 'Provide tweetContent in the request body'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     
     // Calculate time recency bonus
-    const tweetTime = new Date(requestData.createdAt).getTime();
+    const tweetTime = new Date(requestData.createdAt || new Date()).getTime();
     const now = Date.now();
     const hoursOld = (now - tweetTime) / (1000 * 60 * 60);
     const recencyBonus = hoursOld < 6 ? 15 : hoursOld < 24 ? 10 : 0;
 
-    // Discover best available model dynamically
-    const { model: chosenModel, error: modelError } = await discoverBestModel(xaiApiKey);
+    // Discover models dynamically (with cache)
+    const { models, error: modelError } = await discoverModels(xaiApiKey);
     
-    if (!chosenModel) {
-      console.error('[analyze-x-content-grok] No model available:', modelError);
+    if (models.length === 0) {
+      console.error('[analyze-x-content-grok] No models available:', modelError);
       throw new Error(`No xAI model available: ${modelError}`);
     }
+
+    // Select best model using priority list
+    const chosenModel = selectBestModel(models);
+    
+    if (!chosenModel) {
+      throw new Error('Could not select a model from available models');
+    }
+
+    console.log('[analyze-x-content-grok] Selected model:', chosenModel);
 
     // Build analysis prompt
     const systemPrompt = `You are an NFL/NCAA sports content analyzer. Analyze tweets and return ONLY valid JSON (no markdown, no code blocks).
@@ -177,9 +234,9 @@ Return JSON only:
     const userPrompt = `Analyze this tweet:
 
 Content: ${requestData.tweetContent}
-Author: @${requestData.authorUsername}
-Has Media: ${requestData.hasMedia ? `Yes (${requestData.mediaType})` : 'No'}
-Engagement: ${requestData.metrics.likes} likes, ${requestData.metrics.retweets} RTs, ${requestData.metrics.replies} replies
+Author: @${requestData.authorUsername || 'unknown'}
+Has Media: ${requestData.hasMedia ? `Yes (${requestData.mediaType || 'unknown'})` : 'No'}
+Engagement: ${requestData.metrics?.likes || 0} likes, ${requestData.metrics?.retweets || 0} RTs, ${requestData.metrics?.replies || 0} replies
 Age: ${Math.round(hoursOld)} hours old
 
 Apply quality scoring rules (media posts get higher base scores). Return JSON only.`;
@@ -195,30 +252,52 @@ Apply quality scoring rules (media posts get higher base scores). Return JSON on
     const chatUrl = `${XAI_BASE_URL}/chat/completions`;
     console.log('[analyze-x-content-grok] Chat URL:', chatUrl, 'Model:', chosenModel);
 
+    // Build request body with search_parameters for live search
+    const requestBody: any = {
+      model: chosenModel,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.3,
+      // Enable agentic/live search for realtime info
+      search_parameters: {
+        mode: "auto",
+        sources: ["x", "web"]
+      }
+    };
+
+    // Add response_format for models that support it
+    if (chosenModel.includes('grok-2') || chosenModel.includes('grok-3') || chosenModel.includes('grok-4')) {
+      requestBody.response_format = { type: "json_object" };
+    }
+
     const response = await fetch(chatUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${xaiApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: chosenModel,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.3,
-        // Only use response_format if model supports it (grok-2+ models)
-        ...(chosenModel.includes('grok-2') || chosenModel.includes('grok-3') 
-          ? { response_format: { type: "json_object" } } 
-          : {})
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[analyze-x-content-grok] API Error:', response.status, errorText.slice(0, 300));
-      throw new Error(`Grok API error: ${response.status}`);
+      console.error('[analyze-x-content-grok] API Error:', response.status, errorText.slice(0, 1000));
+      return new Response(JSON.stringify({ 
+        error: `Grok API error: ${response.status}`,
+        details: errorText.slice(0, 300),
+        chosenModel,
+        team_ids: [],
+        quality_score: 30,
+        topics: ['error'],
+        broadcast_to: [],
+        highlight_worthy: false,
+        reasoning: 'API call failed'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const grokData = await response.json();
@@ -263,7 +342,7 @@ Apply quality scoring rules (media posts get higher base scores). Return JSON on
       model_used: chosenModel
     });
 
-    return new Response(JSON.stringify(analysis), {
+    return new Response(JSON.stringify({ ...analysis, model_used: chosenModel }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
