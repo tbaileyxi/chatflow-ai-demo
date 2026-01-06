@@ -79,6 +79,15 @@ export const UnifiedChat = memo(function UnifiedChat({
     setShowNewMessages(false);
   }, []);
 
+  // Reset scroll anchor + throttles when entering a different huddle
+  useEffect(() => {
+    lastFetchRef.current = 0;
+    lastMessageIdsRef.current = '';
+    setShowNewMessages(false);
+    setMessages([]);
+    scrollToTop('auto');
+  }, [huddleId, scrollToTop]);
+
   // Handle scroll position
   const handleScroll = useCallback(() => {
     if (isNearTop()) {

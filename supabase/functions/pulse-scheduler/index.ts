@@ -33,9 +33,23 @@ serve(async (req) => {
   // Cron secret auth
   const CRON_SECRET = Deno.env.get('CRON_SECRET');
   const providedSecret = req.headers.get('x-cron-secret');
-  if (CRON_SECRET && providedSecret !== CRON_SECRET) {
-    console.error('[pulse-scheduler] 401 - invalid cron secret');
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+  // Allow either (a) x-cron-secret match OR (b) service-role bearer (for pg_cron net.http_post)
+  const authHeader = req.headers.get('authorization') || '';
+  const bearer = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7) : null;
+  const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || null;
+
+  if (CRON_SECRET) {
+    const okSecret = providedSecret === CRON_SECRET;
+    const okServiceRole = !!(bearer && serviceRole && bearer === serviceRole);
+
+    if (!okSecret && !okServiceRole) {
+      console.error('[pulse-scheduler] 401 - invalid cron secret / bearer');
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
   }
 
   try {
@@ -57,16 +71,16 @@ serve(async (req) => {
 
     let cursorIndex = stateRow?.cursor_index ?? 0;
 
-    // 2. Fetch all eligible huddles (team huddles + event huddles)
+    // 2. Fetch eligible huddles (official team huddles + event huddles)
     const { data: allHuddles } = await supabase
       .from('huddles')
-      .select('id, name, team_id, event_id, is_private')
-      .or('team_id.not.is.null,event_id.not.is.null')
+      .select('id, name, team_id, event_id, is_private, is_official_team_huddle')
+      .or('and(team_id.not.is.null,is_official_team_huddle.eq.true),event_id.not.is.null')
       .order('created_at', { ascending: true });
 
-    const huddles = allHuddles || [];
+    const huddles = (allHuddles || []).filter(h => h.is_private !== true);
     if (huddles.length === 0) {
-      return new Response(JSON.stringify({ success: true, message: 'No huddles to process', drops_triggered: 0 }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ success: true, message: 'No public huddles to process', drops_triggered: 0 }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Wrap cursor if it exceeds list length
@@ -78,25 +92,45 @@ serve(async (req) => {
     const batch = huddles.slice(cursorIndex, cursorIndex + BATCH_SIZE);
     const nextCursor = (cursorIndex + batch.length) % huddles.length;
 
-    // 4. Get team names for context
-    const teamIds = [...new Set(batch.map(h => h.team_id).filter(Boolean))];
+    // 4. Load live events map (for event fan-out)
+    const { data: liveEvents } = await supabase
+      .from('live_events')
+      .select('id, team1_id, team2_id')
+      .in('status', ['live', 'upcoming']);
+
+    const eventTeamMap = new Map<string, { t1?: string; t2?: string }>();
+    liveEvents?.forEach(e => eventTeamMap.set(e.id, { t1: e.team1_id, t2: e.team2_id }));
+
+    // 5. Collect ALL team IDs we may need (batch teams + event-linked teams)
+    const batchTeamIds = [...new Set(batch.map(h => h.team_id).filter(Boolean))] as string[];
+    const eventLinkedTeamIds: string[] = [];
+    for (const h of batch) {
+      if (h.event_id && eventTeamMap.has(h.event_id)) {
+        const { t1, t2 } = eventTeamMap.get(h.event_id)!;
+        if (t1) eventLinkedTeamIds.push(t1);
+        if (t2) eventLinkedTeamIds.push(t2);
+      }
+    }
+    const allTeamIds = [...new Set([...batchTeamIds, ...eventLinkedTeamIds])];
+
+    // 6. Get team names for context (critical so pulse-drop doesn't fall back to "sports game")
     let teamMap = new Map<string, string>();
-    if (teamIds.length > 0) {
-      const { data: teams } = await supabase.from('teams').select('id, name').in('id', teamIds);
+    if (allTeamIds.length > 0) {
+      const { data: teams } = await supabase.from('teams').select('id, name').in('id', allTeamIds);
       teams?.forEach(t => teamMap.set(t.id, t.name));
     }
 
-    // 5. Get teams_live_state for batch team IDs
+    // 7. Get teams_live_state for all team IDs
     let liveStateMap = new Map<string, boolean>();
-    if (teamIds.length > 0) {
+    if (allTeamIds.length > 0) {
       const { data: liveStates } = await supabase
         .from('teams_live_state')
         .select('team_id, state')
-        .in('team_id', teamIds);
+        .in('team_id', allTeamIds);
       liveStates?.forEach(ls => liveStateMap.set(ls.team_id, ls.state === 'live'));
     }
 
-    // 6. Build payloads
+    // 8. Build payloads
     interface DropPayload {
       huddle_id: string;
       team_id?: string;
@@ -108,20 +142,12 @@ serve(async (req) => {
     const payloads: DropPayload[] = batch.map(h => ({
       huddle_id: h.id,
       team_id: h.team_id || undefined,
-      team_name: h.team_id ? teamMap.get(h.team_id) || '' : undefined,
-      is_live: h.team_id ? liveStateMap.get(h.team_id) || false : false,
+      team_name: h.team_id ? (teamMap.get(h.team_id) || '') : undefined,
+      is_live: h.team_id ? (liveStateMap.get(h.team_id) || false) : false,
       event_id: h.event_id || undefined,
     }));
 
-    // 7. Fan-out for events: also post into both teams' main huddles
-    const { data: liveEvents } = await supabase
-      .from('live_events')
-      .select('id, team1_id, team2_id')
-      .in('status', ['live', 'upcoming']);
-
-    const eventTeamMap = new Map<string, { t1?: string; t2?: string }>();
-    liveEvents?.forEach(e => eventTeamMap.set(e.id, { t1: e.team1_id, t2: e.team2_id }));
-
+    // 9. Fan-out for events: also post into both teams' main huddles
     for (const h of batch) {
       if (h.event_id && eventTeamMap.has(h.event_id)) {
         const { t1, t2 } = eventTeamMap.get(h.event_id)!;
@@ -132,6 +158,7 @@ serve(async (req) => {
             .select('id')
             .eq('team_id', tid)
             .eq('is_official_team_huddle', true)
+            .eq('is_private', false)
             .limit(1)
             .maybeSingle();
           if (teamHuddle && !payloads.find(p => p.huddle_id === teamHuddle.id)) {

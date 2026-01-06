@@ -81,7 +81,12 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Missing body', example: { huddle_id: 'uuid', team_id: 'uuid', team_name: 'Bears', is_live: false } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { huddle_id, team_id, team_name, is_live, event_id, debug: requestDebug } = body;
+    let body: any;
+    try { body = await req.json(); } catch {
+      return new Response(JSON.stringify({ error: 'Missing body', example: { huddle_id: 'uuid', team_id: 'uuid', team_name: 'Bears', is_live: false } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    let { huddle_id, team_id, team_name, is_live, event_id, debug: requestDebug } = body;
 
     if (!huddle_id) {
       console.error('[pulse-drop] Missing huddle_id in request');
@@ -93,11 +98,52 @@ serve(async (req) => {
     debug.team_id = team_id;
     debug.is_live = is_live;
 
+    // Resolve team name (prevents generic queries + cross-team content)
+    let resolvedTeamName = typeof team_name === 'string' && team_name.trim() ? team_name.trim() : undefined;
+    if (!resolvedTeamName && team_id) {
+      const { data: teamRow } = await supabase
+        .from('teams')
+        .select('name')
+        .eq('id', team_id)
+        .maybeSingle();
+      if (teamRow?.name) resolvedTeamName = teamRow.name;
+    }
+    debug.team_name = resolvedTeamName ?? null;
+
     // Get system user
     const { data: systemUser } = await supabase.rpc('get_or_create_system_user');
     if (!systemUser) throw new Error('Could not get system user');
 
-    const searchQuery = team_name || 'sports game';
+    // Throttle pulse frequency per huddle
+    const minIntervalMinutes = is_live ? 10 : 180;
+    debug.min_interval_minutes = minIntervalMinutes;
+    const { data: lastPulse } = await supabase
+      .from('huddle_messages')
+      .select('created_at')
+      .eq('huddle_id', huddle_id)
+      .eq('is_pulse_moment', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastPulse?.created_at) {
+      const last = new Date(lastPulse.created_at).getTime();
+      const now = Date.now();
+      const elapsedMinutes = (now - last) / 60000;
+      debug.elapsed_minutes_since_last_pulse = elapsedMinutes;
+
+      if (elapsedMinutes < minIntervalMinutes) {
+        return new Response(JSON.stringify({
+          success: true,
+          inserted: 0,
+          skipped: true,
+          reason: 'throttled',
+          min_interval_minutes: minIntervalMinutes
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
+    const searchQuery = resolvedTeamName ? `${resolvedTeamName} football` : 'sports game';
     debug.search_query = searchQuery;
 
     const samplePostIds: string[] = [];
@@ -122,7 +168,11 @@ serve(async (req) => {
             body: JSON.stringify({
               model: chosenModel,
               input: [
-                { role: 'system', content: 'You are a sports content aggregator. Use x_search to pull recent takes/memes/reactions. Return ONLY a JSON array (no markdown). Each item: {"text":"max 180 chars","media_url":null|"url"}. Return up to 8 items.' },
+                 { role: 'system', content: `You are a sports content aggregator. Use x_search to pull recent takes/memes/reactions.
+
+CRITICAL: Only include items that are clearly about "${resolvedTeamName || searchQuery}". If it seems about a different team/player/topic, SKIP it.
+
+Return ONLY a JSON array (no markdown). Each item: {"text":"max 180 chars","media_url":null|"url"}. Return up to 8 items.` },
                 { role: 'user', content: `Find the freshest buzz about: ${searchQuery}` }
               ],
               tools: [{ type: 'x_search' }],
