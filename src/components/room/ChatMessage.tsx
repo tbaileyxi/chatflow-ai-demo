@@ -114,24 +114,36 @@ export const ChatMessage = memo(function ChatMessage({
         "flex gap-2 max-w-[85%]",
         isOwn && "flex-row-reverse"
       )}>
-        {/* Avatar */}
-        <Avatar className={cn(
-          "h-8 w-8 flex-shrink-0",
-          isCoach && "ring-2 ring-yellow-500 shadow-lg shadow-yellow-500/30"
-        )}>
-          {isCoach ? (
-            <AvatarFallback className="bg-gradient-to-br from-cyan-500 to-blue-600 text-white text-xs">
-              🤖
-            </AvatarFallback>
-          ) : (
-            <>
-              <AvatarImage src={avatarUrl} alt={displayName} />
-              <AvatarFallback className="text-xs bg-muted">
-                {displayName.slice(0, 2).toUpperCase()}
+        {/* Avatar with Badge Overlay */}
+        <div className="relative flex-shrink-0">
+          <Avatar className={cn(
+            "h-8 w-8",
+            isCoach && "ring-2 ring-yellow-500 shadow-lg shadow-yellow-500/30"
+          )}>
+            {isCoach ? (
+              <AvatarFallback className="bg-gradient-to-br from-cyan-500 to-blue-600 text-white text-xs">
+                🤖
               </AvatarFallback>
-            </>
+            ) : (
+              <>
+                <AvatarImage src={avatarUrl} alt={displayName} />
+                <AvatarFallback className="text-xs bg-muted">
+                  {displayName.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </>
+            )}
+          </Avatar>
+          {/* Badge Overlay - bottom-right corner of avatar */}
+          {badge && !isCoach && (
+            <div className="absolute -bottom-0.5 -right-0.5 bg-background rounded-full p-0.5 shadow-sm border border-border/50">
+              <UserBadgeIcon 
+                tier={badge.tier} 
+                teamName={badge.team_name}
+                size="sm"
+              />
+            </div>
           )}
-        </Avatar>
+        </div>
 
         {/* Bubble */}
         <div className={cn(
@@ -143,7 +155,7 @@ export const ChatMessage = memo(function ChatMessage({
           isCoach && "bg-gradient-to-br from-cyan-500/10 to-blue-600/10 border-2 border-cyan-500/30 shadow-lg shadow-cyan-500/10",
           isPulse && !isCoach && "bg-muted/50 border border-border/30"
         )}>
-          {/* Name + Badge + Time */}
+          {/* Name + Time (badge is now on avatar) */}
           <div className={cn(
             "flex items-center gap-1.5 mb-1 flex-wrap",
             isOwn && "justify-end"
@@ -155,16 +167,6 @@ export const ChatMessage = memo(function ChatMessage({
             )}>
               {isCoach ? '@coach' : displayName}
             </span>
-            
-            {/* Badge Icon - more prominent */}
-            {badge && !isCoach && (
-              <UserBadgeIcon 
-                tier={badge.tier} 
-                teamName={badge.team_name}
-                size="md"
-                className="ml-0.5"
-              />
-            )}
             
             <span className={cn(
               "text-[10px]",

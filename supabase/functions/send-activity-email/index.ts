@@ -310,7 +310,7 @@ Deno.serve(async (req) => {
       Jump back in to see the full conversation.
     </p>
     
-    <a href="https://sidehuddle.io/huddle/${mostActiveHuddle.huddleId}" 
+    <a href="https://sidehuddlesports.com/huddle/${mostActiveHuddle.huddleId}" 
        style="display: inline-block; background-color: #facc15; color: #1a1a1a; font-weight: 600; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 15px;">
       Open Side Huddle
     </a>

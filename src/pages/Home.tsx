@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Radio, Flame, Clock, ChevronRight, Users, Globe, Lock, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Radio, Flame, Clock, ChevronRight, Users, Globe, Lock, ShieldCheck, ChevronDown, ChevronUp, MoreVertical, Mail, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BottomNav } from '@/components/mobile/BottomNav';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -440,9 +441,29 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
-        <div className="px-4 py-4 flex flex-col items-center gap-3">
-          <img src={shLogo} alt="Side Huddle" className="h-12 object-contain" />
-          <p className="text-base font-medium text-muted-foreground">Your Team. Your Crew. Live.</p>
+        <div className="px-4 py-4 flex items-center justify-between">
+          <div className="w-10" /> {/* Spacer for centering */}
+          <div className="flex flex-col items-center gap-1">
+            <img src={shLogo} alt="Side Huddle" className="h-12 object-contain" />
+            <p className="text-sm font-medium text-muted-foreground">Your Team. Your Crew. Live.</p>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-full">
+                <MoreVertical className="h-5 w-5 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => window.open('https://sidehuddlefounders.carrd.co/', '_blank')}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Sponsor
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open('https://sidehuddlefounders.carrd.co/#contactus', '_blank')}>
+                <Mail className="mr-2 h-4 w-4" />
+                Contact Us
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
