@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Send, Mic, Camera, Bot } from 'lucide-react';
@@ -15,13 +15,17 @@ interface RoomChatInputProps {
   placeholder?: string;
 }
 
-export function RoomChatInput({
+export interface RoomChatInputRef {
+  insertEmoji: (emoji: string) => void;
+}
+
+export const RoomChatInput = forwardRef<RoomChatInputRef, RoomChatInputProps>(function RoomChatInput({
   huddleId,
   userId,
   onSendMessage,
   disabled = false,
   placeholder = "Say something..."
-}: RoomChatInputProps) {
+}, ref) {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -29,6 +33,14 @@ export function RoomChatInput({
   const [showCameraModal, setShowCameraModal] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Expose insertEmoji method for badge click
+  useImperativeHandle(ref, () => ({
+    insertEmoji: (emoji: string) => {
+      setMessage(prev => prev + emoji);
+      textareaRef.current?.focus();
+    }
+  }), []);
 
   const handleSend = useCallback(async () => {
     if (!message.trim() || sending || disabled) return;
@@ -230,4 +242,4 @@ export function RoomChatInput({
       </Dialog>
     </>
   );
-}
+});
