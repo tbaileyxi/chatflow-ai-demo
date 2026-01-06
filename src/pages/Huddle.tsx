@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLiveContext, getStatusDisplay } from '@/hooks/useLiveContext';
 import { UnifiedChat } from '@/components/room/UnifiedChat';
 import { ChatBottomBar } from '@/components/room/ChatBottomBar';
-import { RoomChatInput } from '@/components/room/RoomChatInput';
+import { RoomChatInput, RoomChatInputRef } from '@/components/room/RoomChatInput';
 import { PulseChrome } from '@/components/room/PulseChrome';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PickEmView } from '@/components/pickem/PickEmView';
@@ -36,6 +36,7 @@ export const Huddle = () => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [liveGame, setLiveGame] = useState<any>(null);
+  const chatInputRef = useRef<RoomChatInputRef>(null);
 
   // Live Context Engine - automatically detects if team is in a live game
   const { context: liveContext } = useLiveContext(huddleId, huddle?.team_id);
@@ -494,6 +495,7 @@ export const Huddle = () => {
           huddleId={huddleId!}
           team1Id={huddle?.team_id}
           team2Id={null}
+          onBadgeClick={(emoji) => chatInputRef.current?.insertEmoji(emoji)}
         />
       </main>
 
@@ -503,6 +505,7 @@ export const Huddle = () => {
           <>
             <div className="px-4 py-2">
               <RoomChatInput
+                ref={chatInputRef}
                 huddleId={huddleId!}
                 userId={user.id}
                 onSendMessage={async (content, mediaUrl) => {
