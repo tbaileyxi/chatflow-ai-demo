@@ -1700,6 +1700,24 @@ export type Database = {
           },
         ]
       }
+      pulse_scheduler_state: {
+        Row: {
+          cursor_index: number
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          cursor_index?: number
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          cursor_index?: number
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       reddit_daily_counts: {
         Row: {
           huddle_id: string

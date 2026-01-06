@@ -6,19 +6,18 @@ import { useLiveContext, getStatusDisplay } from '@/hooks/useLiveContext';
 import { UnifiedChat } from '@/components/room/UnifiedChat';
 import { ChatBottomBar } from '@/components/room/ChatBottomBar';
 import { RoomChatInput } from '@/components/room/RoomChatInput';
+import { PulseChrome } from '@/components/room/PulseChrome';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PickEmView } from '@/components/pickem/PickEmView';
 import { useToast } from '@/hooks/use-toast';
-import { Zap, ArrowLeft, MoreVertical, UserPlus, UsersRound, Lock, Heart, Check } from 'lucide-react';
+import { Zap, ArrowLeft, MoreVertical, Heart, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { HuddlePeopleSheet } from '@/components/HuddlePeopleSheet';
-import { StartHuddleDialog } from '@/components/StartHuddleDialog';
 import { SignupPromptModal } from '@/components/SignupPromptModal';
 import { BadgesModal } from '@/components/badges/BadgesModal';
 import { FadesSidebar } from '@/components/fades/FadesSidebar';
 import { GamePulseHeader } from '@/components/game-pulse/GamePulseHeader';
-import { ShareButton } from '@/components/ShareButton';
 
 export const Huddle = () => {
   const { huddleId } = useParams<{ huddleId: string }>();
@@ -482,6 +481,13 @@ export const Huddle = () => {
         </div>
       )}
 
+      {/* Pulse Chrome - shows trending content */}
+      <PulseChrome
+        huddleId={huddleId!}
+        teamId={huddle?.team_id}
+        isLive={liveContext.mode === 'live'}
+      />
+
       {/* Main Chat Area - UnifiedChat component handles messages only */}
       <main className="flex-1 flex flex-col overflow-hidden">
         <UnifiedChat 
@@ -537,46 +543,6 @@ export const Huddle = () => {
       </div>
 
       {/* Yellow FABs - bottom right */}
-      {user && (
-        <div className="fixed bottom-24 right-4 z-30 flex flex-col gap-3">
-          {/* Fades Lightning FAB - for private huddles AND verified huddles */}
-          {(huddle?.is_private || huddle?.is_verified) && !huddle?.is_official_team_huddle && (
-            <Button 
-              onClick={() => setShowFadesSidebar(true)}
-              className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90 shadow-lg"
-            >
-              <Zap className="h-6 w-6 text-primary-foreground" />
-            </Button>
-          )}
-          
-          {huddle?.is_official_team_huddle ? (
-            <StartHuddleDialog
-              onHuddleCreated={() => {
-                toast({
-                  title: "Side Huddle Created!",
-                  description: "Your private huddle has been created",
-                });
-              }}
-              parentTeamId={huddle.team_id}
-              isCreatingSideHuddle={true}
-              trigger={
-                <Button className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90 shadow-lg relative">
-                  <UsersRound className="h-6 w-6 text-primary-foreground" />
-                  <Lock className="h-3 w-3 text-primary-foreground absolute bottom-3 right-3" />
-                </Button>
-              }
-            />
-          ) : (
-            <Button 
-              onClick={handleInvite}
-              className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90 shadow-lg"
-            >
-              <UserPlus className="h-6 w-6 text-primary-foreground" />
-            </Button>
-          )}
-        </div>
-      )}
-
       {/* Fades Sidebar - slide over */}
       <FadesSidebar
         huddleId={huddleId!}
@@ -613,9 +579,6 @@ export const Huddle = () => {
         open={showBadgesModal}
         onClose={() => setShowBadgesModal(false)}
       />
-
-      {/* Floating Share Button */}
-      <ShareButton huddleId={huddleId!} huddleName={huddle?.name || teamName} />
     </div>
   );
 };
