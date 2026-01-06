@@ -6,8 +6,6 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { UserBadgeIcon } from '@/components/badges/UserBadgeIcon';
-import { useUserBadge } from '@/hooks/useUserBadges';
 
 interface RoomChatInputProps {
   huddleId: string;
@@ -31,9 +29,6 @@ export function RoomChatInput({
   const [showCameraModal, setShowCameraModal] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-
-  // Fetch user's active badge
-  const userBadge = useUserBadge(userId);
 
   const handleSend = useCallback(async () => {
     if (!message.trim() || sending || disabled) return;
@@ -136,15 +131,6 @@ export function RoomChatInput({
       />
 
       <div className="flex gap-2 items-end">
-        {/* User Badge Indicator - shown when user has active badge */}
-        {userBadge && (
-          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted/50 border border-border/30 mb-1">
-            <UserBadgeIcon tier={userBadge.tier} teamName={userBadge.team_name} size="md" />
-            <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[60px]">
-              {userBadge.team_name?.split(' ').pop() || 'Fan'}
-            </span>
-          </div>
-        )}
 
         {/* Camera Button */}
         <Button
