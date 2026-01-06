@@ -156,12 +156,13 @@ export const ChatMessage = memo(function ChatMessage({
               {isCoach ? '@coach' : displayName}
             </span>
             
-            {/* Badge Icon */}
+            {/* Badge Icon - more prominent */}
             {badge && !isCoach && (
               <UserBadgeIcon 
                 tier={badge.tier} 
                 teamName={badge.team_name}
-                size="sm"
+                size="md"
+                className="ml-0.5"
               />
             )}
             
@@ -270,6 +271,8 @@ export const ChatMessage = memo(function ChatMessage({
     prevProps.profile?.display_name === nextProps.profile?.display_name &&
     prevProps.profile?.avatar_url === nextProps.profile?.avatar_url &&
     JSON.stringify(prevProps.reactionCounts) === JSON.stringify(nextProps.reactionCounts) &&
-    prevProps.sponsor?.name === nextProps.sponsor?.name
+    prevProps.sponsor?.name === nextProps.sponsor?.name &&
+    prevProps.badge?.tier === nextProps.badge?.tier &&
+    prevProps.badge?.team_id === nextProps.badge?.team_id
   );
 });
