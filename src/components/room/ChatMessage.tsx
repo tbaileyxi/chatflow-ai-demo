@@ -16,6 +16,7 @@ interface UserBadge {
   team_id: string;
   tier: 'basic' | 'superfan';
   team_name?: string;
+  team_logo_url?: string;
 }
 
 interface Message {
@@ -56,6 +57,7 @@ interface ChatMessageProps {
   onReaction: (emoji: string) => void;
   sponsor?: TeamSponsor | null;
   badge?: UserBadge | null;
+  onBadgeClick?: (emoji: string) => void;
 }
 
 export const ChatMessage = memo(function ChatMessage({
@@ -65,7 +67,8 @@ export const ChatMessage = memo(function ChatMessage({
   reactionCounts,
   onReaction,
   sponsor,
-  badge
+  badge,
+  onBadgeClick
 }: ChatMessageProps) {
   const displayName = profile?.display_name || profile?.username || 'Anonymous';
   const avatarUrl = profile?.avatar_url;
@@ -139,7 +142,9 @@ export const ChatMessage = memo(function ChatMessage({
               <UserBadgeIcon 
                 tier={badge.tier} 
                 teamName={badge.team_name}
+                teamLogoUrl={badge.team_logo_url}
                 size="sm"
+                onClick={onBadgeClick ? () => onBadgeClick('🦬') : undefined}
               />
             </div>
           )}

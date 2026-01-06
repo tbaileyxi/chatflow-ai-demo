@@ -5,6 +5,7 @@ interface UserBadge {
   team_id: string;
   tier: 'basic' | 'superfan';
   team_name?: string;
+  team_logo_url?: string;
 }
 
 // Global cache to avoid refetching for same users
@@ -41,7 +42,7 @@ export function useUserBadges(userIds: string[]) {
         user_id,
         team_id,
         tier,
-        teams:team_id (name)
+        teams:team_id (name, logo_url)
       `)
       .in('user_id', toFetch)
       .eq('is_active', true);
@@ -58,7 +59,8 @@ export function useUserBadges(userIds: string[]) {
       const userBadge: UserBadge = {
         team_id: badge.team_id,
         tier: badge.tier,
-        team_name: badge.teams?.name
+        team_name: badge.teams?.name,
+        team_logo_url: badge.teams?.logo_url
       };
       newBadges[badge.user_id] = userBadge;
       badgeCache.set(badge.user_id, userBadge);

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, memo, useMemo } from '
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { ChatMessage } from '@/components/room/ChatMessage';
-import { RoomChatInput } from '@/components/room/RoomChatInput';
+import { RoomChatInput, RoomChatInputRef } from '@/components/room/RoomChatInput';
 import { DateDivider } from '@/components/chat/DateDivider';
 import { Button } from '@/components/ui/button';
 import { ChevronUp } from 'lucide-react';
@@ -54,7 +54,7 @@ export const UnifiedChat = memo(function UnifiedChat({
   const [reactionCounts, setReactionCounts] = useState<Record<string, Record<string, number>>>({});
   const [showNewMessages, setShowNewMessages] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  
+  const chatInputRef = useRef<RoomChatInputRef>(null);
   // Cache team sponsors (profiles now in state for reactivity)
   const sponsorsCacheRef = useRef<Record<string, TeamSponsor | null>>({});
   const [sponsors, setSponsors] = useState<Record<string, TeamSponsor | null>>({});
@@ -364,6 +364,7 @@ export const UnifiedChat = memo(function UnifiedChat({
                 onReaction={(emoji) => handleReaction(msg.id, emoji)}
                 sponsor={getSponsorForMessage(msg)}
                 badge={userBadges[msg.user_id] || null}
+                onBadgeClick={(emoji) => chatInputRef.current?.insertEmoji(emoji)}
               />
             </React.Fragment>
           );
