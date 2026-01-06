@@ -20,15 +20,15 @@ export function UserBadgeIcon({
   onClick
 }: UserBadgeIconProps) {
   const sizeClasses = {
-    sm: 'h-4 w-4',
-    md: 'h-5 w-5',
-    lg: 'h-6 w-6'
+    sm: 'h-5 w-5',
+    md: 'h-6 w-6',
+    lg: 'h-7 w-7'
   };
 
   const ringClasses = {
-    sm: 'ring-1',
+    sm: 'ring-2',
     md: 'ring-2',
-    lg: 'ring-2'
+    lg: 'ring-[3px]'
   };
 
   const title = teamName 
@@ -47,9 +47,9 @@ export function UserBadgeIcon({
           onClick && "cursor-pointer hover:scale-110 active:scale-95",
           !onClick && "cursor-default",
           sizeClasses[size],
-          // Add ring for superfan tier
-          tier === 'superfan' && `${ringClasses[size]} ring-yellow-400 shadow-lg shadow-yellow-400/30`,
-          tier === 'basic' && `${ringClasses[size]} ring-primary/50`,
+          // Ring + shadow for prominence
+          tier === 'superfan' && `${ringClasses[size]} ring-yellow-400 shadow-lg shadow-yellow-400/50`,
+          tier === 'basic' && `${ringClasses[size]} ring-primary shadow-md shadow-primary/30`,
           className
         )}
         title={title}
