@@ -6,7 +6,7 @@ import { useLiveContext, getStatusDisplay } from '@/hooks/useLiveContext';
 import { UnifiedChat } from '@/components/room/UnifiedChat';
 import { ChatBottomBar } from '@/components/room/ChatBottomBar';
 import { RoomChatInput, RoomChatInputRef } from '@/components/room/RoomChatInput';
-import { PulseChrome } from '@/components/room/PulseChrome';
+// Pulse content now flows directly into chat messages
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PickEmView } from '@/components/pickem/PickEmView';
 import { useToast } from '@/hooks/use-toast';
@@ -482,12 +482,7 @@ export const Huddle = () => {
         </div>
       )}
 
-      {/* Pulse Chrome - shows trending content */}
-      <PulseChrome
-        huddleId={huddleId!}
-        teamId={huddle?.team_id}
-        isLive={liveContext.mode === 'live'}
-      />
+      {/* Pulse content is now shown inline in chat as messages */}
 
       {/* Main Chat Area - UnifiedChat component handles messages only */}
       <main className="flex-1 flex flex-col overflow-hidden">
