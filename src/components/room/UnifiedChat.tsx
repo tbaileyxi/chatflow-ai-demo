@@ -294,7 +294,7 @@ export const UnifiedChat = memo(function UnifiedChat({
     }
   }, [user]);
 
-  // Send message
+  // Send message - and scroll to top after sending
   const handleSendMessage = useCallback(async (content: string, mediaUrl?: string) => {
     if (!user || !content.trim()) return;
 
@@ -310,8 +310,11 @@ export const UnifiedChat = memo(function UnifiedChat({
 
     if (error) {
       console.error('Error sending message:', error);
+    } else {
+      // Scroll to top after sending to see your message
+      setTimeout(() => scrollToTop(), 100);
     }
-  }, [huddleId, user]);
+  }, [huddleId, user, scrollToTop]);
 
   // Get sponsor for a message (only for team-directed @coach messages)
   const getSponsorForMessage = useCallback((msg: Message): TeamSponsor | null => {
