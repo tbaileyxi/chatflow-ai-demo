@@ -615,17 +615,6 @@ export default function Home() {
                     </div>
                     <div className="text-center">
                       <span className="text-xs max-w-[56px] truncate text-muted-foreground group-hover:text-foreground transition-colors block">{team.name}</span>
-                      {(isLive || isCooldown) && team.opponent_name && (
-                        <span className="text-[9px] text-muted-foreground">vs {team.opponent_name}</span>
-                      )}
-                      {(isLive || isCooldown) && team.live_state?.home_score !== null && team.live_state?.away_score !== null && (
-                        <span className={cn("text-[9px] font-semibold block", isLive ? "text-destructive" : "text-orange-500")}>
-                          {team.live_state.is_home_team 
-                            ? `${team.live_state.home_score}-${team.live_state.away_score}`
-                            : `${team.live_state.away_score}-${team.live_state.home_score}`
-                          }
-                        </span>
-                      )}
                     </div>
                   </button>
                 );

@@ -511,6 +511,7 @@ export const Huddle = () => {
                     media_url: mediaUrl,
                     media_type: mediaUrl ? 'image' : 'text'
                   });
+                  // Scroll handled by UnifiedChat realtime subscription
                 }}
                 placeholder="Say something..."
               />
