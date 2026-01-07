@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, memo, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, memo, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { ChatMessage } from '@/components/room/ChatMessage';
@@ -55,6 +55,7 @@ export const UnifiedChat = memo(function UnifiedChat({
   const [reactionCounts, setReactionCounts] = useState<Record<string, Record<string, number>>>({});
   const [showNewMessages, setShowNewMessages] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const didInitialScrollRef = useRef(false);
   // Cache team sponsors (profiles now in state for reactivity)
   const sponsorsCacheRef = useRef<Record<string, TeamSponsor | null>>({});
   const [sponsors, setSponsors] = useState<Record<string, TeamSponsor | null>>({});
@@ -81,6 +82,7 @@ export const UnifiedChat = memo(function UnifiedChat({
 
   // Reset scroll anchor + throttles when entering a different huddle
   useEffect(() => {
+    didInitialScrollRef.current = false;
     lastFetchRef.current = 0;
     lastMessageIdsRef.current = '';
     setShowNewMessages(false);
@@ -152,10 +154,12 @@ export const UnifiedChat = memo(function UnifiedChat({
 
     setMessages(data || []);
     
-    // Scroll to top on initial load (newest messages at top)
-    setTimeout(() => {
-      scrollToTop('auto');
-    }, 100);
+    // Scroll to top after initial load (wait for DOM to paint)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollToTop('auto');
+      });
+    });
 
     // Fetch profiles for unknown users - update state for reactivity
     const userIds = [...new Set((data || []).map(m => m.user_id))];
@@ -207,6 +211,14 @@ export const UnifiedChat = memo(function UnifiedChat({
     fetchMessages();
   }, [fetchMessages]);
 
+  // Guaranteed anchor: once messages render, force scroll-to-top on entry
+  useLayoutEffect(() => {
+    if (!didInitialScrollRef.current && messages.length > 0) {
+      didInitialScrollRef.current = true;
+      scrollToTop('auto');
+    }
+  }, [messages.length, scrollToTop]);
+
   // Realtime subscription - PREPEND new messages (newest at top)
   useEffect(() => {
     const channel = supabase
@@ -220,25 +232,31 @@ export const UnifiedChat = memo(function UnifiedChat({
           filter: `huddle_id=eq.${huddleId}`
         },
         (payload) => {
+          const newMsg = payload.new as Message;
+
           setMessages(prev => {
-            if (prev.some(m => m.id === payload.new.id)) return prev;
+            if (prev.some(m => m.id === newMsg.id)) return prev;
             // PREPEND new message at the beginning (newest first)
-            const updated = [payload.new as Message, ...prev];
+            const updated = [newMsg, ...prev];
             lastMessageIdsRef.current = updated.map(m => m.id).join(',');
             return updated;
           });
-          
-          // Auto-scroll to top if user is near top, otherwise show pill
-          if (isNearTop()) {
-            setTimeout(() => {
-              scrollToTop();
-            }, 100);
+
+          const isOwnMessage = !!user && newMsg.user_id === user.id;
+
+          // If I just sent, ALWAYS jump to top so I see it.
+          if (isOwnMessage) {
+            setShowNewMessages(false);
+            setTimeout(() => scrollToTop(), 100);
+          } else if (isNearTop()) {
+            // Auto-scroll to top if user is near top, otherwise show pill
+            setTimeout(() => scrollToTop(), 100);
           } else {
             setShowNewMessages(true);
           }
-          
+
           // Fetch profile for new user - update state for reactivity
-          const userId = payload.new.user_id;
+          const userId = newMsg.user_id;
           if (!profiles[userId]) {
             supabase
               .from('profiles')
@@ -258,7 +276,7 @@ export const UnifiedChat = memo(function UnifiedChat({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [huddleId, isNearTop, scrollToTop]);
+  }, [huddleId, isNearTop, scrollToTop, user, profiles]);
 
   // Handle reaction
   const handleReaction = useCallback(async (messageId: string, emoji: string) => {

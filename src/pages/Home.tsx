@@ -233,9 +233,18 @@ export default function Home() {
         .select('*')
         .in('state', ['live', 'cooldown']);
       
+      // Guardrail: ignore stale live states (prevents incorrect LIVE pills)
       const liveStatesMap = new Map<string, TeamLiveState>();
       (liveStatesData || []).forEach((ls: any) => {
-        liveStatesMap.set(ls.team_id, ls);
+        const updatedAt = ls.updated_at ? new Date(ls.updated_at).getTime() : 0;
+        const ageMinutes = updatedAt ? (Date.now() - updatedAt) / 60000 : Number.POSITIVE_INFINITY;
+
+        const isFreshLive = ls.state === 'live' && ageMinutes <= 15;
+        const isFreshCooldown = ls.state === 'cooldown' && ageMinutes <= 360; // 6h
+
+        if (isFreshLive || isFreshCooldown) {
+          liveStatesMap.set(ls.team_id, ls);
+        }
       });
 
       // Create team name lookup for opponent display
@@ -319,7 +328,7 @@ export default function Home() {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   };
 
-  // My Huddles Section Component with expandable grid
+  // My Huddles Section Component (split into Followed Teams + Private)
   const MyHuddlesSection = ({
     publicHuddles,
     privateHuddles,
@@ -331,105 +340,108 @@ export default function Home() {
     huddlesLoading: boolean;
     onHuddleClick: (huddle: Huddle) => void;
   }) => {
-    const [expanded, setExpanded] = useState(false);
-    const allHuddles = [...publicHuddles, ...privateHuddles];
-    const hasHuddles = allHuddles.length > 0;
-    const INITIAL_VISIBLE = 8; // 2 rows of 4
-    const showExpand = allHuddles.length > INITIAL_VISIBLE;
-    const visibleHuddles = expanded ? allHuddles : allHuddles.slice(0, INITIAL_VISIBLE);
+    const hasAny = publicHuddles.length > 0 || privateHuddles.length > 0;
 
-    const HuddleCard = ({ huddle }: { huddle: Huddle }) => {
-      const isPublic = huddle.is_official_team_huddle;
-      const isVerified = huddle.is_verified;
+    const isRecentlyActive = (h: Huddle) => {
+      const ts = h.latest_message?.created_at ? new Date(h.latest_message.created_at).getTime() : 0;
+      if (!ts) return false;
+      return (Date.now() - ts) < 60 * 60 * 1000; // 1 hour
+    };
+
+    const HuddleTile = ({ huddle, kind }: { huddle: Huddle; kind: 'public' | 'private' }) => {
+      const active = isRecentlyActive(huddle) || (huddle.unread_count || 0) > 0;
 
       return (
-        <button
-          onClick={() => onHuddleClick(huddle)}
-          className="relative flex flex-col items-center gap-2 p-3 rounded-xl bg-card border border-border/50 hover:border-primary/50 hover:bg-card/80 transition-all group min-w-[80px]"
-        >
-          {/* Unread badge - top right of card */}
-          {huddle.unread_count && huddle.unread_count > 0 && (
-            <div className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive flex items-center justify-center z-10">
-              <span className="text-[10px] font-bold text-destructive-foreground">
-                {huddle.unread_count > 9 ? '9+' : huddle.unread_count}
-              </span>
+        <div className="rounded-xl bg-card border border-border/50 p-3">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-12 w-12 ring-2 ring-border/30">
+              <AvatarImage src={huddle.team_logo_url} alt={huddle.name} />
+              <AvatarFallback className="text-xs bg-muted">
+                {huddle.name.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-sm truncate">{huddle.name}</p>
+                {kind === 'private' && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
+              </div>
+              <p className="text-xs text-muted-foreground truncate">
+                {active
+                  ? `Active now${huddle.participant_count > 1 ? `: ${huddle.participant_count} members chatting` : ''}`
+                  : (kind === 'public' ? 'Join the conversation!' : 'Invite friends for game talk!')}
+              </p>
             </div>
-          )}
-          
-          <Avatar className="h-12 w-12 ring-2 ring-border/30 group-hover:ring-primary/50 transition-all">
-            <AvatarImage src={huddle.team_logo_url} alt={huddle.name} />
-            <AvatarFallback className="text-xs bg-muted">
-              {huddle.name.slice(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          
-          {/* Huddle name - ALWAYS visible */}
-          <div className="text-center w-full">
-            <p className="text-xs font-medium truncate max-w-[72px] mx-auto text-foreground">
-              {huddle.name}
-            </p>
-            <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground mt-0.5">
-              {isPublic ? (
-                <Globe className="h-2.5 w-2.5" />
-              ) : isVerified ? (
-                <ShieldCheck className="h-2.5 w-2.5 text-emerald-500" />
-              ) : (
-                <Lock className="h-2.5 w-2.5" />
-              )}
-              <span>{huddle.participant_count}</span>
-            </div>
+
+            <Button size="sm" variant="outline" onClick={() => onHuddleClick(huddle)}>
+              Enter
+            </Button>
           </div>
-        </button>
+        </div>
       );
     };
 
     return (
-      <section>
-        <div className="flex items-center gap-2 mb-4">
+      <section className="space-y-6">
+        <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-bold">My Huddles</h2>
         </div>
-        
+
         {huddlesLoading ? (
-          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex flex-col items-center gap-2 animate-pulse">
-                <div className="h-14 w-14 rounded-full bg-muted" />
-                <div className="h-3 w-12 bg-muted rounded" />
-              </div>
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />
             ))}
           </div>
-        ) : !hasHuddles ? (
-          <div className="bg-card/50 rounded-xl p-6 border border-dashed border-border/50 text-center">
-            <p className="text-sm text-muted-foreground">Follow teams below to join their huddles</p>
+        ) : !hasAny ? (
+          <div className="bg-card/50 rounded-xl p-6 border border-dashed border-border/50 text-center space-y-3">
+            <p className="text-sm text-muted-foreground">Build your huddle! Follow a team or create a private group.</p>
+            <Button onClick={() => navigate('/huddle-search')} className="w-full">
+              Find My Team
+            </Button>
           </div>
         ) : (
-          <div className="space-y-3">
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
-              {visibleHuddles.map((huddle) => (
-                <HuddleCard key={huddle.id} huddle={huddle} />
-              ))}
+          <div className="space-y-6">
+            {/* Followed Teams */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">Followed Teams</h3>
+                <span className="text-xs text-muted-foreground">Public</span>
+              </div>
+
+              {publicHuddles.length === 0 ? (
+                <div className="bg-card/50 rounded-xl p-4 border border-dashed border-border/50">
+                  <p className="text-sm text-muted-foreground">No followed teams yet — pick a team below and tap into the chat.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {publicHuddles.map((h) => (
+                    <HuddleTile key={h.id} huddle={h} kind="public" />
+                  ))}
+                </div>
+              )}
             </div>
-            {showExpand && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setExpanded(!expanded)}
-                className="w-full text-muted-foreground hover:text-foreground"
-              >
-                {expanded ? (
-                  <>
-                    <ChevronUp className="h-4 w-4 mr-1" />
-                    Show Less
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="h-4 w-4 mr-1" />
-                    Show All ({allHuddles.length})
-                  </>
-                )}
-              </Button>
-            )}
+
+            {/* Private huddles */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">My Private Huddles</h3>
+                <span className="text-xs text-muted-foreground">Private</span>
+              </div>
+
+              {privateHuddles.length === 0 ? (
+                <div className="bg-card/50 rounded-xl p-4 border border-dashed border-border/50">
+                  <p className="text-sm text-muted-foreground">Create your first private huddle—invite friends for game talk!</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {privateHuddles.map((h) => (
+                    <HuddleTile key={h.id} huddle={h} kind="private" />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </section>
@@ -521,7 +533,7 @@ export default function Home() {
             </div>
           ) : (
             <div className="bg-card/50 rounded-xl p-6 border border-dashed border-border/50 text-center">
-              <p className="text-sm text-muted-foreground">No live events right now</p>
+              <p className="text-sm text-muted-foreground">No special events at this time—check back for playoffs, majors, and more!</p>
             </div>
           )}
         </section>
