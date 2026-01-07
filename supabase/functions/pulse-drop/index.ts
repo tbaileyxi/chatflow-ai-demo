@@ -77,13 +77,16 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     let body: any;
-    try { body = await req.json(); } catch {
-      return new Response(JSON.stringify({ error: 'Missing body', example: { huddle_id: 'uuid', team_id: 'uuid', team_name: 'Bears', is_live: false } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    let body: any;
-    try { body = await req.json(); } catch {
-      return new Response(JSON.stringify({ error: 'Missing body', example: { huddle_id: 'uuid', team_id: 'uuid', team_name: 'Bears', is_live: false } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({
+          error: 'Missing body',
+          example: { huddle_id: 'uuid', team_id: 'uuid', team_name: 'Bears', is_live: false }
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     let { huddle_id, team_id, team_name, is_live, event_id, debug: requestDebug } = body;
@@ -115,7 +118,9 @@ serve(async (req) => {
     if (!systemUser) throw new Error('Could not get system user');
 
     // Throttle pulse frequency per huddle
-    const minIntervalMinutes = is_live ? 10 : 180;
+    // - live: frequent, to feel real-time
+    // - non-live: at least hourly to keep feeds fresh
+    const minIntervalMinutes = is_live ? 10 : 60;
     debug.min_interval_minutes = minIntervalMinutes;
     const { data: lastPulse } = await supabase
       .from('huddle_messages')

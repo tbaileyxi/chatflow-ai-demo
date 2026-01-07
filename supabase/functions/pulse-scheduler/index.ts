@@ -7,8 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
 
-const BATCH_SIZE = 5;
+const BATCH_SIZE = 15;
 const CONCURRENCY_CAP = 4;
+// Note: cron runs frequently; pulse-drop enforces per-huddle throttling (live vs non-live).
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -34,16 +35,19 @@ serve(async (req) => {
   const CRON_SECRET = Deno.env.get('CRON_SECRET');
   const providedSecret = req.headers.get('x-cron-secret');
 
-  // Allow either (a) x-cron-secret match OR (b) service-role bearer (for pg_cron net.http_post)
+  // Allow either (a) x-cron-secret match OR (b) service-role bearer OR (c) anon-key bearer (pg_cron convenience)
   const authHeader = req.headers.get('authorization') || '';
   const bearer = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7) : null;
   const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || null;
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || null;
 
+  // If a cron secret is configured, enforce one of the allowed auth methods
   if (CRON_SECRET) {
     const okSecret = providedSecret === CRON_SECRET;
     const okServiceRole = !!(bearer && serviceRole && bearer === serviceRole);
+    const okAnon = !!(bearer && anonKey && bearer === anonKey);
 
-    if (!okSecret && !okServiceRole) {
+    if (!okSecret && !okServiceRole && !okAnon) {
       console.error('[pulse-scheduler] 401 - invalid cron secret / bearer');
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
