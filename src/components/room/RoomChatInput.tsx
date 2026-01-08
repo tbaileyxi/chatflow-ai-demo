@@ -1,22 +1,31 @@
 import React, { useState, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Mic, Camera, Bot } from 'lucide-react';
+import { Send, Mic, Camera, Bot, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
+interface ReplyContext {
+  messageId: string;
+  displayName: string;
+  content: string;
+}
+
 interface RoomChatInputProps {
   huddleId: string;
   userId?: string;
-  onSendMessage: (content: string, mediaUrl?: string) => Promise<void>;
+  onSendMessage: (content: string, mediaUrl?: string, replyToId?: string) => Promise<void>;
   disabled?: boolean;
   placeholder?: string;
+  replyTo?: ReplyContext | null;
+  onCancelReply?: () => void;
 }
 
 export interface RoomChatInputRef {
   insertEmoji: (emoji: string) => void;
+  focus: () => void;
 }
 
 export const RoomChatInput = forwardRef<RoomChatInputRef, RoomChatInputProps>(function RoomChatInput({
@@ -24,7 +33,9 @@ export const RoomChatInput = forwardRef<RoomChatInputRef, RoomChatInputProps>(fu
   userId,
   onSendMessage,
   disabled = false,
-  placeholder = "Say something..."
+  placeholder = "Say something...",
+  replyTo,
+  onCancelReply
 }, ref) {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -34,10 +45,13 @@ export const RoomChatInput = forwardRef<RoomChatInputRef, RoomChatInputProps>(fu
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  // Expose insertEmoji method for badge click
+  // Expose insertEmoji and focus methods
   useImperativeHandle(ref, () => ({
     insertEmoji: (emoji: string) => {
       setMessage(prev => prev + emoji);
+      textareaRef.current?.focus();
+    },
+    focus: () => {
       textareaRef.current?.focus();
     }
   }), []);
@@ -47,8 +61,9 @@ export const RoomChatInput = forwardRef<RoomChatInputRef, RoomChatInputProps>(fu
 
     setSending(true);
     try {
-      await onSendMessage(message.trim());
+      await onSendMessage(message.trim(), undefined, replyTo?.messageId);
       setMessage('');
+      onCancelReply?.();
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
@@ -58,7 +73,7 @@ export const RoomChatInput = forwardRef<RoomChatInputRef, RoomChatInputProps>(fu
     } finally {
       setSending(false);
     }
-  }, [message, sending, disabled, onSendMessage]);
+  }, [message, sending, disabled, onSendMessage, replyTo, onCancelReply]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -142,10 +157,26 @@ export const RoomChatInput = forwardRef<RoomChatInputRef, RoomChatInputProps>(fu
         style={{ display: 'none' }}
       />
 
-      <div className="flex gap-2 items-end">
+      <div className="flex flex-col gap-2">
+        {/* Reply indicator */}
+        {replyTo && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg border border-border/50">
+            <div className="flex-1 text-xs text-muted-foreground truncate">
+              <span className="font-medium text-foreground">↩ Replying to {replyTo.displayName}:</span>{' '}
+              <span className="line-clamp-1">{replyTo.content}</span>
+            </div>
+            <button
+              onClick={onCancelReply}
+              className="p-1 hover:bg-muted rounded-full transition-colors"
+            >
+              <X className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          </div>
+        )}
 
-        {/* Camera Button */}
-        <Button
+        <div className="flex gap-2 items-end">
+          {/* Camera Button */}
+          <Button
           variant="ghost"
           size="sm"
           className="h-10 w-10 p-0 rounded-full border border-muted-foreground/30 text-muted-foreground hover:text-primary hover:border-primary"
@@ -201,6 +232,7 @@ export const RoomChatInput = forwardRef<RoomChatInputRef, RoomChatInputProps>(fu
         >
           <Send className="w-5 h-5" />
         </Button>
+        </div>
       </div>
 
       {/* Voice Drop Modal (Coming Soon) */}
