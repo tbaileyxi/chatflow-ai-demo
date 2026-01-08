@@ -6,7 +6,7 @@ import { DateDivider } from '@/components/chat/DateDivider';
 import { Button } from '@/components/ui/button';
 import { ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isSameDay } from 'date-fns';
+import { isSameDay, formatDistanceToNow } from 'date-fns';
 import { useUserBadges } from '@/hooks/useUserBadges';
 
 interface Message {
@@ -357,16 +357,6 @@ export const UnifiedChat = memo(function UnifiedChat({
     onReply?.(msg, displayName);
     inputRef?.current?.focus();
   }, [profiles, onReply, inputRef]);
-
-  // Get reply-to message data for rendering
-  const getReplyToData = useCallback((replyToId: string): { content: string; displayName: string } | null => {
-    const replyMsg = messages.find(m => m.id === replyToId);
-    if (!replyMsg) return null;
-    const displayName = replyMsg.is_bot_message ? '@coach' : 
-      (profiles[replyMsg.user_id]?.display_name || profiles[replyMsg.user_id]?.username || 'Anonymous');
-    return { content: replyMsg.content, displayName };
-  }, [messages, profiles]);
-
   // Get sponsor for a message (only for team-directed @coach messages)
   const getSponsorForMessage = useCallback((msg: Message): TeamSponsor | null => {
     // Only @coach messages can have sponsors
@@ -407,33 +397,74 @@ export const UnifiedChat = memo(function UnifiedChat({
         className="flex-1 overflow-y-auto px-4 py-2 pb-36"
         onScroll={handleScroll}
       >
-        {messages.map((msg, index) => {
-          const prevMessage = index > 0 ? messages[index - 1] : null;
-          
-          // Show date divider when date changes (top-down: check if current differs from previous)
-          // Since newest is first, we show divider when date changes going DOWN the list
-          const showDateDivider = index === 0 || 
-            (prevMessage?.created_at && msg.created_at && 
-             !isSameDay(new Date(msg.created_at), new Date(prevMessage.created_at)));
+        {(() => {
+          // Group messages: separate parent messages from replies
+          const parentMessages = messages.filter(m => !m.reply_to_id);
+          const repliesByParent: Record<string, Message[]> = {};
+          messages.filter(m => m.reply_to_id).forEach(reply => {
+            const parentId = reply.reply_to_id!;
+            if (!repliesByParent[parentId]) repliesByParent[parentId] = [];
+            repliesByParent[parentId].push(reply);
+          });
+          // Sort replies by created_at ascending (oldest first in thread)
+          Object.values(repliesByParent).forEach(arr => arr.sort((a, b) => 
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          ));
 
-          return (
-            <React.Fragment key={msg.id}>
-              {showDateDivider && <DateDivider date={new Date(msg.created_at)} />}
-              <ChatMessage
-                message={msg}
-                profile={profiles[msg.user_id]}
-                isOwn={msg.user_id === user?.id}
-                reactionCounts={reactionCounts[msg.id] || {}}
-                onReaction={(emoji) => handleReaction(msg.id, emoji)}
-                onReply={onReply ? handleReplyToMessage : undefined}
-                sponsor={getSponsorForMessage(msg)}
-                badge={userBadges[msg.user_id] || null}
-                onBadgeClick={onBadgeClick}
-                replyToMessage={msg.reply_to_id ? getReplyToData(msg.reply_to_id) : null}
-              />
-            </React.Fragment>
-          );
-        })}
+          return parentMessages.map((msg, index) => {
+            const prevMessage = index > 0 ? parentMessages[index - 1] : null;
+            const showDateDivider = index === 0 || 
+              (prevMessage?.created_at && msg.created_at && 
+               !isSameDay(new Date(msg.created_at), new Date(prevMessage.created_at)));
+            const replies = repliesByParent[msg.id] || [];
+
+            return (
+              <React.Fragment key={msg.id}>
+                {showDateDivider && <DateDivider date={new Date(msg.created_at)} />}
+                <ChatMessage
+                  message={msg}
+                  profile={profiles[msg.user_id]}
+                  isOwn={msg.user_id === user?.id}
+                  reactionCounts={reactionCounts[msg.id] || {}}
+                  onReaction={(emoji) => handleReaction(msg.id, emoji)}
+                  onReply={onReply ? handleReplyToMessage : undefined}
+                  sponsor={getSponsorForMessage(msg)}
+                  badge={userBadges[msg.user_id] || null}
+                  onBadgeClick={onBadgeClick}
+                />
+                {/* Inline Thread Replies */}
+                {replies.length > 0 && (
+                  <div className="ml-10 pl-3 border-l-2 border-border/50 mb-4 space-y-2">
+                    {replies.map(reply => (
+                      <div key={reply.id} className="flex items-start gap-2">
+                        <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
+                          {profiles[reply.user_id]?.avatar_url ? (
+                            <img src={profiles[reply.user_id].avatar_url} alt="" className="h-5 w-5 rounded-full object-cover" />
+                          ) : (
+                            <span className="text-[9px] text-muted-foreground">
+                              {(profiles[reply.user_id]?.display_name || 'A').slice(0, 1).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-medium text-foreground">
+                              {profiles[reply.user_id]?.display_name || profiles[reply.user_id]?.username || 'Anonymous'}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {formatDistanceToNow(new Date(reply.created_at), { addSuffix: false })}
+                            </span>
+                          </div>
+                          <p className="text-sm text-foreground/90">{reply.content}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          });
+        })()}
         
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
