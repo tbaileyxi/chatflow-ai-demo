@@ -60,7 +60,6 @@ interface ChatMessageProps {
   sponsor?: TeamSponsor | null;
   badge?: UserBadge | null;
   onBadgeClick?: (emoji: string) => void;
-  replyToMessage?: { content: string; displayName: string } | null;
 }
 
 export const ChatMessage = memo(function ChatMessage({
@@ -72,8 +71,7 @@ export const ChatMessage = memo(function ChatMessage({
   onReply,
   sponsor,
   badge,
-  onBadgeClick,
-  replyToMessage
+  onBadgeClick
 }: ChatMessageProps) {
   const displayName = profile?.display_name || profile?.username || 'Anonymous';
   const avatarUrl = profile?.avatar_url;
@@ -169,13 +167,6 @@ export const ChatMessage = memo(function ChatMessage({
           isCoach && "bg-gradient-to-br from-cyan-500/10 to-blue-600/10 border-2 border-cyan-500/30 shadow-lg shadow-cyan-500/10",
           isPulse && !isCoach && "bg-muted/50 border border-border/30"
         )}>
-          {/* Reply Context */}
-          {replyToMessage && (
-            <div className="mb-2 pl-2 border-l-2 border-primary/50 text-xs text-muted-foreground">
-              <span className="font-medium">↩ {replyToMessage.displayName}:</span>{' '}
-              <span className="line-clamp-1">{replyToMessage.content}</span>
-            </div>
-          )}
           {/* Name + Time (badge is now on avatar) */}
           <div className={cn(
             "flex items-center gap-1.5 mb-1 flex-wrap",
