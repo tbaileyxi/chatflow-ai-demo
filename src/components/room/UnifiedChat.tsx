@@ -22,6 +22,13 @@ interface Message {
   pulse_source?: string;
   embed_code?: string;
   origin_team_id?: string;
+  reply_to_id?: string;
+}
+
+interface ReplyContext {
+  messageId: string;
+  displayName: string;
+  content: string;
 }
 
 interface Profile {
@@ -41,13 +48,21 @@ interface UnifiedChatProps {
   team1Id?: string | null;
   team2Id?: string | null;
   onBadgeClick?: (emoji: string) => void;
+  inputRef?: React.RefObject<any>;
+  replyTo?: ReplyContext | null;
+  onReply?: (message: Message, displayName: string) => void;
+  onCancelReply?: () => void;
 }
 
 export const UnifiedChat = memo(function UnifiedChat({
   huddleId,
   team1Id,
   team2Id,
-  onBadgeClick
+  onBadgeClick,
+  inputRef,
+  replyTo,
+  onReply,
+  onCancelReply
 }: UnifiedChatProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -313,7 +328,7 @@ export const UnifiedChat = memo(function UnifiedChat({
   }, [user]);
 
   // Send message - and scroll to top after sending
-  const handleSendMessage = useCallback(async (content: string, mediaUrl?: string) => {
+  const handleSendMessage = useCallback(async (content: string, mediaUrl?: string, replyToId?: string) => {
     if (!user || !content.trim()) return;
 
     const { error } = await supabase
@@ -323,7 +338,8 @@ export const UnifiedChat = memo(function UnifiedChat({
         user_id: user.id,
         content: content.trim(),
         media_url: mediaUrl,
-        media_type: mediaUrl ? 'image' : 'text'
+        media_type: mediaUrl ? 'image' : 'text',
+        reply_to_id: replyToId || null
       });
 
     if (error) {
@@ -333,6 +349,23 @@ export const UnifiedChat = memo(function UnifiedChat({
       setTimeout(() => scrollToTop(), 100);
     }
   }, [huddleId, user, scrollToTop]);
+
+  // Handle reply click from message
+  const handleReplyToMessage = useCallback((msg: Message) => {
+    const displayName = msg.is_bot_message ? '@coach' : 
+      (profiles[msg.user_id]?.display_name || profiles[msg.user_id]?.username || 'Anonymous');
+    onReply?.(msg, displayName);
+    inputRef?.current?.focus();
+  }, [profiles, onReply, inputRef]);
+
+  // Get reply-to message data for rendering
+  const getReplyToData = useCallback((replyToId: string): { content: string; displayName: string } | null => {
+    const replyMsg = messages.find(m => m.id === replyToId);
+    if (!replyMsg) return null;
+    const displayName = replyMsg.is_bot_message ? '@coach' : 
+      (profiles[replyMsg.user_id]?.display_name || profiles[replyMsg.user_id]?.username || 'Anonymous');
+    return { content: replyMsg.content, displayName };
+  }, [messages, profiles]);
 
   // Get sponsor for a message (only for team-directed @coach messages)
   const getSponsorForMessage = useCallback((msg: Message): TeamSponsor | null => {
@@ -392,9 +425,11 @@ export const UnifiedChat = memo(function UnifiedChat({
                 isOwn={msg.user_id === user?.id}
                 reactionCounts={reactionCounts[msg.id] || {}}
                 onReaction={(emoji) => handleReaction(msg.id, emoji)}
+                onReply={onReply ? handleReplyToMessage : undefined}
                 sponsor={getSponsorForMessage(msg)}
                 badge={userBadges[msg.user_id] || null}
                 onBadgeClick={onBadgeClick}
+                replyToMessage={msg.reply_to_id ? getReplyToData(msg.reply_to_id) : null}
               />
             </React.Fragment>
           );

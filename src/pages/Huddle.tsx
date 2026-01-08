@@ -36,6 +36,7 @@ export const Huddle = () => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [liveGame, setLiveGame] = useState<any>(null);
+  const [replyTo, setReplyTo] = useState<{ messageId: string; displayName: string; content: string } | null>(null);
   const chatInputRef = useRef<RoomChatInputRef>(null);
 
   // Live Context Engine - automatically detects if team is in a live game
@@ -491,6 +492,16 @@ export const Huddle = () => {
           team1Id={huddle?.team_id}
           team2Id={null}
           onBadgeClick={(emoji) => chatInputRef.current?.insertEmoji(emoji)}
+          inputRef={chatInputRef}
+          replyTo={replyTo}
+          onReply={(msg, displayName) => {
+            setReplyTo({
+              messageId: msg.id,
+              displayName,
+              content: msg.content.slice(0, 100)
+            });
+          }}
+          onCancelReply={() => setReplyTo(null)}
         />
       </main>
 
@@ -503,17 +514,21 @@ export const Huddle = () => {
                 ref={chatInputRef}
                 huddleId={huddleId!}
                 userId={user.id}
-                onSendMessage={async (content, mediaUrl) => {
+                onSendMessage={async (content, mediaUrl, replyToId) => {
                   await supabase.from('huddle_messages').insert({
                     huddle_id: huddleId,
                     user_id: user.id,
                     content,
                     media_url: mediaUrl,
-                    media_type: mediaUrl ? 'image' : 'text'
+                    media_type: mediaUrl ? 'image' : 'text',
+                    reply_to_id: replyToId || null
                   });
+                  setReplyTo(null);
                   // Scroll handled by UnifiedChat realtime subscription
                 }}
                 placeholder="Say something..."
+                replyTo={replyTo}
+                onCancelReply={() => setReplyTo(null)}
               />
             </div>
             <ChatBottomBar

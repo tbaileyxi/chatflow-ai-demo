@@ -1,6 +1,6 @@
 import React, { memo, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { ThumbsUp, Laugh, Eye } from 'lucide-react';
+import { ThumbsUp, Laugh, Eye, Reply } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -31,6 +31,7 @@ interface Message {
   is_bot_message?: boolean;
   pulse_source?: string;
   embed_code?: string;
+  reply_to_id?: string;
 }
 
 interface TeamSponsor {
@@ -55,9 +56,11 @@ interface ChatMessageProps {
   isOwn: boolean;
   reactionCounts: ReactionCount;
   onReaction: (emoji: string) => void;
+  onReply?: (message: Message) => void;
   sponsor?: TeamSponsor | null;
   badge?: UserBadge | null;
   onBadgeClick?: (emoji: string) => void;
+  replyToMessage?: { content: string; displayName: string } | null;
 }
 
 export const ChatMessage = memo(function ChatMessage({
@@ -66,14 +69,20 @@ export const ChatMessage = memo(function ChatMessage({
   isOwn,
   reactionCounts,
   onReaction,
+  onReply,
   sponsor,
   badge,
-  onBadgeClick
+  onBadgeClick,
+  replyToMessage
 }: ChatMessageProps) {
   const displayName = profile?.display_name || profile?.username || 'Anonymous';
   const avatarUrl = profile?.avatar_url;
   const isCoach = message.is_bot_message || message.message_type === 'coach_response';
   const isPulse = message.pulse_source || message.message_type === 'pulse';
+
+  const handleReplyClick = useCallback(() => {
+    onReply?.(message);
+  }, [onReply, message]);
   
   // Extract media from pulse content OR user uploads
   const hasInlineMedia = message.media_url && (
@@ -160,6 +169,13 @@ export const ChatMessage = memo(function ChatMessage({
           isCoach && "bg-gradient-to-br from-cyan-500/10 to-blue-600/10 border-2 border-cyan-500/30 shadow-lg shadow-cyan-500/10",
           isPulse && !isCoach && "bg-muted/50 border border-border/30"
         )}>
+          {/* Reply Context */}
+          {replyToMessage && (
+            <div className="mb-2 pl-2 border-l-2 border-primary/50 text-xs text-muted-foreground">
+              <span className="font-medium">↩ {replyToMessage.displayName}:</span>{' '}
+              <span className="line-clamp-1">{replyToMessage.content}</span>
+            </div>
+          )}
           {/* Name + Time (badge is now on avatar) */}
           <div className={cn(
             "flex items-center gap-1.5 mb-1 flex-wrap",
@@ -243,11 +259,22 @@ export const ChatMessage = memo(function ChatMessage({
         </div>
       </div>
 
-      {/* Inline Reactions */}
+      {/* Inline Reactions + Reply */}
       <div className={cn(
         "flex items-center gap-1 mt-1.5 px-10",
         isOwn && "justify-end"
       )}>
+        {/* Reply button */}
+        {onReply && (
+          <button
+            onClick={handleReplyClick}
+            className="flex items-center gap-1 px-2 py-1 rounded-full text-xs transition-all hover:bg-muted active:scale-95 text-muted-foreground hover:text-foreground"
+            title="Reply"
+          >
+            <Reply className="w-3.5 h-3.5" />
+          </button>
+        )}
+        
         {REACTIONS.map(({ emoji, label }) => {
           const count = reactionCounts[emoji] || 0;
           return (
