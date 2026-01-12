@@ -88,6 +88,42 @@ export type Database = {
           },
         ]
       }
+      cash_mode_subscriptions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+          user_id: string
+          venmo_username: string | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id: string
+          venmo_username?: string | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id?: string
+          venmo_username?: string | null
+        }
+        Relationships: []
+      }
       content_admin_teams: {
         Row: {
           created_at: string
@@ -272,8 +308,13 @@ export type Database = {
           line_description: string
           line_value: number
           locked_at: string | null
+          paid_confirmed_at: string | null
+          paid_confirmed_by: string | null
+          paid_marked_at: string | null
+          paid_marked_by: string | null
           poster_id: string
           settled_at: string | null
+          settlement_status: string
           sport: string
           stake: number
           status: string
@@ -294,8 +335,13 @@ export type Database = {
           line_description: string
           line_value: number
           locked_at?: string | null
+          paid_confirmed_at?: string | null
+          paid_confirmed_by?: string | null
+          paid_marked_at?: string | null
+          paid_marked_by?: string | null
           poster_id: string
           settled_at?: string | null
+          settlement_status?: string
           sport?: string
           stake?: number
           status?: string
@@ -316,8 +362,13 @@ export type Database = {
           line_description?: string
           line_value?: number
           locked_at?: string | null
+          paid_confirmed_at?: string | null
+          paid_confirmed_by?: string | null
+          paid_marked_at?: string | null
+          paid_marked_by?: string | null
           poster_id?: string
           settled_at?: string | null
+          settlement_status?: string
           sport?: string
           stake?: number
           status?: string
