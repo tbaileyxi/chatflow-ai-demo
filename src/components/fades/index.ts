@@ -7,3 +7,8 @@ export { ActiveFadeCard } from './ActiveFadeCard';
 export { LockedFadeCard } from './LockedFadeCard';
 export { SettledFadeCard } from './SettledFadeCard';
 export { PrivateFeaturesTeaser } from './PrivateFeaturesTeaser';
+export { InlineFadeCard } from './InlineFadeCard';
+export { GameFadeCards } from './GameFadeCards';
+export { FadeConfirmSheet } from './FadeConfirmSheet';
+export { FadesInChat } from './FadesInChat';
+export { CashModeUpgradeModal } from './CashModeUpgradeModal';

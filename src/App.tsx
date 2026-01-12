@@ -26,6 +26,7 @@ import { HuddleCoachSettings } from "./pages/HuddleCoachSettings";
 import FAQ from "./pages/FAQ";
 import { RetroDemo } from "./pages/RetroDemo";
 import Room from "./pages/Room";
+import Ledger from "./pages/Ledger";
 
 const queryClient = new QueryClient();
 
@@ -63,6 +64,7 @@ const AppContent = () => {
           <Route path="/join/:huddleId" element={<JoinHuddleRedirect />} />
           <Route path="/huddle-search" element={<HuddleSearch />} />
           <Route path="/room/:eventId" element={<Room />} />
+          <Route path="/ledger" element={<Ledger />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

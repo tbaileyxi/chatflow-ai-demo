@@ -158,7 +158,13 @@ export const InlineFadeCard: React.FC<InlineFadeCardProps> = ({
   }, [user, fade, markingPaid, toast, onSettlementUpdate]);
 
   const handleVenmoSettle = useCallback(() => {
-    if (!hasCashMode || !isPrivate) {
+    if (!isPrivate) {
+      toast({ title: 'Private Huddle Required', description: 'Venmo settlement is only available in private huddles', variant: 'destructive' });
+      return;
+    }
+    
+    if (!hasCashMode) {
+      // Trigger upsell - parent component should handle showing the modal
       toast({ title: 'Cash Mode Required', description: 'Upgrade to Cash Mode for Venmo settlement' });
       return;
     }
