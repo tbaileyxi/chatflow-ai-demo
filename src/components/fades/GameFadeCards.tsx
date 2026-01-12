@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Loader2, ChevronDown, ChevronUp, Zap, Clock } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronUp, Zap, Clock, Receipt } from 'lucide-react';
 import { format, isPast, differenceInHours } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -30,6 +30,7 @@ interface GameFadeCardsProps {
   teamLeague: string;
   isPrivate?: boolean;
   onFadePosted?: () => void;
+  onViewLedger?: () => void;
 }
 
 export const GameFadeCards: React.FC<GameFadeCardsProps> = ({
@@ -38,6 +39,7 @@ export const GameFadeCards: React.FC<GameFadeCardsProps> = ({
   teamLeague,
   isPrivate = false,
   onFadePosted,
+  onViewLedger,
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -214,9 +216,25 @@ export const GameFadeCards: React.FC<GameFadeCardsProps> = ({
         {/* Expanded Options */}
         {expanded && (
           <div className="px-4 pb-4 space-y-2 border-t border-border/50 pt-3">
-            <p className="text-xs text-muted-foreground mb-2">
-              Select your side — someone else will fade you
-            </p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-muted-foreground">
+                Select your side — someone else will fade you
+              </p>
+              {onViewLedger && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewLedger();
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground h-7 px-2"
+                >
+                  <Receipt className="h-3 w-3 mr-1" />
+                  Ledger
+                </Button>
+              )}
+            </div>
             {fadeOptions.map((option) => (
               <Button
                 key={`${option.type}-${option.line_value}`}
