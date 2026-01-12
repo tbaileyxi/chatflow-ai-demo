@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useState } from 'react';
-import { Zap, UserPlus, Award, Lock } from 'lucide-react';
+import { Receipt, UserPlus, Award, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Users, Trophy } from 'lucide-react';
+import { LedgerModal } from '@/components/fades/LedgerModal';
 
 interface Team {
   id: string;
@@ -29,6 +30,7 @@ interface ChatBottomBarProps {
   eventId?: string;
   onOpenFades?: () => void;
   onOpenBadgesModal?: () => void;
+  onOpenLedger?: () => void;
   className?: string;
 }
 
@@ -39,11 +41,13 @@ export const ChatBottomBar = memo(function ChatBottomBar({
   eventId,
   onOpenFades,
   onOpenBadgesModal,
+  onOpenLedger,
   className
 }: ChatBottomBarProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showPrivateDialog, setShowPrivateDialog] = useState(false);
+  const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamsLoaded, setTeamsLoaded] = useState(false);
   const [formData, setFormData] = useState({ name: '', team_id: teamId || '' });
@@ -60,20 +64,14 @@ export const ChatBottomBar = memo(function ChatBottomBar({
     }
   }, [huddleId]);
 
-  // Handle fades - scroll to fade section or show message
-  const handleFades = useCallback(() => {
-    if (onOpenFades) {
-      onOpenFades();
+  // Handle ledger - opens ledger modal
+  const handleLedger = useCallback(() => {
+    if (onOpenLedger) {
+      onOpenLedger();
     } else {
-      // Scroll to fade cards if they exist, otherwise show message
-      const fadeCards = document.querySelector('[data-fade-cards]');
-      if (fadeCards) {
-        fadeCards.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else {
-        toast.info('No open fades for upcoming games');
-      }
+      setShowLedgerModal(true);
     }
-  }, [onOpenFades]);
+  }, [onOpenLedger]);
 
   // Handle badges
   const handleBadges = useCallback(() => {
@@ -177,7 +175,7 @@ export const ChatBottomBar = memo(function ChatBottomBar({
   };
 
   const actions = [
-    { icon: Zap, label: 'Fade', onClick: handleFades, color: 'text-yellow-400' },
+    { icon: Receipt, label: 'Ledger', onClick: handleLedger, color: 'text-yellow-400' },
     { icon: UserPlus, label: 'Invite', onClick: handleInvite, color: 'text-cyan-400' },
     { icon: Award, label: 'Badges', onClick: handleBadges, color: 'text-purple-400' },
     { icon: Lock, label: 'Private', onClick: handlePrivate, color: 'text-green-400' },
@@ -299,6 +297,13 @@ export const ChatBottomBar = memo(function ChatBottomBar({
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Ledger Modal */}
+      <LedgerModal
+        open={showLedgerModal}
+        onOpenChange={setShowLedgerModal}
+        huddleId={huddleId}
+      />
     </>
   );
 });

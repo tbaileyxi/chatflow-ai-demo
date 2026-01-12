@@ -18,7 +18,7 @@ import { SignupPromptModal } from '@/components/SignupPromptModal';
 import { BadgesModal } from '@/components/badges/BadgesModal';
 import { FadesSidebar } from '@/components/fades/FadesSidebar';
 import { GameFadeCards } from '@/components/fades/GameFadeCards';
-import { FadesInChat } from '@/components/fades/FadesInChat';
+// FadesInChat removed - fades now appear as actionable chat messages
 import { LedgerModal } from '@/components/fades/LedgerModal';
 import { GamePulseHeader } from '@/components/game-pulse/GamePulseHeader';
 
@@ -498,15 +498,9 @@ export const Huddle = () => {
             teamName={teamName}
             teamLeague={huddle?.team?.league || 'NCAA'}
             isPrivate={huddle?.is_private}
+            onViewLedger={() => setShowLedgerModal(true)}
           />
         )}
-        
-        {/* Show active fades in chat feed with ledger access */}
-        <FadesInChat
-          huddleId={huddleId!}
-          isPrivate={huddle?.is_private}
-          onViewLedger={() => setShowLedgerModal(true)}
-        />
         
         <UnifiedChat 
           huddleId={huddleId!}
