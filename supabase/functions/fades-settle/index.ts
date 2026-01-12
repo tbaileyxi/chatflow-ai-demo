@@ -158,7 +158,7 @@ serve(async (req) => {
           }
 
           if (winnerId) {
-            // Update fade as settled
+            // Update fade as settled with settlement_status
             const { error: updateError } = await supabase
               .from('fades')
               .update({
@@ -167,6 +167,7 @@ serve(async (req) => {
                 final_score_home: parseInt(homeScore),
                 final_score_away: parseInt(awayScore),
                 settled_at: new Date().toISOString(),
+                settlement_status: 'unpaid', // Initialize settlement status
               })
               .eq('id', fade.id);
 

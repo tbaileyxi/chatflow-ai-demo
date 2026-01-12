@@ -17,6 +17,8 @@ import { HuddlePeopleSheet } from '@/components/HuddlePeopleSheet';
 import { SignupPromptModal } from '@/components/SignupPromptModal';
 import { BadgesModal } from '@/components/badges/BadgesModal';
 import { FadesSidebar } from '@/components/fades/FadesSidebar';
+import { GameFadeCards } from '@/components/fades/GameFadeCards';
+import { FadesInChat } from '@/components/fades/FadesInChat';
 import { GamePulseHeader } from '@/components/game-pulse/GamePulseHeader';
 
 export const Huddle = () => {
@@ -487,6 +489,22 @@ export const Huddle = () => {
 
       {/* Main Chat Area - UnifiedChat component handles messages only */}
       <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Inline Game Fade Cards - shows upcoming game betting options */}
+        {huddle?.is_official_team_huddle && (
+          <GameFadeCards
+            huddleId={huddleId!}
+            teamName={teamName}
+            teamLeague={huddle?.team?.league || 'NCAA'}
+            isPrivate={huddle?.is_private}
+          />
+        )}
+        
+        {/* Show active fades in chat feed */}
+        <FadesInChat
+          huddleId={huddleId!}
+          isPrivate={huddle?.is_private}
+        />
+        
         <UnifiedChat 
           huddleId={huddleId!}
           team1Id={huddle?.team_id}
