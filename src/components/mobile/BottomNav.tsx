@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { User, Compass, Grid } from 'lucide-react';
+import { User, Compass, Grid, Receipt } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,10 +19,11 @@ export const BottomNav = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Navigation items for logged-in users (Teams, Discover, Profile)
+  // Navigation items for logged-in users (Home, Discover, Ledger, Profile)
   const loggedInNavItems: NavItem[] = [
     { icon: Grid, label: 'Home', to: '/' },
     { icon: Compass, label: 'Discover', to: '/huddle-search' },
+    { icon: Receipt, label: 'Ledger', to: '/ledger', authRequired: true },
     { icon: User, label: 'Profile', to: '/profile', authRequired: true },
   ];
 
