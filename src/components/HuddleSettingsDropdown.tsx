@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, LogOut, Trash2, Shield, Users, Zap, Bot } from 'lucide-react';
+import { Settings, LogOut, Trash2, Shield, Users, Zap, Bot, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -180,6 +180,11 @@ export const HuddleSettingsDropdown: React.FC<HuddleSettingsDropdownProps> = ({
             )}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+
+          <DropdownMenuItem onClick={() => navigate('/ledger')}>
+            <Receipt className="mr-2 h-4 w-4" />
+            View Ledger
+          </DropdownMenuItem>
 
           {isOwner && (
             <>

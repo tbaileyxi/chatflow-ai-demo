@@ -12,3 +12,4 @@ export { GameFadeCards } from './GameFadeCards';
 export { FadeConfirmSheet } from './FadeConfirmSheet';
 export { FadesInChat } from './FadesInChat';
 export { CashModeUpgradeModal } from './CashModeUpgradeModal';
+export { LedgerModal } from './LedgerModal';

@@ -19,6 +19,7 @@ import { BadgesModal } from '@/components/badges/BadgesModal';
 import { FadesSidebar } from '@/components/fades/FadesSidebar';
 import { GameFadeCards } from '@/components/fades/GameFadeCards';
 import { FadesInChat } from '@/components/fades/FadesInChat';
+import { LedgerModal } from '@/components/fades/LedgerModal';
 import { GamePulseHeader } from '@/components/game-pulse/GamePulseHeader';
 
 export const Huddle = () => {
@@ -35,6 +36,7 @@ export const Huddle = () => {
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [showBadgesModal, setShowBadgesModal] = useState(false);
   const [showFadesSidebar, setShowFadesSidebar] = useState(false);
+  const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [liveGame, setLiveGame] = useState<any>(null);
@@ -499,10 +501,11 @@ export const Huddle = () => {
           />
         )}
         
-        {/* Show active fades in chat feed */}
+        {/* Show active fades in chat feed with ledger access */}
         <FadesInChat
           huddleId={huddleId!}
           isPrivate={huddle?.is_private}
+          onViewLedger={() => setShowLedgerModal(true)}
         />
         
         <UnifiedChat 
@@ -610,6 +613,13 @@ export const Huddle = () => {
       <BadgesModal 
         open={showBadgesModal}
         onClose={() => setShowBadgesModal(false)}
+      />
+
+      {/* Ledger Modal */}
+      <LedgerModal
+        open={showLedgerModal}
+        onOpenChange={setShowLedgerModal}
+        huddleId={huddleId}
       />
     </div>
   );
