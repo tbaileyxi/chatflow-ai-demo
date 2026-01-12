@@ -1,14 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { Receipt } from 'lucide-react';
 import { InlineFadeCard, FadeData } from './InlineFadeCard';
 
 interface FadesInChatProps {
   huddleId: string;
   isPrivate?: boolean;
+  onViewLedger?: () => void;
 }
 
-export const FadesInChat: React.FC<FadesInChatProps> = ({ huddleId, isPrivate = false }) => {
+export const FadesInChat: React.FC<FadesInChatProps> = ({ 
+  huddleId, 
+  isPrivate = false,
+  onViewLedger 
+}) => {
   const { user } = useAuth();
   const [fades, setFades] = useState<FadeData[]>([]);
   const [hasCashMode, setHasCashMode] = useState(false);
@@ -101,6 +108,21 @@ export const FadesInChat: React.FC<FadesInChatProps> = ({ huddleId, isPrivate = 
 
   return (
     <div className="px-4 space-y-3 mb-4">
+      {/* Ledger Link Header */}
+      {onViewLedger && (
+        <div className="flex items-center justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onViewLedger}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            <Receipt className="h-3 w-3 mr-1" />
+            View Ledger
+          </Button>
+        </div>
+      )}
+      
       {fades.map(fade => (
         <InlineFadeCard
           key={fade.id}

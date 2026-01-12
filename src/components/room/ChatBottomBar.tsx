@@ -60,12 +60,18 @@ export const ChatBottomBar = memo(function ChatBottomBar({
     }
   }, [huddleId]);
 
-  // Handle fades
+  // Handle fades - scroll to fade section or show message
   const handleFades = useCallback(() => {
     if (onOpenFades) {
       onOpenFades();
     } else {
-      toast.info('Fades coming soon!');
+      // Scroll to fade cards if they exist, otherwise show message
+      const fadeCards = document.querySelector('[data-fade-cards]');
+      if (fadeCards) {
+        fadeCards.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        toast.info('No open fades for upcoming games');
+      }
     }
   }, [onOpenFades]);
 

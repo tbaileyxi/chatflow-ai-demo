@@ -170,7 +170,7 @@ export const GameFadeCards: React.FC<GameFadeCardsProps> = ({
 
   return (
     <>
-      <Card className="mx-4 mb-4 overflow-hidden border-primary/30 bg-card/50 backdrop-blur">
+      <Card data-fade-cards className="mx-4 mb-4 overflow-hidden border-primary/30 bg-card/50 backdrop-blur">
         {/* Header - Always Visible */}
         <button
           onClick={() => setExpanded(!expanded)}
@@ -221,11 +221,13 @@ export const GameFadeCards: React.FC<GameFadeCardsProps> = ({
               <Button
                 key={`${option.type}-${option.line_value}`}
                 variant="outline"
-                className="w-full justify-between h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary"
+                className="w-full h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary text-left"
                 onClick={() => handleOptionSelect(option)}
               >
-                <span className="font-medium">{option.label}</span>
-                <span className="text-muted-foreground text-sm">{option.description}</span>
+                <div className="flex flex-col items-start gap-1 min-w-0 w-full">
+                  <span className="font-semibold text-primary truncate max-w-full">{option.label}</span>
+                  <span className="text-muted-foreground text-xs whitespace-normal break-words">{option.description}</span>
+                </div>
               </Button>
             ))}
           </div>
