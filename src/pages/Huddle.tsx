@@ -18,7 +18,7 @@ import { SignupPromptModal } from '@/components/SignupPromptModal';
 import { BadgesModal } from '@/components/badges/BadgesModal';
 import { FadesSidebar } from '@/components/fades/FadesSidebar';
 import { GameFadeCards } from '@/components/fades/GameFadeCards';
-// FadesInChat removed - fades now appear as actionable chat messages
+import { FadesInChat } from '@/components/fades/FadesInChat';
 import { LedgerModal } from '@/components/fades/LedgerModal';
 import { GamePulseHeader } from '@/components/game-pulse/GamePulseHeader';
 
@@ -501,6 +501,13 @@ export const Huddle = () => {
             onViewLedger={() => setShowLedgerModal(true)}
           />
         )}
+        
+        {/* Active Fades in Chat - shows open, locked, and settled fades for any user to accept */}
+        <FadesInChat
+          huddleId={huddleId!}
+          isPrivate={huddle?.is_private}
+          onViewLedger={() => setShowLedgerModal(true)}
+        />
         
         <UnifiedChat 
           huddleId={huddleId!}
