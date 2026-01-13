@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { UserBadgeIcon } from '@/components/badges/UserBadgeIcon';
+import { FadeMessageAction } from './FadeMessageAction';
 
 interface Profile {
   display_name: string;
@@ -60,6 +61,9 @@ interface ChatMessageProps {
   sponsor?: TeamSponsor | null;
   badge?: UserBadge | null;
   onBadgeClick?: (emoji: string) => void;
+  huddleId?: string;
+  isPrivate?: boolean;
+  onCashModeRequired?: () => void;
 }
 
 export const ChatMessage = memo(function ChatMessage({
@@ -71,12 +75,16 @@ export const ChatMessage = memo(function ChatMessage({
   onReply,
   sponsor,
   badge,
-  onBadgeClick
+  onBadgeClick,
+  huddleId,
+  isPrivate,
+  onCashModeRequired
 }: ChatMessageProps) {
   const displayName = profile?.display_name || profile?.username || 'Anonymous';
   const avatarUrl = profile?.avatar_url;
   const isCoach = message.is_bot_message || message.message_type === 'coach_response';
   const isPulse = message.pulse_source || message.message_type === 'pulse';
+  const isFadeNotification = message.message_type === 'fade_notification';
 
   const handleReplyClick = useCallback(() => {
     onReply?.(message);
@@ -246,6 +254,16 @@ export const ChatMessage = memo(function ChatMessage({
                 </span>
               )}
             </div>
+          )}
+
+          {/* Fade Action Button - embedded in chat bubble */}
+          {isFadeNotification && huddleId && (
+            <FadeMessageAction
+              messageContent={message.content}
+              huddleId={huddleId}
+              isPrivate={isPrivate}
+              onCashModeRequired={onCashModeRequired}
+            />
           )}
         </div>
       </div>

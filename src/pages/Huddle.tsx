@@ -18,7 +18,7 @@ import { SignupPromptModal } from '@/components/SignupPromptModal';
 import { BadgesModal } from '@/components/badges/BadgesModal';
 import { FadesSidebar } from '@/components/fades/FadesSidebar';
 import { GameFadeCards } from '@/components/fades/GameFadeCards';
-import { FadesInChat } from '@/components/fades/FadesInChat';
+import { CashModeUpgradeModal } from '@/components/fades/CashModeUpgradeModal';
 import { LedgerModal } from '@/components/fades/LedgerModal';
 import { GamePulseHeader } from '@/components/game-pulse/GamePulseHeader';
 
@@ -37,6 +37,7 @@ export const Huddle = () => {
   const [showBadgesModal, setShowBadgesModal] = useState(false);
   const [showFadesSidebar, setShowFadesSidebar] = useState(false);
   const [showLedgerModal, setShowLedgerModal] = useState(false);
+  const [showCashModeModal, setShowCashModeModal] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [liveGame, setLiveGame] = useState<any>(null);
@@ -502,12 +503,7 @@ export const Huddle = () => {
           />
         )}
         
-        {/* Active Fades in Chat - shows open, locked, and settled fades for any user to accept */}
-        <FadesInChat
-          huddleId={huddleId!}
-          isPrivate={huddle?.is_private}
-          onViewLedger={() => setShowLedgerModal(true)}
-        />
+        {/* Fades now embedded in chat message bubbles via FadeMessageAction */}
         
         <UnifiedChat 
           huddleId={huddleId!}
@@ -621,6 +617,12 @@ export const Huddle = () => {
         open={showLedgerModal}
         onOpenChange={setShowLedgerModal}
         huddleId={huddleId}
+      />
+
+      {/* Cash Mode Upgrade Modal */}
+      <CashModeUpgradeModal
+        open={showCashModeModal}
+        onOpenChange={setShowCashModeModal}
       />
     </div>
   );

@@ -431,6 +431,7 @@ export const UnifiedChat = memo(function UnifiedChat({
                   sponsor={getSponsorForMessage(msg)}
                   badge={userBadges[msg.user_id] || null}
                   onBadgeClick={onBadgeClick}
+                  huddleId={huddleId}
                 />
                 {/* Inline Thread Replies */}
                 {replies.length > 0 && (
