@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useCashMode } from '@/hooks/useCashMode';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, Clock, Check, X, Zap, History, Lock } from 'lucide-react';
+import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, Clock, Check, X, Zap, History, Lock, Edit2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isPast } from 'date-fns';
 import { CashModeUpgradeModal } from '@/components/fades/CashModeUpgradeModal';
+import { VenmoSetupModal } from '@/components/fades/VenmoSetupModal';
 
 interface LedgerEntry {
   id: string;
@@ -41,14 +43,26 @@ interface FadeRecord {
 
 export default function Ledger() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const { hasCashMode, venmoUsername, loading: cashModeLoading } = useCashMode();
   const [ledgers, setLedgers] = useState<LedgerEntry[]>([]);
   const [openFades, setOpenFades] = useState<FadeRecord[]>([]);
   const [lockedFades, setLockedFades] = useState<FadeRecord[]>([]);
   const [historyFades, setHistoryFades] = useState<FadeRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hasCashMode, setHasCashMode] = useState(false);
   const [showCashModeModal, setShowCashModeModal] = useState(false);
+  const [showVenmoSetup, setShowVenmoSetup] = useState(false);
+
+  // Check if we just came from a Cash Mode purchase
+  useEffect(() => {
+    const cashModeStatus = searchParams.get('cashmode');
+    if (cashModeStatus === 'success' && hasCashMode && !venmoUsername) {
+      setShowVenmoSetup(true);
+      // Clean up URL
+      window.history.replaceState({}, '', '/ledger');
+    }
+  }, [searchParams, hasCashMode, venmoUsername]);
 
   useEffect(() => {
     if (!user) {
@@ -58,18 +72,6 @@ export default function Ledger() {
 
     const fetchData = async () => {
       setLoading(true);
-
-      // Check Cash Mode status
-      const { data: cashModeData } = await supabase
-        .from('cash_mode_subscriptions')
-        .select('status, expires_at')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .maybeSingle();
-
-      if (cashModeData && new Date(cashModeData.expires_at) > new Date()) {
-        setHasCashMode(true);
-      }
 
       // Fetch ALL fades where user is participant
       const { data: allFades } = await supabase
@@ -267,8 +269,39 @@ export default function Ledger() {
         </div>
       </div>
 
-      {/* Cash Mode Banner */}
-      {!hasCashMode && (
+      {/* Cash Mode Status Banner */}
+      {hasCashMode ? (
+        <div className="mx-4 mt-4">
+          <Card className="p-4 bg-gradient-to-r from-green-500/20 to-emerald-600/20 border-green-500/50">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-green-500/30 flex items-center justify-center">
+                <Check className="h-5 w-5 text-green-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-foreground flex items-center gap-2">
+                  Cash Mode Active
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">PRO</span>
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {venmoUsername ? (
+                    <>Venmo: @{venmoUsername}</>
+                  ) : (
+                    <>Add your Venmo handle for easy settlement</>
+                  )}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowVenmoSetup(true)}
+                className="text-green-400 hover:text-green-300"
+              >
+                <Edit2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </Card>
+        </div>
+      ) : (
         <div className="mx-4 mt-4">
           <Card 
             className="p-4 bg-gradient-to-r from-amber-500/20 to-amber-600/20 border-amber-500/50 cursor-pointer hover:border-amber-400 transition-colors"
@@ -436,6 +469,12 @@ export default function Ledger() {
       <CashModeUpgradeModal
         open={showCashModeModal}
         onOpenChange={setShowCashModeModal}
+      />
+
+      {/* Venmo Setup Modal */}
+      <VenmoSetupModal
+        open={showVenmoSetup}
+        onOpenChange={setShowVenmoSetup}
       />
     </div>
   );

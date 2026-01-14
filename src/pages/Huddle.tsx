@@ -492,8 +492,8 @@ export const Huddle = () => {
 
       {/* Main Chat Area - UnifiedChat component handles messages only */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Inline Game Fade Cards - shows upcoming game betting options */}
-        {huddle?.is_official_team_huddle && (
+        {/* Inline Game Fade Cards - shows upcoming game betting options for any team huddle */}
+        {huddle?.team_id && (
           <GameFadeCards
             huddleId={huddleId!}
             teamName={teamName}
@@ -520,6 +520,8 @@ export const Huddle = () => {
             });
           }}
           onCancelReply={() => setReplyTo(null)}
+          isPrivate={huddle?.is_private}
+          onCashModeRequired={() => setShowCashModeModal(true)}
         />
       </main>
 
