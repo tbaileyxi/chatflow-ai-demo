@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useCashMode } from '@/hooks/useCashMode';
 import { useToast } from '@/hooks/use-toast';
 import { isPast, format } from 'date-fns';
 
@@ -38,6 +39,7 @@ export const FadeMessageAction: React.FC<FadeMessageActionProps> = ({
   onCashModeRequired,
 }) => {
   const { user } = useAuth();
+  const { hasCashMode } = useCashMode();
   const { toast } = useToast();
   const [fade, setFade] = useState<FadeData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,6 +111,12 @@ export const FadeMessageAction: React.FC<FadeMessageActionProps> = ({
 
   const handleAccept = useCallback(async () => {
     if (!user || !fade || accepting) return;
+
+    // Check Cash Mode requirement for private huddles with higher stakes
+    if (isPrivate && fade.stake > 10 && !hasCashMode) {
+      onCashModeRequired?.();
+      return;
+    }
 
     const gameTime = new Date(fade.game_commence_time);
     if (isPast(gameTime)) {

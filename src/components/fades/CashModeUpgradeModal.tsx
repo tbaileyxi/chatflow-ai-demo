@@ -36,7 +36,7 @@ export const CashModeUpgradeModal: React.FC<CashModeUpgradeModalProps> = ({
       const { data, error } = await supabase.functions.invoke('create-cashmode-checkout', {
         body: {
           userId: user.id,
-          returnUrl: window.location.href,
+          returnUrl: `${window.location.origin}/ledger?cashmode=success`,
         },
       });
 
