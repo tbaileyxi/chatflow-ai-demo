@@ -34,6 +34,16 @@ serve(async (req) => {
     });
 
     // Cash Mode subscription - $9.99/month
+    // Parse returnUrl - if it already has query params, append with &, otherwise with ?
+    const baseReturnUrl = returnUrl || 'https://sidehuddlesports.com/ledger';
+    const hasQuery = baseReturnUrl.includes('?');
+    const successUrl = hasQuery 
+      ? `${baseReturnUrl}&session_id={CHECKOUT_SESSION_ID}`
+      : `${baseReturnUrl}?cashmode=success&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = hasQuery
+      ? baseReturnUrl.replace('cashmode=success', 'cashmode=cancelled')
+      : `${baseReturnUrl}?cashmode=cancelled`;
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
@@ -58,8 +68,8 @@ serve(async (req) => {
         type: 'cash_mode',
         user_id: userId,
       },
-      success_url: `${returnUrl || 'https://sidehuddlesports.com'}?cashmode=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${returnUrl || 'https://sidehuddlesports.com'}?cashmode=cancelled`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
     });
 
     return new Response(

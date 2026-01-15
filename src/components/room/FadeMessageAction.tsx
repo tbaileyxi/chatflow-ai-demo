@@ -48,13 +48,14 @@ export const FadeMessageAction: React.FC<FadeMessageActionProps> = ({
   // Parse the message to extract the fade details
   useEffect(() => {
     const findMatchingFade = async () => {
-      if (!messageContent.includes('took') && !messageContent.includes('faded')) {
+      // Only match fade notification messages that contain "took" 
+      if (!messageContent.includes('took')) {
         setLoading(false);
         return;
       }
 
       // Check for locked fade message (e.g., "💥 JOE faded JONES! LOCKED:")
-      if (messageContent.includes('LOCKED:')) {
+      if (messageContent.includes('LOCKED:') || messageContent.includes('faded')) {
         setLoading(false);
         return; // Already locked, no action needed
       }
@@ -72,11 +73,32 @@ export const FadeMessageAction: React.FC<FadeMessageActionProps> = ({
         return;
       }
 
-      // Match the message content to a fade (by stake and line_description)
+      // Enhanced matching: try multiple strategies
+      const messageLower = messageContent.toLowerCase();
+      
       const matchedFade = fades.find(f => {
+        // Strategy 1: Match stake amount
         const hasStake = messageContent.includes(`$${f.stake}`);
-        const hasLine = messageContent.toLowerCase().includes(f.line_description.toLowerCase().slice(0, 20));
-        return hasStake && hasLine;
+        if (!hasStake) return false;
+        
+        // Strategy 2: Match any significant part of line_description
+        const lineParts = f.line_description.toLowerCase().split(' ');
+        const significantParts = lineParts.filter(p => 
+          p.length > 3 && !['the', 'for', 'points', 'over', 'under', 'total', 'game'].includes(p)
+        );
+        
+        // Check if any significant word from line description is in message
+        const hasLinePart = significantParts.some(part => messageLower.includes(part));
+        
+        // Strategy 3: Fallback - check for team name match
+        const hasHomeTeam = messageLower.includes(f.home_team.toLowerCase().split(' ').pop() || '');
+        const hasAwayTeam = messageLower.includes(f.away_team.toLowerCase().split(' ').pop() || '');
+        
+        // Strategy 4: Match "Over" or "Under" keywords
+        const hasOverUnder = (messageLower.includes('over') && f.fade_type === 'over') ||
+                            (messageLower.includes('under') && f.fade_type === 'under');
+        
+        return hasStake && (hasLinePart || hasOverUnder || hasHomeTeam || hasAwayTeam);
       });
 
       if (matchedFade) {
