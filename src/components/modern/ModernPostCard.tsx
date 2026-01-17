@@ -4,8 +4,9 @@ import { formatDistanceToNow } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, Share2, Play, Volume2, VolumeX, MoreHorizontal } from "lucide-react";
+import { Heart, MessageCircle, Share2, Play, Volume2, VolumeX, MoreHorizontal, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import { MediaViewer } from "@/components/MediaViewer";
 import { XPostEmbed } from "@/components/embeds/XPostEmbed";
 import { ReportButton } from "@/components/ReportButton";
@@ -25,9 +26,11 @@ export const ModernPostCard = React.memo(({
   disableReply = false,
   className 
 }: ModernPostCardProps) => {
+  const { toast } = useToast();
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.post_reactions?.length || 0);
   const [isMuted, setIsMuted] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   // Calculate stagger delay for animations
   const staggerDelay = Math.min(index * 50, 500);
@@ -41,17 +44,39 @@ export const ModernPostCard = React.memo(({
     setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
   }, [isLiked]);
 
-  const handleShare = useCallback(() => {
+  const handleShare = useCallback(async () => {
+    const postUrl = `${window.location.origin}/spotlight/${post.id}`;
+    const shareText = post.content?.slice(0, 100) + (post.content?.length > 100 ? '...' : '');
+    const shareTitle = `${post.team?.name || post.author?.display_name || 'Post'} on Side Huddle`;
+    
     if (navigator.share) {
-      navigator.share({
-        title: `${post.team?.name || post.author?.display_name} on Side Huddle`,
-        text: post.content,
-        url: window.location.href,
-      });
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: postUrl,
+        });
+      } catch {
+        // User cancelled share
+      }
     } else {
-      navigator.clipboard.writeText(window.location.href);
+      try {
+        await navigator.clipboard.writeText(postUrl);
+        setCopied(true);
+        toast({
+          title: "Link copied!",
+          description: "Share this post with friends",
+        });
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        toast({
+          title: "Copy failed",
+          description: "Please copy the URL manually",
+          variant: "destructive",
+        });
+      }
     }
-  }, [post]);
+  }, [post, toast]);
 
   const displayName = post.author?.display_name || post.team?.name || 'Unknown';
   const avatarUrl = post.author?.avatar_url || post.team?.logo_url;
@@ -192,11 +217,13 @@ export const ModernPostCard = React.memo(({
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2 text-muted-foreground hover:text-foreground"
+            className={cn(
+              "gap-1.5 transition-colors",
+              copied ? "text-green-500" : "text-muted-foreground hover:text-foreground"
+            )}
             onClick={handleShare}
           >
-            <Share2 className="w-4 h-4" />
-            <span className="text-sm">Share</span>
+            {copied ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
           </Button>
         </div>
 
