@@ -1,11 +1,12 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ThumbsUp, Laugh, Eye, Reply } from 'lucide-react';
+import { ThumbsUp, Laugh, Eye, Reply, Share2, Check } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { UserBadgeIcon } from '@/components/badges/UserBadgeIcon';
 import { FadeMessageAction } from './FadeMessageAction';
+import { useToast } from '@/hooks/use-toast';
 
 interface Profile {
   display_name: string;
@@ -80,6 +81,9 @@ export const ChatMessage = memo(function ChatMessage({
   isPrivate,
   onCashModeRequired
 }: ChatMessageProps) {
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+  
   const displayName = profile?.display_name || profile?.username || 'Anonymous';
   const avatarUrl = profile?.avatar_url;
   const isCoach = message.is_bot_message || message.message_type === 'coach_response';
@@ -89,6 +93,18 @@ export const ChatMessage = memo(function ChatMessage({
   const handleReplyClick = useCallback(() => {
     onReply?.(message);
   }, [onReply, message]);
+
+  const handleShare = useCallback(async () => {
+    const shareUrl = `${window.location.origin}/spotlight/${message.id}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      toast({ title: "Link copied!" });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: "Copy failed", variant: "destructive" });
+    }
+  }, [message.id, toast]);
   
   // Extract media from pulse content OR user uploads
   const hasInlineMedia = message.media_url && (
@@ -268,7 +284,7 @@ export const ChatMessage = memo(function ChatMessage({
         </div>
       </div>
 
-      {/* Inline Reactions + Reply */}
+      {/* Inline Reactions + Reply + Share */}
       <div className={cn(
         "flex items-center gap-1 mt-1.5 px-10",
         isOwn && "justify-end"
@@ -283,6 +299,18 @@ export const ChatMessage = memo(function ChatMessage({
             <Reply className="w-3.5 h-3.5" />
           </button>
         )}
+
+        {/* Share button */}
+        <button
+          onClick={handleShare}
+          className={cn(
+            "flex items-center gap-1 px-2 py-1 rounded-full text-xs transition-all hover:bg-muted active:scale-95",
+            copied ? "text-green-500" : "text-muted-foreground hover:text-foreground"
+          )}
+          title="Share"
+        >
+          {copied ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
+        </button>
         
         {REACTIONS.map(({ emoji, label }) => {
           const count = reactionCounts[emoji] || 0;
