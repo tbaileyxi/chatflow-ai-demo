@@ -1,25 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Radio, Flame, Clock, ChevronRight, Users, Globe, Lock, ShieldCheck, ChevronDown, ChevronUp, MoreVertical, Mail, Sparkles } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BottomNav } from '@/components/mobile/BottomNav';
+import { MoreVertical, Mail, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { BottomNav } from '@/components/mobile/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { cn } from '@/lib/utils';
 import shLogo from '@/assets/sh-logo.png';
 
-interface Team {
-  id: string;
-  name: string;
-  city: string;
-  logo_url: string | null;
-  league: string;
-}
+// New modular components
+import { TopMoments } from '@/components/home/TopMoments';
+import { LiveEventCard } from '@/components/home/LiveEventCard';
+import { YourHuddlesSection } from '@/components/home/YourHuddlesSection';
+import { DiscoverySection } from '@/components/home/DiscoverySection';
 
 interface LiveEvent {
   id: string;
@@ -30,25 +22,6 @@ interface LiveEvent {
   status: 'upcoming' | 'live' | 'completed';
   score_team1: number | null;
   score_team2: number | null;
-  team1_id: string | null;
-  team2_id: string | null;
-}
-
-interface TeamLiveState {
-  team_id: string;
-  state: 'normal' | 'live' | 'cooldown';
-  active_opponent_team_id: string | null;
-  home_score: number | null;
-  away_score: number | null;
-  is_home_team: boolean;
-}
-
-interface TeamWithActivity extends Team {
-  huddle_id?: string;
-  is_active?: boolean;
-  member_count?: number;
-  live_state?: TeamLiveState;
-  opponent_name?: string;
 }
 
 interface Huddle {
@@ -63,49 +36,32 @@ interface Huddle {
   latest_message?: {
     content: string;
     created_at: string;
+    is_bot_message?: boolean;
   };
 }
 
-const RECENTLY_VIEWED_KEY = 'sh_recently_viewed';
-
-const getRecentlyViewed = (): string[] => {
-  try {
-    return JSON.parse(localStorage.getItem(RECENTLY_VIEWED_KEY) || '[]');
-  } catch {
-    return [];
-  }
-};
-
-const addRecentlyViewed = (teamId: string) => {
-  const recent = getRecentlyViewed().filter(id => id !== teamId);
-  recent.unshift(teamId);
-  localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(recent.slice(0, 5)));
-};
-
-const LEAGUES = [
-  { id: 'all', label: 'All' },
-  { id: 'NFL', label: 'NFL' },
-  { id: 'NCAA', label: 'NCAA' },
-  { id: 'NBA', label: 'NBA' },
-  { id: 'NHL', label: 'NHL' },
-  { id: 'MLB', label: 'MLB' },
-];
-
 export default function Home() {
-  const navigate = useNavigate();
   const { user } = useAuth();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLeague, setSelectedLeague] = useState('all');
-  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
-  const [teams, setTeams] = useState<TeamWithActivity[]>([]);
-  const [recentTeams, setRecentTeams] = useState<TeamWithActivity[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  // My Huddles state
+  const [liveEvent, setLiveEvent] = useState<LiveEvent | null>(null);
   const [publicHuddles, setPublicHuddles] = useState<Huddle[]>([]);
   const [privateHuddles, setPrivateHuddles] = useState<Huddle[]>([]);
   const [huddlesLoading, setHuddlesLoading] = useState(true);
 
+  // Fetch active live event (only LIVE status)
+  const fetchLiveEvent = useCallback(async () => {
+    const { data } = await supabase
+      .from('live_events')
+      .select('*')
+      .eq('status', 'live')
+      .eq('is_pinned', true)
+      .order('start_time', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    
+    setLiveEvent(data as LiveEvent | null);
+  }, []);
+
+  // Fetch user's huddles
   const fetchHuddles = useCallback(async () => {
     if (!user) {
       setPublicHuddles([]);
@@ -115,29 +71,18 @@ export default function Home() {
     }
 
     try {
-      const { data: membershipData, error: membershipError } = await supabase
+      const { data: membershipData } = await supabase
         .from('huddle_members')
         .select(`
           huddle_id,
           last_read_at,
           huddles (
-            id,
-            name,
-            member_count,
-            last_message_at,
-            is_verified,
-            is_official_team_huddle,
-            is_private,
-            teams!team_id (
-              name,
-              city,
-              logo_url
-            )
+            id, name, member_count, last_message_at,
+            is_verified, is_official_team_huddle, is_private,
+            teams!team_id (name, city, logo_url)
           )
         `)
         .eq('user_id', user.id);
-
-      if (membershipError) throw membershipError;
 
       const huddles = membershipData?.map(m => m.huddles).filter(Boolean) || [];
       const huddleIds = huddles.map(h => h.id);
@@ -145,15 +90,9 @@ export default function Home() {
       // Get latest messages
       const { data: latestMessages } = await supabase
         .from('huddle_messages')
-        .select('huddle_id, content, created_at')
+        .select('huddle_id, content, created_at, is_bot_message')
         .in('huddle_id', huddleIds)
         .order('created_at', { ascending: false });
-
-      // Get member counts
-      const { data: memberCounts } = await supabase
-        .from('huddle_members')
-        .select('huddle_id')
-        .in('huddle_id', huddleIds);
 
       // Calculate unread counts
       const unreadCounts: Record<string, number> = {};
@@ -164,35 +103,32 @@ export default function Home() {
 
       membershipData?.forEach(member => {
         const lastReadTime = member.last_read_at ? new Date(member.last_read_at) : new Date(0);
-        const unreadCount = unreadMessages?.filter(msg => 
-          msg.huddle_id === member.huddle_id && 
-          new Date(msg.created_at) > lastReadTime
+        unreadCounts[member.huddle_id] = unreadMessages?.filter(msg => 
+          msg.huddle_id === member.huddle_id && new Date(msg.created_at) > lastReadTime
         ).length || 0;
-        unreadCounts[member.huddle_id] = unreadCount;
       });
 
-      const transformedHuddles: Huddle[] = huddles.map(huddle => {
-        const actualMemberCount = memberCounts?.filter(mc => mc.huddle_id === huddle.id).length || 1;
-        const latestMessage = latestMessages?.find(msg => msg.huddle_id === huddle.id);
-        
+      const transformed: Huddle[] = huddles.map(h => {
+        const latestMsg = latestMessages?.find(m => m.huddle_id === h.id);
         return {
-          id: huddle.id,
-          name: huddle.name,
-          team_name: `${huddle.teams?.city} ${huddle.teams?.name}`,
-          team_logo_url: huddle.teams?.logo_url || '/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png',
-          participant_count: actualMemberCount,
-          is_verified: huddle.is_verified,
-          is_official_team_huddle: huddle.is_official_team_huddle,
-          unread_count: unreadCounts[huddle.id] || 0,
-          latest_message: latestMessage ? {
-            content: latestMessage.content,
-            created_at: latestMessage.created_at
+          id: h.id,
+          name: h.name,
+          team_name: `${h.teams?.city || ''} ${h.teams?.name || ''}`.trim(),
+          team_logo_url: h.teams?.logo_url || '/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png',
+          participant_count: h.member_count || 0,
+          is_verified: h.is_verified,
+          is_official_team_huddle: h.is_official_team_huddle,
+          unread_count: unreadCounts[h.id] || 0,
+          latest_message: latestMsg ? {
+            content: latestMsg.content,
+            created_at: latestMsg.created_at,
+            is_bot_message: latestMsg.is_bot_message
           } : undefined
         };
       });
 
-      setPublicHuddles(transformedHuddles.filter(h => h.is_official_team_huddle));
-      setPrivateHuddles(transformedHuddles.filter(h => !h.is_official_team_huddle));
+      setPublicHuddles(transformed.filter(h => h.is_official_team_huddle));
+      setPrivateHuddles(transformed.filter(h => !h.is_official_team_huddle));
     } catch (error) {
       console.error('Error fetching huddles:', error);
     } finally {
@@ -200,261 +136,19 @@ export default function Home() {
     }
   }, [user]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      // Fetch live events
-      const eventsResult = await supabase
-        .from('live_events')
-        .select('*')
-        .in('status', ['live', 'upcoming'])
-        .eq('is_pinned', true)
-        .order('start_time', { ascending: true })
-        .limit(5);
-      setLiveEvents((eventsResult.data as unknown as LiveEvent[]) || []);
-
-      // Fetch teams
-      const teamsData: Team[] = ((await (supabase as any)
-        .from('teams')
-        .select('id, name, city, logo_url, league')
-        .eq('status', 'active')
-        .order('name')).data) || [];
-
-      // Fetch official huddles
-      type HuddleRow = { id: string; team_id: string; member_count: number | null; last_message_at: string | null };
-      const huddlesData: HuddleRow[] = ((await (supabase as any)
-        .from('huddles')
-        .select('id, team_id, member_count, last_message_at')
-        .eq('is_official_team_huddle', true)).data) || [];
-
-      // Fetch team live states
-      const { data: liveStatesData } = await supabase
-        .from('teams_live_state')
-        .select('*')
-        .in('state', ['live', 'cooldown']);
-      
-      // Guardrail: ignore stale live states (prevents incorrect LIVE pills)
-      const liveStatesMap = new Map<string, TeamLiveState>();
-      (liveStatesData || []).forEach((ls: any) => {
-        const updatedAt = ls.updated_at ? new Date(ls.updated_at).getTime() : 0;
-        const ageMinutes = updatedAt ? (Date.now() - updatedAt) / 60000 : Number.POSITIVE_INFINITY;
-
-        const isFreshLive = ls.state === 'live' && ageMinutes <= 15;
-        const isFreshCooldown = ls.state === 'cooldown' && ageMinutes <= 360; // 6h
-
-        if (isFreshLive || isFreshCooldown) {
-          liveStatesMap.set(ls.team_id, ls);
-        }
-      });
-
-      // Create team name lookup for opponent display
-      const teamNamesMap = new Map<string, string>();
-      teamsData.forEach(t => teamNamesMap.set(t.id, t.name));
-
-      const huddlesByTeam = new Map<string, HuddleRow>();
-      huddlesData.forEach((h) => {
-        if (h.team_id) huddlesByTeam.set(h.team_id, h);
-      });
-      
-      const formattedTeams: TeamWithActivity[] = teamsData.map((t) => {
-        const huddle = huddlesByTeam.get(t.id);
-        const lastMessage = huddle?.last_message_at ? new Date(huddle.last_message_at) : null;
-        const isActive = lastMessage ? (Date.now() - lastMessage.getTime()) < 3600000 : false;
-        const liveState = liveStatesMap.get(t.id);
-        const opponentName = liveState?.active_opponent_team_id 
-          ? teamNamesMap.get(liveState.active_opponent_team_id) 
-          : undefined;
-        
-        return {
-          id: t.id,
-          name: t.name,
-          city: t.city || '',
-          logo_url: t.logo_url,
-          league: t.league || '',
-          huddle_id: huddle?.id,
-          is_active: isActive || liveState?.state === 'live',
-          member_count: huddle?.member_count || 0,
-          live_state: liveState,
-          opponent_name: opponentName
-        };
-      }).filter((t) => t.huddle_id);
-
-      setTeams(formattedTeams);
-
-      const recentIds = getRecentlyViewed();
-      const recentTeamsData = formattedTeams.filter(t => recentIds.includes(t.id));
-      recentTeamsData.sort((a, b) => recentIds.indexOf(a.id) - recentIds.indexOf(b.id));
-      setRecentTeams(recentTeamsData.slice(0, 5));
-    } catch (error) {
-      console.error('Error fetching home data:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchData();
+    fetchLiveEvent();
     fetchHuddles();
-  }, [fetchData, fetchHuddles]);
-
-  const handleTeamClick = (team: TeamWithActivity) => {
-    addRecentlyViewed(team.id);
-    if (team.huddle_id) {
-      navigate(`/huddle/${team.huddle_id}`);
-    }
-  };
-
-  const handleEventClick = (event: LiveEvent) => {
-    navigate(`/room/${event.id}`);
-  };
-
-  const handleHuddleClick = (huddle: Huddle) => {
-    navigate(`/huddle/${huddle.id}`);
-  };
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-  };
-
-  const filteredTeams = teams.filter(t => {
-    const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.city.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesLeague = selectedLeague === 'all' || t.league === selectedLeague;
-    return matchesSearch && matchesLeague;
-  });
-
-  const formatEventTime = (startTime: string) => {
-    const date = new Date(startTime);
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  };
-
-  // My Huddles Section Component (split into Followed Teams + Private)
-  const MyHuddlesSection = ({
-    publicHuddles,
-    privateHuddles,
-    huddlesLoading,
-    onHuddleClick
-  }: {
-    publicHuddles: Huddle[];
-    privateHuddles: Huddle[];
-    huddlesLoading: boolean;
-    onHuddleClick: (huddle: Huddle) => void;
-  }) => {
-    const hasAny = publicHuddles.length > 0 || privateHuddles.length > 0;
-
-    const isRecentlyActive = (h: Huddle) => {
-      const ts = h.latest_message?.created_at ? new Date(h.latest_message.created_at).getTime() : 0;
-      if (!ts) return false;
-      return (Date.now() - ts) < 60 * 60 * 1000; // 1 hour
-    };
-
-    const HuddleTile = ({ huddle, kind }: { huddle: Huddle; kind: 'public' | 'private' }) => {
-      const active = isRecentlyActive(huddle) || (huddle.unread_count || 0) > 0;
-
-      return (
-        <div className="rounded-xl bg-card border border-border/50 p-3">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-12 w-12 ring-2 ring-border/30">
-              <AvatarImage src={huddle.team_logo_url} alt={huddle.name} />
-              <AvatarFallback className="text-xs bg-muted">
-                {huddle.name.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="font-semibold text-sm truncate">{huddle.name}</p>
-                {kind === 'private' && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
-              </div>
-              <p className="text-xs text-muted-foreground truncate">
-                {active
-                  ? `Active now${huddle.participant_count > 1 ? `: ${huddle.participant_count} members chatting` : ''}`
-                  : (kind === 'public' ? 'Join the conversation!' : 'Invite friends for game talk!')}
-              </p>
-            </div>
-
-            <Button size="sm" variant="outline" onClick={() => onHuddleClick(huddle)}>
-              Enter
-            </Button>
-          </div>
-        </div>
-      );
-    };
-
-    return (
-      <section className="space-y-6">
-        <div className="flex items-center gap-2">
-          <Users className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-bold">My Huddles</h2>
-        </div>
-
-        {huddlesLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />
-            ))}
-          </div>
-        ) : !hasAny ? (
-          <div className="bg-card/50 rounded-xl p-6 border border-dashed border-border/50 text-center space-y-3">
-            <p className="text-sm text-muted-foreground">Build your huddle! Follow a team or create a private group.</p>
-            <Button onClick={() => navigate('/huddle-search')} className="w-full">
-              Find My Team
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Followed Teams */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">Followed Teams</h3>
-                <span className="text-xs text-muted-foreground">Public</span>
-              </div>
-
-              {publicHuddles.length === 0 ? (
-                <div className="bg-card/50 rounded-xl p-4 border border-dashed border-border/50">
-                  <p className="text-sm text-muted-foreground">No followed teams yet — pick a team below and tap into the chat.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {publicHuddles.map((h) => (
-                    <HuddleTile key={h.id} huddle={h} kind="public" />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Private huddles */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">My Private Huddles</h3>
-                <span className="text-xs text-muted-foreground">Private</span>
-              </div>
-
-              {privateHuddles.length === 0 ? (
-                <div className="bg-card/50 rounded-xl p-4 border border-dashed border-border/50">
-                  <p className="text-sm text-muted-foreground">Create your first private huddle—invite friends for game talk!</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {privateHuddles.map((h) => (
-                    <HuddleTile key={h.id} huddle={h} kind="private" />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
-    );
-  };
+  }, [fetchLiveEvent, fetchHuddles]);
 
   const hasHuddles = publicHuddles.length > 0 || privateHuddles.length > 0;
 
   return (
     <div className="min-h-screen bg-background pb-24">
+      {/* Header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50">
         <div className="px-4 py-4 flex items-center justify-between">
-          <div className="w-10" /> {/* Spacer for centering */}
+          <div className="w-10" />
           <div className="flex flex-col items-center gap-1">
             <img src={shLogo} alt="Side Huddle" className="h-12 object-contain" />
             <p className="text-sm font-medium text-muted-foreground">Your Team. Your Crew. Live.</p>
@@ -479,164 +173,24 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="px-4 py-6">
-        <form onSubmit={handleSearch}>
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Pick a team or live event..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-12 pr-4 py-6 text-lg rounded-2xl bg-card border-2 border-primary/20 focus:border-primary/50 transition-all"
-            />
-          </div>
-        </form>
-      </div>
+      <div className="px-4 py-6 space-y-8">
+        {/* SECTION 1: Live Event (conditional - only when live) */}
+        {liveEvent && <LiveEventCard event={liveEvent} />}
 
-      <div className="px-4 space-y-8">
-        {/* Special Events Section */}
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <Radio className="h-5 w-5 text-destructive animate-pulse" />
-            <h2 className="text-lg font-bold">Special Events</h2>
-          </div>
-          {liveEvents.length > 0 ? (
-            <div className="space-y-3">
-              {liveEvents.map((event) => (
-                <button
-                  key={event.id}
-                  onClick={() => handleEventClick(event)}
-                  className="w-full bg-card rounded-xl p-4 border border-border/50 hover:border-primary/50 transition-all text-left"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        {event.status === 'live' && (
-                          <Badge variant="destructive" className="animate-pulse text-xs">LIVE</Badge>
-                        )}
-                        {event.network && <span className="text-sm text-muted-foreground">{event.network}</span>}
-                      </div>
-                      <h3 className="font-semibold">{event.name}</h3>
-                      {event.subtitle && <p className="text-sm text-muted-foreground">{event.subtitle}</p>}
-                      {event.status === 'live' && event.score_team1 !== null && (
-                        <p className="text-lg font-bold text-primary mt-1">{event.score_team1} - {event.score_team2}</p>
-                      )}
-                      {event.status === 'upcoming' && (
-                        <p className="text-sm text-muted-foreground mt-1">{formatEventTime(event.start_time)}</p>
-                      )}
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-card/50 rounded-xl p-6 border border-dashed border-border/50 text-center">
-              <p className="text-sm text-muted-foreground">No special events at this time—check back for playoffs, majors, and more!</p>
-            </div>
-          )}
-        </section>
+        {/* SECTION 2: Top Moments (primary feature) */}
+        <TopMoments />
 
-        {/* My Huddles Section - Only for logged in users */}
-        {user && (
-          <MyHuddlesSection
+        {/* SECTION 3: Your Huddles (returning users only) */}
+        {user && hasHuddles && (
+          <YourHuddlesSection
             publicHuddles={publicHuddles}
             privateHuddles={privateHuddles}
-            huddlesLoading={huddlesLoading}
-            onHuddleClick={handleHuddleClick}
+            loading={huddlesLoading}
           />
         )}
 
-        {recentTeams.length > 0 && !searchQuery && (
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Clock className="h-5 w-5 text-muted-foreground" />
-              <h2 className="text-lg font-bold">Recently Viewed</h2>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
-              {recentTeams.map((team) => (
-                <button key={team.id} onClick={() => handleTeamClick(team)} className="flex-shrink-0 flex flex-col items-center gap-2">
-                  <div className={cn("relative rounded-full p-0.5", team.is_active && "ring-2 ring-green-500 animate-pulse")}>
-                    <Avatar className="h-16 w-16">
-                      <AvatarImage src={team.logo_url || undefined} alt={team.name} />
-                      <AvatarFallback>{team.name.slice(0, 2)}</AvatarFallback>
-                    </Avatar>
-                  </div>
-                  <span className="text-xs text-center max-w-[64px] truncate">{team.name}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Teams Section with League Tabs */}
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <Flame className="h-5 w-5 text-orange-500" />
-            <h2 className="text-lg font-bold">Teams</h2>
-          </div>
-          
-          <Tabs value={selectedLeague} onValueChange={setSelectedLeague} className="mb-4">
-            <TabsList className="w-full justify-start overflow-x-auto flex-nowrap">
-              {LEAGUES.map((league) => (
-                <TabsTrigger key={league.id} value={league.id} className="flex-shrink-0">
-                  {league.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-
-          {loading ? (
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
-              {Array.from({ length: 16 }).map((_, i) => (
-                <div key={i} className="flex flex-col items-center gap-2 animate-pulse">
-                  <div className="h-14 w-14 rounded-full bg-muted" />
-                  <div className="h-3 w-12 bg-muted rounded" />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
-              {filteredTeams.map((team) => {
-                const isLive = team.live_state?.state === 'live';
-                const isCooldown = team.live_state?.state === 'cooldown';
-                
-                return (
-                  <button key={team.id} onClick={() => handleTeamClick(team)} className="flex flex-col items-center gap-2 group relative">
-                    <div className={cn(
-                      "relative rounded-full transition-all duration-200 group-hover:scale-110", 
-                      isLive && "ring-2 ring-destructive",
-                      isCooldown && "ring-2 ring-orange-500",
-                      team.is_active && !isLive && !isCooldown && "ring-2 ring-green-500"
-                    )}>
-                      <Avatar className="h-14 w-14">
-                        <AvatarImage src={team.logo_url || undefined} alt={team.name} />
-                        <AvatarFallback className="text-xs">{team.name.slice(0, 2)}</AvatarFallback>
-                      </Avatar>
-                      {isLive && (
-                        <div className="absolute -top-1 -right-1 px-1.5 py-0.5 bg-destructive rounded text-[8px] font-bold text-destructive-foreground animate-pulse">
-                          LIVE
-                        </div>
-                      )}
-                      {isCooldown && (
-                        <div className="absolute -top-1 -right-1 px-1 py-0.5 bg-orange-500 rounded text-[7px] font-bold text-white">
-                          FINAL
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-center">
-                      <span className="text-xs max-w-[56px] truncate text-muted-foreground group-hover:text-foreground transition-colors block">{team.name}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {!loading && filteredTeams.length === 0 && (
-            <p className="text-center text-muted-foreground py-8">No teams found matching "{searchQuery}"</p>
-          )}
-        </section>
+        {/* SECTION 4 & 5: Discovery (everyone) */}
+        <DiscoverySection />
       </div>
 
       <BottomNav />
