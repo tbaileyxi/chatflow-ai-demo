@@ -104,7 +104,30 @@ export const GameFadeCards: React.FC<GameFadeCardsProps> = ({
       const sport = getSport();
       const cacheKey = `fades-odds:${sport}:${teamName.toLowerCase().trim()}`;
 
-      // 15-minute client cache to reduce Odds API usage
+      // FIRST: Always try fallback from existing fades in DB - this is our source of truth
+      const fallbackGame = await loadFallbackGameFromFades();
+      
+      // If we have a fallback game from DB, use it immediately
+      if (fallbackGame) {
+        console.log('[GameFadeCards] Using fallback game from fades DB:', fallbackGame);
+        // Note: loadFallbackGameFromFades already calls setGame and clears fadeOptions
+        // Now try API to get betting options (spreads, totals, etc.)
+        try {
+          const { data } = await supabase.functions.invoke('fades-get-odds', {
+            body: { team: teamName, sport },
+          });
+          // Only use API fade options if available, keep the fallback game data
+          if (data?.fade_options?.length > 0) {
+            setFadeOptions(data.fade_options);
+          }
+        } catch {
+          // API failed, that's ok - we still show the game header
+        }
+        return;
+      }
+
+      // No fallback from DB - try the Odds API
+      // Check client cache first (15-minute cache to reduce API calls)
       try {
         const cachedRaw = localStorage.getItem(cacheKey);
         if (cachedRaw) {
@@ -119,41 +142,35 @@ export const GameFadeCards: React.FC<GameFadeCardsProps> = ({
         // ignore cache errors
       }
 
-      const { data, error } = await supabase.functions.invoke('fades-get-odds', {
-        body: { team: teamName, sport },
-      });
-
-      if (error) throw error;
-
+      // Fetch fresh from API
       try {
-        localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data }));
-      } catch {
-        // ignore cache errors
+        const { data, error } = await supabase.functions.invoke('fades-get-odds', {
+          body: { team: teamName, sport },
+        });
+
+        if (!error && data?.game) {
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data }));
+          } catch {
+            // ignore cache errors
+          }
+          setGame(data.game);
+          setFadeOptions(data.fade_options || []);
+          return;
+        }
+      } catch (apiErr) {
+        console.log('[GameFadeCards] Odds API unavailable:', apiErr);
       }
 
-      if (data?.game) {
-        setGame(data.game);
-        setFadeOptions(data.fade_options || []);
-        return;
-      }
-
-      // Odds API can return game=null when rate limited. If there are open/locked upcoming
-      // fades in this huddle, keep the pinned header visible by deriving matchup + time from fades.
+      // No game data available at all
       setOddsUnavailable(true);
-      const fallback = await loadFallbackGameFromFades();
-      if (!fallback) {
-        setGame(null);
-        setFadeOptions([]);
-      }
+      setGame(null);
+      setFadeOptions([]);
     } catch (err) {
-      console.error('Error fetching odds:', err);
+      console.error('[GameFadeCards] Error in fetchOdds:', err);
       setOddsUnavailable(true);
-      // Same fallback for network/API failures
-      const fallback = await loadFallbackGameFromFades();
-      if (!fallback) {
-        setGame(null);
-        setFadeOptions([]);
-      }
+      setGame(null);
+      setFadeOptions([]);
     } finally {
       setLoading(false);
     }

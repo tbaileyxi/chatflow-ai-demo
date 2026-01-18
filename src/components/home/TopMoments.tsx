@@ -131,40 +131,62 @@ export const TopMoments = () => {
     try {
       const isDev = import.meta.env.DEV;
       
-      // Step 1: Fetch recent messages from PUBLIC official team huddles
-      // Using a broad query without relying on is_pulse_moment
+      // Step 1: First fetch official public huddle IDs
+      const { data: officialHuddles, error: huddlesError } = await supabase
+        .from('huddles')
+        .select('id, name, is_private, is_official_team_huddle, teams!team_id(name, logo_url)')
+        .eq('is_official_team_huddle', true)
+        .eq('is_private', false)
+        .limit(50);
+
+      if (huddlesError) {
+        if (isDev) console.error('[TopMoments] Huddles query error:', huddlesError);
+        throw huddlesError;
+      }
+
+      const officialHuddleIds = (officialHuddles || []).map(h => h.id);
+      if (isDev) console.log('[TopMoments] Found official huddles:', officialHuddleIds.length);
+
+      if (officialHuddleIds.length === 0) {
+        if (isDev) console.log('[TopMoments] No official huddles found');
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Fetch recent messages from these huddles
       const { data: messages, error } = await supabase
         .from('huddle_messages')
-        .select(`
-          id,
-          content,
-          created_at,
-          huddle_id,
-          is_bot_message,
-          pulse_source,
-          huddles!inner (
-            id,
-            name,
-            is_private,
-            is_official_team_huddle,
-            teams!team_id (
-              name,
-              logo_url
-            )
-          )
-        `)
-        .eq('huddles.is_official_team_huddle', true)
-        .eq('huddles.is_private', false)
+        .select('id, content, created_at, huddle_id, is_bot_message, pulse_source')
+        .in('huddle_id', officialHuddleIds)
         .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) {
-        if (isDev) console.error('[TopMoments] Query error:', error);
+        if (isDev) console.error('[TopMoments] Messages query error:', error);
         throw error;
       }
 
-      const rawMessages = (messages || []) as unknown as RawMessage[];
+      // Build a map of huddle data for enrichment
+      const huddleMap = new Map(officialHuddles.map(h => [h.id, h]));
+      
+      // Transform messages to include huddle data
+      const rawMessages: RawMessage[] = (messages || []).map(msg => {
+        const huddle = huddleMap.get(msg.huddle_id);
+        return {
+          ...msg,
+          huddles: huddle ? {
+            id: huddle.id,
+            name: huddle.name,
+            is_private: huddle.is_private,
+            is_official_team_huddle: huddle.is_official_team_huddle,
+            teams: huddle.teams
+          } : null
+        };
+      });
+
       if (isDev) console.log('[TopMoments] Fetched messages:', rawMessages.length);
+
+      // rawMessages already defined above
 
       // Build candidate pools
       const poolA: RawMessage[] = []; // Sourced (X, Reddit, URL)
@@ -242,28 +264,23 @@ export const TopMoments = () => {
 
       if (isDev) console.log('[TopMoments] Real moments:', realMoments.length);
 
-      // Collect active huddles for Coach fallback
-      const huddleMap = new Map<string, { id: string; name: string; logo_url: string | null }>();
-      rawMessages.forEach(msg => {
-        if (msg.huddles && !huddleMap.has(msg.huddle_id)) {
-          huddleMap.set(msg.huddle_id, {
-            id: msg.huddle_id,
-            name: msg.huddles.teams?.name || msg.huddles.name,
-            logo_url: msg.huddles.teams?.logo_url || null,
-          });
-        }
-      });
-      setActiveHuddles(Array.from(huddleMap.values()).slice(0, 5));
+      // Use existing huddleMap from above - convert for activeHuddles state
+      const activeHuddlesList = Array.from(huddleMap.values()).slice(0, 5).map(h => ({
+        id: h.id,
+        name: h.teams?.name || h.name,
+        logo_url: h.teams?.logo_url || null,
+      }));
+      setActiveHuddles(activeHuddlesList);
 
       // If we have fewer than 3, add Coach fallback cards
       let finalMoments = [...realMoments];
       if (finalMoments.length < 3) {
         // Get huddles not already in moments
         const usedHuddleIds = new Set(finalMoments.map(m => m.huddle_id));
-        const availableHuddles = Array.from(huddleMap.values()).filter(h => !usedHuddleIds.has(h.id));
+        const huddlesForFallback = activeHuddlesList.filter(h => !usedHuddleIds.has(h.id));
         
         // If still not enough available, reuse existing
-        const huddlesToUse = availableHuddles.length > 0 ? availableHuddles : Array.from(huddleMap.values());
+        const huddlesToUse = huddlesForFallback.length > 0 ? huddlesForFallback : activeHuddlesList;
         const coachCards = generateCoachCards(huddlesToUse, finalMoments.length);
         finalMoments = [...finalMoments, ...coachCards];
         
