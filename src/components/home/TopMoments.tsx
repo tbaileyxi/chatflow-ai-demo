@@ -47,7 +47,7 @@ interface RawMessage {
   } | null;
 }
 
-// Calculate importance score for a message
+// Calculate importance score for a message - PRIORITIZE Reddit when X unavailable
 function calculateScore(msg: RawMessage): number {
   let score = 0;
   const content = msg.content?.toUpperCase() || '';
@@ -55,29 +55,46 @@ function calculateScore(msg: RawMessage): number {
   const now = new Date();
   const minutesAgo = (now.getTime() - createdAt.getTime()) / (1000 * 60);
 
-  // Pool A: Sourced messages (best)
-  if (msg.pulse_source === 'x' || msg.pulse_source === 'reddit') {
+  // Reddit gets highest priority (X is currently rate-limited)
+  if (msg.pulse_source === 'reddit') {
+    score += 8;
+  } else if (msg.pulse_source === 'x') {
+    score += 6;
+  }
+
+  // Contains URL (likely external source)
+  if (msg.content?.includes('http://') || msg.content?.includes('https://')) {
     score += 5;
   }
 
-  // Contains URL
-  if (msg.content?.includes('http://') || msg.content?.includes('https://')) {
-    score += 4;
-  }
-
-  // Contains state-change keyword
+  // Contains state-change keyword (BREAKING news value)
   const hasStateChange = STATE_CHANGE_KEYWORDS.some(kw => content.includes(kw));
   if (hasStateChange) {
+    score += 6;
+  }
+
+  // Score updates and game results are high value
+  const hasScoreUpdate = /\d+\s*[-–]\s*\d+/.test(msg.content || '') || 
+                         content.includes('SCORE') || 
+                         content.includes('TOUCHDOWN') ||
+                         content.includes('GOAL') ||
+                         content.includes('WIN') ||
+                         content.includes('LOSS');
+  if (hasScoreUpdate) {
     score += 4;
   }
 
-  // Bot message
+  // Bot message (curated content)
   if (msg.is_bot_message) {
     score += 3;
   }
 
-  // Freshness bonus
-  if (minutesAgo < 30) {
+  // Strong freshness bonus - prioritize recent content
+  if (minutesAgo < 15) {
+    score += 4;
+  } else if (minutesAgo < 30) {
+    score += 3;
+  } else if (minutesAgo < 60) {
     score += 2;
   } else if (minutesAgo < 120) {
     score += 1;
@@ -86,7 +103,17 @@ function calculateScore(msg: RawMessage): number {
   return score;
 }
 
-// Generate Coach fallback cards
+// Dynamic Coach prompts that feel more engaging
+const COACH_PROMPTS = [
+  (team: string) => `🔥 Coach: ${team} fans, here's what you need to know right now...`,
+  (team: string) => `📊 Coach: The latest buzz from ${team} nation...`,
+  (team: string) => `🎯 Coach: Big storylines developing for ${team}...`,
+  (team: string) => `💬 Coach: ${team} fans are talking about this...`,
+  (team: string) => `⚡ Coach: Breaking down what's happening with ${team}...`,
+  (team: string) => `🏆 Coach: Today's must-know updates for ${team}...`,
+];
+
+// Generate Coach fallback cards with more variety
 function generateCoachCards(
   huddles: { id: string; name: string; logo_url: string | null }[],
   existingCount: number
@@ -94,18 +121,15 @@ function generateCoachCards(
   const needed = 3 - existingCount;
   if (needed <= 0 || huddles.length === 0) return [];
 
-  const coachPrompts = [
-    (team: string) => `Coach: 3 things to know today for ${team} fans...`,
-    (team: string) => `Coach: The debate ${team} fans can't stop having...`,
-    (team: string) => `Coach: Here's what's trending in ${team} nation...`,
-  ];
+  // Shuffle prompts for variety
+  const shuffledPrompts = [...COACH_PROMPTS].sort(() => Math.random() - 0.5);
 
   const cards: TopMoment[] = [];
-  for (let i = 0; i < needed && i < huddles.length; i++) {
+  for (let i = 0; i < needed; i++) {
     const huddle = huddles[i % huddles.length];
-    const promptFn = coachPrompts[i % coachPrompts.length];
+    const promptFn = shuffledPrompts[i % shuffledPrompts.length];
     cards.push({
-      id: `coach-${huddle.id}-${i}`,
+      id: `coach-${huddle.id}-${Date.now()}-${i}`,
       content: promptFn(huddle.name),
       created_at: new Date().toISOString(),
       huddle_id: huddle.id,
