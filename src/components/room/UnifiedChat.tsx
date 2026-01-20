@@ -231,10 +231,18 @@ export const UnifiedChat = memo(function UnifiedChat({
   }, [fetchMessages]);
 
   // Guaranteed anchor: once messages render, force scroll-to-top on entry
+  // Using multiple RAF calls to ensure DOM is fully painted before scrolling
   useLayoutEffect(() => {
     if (!didInitialScrollRef.current && messages.length > 0) {
       didInitialScrollRef.current = true;
-      scrollToTop('auto');
+      // Triple RAF to ensure layout is complete before scroll
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            scrollToTop('auto');
+          });
+        });
+      });
     }
   }, [messages.length, scrollToTop]);
 

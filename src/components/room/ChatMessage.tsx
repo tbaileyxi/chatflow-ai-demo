@@ -1,5 +1,5 @@
-import React, { memo, useCallback, useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { memo, useCallback, useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ThumbsUp, Laugh, Eye, Reply, Share2, Check } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
@@ -8,6 +8,8 @@ import { UserBadgeIcon } from '@/components/badges/UserBadgeIcon';
 import { FadeMessageAction } from './FadeMessageAction';
 import { useToast } from '@/hooks/use-toast';
 
+// Maximum character length before truncating
+const MAX_CONTENT_LENGTH = 280;
 interface Profile {
   display_name: string;
   username: string;
@@ -83,13 +85,19 @@ export const ChatMessage = memo(function ChatMessage({
 }: ChatMessageProps) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   
   const displayName = profile?.display_name || profile?.username || 'Anonymous';
   const avatarUrl = profile?.avatar_url;
   const isCoach = message.is_bot_message || message.message_type === 'coach_response';
   const isPulse = message.pulse_source || message.message_type === 'pulse';
   const isFadeNotification = message.message_type === 'fade_notification';
-
+  
+  // Check if content needs truncation
+  const shouldTruncate = message.content && message.content.length > MAX_CONTENT_LENGTH;
+  const displayContent = shouldTruncate && !isExpanded 
+    ? message.content.slice(0, MAX_CONTENT_LENGTH) + '...'
+    : message.content;
   const handleReplyClick = useCallback(() => {
     onReply?.(message);
   }, [onReply, message]);
@@ -212,13 +220,30 @@ export const ChatMessage = memo(function ChatMessage({
             </span>
           </div>
 
-          {/* Content */}
-          <p className={cn(
-            "text-sm leading-relaxed whitespace-pre-wrap",
-            isCoach && "font-medium"
-          )}>
-            {message.content}
-          </p>
+          {/* Content with Read More */}
+          <div>
+            <p className={cn(
+              "text-sm leading-relaxed whitespace-pre-wrap",
+              isCoach && "font-medium"
+            )}>
+              {displayContent}
+            </p>
+            
+            {/* Read More / Show Less button */}
+            {shouldTruncate && (
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className={cn(
+                  "text-xs font-medium mt-1 transition-colors",
+                  isOwn 
+                    ? "text-primary-foreground/70 hover:text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {isExpanded ? 'Show less' : 'Read more'}
+              </button>
+            )}
+          </div>
 
           {/* Inline Media */}
           {hasInlineMedia && (
