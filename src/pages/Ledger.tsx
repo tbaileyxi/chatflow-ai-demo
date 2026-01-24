@@ -39,6 +39,9 @@ interface FadeRecord {
   game_commence_time: string;
   home_team: string;
   away_team: string;
+  final_score_home: number | null;
+  final_score_away: number | null;
+  fade_type: string;
 }
 
 export default function Ledger() {
@@ -110,6 +113,9 @@ export default function Ledger() {
           game_commence_time: f.game_commence_time,
           home_team: f.home_team,
           away_team: f.away_team,
+          final_score_home: f.final_score_home,
+          final_score_away: f.final_score_away,
+          fade_type: f.fade_type,
         });
 
         // Categorize fades
@@ -188,69 +194,131 @@ export default function Ledger() {
   const totalOpen = openFades.reduce((sum, f) => sum + f.stake, 0);
   const totalLocked = lockedFades.reduce((sum, f) => sum + f.stake, 0);
 
-  const FadeCard = ({ fade, showActions = false }: { fade: FadeRecord; showActions?: boolean }) => (
-    <Card className={cn(
-      "p-4 border-2",
-      fade.status === 'settled' && fade.is_winner ? "border-green-500/30 bg-green-500/5" :
-      fade.status === 'settled' && fade.is_winner === false ? "border-red-500/30 bg-red-500/5" :
-      fade.status === 'locked' ? "border-primary/30 bg-primary/5" :
-      fade.status === 'expired' ? "border-muted opacity-60" :
-      "border-border"
-    )}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-muted-foreground">{fade.huddle_name}</span>
-        <span className={cn(
-          "text-xs px-2 py-0.5 rounded-full font-medium",
-          fade.status === 'open' ? "bg-amber-500/20 text-amber-400" :
-          fade.status === 'locked' ? "bg-primary/20 text-primary" :
-          fade.status === 'settled' && fade.is_winner ? "bg-green-500/20 text-green-400" :
-          fade.status === 'settled' ? "bg-red-500/20 text-red-400" :
-          "bg-muted text-muted-foreground"
-        )}>
-          {fade.status === 'open' ? 'Open' :
-           fade.status === 'locked' ? '🔒 Locked' :
-           fade.status === 'settled' && fade.is_winner ? '🏆 Won' :
-           fade.status === 'settled' ? 'Lost' :
-           'Expired'}
-        </span>
-      </div>
+  const FadeCard = ({ fade, showActions = false }: { fade: FadeRecord; showActions?: boolean }) => {
+    const gameTime = new Date(fade.game_commence_time);
+    const isGamePast = isPast(gameTime);
+    const hasScores = fade.final_score_home !== null && fade.final_score_away !== null;
+    
+    // Determine game status message
+    const getGameStatus = () => {
+      if (fade.status === 'settled') return null;
+      if (hasScores) return `Final: ${fade.away_team} ${fade.final_score_away} - ${fade.home_team} ${fade.final_score_home}`;
+      if (isGamePast) return '⏳ Awaiting final score...';
+      return `Game: ${format(gameTime, 'MMM d, h:mm a')}`;
+    };
+    
+    // Get user's position description
+    const getUserPosition = () => {
+      if (fade.is_poster) {
+        return fade.line_description;
+      }
+      // Accepter takes opposite position
+      if (fade.fade_type === 'over') return fade.line_description.replace('Over', 'Under');
+      if (fade.fade_type === 'under') return fade.line_description.replace('Under', 'Over');
+      if (fade.fade_type === 'spread') {
+        // Flip the spread sign
+        const spreadMatch = fade.line_description.match(/([+-]?\d+\.?\d*)/);
+        if (spreadMatch) {
+          const spread = parseFloat(spreadMatch[1]);
+          return fade.line_description.replace(spreadMatch[1], (spread * -1 > 0 ? '+' : '') + (spread * -1).toString());
+        }
+      }
+      return `Against: ${fade.line_description}`;
+    };
+    
+    return (
+      <Card className={cn(
+        "p-4 border-2",
+        fade.status === 'settled' && fade.is_winner ? "border-green-500/30 bg-green-500/5" :
+        fade.status === 'settled' && fade.is_winner === false ? "border-red-500/30 bg-red-500/5" :
+        fade.status === 'locked' && isGamePast ? "border-amber-500/30 bg-amber-500/5" :
+        fade.status === 'locked' ? "border-primary/30 bg-primary/5" :
+        fade.status === 'expired' ? "border-muted opacity-60" :
+        "border-border"
+      )}>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs text-muted-foreground">{fade.huddle_name}</span>
+          <span className={cn(
+            "text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1",
+            fade.status === 'open' ? "bg-amber-500/20 text-amber-400" :
+            fade.status === 'locked' && isGamePast ? "bg-amber-500/20 text-amber-400" :
+            fade.status === 'locked' ? "bg-primary/20 text-primary" :
+            fade.status === 'settled' && fade.is_winner ? "bg-green-500/20 text-green-400" :
+            fade.status === 'settled' ? "bg-red-500/20 text-red-400" :
+            "bg-muted text-muted-foreground"
+          )}>
+            {fade.status === 'open' ? 'Open' :
+             fade.status === 'locked' && isGamePast ? '⏳ Pending' :
+             fade.status === 'locked' ? '🔒 Locked' :
+             fade.status === 'settled' && fade.is_winner ? '🏆 Won' :
+             fade.status === 'settled' ? '❌ Lost' :
+             'Expired'}
+          </span>
+        </div>
 
-      <div className="text-sm text-muted-foreground mb-1">
-        {fade.away_team} @ {fade.home_team}
-      </div>
+        {/* Matchup */}
+        <div className="text-sm text-muted-foreground mb-1">
+          {fade.away_team} @ {fade.home_team}
+        </div>
+        
+        {/* Scores if available */}
+        {hasScores && (
+          <div className="text-sm font-semibold text-foreground mb-2 bg-muted/50 rounded px-2 py-1 inline-block">
+            Final: {fade.final_score_away} - {fade.final_score_home}
+          </div>
+        )}
+        
+        {/* Game status for locked */}
+        {fade.status === 'locked' && !hasScores && (
+          <div className={cn(
+            "text-xs mb-2",
+            isGamePast ? "text-amber-400" : "text-muted-foreground"
+          )}>
+            {getGameStatus()}
+          </div>
+        )}
 
-      <p className="text-foreground font-semibold mb-2">{fade.line_description}</p>
+        {/* Your position */}
+        <div className="mb-3">
+          <p className="text-xs text-muted-foreground mb-0.5">Your pick:</p>
+          <p className="text-foreground font-semibold">{getUserPosition()}</p>
+        </div>
 
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">
-          {fade.is_poster ? 'You vs' : 'vs'} {fade.opponent_name}
-        </span>
-        <span className={cn(
-          "text-lg font-bold",
-          fade.status === 'settled' && fade.is_winner ? "text-green-500" :
-          fade.status === 'settled' && fade.is_winner === false ? "text-red-500" :
-          "text-foreground"
-        )}>
-          {fade.status === 'settled' && fade.is_winner === false ? '-' : ''}${fade.stake}
-        </span>
-      </div>
+        {/* VS Display */}
+        <div className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
+              <span className="text-xs font-bold text-primary">YOU</span>
+            </div>
+            <span className="text-sm font-medium">vs</span>
+            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+              <span className="text-xs font-bold">{fade.opponent_name.charAt(0).toUpperCase()}</span>
+            </div>
+            <span className="text-sm text-muted-foreground">{fade.opponent_name}</span>
+          </div>
+          <span className={cn(
+            "text-lg font-bold",
+            fade.status === 'settled' && fade.is_winner ? "text-green-500" :
+            fade.status === 'settled' && fade.is_winner === false ? "text-red-500" :
+            "text-primary"
+          )}>
+            {fade.status === 'settled' && fade.is_winner === false ? '-' : ''}${fade.stake}
+          </span>
+        </div>
 
-      <p className="text-xs text-muted-foreground mt-2">
-        {format(new Date(fade.created_at), 'MMM d, yyyy h:mm a')}
-      </p>
-
-      {showActions && fade.status === 'open' && (
-        <Button
-          size="sm"
-          variant="outline"
-          className="w-full mt-3"
-          onClick={() => navigate(`/huddle/${fade.huddle_id}`)}
-        >
-          View in Huddle
-        </Button>
-      )}
-    </Card>
-  );
+        {showActions && fade.status === 'open' && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full mt-3"
+            onClick={() => navigate(`/huddle/${fade.huddle_id}`)}
+          >
+            View in Huddle
+          </Button>
+        )}
+      </Card>
+    );
+  };
 
   return (
     <div className="min-h-screen-dynamic bg-background">
