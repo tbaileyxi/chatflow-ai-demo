@@ -1880,6 +1880,94 @@ export type Database = {
           },
         ]
       }
+      sponsor_reservations: {
+        Row: {
+          created_at: string
+          deposit_amount: number
+          id: string
+          reservation_date: string
+          reserved_by_company: string
+          reserved_by_name: string
+          reserved_email: string
+          status: string
+          stripe_payment_id: string | null
+          stripe_session_id: string | null
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deposit_amount?: number
+          id?: string
+          reservation_date?: string
+          reserved_by_company: string
+          reserved_by_name: string
+          reserved_email: string
+          status?: string
+          stripe_payment_id?: string | null
+          stripe_session_id?: string | null
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deposit_amount?: number
+          id?: string
+          reservation_date?: string
+          reserved_by_company?: string
+          reserved_by_name?: string
+          reserved_email?: string
+          status?: string
+          stripe_payment_id?: string | null
+          stripe_session_id?: string | null
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_reservations_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sponsor_waitlist: {
+        Row: {
+          company: string
+          created_at: string
+          email: string
+          id: string
+          name: string
+          team_id: string
+        }
+        Insert: {
+          company: string
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          team_id: string
+        }
+        Update: {
+          company?: string
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_waitlist_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spotlight_reports: {
         Row: {
           created_at: string
