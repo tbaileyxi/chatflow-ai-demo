@@ -107,11 +107,12 @@ export const TeamDirectoryGrid: React.FC = () => {
       </div>
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="NFL">NFL</TabsTrigger>
-          <TabsTrigger value="NCAA">College</TabsTrigger>
-          <TabsTrigger value="NBA">NBA</TabsTrigger>
+        <TabsList className="flex w-full overflow-x-auto gap-1 h-auto p-1">
+          <TabsTrigger value="all" className="flex-shrink-0 px-4">All</TabsTrigger>
+          <TabsTrigger value="NFL" className="flex-shrink-0 px-4">NFL</TabsTrigger>
+          <TabsTrigger value="NCAA" className="flex-shrink-0 px-4">College</TabsTrigger>
+          <TabsTrigger value="NBA" className="flex-shrink-0 px-4">NBA</TabsTrigger>
+          <TabsTrigger value="MLB" className="flex-shrink-0 px-4">MLB</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4 mt-4">
@@ -166,6 +167,20 @@ export const TeamDirectoryGrid: React.FC = () => {
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               No NBA teams found
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="MLB" className="space-y-4 mt-4">
+          {filterTeams('MLB').length > 0 ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+              {filterTeams('MLB').map(team => (
+                <TeamTile key={team.id} team={team} huddle={team.huddle} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              No MLB teams found
             </div>
           )}
         </TabsContent>
