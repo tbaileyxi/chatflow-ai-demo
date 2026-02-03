@@ -160,7 +160,7 @@ export default function Home() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => window.open('https://sidehuddlefounders.carrd.co/', '_blank')}>
+              <DropdownMenuItem onClick={() => window.location.href = '/sponsor'}>
                 <Sparkles className="mr-2 h-4 w-4" />
                 Sponsor
               </DropdownMenuItem>
