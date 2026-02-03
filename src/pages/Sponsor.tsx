@@ -454,12 +454,20 @@ export default function Sponsor() {
                 We'll contact you before launch to activate your sponsorship. Your $149 deposit will be applied to your first invoice.
               </p>
             </DialogDescription>
-            <Button
-              className="mt-6 bg-primary text-primary-foreground hover:bg-primary/90"
-              onClick={() => setShowSuccessModal(false)}
-            >
-              Got It!
-            </Button>
+            <div className="flex gap-3 mt-6 justify-center">
+              <Button
+                variant="outline"
+                onClick={() => window.location.href = '/'}
+              >
+                Return Home
+              </Button>
+              <Button
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={() => setShowSuccessModal(false)}
+              >
+                Browse More Teams
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
