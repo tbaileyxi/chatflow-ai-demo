@@ -121,6 +121,5 @@ verify_jwt = true
 [functions.stripe-cashmode-webhook]
 verify_jwt = false
 
-[functions.fades-settle]
+[functions.og-message]
 verify_jwt = false
-
