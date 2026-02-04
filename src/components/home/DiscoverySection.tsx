@@ -108,8 +108,8 @@ export const DiscoverySection = () => {
             huddle_id: huddle?.id,
             is_active: isActive
           };
-        })
-        .filter((t: Team) => t.huddle_id);
+        });
+      // Show all teams, including those without huddles
 
       setTeams(formattedTeams);
     } catch (error) {
@@ -130,6 +130,9 @@ export const DiscoverySection = () => {
   const handleTeamClick = (team: Team) => {
     if (team.huddle_id) {
       navigate(`/huddle/${team.huddle_id}`);
+    } else {
+      // Navigate to team feed for teams without huddles
+      navigate(`/team/${team.id}`);
     }
   };
 
