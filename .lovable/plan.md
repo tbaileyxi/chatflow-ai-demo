@@ -1,150 +1,155 @@
 
-# Add NCAA Power Four Conference Teams
 
-## Overview
-Add all missing teams from the four major NCAA football conferences (Big Ten, Big 12, SEC, ACC) to the teams database. The system currently has 16 NCAA teams, and we need to add the remaining Power Four teams while avoiding duplicates.
+# Dynamic Share Links for Chat Messages with Rich Previews
 
-## Power Four Conferences (2024-25 Realignment)
+## The Problem
+When you click the share button on a chat message in a huddle, the generated link goes to `/spotlight/{message.id}`. But:
+1. Chat messages are stored in `huddle_messages` table
+2. Spotlight posts are stored in a separate `posts` table
+3. The SpotlightPost page only looks in `posts`, so chat message links show "Post not found"
+4. Social platforms (iMessage, Twitter, etc.) only see the default Side Huddle logo since meta tags require server-side rendering
 
-### Teams Already in Database (No Action Needed)
-| Team | Conference |
-|------|------------|
-| Texas A&M Aggies | SEC |
-| Colorado Buffaloes | Big 12 |
-| Georgia Bulldogs | SEC |
-| Alabama Crimson Tide | SEC |
-| Oregon Ducks | Big Ten |
-| South Carolina Gamecocks | SEC |
-| Florida Gators | SEC |
-| Indiana Hoosiers | Big Ten |
-| Miami Hurricanes | ACC |
-| Texas Tech Red Raiders | Big 12 |
-| North Carolina Tar Heels | ACC |
-| LSU Tigers | SEC |
-| Auburn Tigers | SEC |
-| Tennessee Volunteers | SEC |
+## The Solution
 
-### Teams to Add
+Create a complete sharing system for chat messages:
+1. New route and page for viewing shared chat messages
+2. Edge function proxy for rich social previews
+3. Updated share button to generate the correct URLs
 
-**Big Ten Conference (14 teams needed)**
-| City | Name | Slug |
-|------|------|------|
-| Illinois | Fighting Illini | ill |
-| Iowa | Hawkeyes | iowa |
-| Maryland | Terrapins | md |
-| Michigan | Wolverines | mich |
-| Michigan State | Spartans | msu |
-| Minnesota | Golden Gophers | minn |
-| Nebraska | Cornhuskers | neb |
-| Northwestern | Wildcats | nw |
-| Ohio State | Buckeyes | osu |
-| Penn State | Nittany Lions | psu |
-| Purdue | Boilermakers | pur |
-| Rutgers | Scarlet Knights | rut |
-| UCLA | Bruins | ucla |
-| USC | Trojans | usc |
-| Washington | Huskies | wash |
-| Wisconsin | Badgers | wis |
+---
 
-**Big 12 Conference (14 teams needed)**
-| City | Name | Slug |
-|------|------|------|
-| Arizona | Wildcats | ari |
-| Arizona State | Sun Devils | asu |
-| Baylor | Bears | bay |
-| BYU | Cougars | byu |
-| Cincinnati | Bearcats | cin |
-| Houston | Cougars | hou |
-| Iowa State | Cyclones | isu |
-| Kansas | Jayhawks | kan |
-| Kansas State | Wildcats | ksu |
-| Oklahoma State | Cowboys | okst |
-| TCU | Horned Frogs | tcu |
-| UCF | Knights | ucf |
-| Utah | Utes | utah |
-| West Virginia | Mountaineers | wvu |
+## Implementation Steps
 
-**SEC (2 teams needed)**
-| City | Name | Slug |
-|------|------|------|
-| Arkansas | Razorbacks | ark |
-| Kentucky | Wildcats | uk |
-| Mississippi State | Bulldogs | miss |
-| Missouri | Tigers | miz |
-| Oklahoma | Sooners | okla |
-| Ole Miss | Rebels | olemiss |
-| Texas | Longhorns | tex |
-| Vanderbilt | Commodores | van |
+### Step 1: Create New Message View Page
 
-**ACC (13 teams needed)**
-| City | Name | Slug |
-|------|------|------|
-| Boston College | Eagles | bc |
-| California | Golden Bears | cal |
-| Clemson | Tigers | clem |
-| Duke | Blue Devils | duke |
-| Florida State | Seminoles | fsu |
-| Georgia Tech | Yellow Jackets | gt |
-| Louisville | Cardinals | lou |
-| NC State | Wolfpack | ncsu |
-| Pitt | Panthers | pitt |
-| SMU | Mustangs | smu |
-| Stanford | Cardinal | stan |
-| Syracuse | Orange | syr |
-| Virginia | Cavaliers | uva |
-| Virginia Tech | Hokies | vt |
-| Wake Forest | Demon Deacons | wake |
+**New file:** `src/pages/MessagePost.tsx`
 
-## Implementation
+A dedicated page that:
+- Fetches the message from `huddle_messages` table
+- Shows the message content, author, media, and huddle context
+- Includes proper meta tags via React Helmet
+- Provides a "Join this Huddle" call-to-action
 
-### Logo URL Pattern
-Following the established pattern from NBA/MLB additions:
-```
-https://a.espncdn.com/i/teamlogos/ncaa/500/[slug].png
+### Step 2: Add Route
+
+**Update:** `src/App.tsx`
+
+```typescript
+import { MessagePost } from "./pages/MessagePost";
+
+// Add route:
+<Route path="/message/:id" element={<MessagePost />} />
 ```
 
-### Database Insert Strategy
-Create an edge function to bulk insert all teams with proper deduplication logic:
+### Step 3: Update Share Button URL
 
-1. Check existing teams by matching `city` + `name` combination
-2. Skip teams that already exist
-3. Insert new teams with:
-   - `league`: 'NCAA'
-   - `conference`: The appropriate conference name
-   - `status`: 'active'
-   - `logo_url`: ESPN CDN URL
+**Update:** `src/components/room/ChatMessage.tsx`
 
-### Total Teams to Add
-- Big Ten: ~14 new teams
-- Big 12: ~14 new teams  
-- SEC: ~2 new teams (most already exist)
-- ACC: ~13 new teams
+Change the share URL from spotlight to message:
+```typescript
+// Current (broken):
+const shareUrl = `${window.location.origin}/spotlight/${message.id}`;
 
-**Approximate Total: 43 new NCAA teams**
-
-## Technical Details
-
-### SQL Insert Statement Pattern
-```sql
-INSERT INTO teams (name, city, league, conference, logo_url, status)
-VALUES 
-  ('Wolverines', 'Michigan', 'NCAA', 'Big Ten', 'https://a.espncdn.com/i/teamlogos/ncaa/500/mich.png', 'active'),
-  -- ... more teams
-ON CONFLICT DO NOTHING;
+// New (correct):
+const shareUrl = `${window.location.origin}/message/${message.id}`;
 ```
 
-### Files to Modify
-- No code changes needed - this is a data-only update
-- Will execute SQL directly to add teams
+### Step 4: Edge Function for Rich Social Previews
 
-### After Insertion
-- Teams will immediately appear in `/sponsor` page
-- Teams will appear in Team Directory
-- Teams will be available for huddle creation
-- `sync-highlightly-teams` function can map them to Highlightly IDs for scores/highlights
+**New file:** `supabase/functions/og-message/index.ts`
 
-## Verification Steps
-1. Run the insert SQL
-2. Verify teams appear on sponsor page with correct logos
-3. Confirm no duplicate teams were created
-4. Test that new teams can be selected for sponsorship
+When someone shares a link on iMessage/Twitter/Slack:
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│  Someone shares: sidehuddlesports.com/message/abc123        │
+└───────────────────────────────┬──────────────────────────────┘
+                                │
+                                ▼
+              ┌─────────────────────────────────────┐
+              │   Edge Function: og-message         │
+              │   Detects User-Agent                │
+              └─────────────────────┬───────────────┘
+                                    │
+            ┌───────────────────────┴───────────────────┐
+            │                                           │
+            ▼                                           ▼
+   ┌─────────────────┐                       ┌─────────────────────┐
+   │  Social Crawler │                       │   Regular Browser   │
+   │  (iMessage, X)  │                       │                     │
+   └────────┬────────┘                       └──────────┬──────────┘
+            │                                           │
+            ▼                                           ▼
+   ┌─────────────────────┐                   ┌─────────────────────┐
+   │ Return HTML with    │                   │ Redirect to SPA     │
+   │ dynamic OG tags:    │                   │ /message/:id        │
+   │ - Author name       │                   └─────────────────────┘
+   │ - Message preview   │
+   │ - Media/Team logo   │
+   └─────────────────────┘
+```
+
+The edge function:
+- Detects social crawlers via User-Agent header
+- Fetches message + author profile from database
+- Returns HTML with proper `og:title`, `og:description`, `og:image` meta tags
+- Regular users get redirected to the React app
+
+### Step 5: Update Share URL to Use Edge Function
+
+For proper social previews, the share URL will point to the edge function:
+```typescript
+const shareUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-message?id=${message.id}`;
+```
+
+The edge function handles both crawlers (OG tags) and regular browsers (redirect to SPA).
+
+---
+
+## Files to Create/Modify
+
+| File | Action | Purpose |
+|------|--------|---------|
+| `src/pages/MessagePost.tsx` | Create | Page to display shared chat messages |
+| `src/App.tsx` | Update | Add `/message/:id` route |
+| `src/components/room/ChatMessage.tsx` | Update | Fix share URL |
+| `supabase/functions/og-message/index.ts` | Create | Edge function for OG meta tags |
+| `supabase/config.toml` | Update | Register edge function |
+
+---
+
+## What the Share Preview Will Look Like
+
+When shared on iMessage/Twitter:
+
+```text
+┌─────────────────────────────────────┐
+│  [Author Avatar or Team Logo]       │
+│                                     │
+│  @username in Georgia Bulldogs      │
+│  "Kirby's defense is elite..."      │
+│  sidehuddlesports.com               │
+└─────────────────────────────────────┘
+```
+
+---
+
+## OG Tag Content Strategy
+
+| Tag | Value |
+|-----|-------|
+| `og:title` | "@{username} in {huddle_name}" |
+| `og:description` | First 160 characters of message content |
+| `og:image` | Message media_url if exists, otherwise team logo, fallback to Side Huddle logo |
+| `og:url` | Canonical message URL |
+| `twitter:card` | "summary_large_image" |
+
+---
+
+## Technical Notes
+
+- Edge function uses `SUPABASE_SERVICE_ROLE_KEY` to fetch message data
+- Crawler detection patterns: `Twitterbot`, `facebookexternalhit`, `LinkedInBot`, `Slackbot`, `Discordbot`, `WhatsApp`, `iMessage`
+- Fallback to generic Side Huddle branding if message not found
+- The SPA page (`MessagePost.tsx`) also includes Helmet meta tags for users who visit directly
+
