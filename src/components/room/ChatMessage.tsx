@@ -103,7 +103,8 @@ export const ChatMessage = memo(function ChatMessage({
   }, [onReply, message]);
 
   const handleShare = useCallback(async () => {
-    const shareUrl = `${window.location.origin}/spotlight/${message.id}`;
+    // Use edge function URL for rich social previews
+    const shareUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-message?id=${message.id}`;
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);

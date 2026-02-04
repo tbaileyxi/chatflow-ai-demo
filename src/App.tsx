@@ -29,6 +29,7 @@ import Room from "./pages/Room";
 import Ledger from "./pages/Ledger";
 import Sponsor from "./pages/Sponsor";
 import { SpotlightPost } from "./pages/SpotlightPost";
+import { MessagePost } from "./pages/MessagePost";
 
 const queryClient = new QueryClient();
 
@@ -69,6 +70,7 @@ const AppContent = () => {
           <Route path="/ledger" element={<Ledger />} />
           <Route path="/sponsor" element={<Sponsor />} />
           <Route path="/spotlight/:id" element={<SpotlightPost />} />
+          <Route path="/message/:id" element={<MessagePost />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
