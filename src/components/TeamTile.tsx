@@ -30,6 +30,9 @@ export const TeamTile: React.FC<TeamTileProps> = ({ team, huddle, size = 'defaul
   const handleClick = () => {
     if (huddle?.id) {
       navigate(`/huddle/${huddle.id}`);
+    } else {
+      // Navigate to team feed for teams without huddles
+      navigate(`/team/${team.id}`);
     }
   };
 
@@ -46,7 +49,7 @@ export const TeamTile: React.FC<TeamTileProps> = ({ team, huddle, size = 'defaul
         "relative bg-card border border-border rounded-xl cursor-pointer",
         "hover:border-primary/50 hover:shadow-lg transition-all duration-200",
         "flex flex-col items-center justify-center gap-2",
-        "overflow-hidden",
+        "overflow-hidden group",
         sizeClasses
       )}
     >
