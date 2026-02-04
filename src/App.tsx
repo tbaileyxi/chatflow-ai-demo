@@ -28,6 +28,7 @@ import { RetroDemo } from "./pages/RetroDemo";
 import Room from "./pages/Room";
 import Ledger from "./pages/Ledger";
 import Sponsor from "./pages/Sponsor";
+import { SpotlightPost } from "./pages/SpotlightPost";
 
 const queryClient = new QueryClient();
 
@@ -67,6 +68,7 @@ const AppContent = () => {
           <Route path="/room/:eventId" element={<Room />} />
           <Route path="/ledger" element={<Ledger />} />
           <Route path="/sponsor" element={<Sponsor />} />
+          <Route path="/spotlight/:id" element={<SpotlightPost />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
