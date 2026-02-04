@@ -1,159 +1,150 @@
 
-# Multi-Team Sponsorship Selection with Bulk Discount
+# Add NCAA Power Four Conference Teams
 
 ## Overview
-Add the ability for sponsors to select multiple teams at once, with a **20% discount** automatically applied when 3 or more teams are selected. This creates a cart-like experience before checkout.
+Add all missing teams from the four major NCAA football conferences (Big Ten, Big 12, SEC, ACC) to the teams database. The system currently has 16 NCAA teams, and we need to add the remaining Power Four teams while avoiding duplicates.
 
-## User Experience Flow
+## Power Four Conferences (2024-25 Realignment)
 
-```text
-1. User browses team directory
-2. Instead of "Reserve This Team" button → Checkbox to add/remove teams
-3. Selected teams appear in a floating "cart" panel (sticky at bottom or side)
-4. Cart shows:
-   - List of selected teams (with remove option)
-   - Price breakdown: $149 x [count]
-   - Discount line (if 3+ teams): -20% discount
-   - Total amount
-   - "Proceed to Checkout" button
-5. Checkout creates single Stripe session with multiple line items
-6. Webhook processes all teams as reserved
+### Teams Already in Database (No Action Needed)
+| Team | Conference |
+|------|------------|
+| Texas A&M Aggies | SEC |
+| Colorado Buffaloes | Big 12 |
+| Georgia Bulldogs | SEC |
+| Alabama Crimson Tide | SEC |
+| Oregon Ducks | Big Ten |
+| South Carolina Gamecocks | SEC |
+| Florida Gators | SEC |
+| Indiana Hoosiers | Big Ten |
+| Miami Hurricanes | ACC |
+| Texas Tech Red Raiders | Big 12 |
+| North Carolina Tar Heels | ACC |
+| LSU Tigers | SEC |
+| Auburn Tigers | SEC |
+| Tennessee Volunteers | SEC |
+
+### Teams to Add
+
+**Big Ten Conference (14 teams needed)**
+| City | Name | Slug |
+|------|------|------|
+| Illinois | Fighting Illini | ill |
+| Iowa | Hawkeyes | iowa |
+| Maryland | Terrapins | md |
+| Michigan | Wolverines | mich |
+| Michigan State | Spartans | msu |
+| Minnesota | Golden Gophers | minn |
+| Nebraska | Cornhuskers | neb |
+| Northwestern | Wildcats | nw |
+| Ohio State | Buckeyes | osu |
+| Penn State | Nittany Lions | psu |
+| Purdue | Boilermakers | pur |
+| Rutgers | Scarlet Knights | rut |
+| UCLA | Bruins | ucla |
+| USC | Trojans | usc |
+| Washington | Huskies | wash |
+| Wisconsin | Badgers | wis |
+
+**Big 12 Conference (14 teams needed)**
+| City | Name | Slug |
+|------|------|------|
+| Arizona | Wildcats | ari |
+| Arizona State | Sun Devils | asu |
+| Baylor | Bears | bay |
+| BYU | Cougars | byu |
+| Cincinnati | Bearcats | cin |
+| Houston | Cougars | hou |
+| Iowa State | Cyclones | isu |
+| Kansas | Jayhawks | kan |
+| Kansas State | Wildcats | ksu |
+| Oklahoma State | Cowboys | okst |
+| TCU | Horned Frogs | tcu |
+| UCF | Knights | ucf |
+| Utah | Utes | utah |
+| West Virginia | Mountaineers | wvu |
+
+**SEC (2 teams needed)**
+| City | Name | Slug |
+|------|------|------|
+| Arkansas | Razorbacks | ark |
+| Kentucky | Wildcats | uk |
+| Mississippi State | Bulldogs | miss |
+| Missouri | Tigers | miz |
+| Oklahoma | Sooners | okla |
+| Ole Miss | Rebels | olemiss |
+| Texas | Longhorns | tex |
+| Vanderbilt | Commodores | van |
+
+**ACC (13 teams needed)**
+| City | Name | Slug |
+|------|------|------|
+| Boston College | Eagles | bc |
+| California | Golden Bears | cal |
+| Clemson | Tigers | clem |
+| Duke | Blue Devils | duke |
+| Florida State | Seminoles | fsu |
+| Georgia Tech | Yellow Jackets | gt |
+| Louisville | Cardinals | lou |
+| NC State | Wolfpack | ncsu |
+| Pitt | Panthers | pitt |
+| SMU | Mustangs | smu |
+| Stanford | Cardinal | stan |
+| Syracuse | Orange | syr |
+| Virginia | Cavaliers | uva |
+| Virginia Tech | Hokies | vt |
+| Wake Forest | Demon Deacons | wake |
+
+## Implementation
+
+### Logo URL Pattern
+Following the established pattern from NBA/MLB additions:
+```
+https://a.espncdn.com/i/teamlogos/ncaa/500/[slug].png
 ```
 
-## Technical Implementation
+### Database Insert Strategy
+Create an edge function to bulk insert all teams with proper deduplication logic:
 
-### 1. Frontend Changes (Sponsor.tsx)
+1. Check existing teams by matching `city` + `name` combination
+2. Skip teams that already exist
+3. Insert new teams with:
+   - `league`: 'NCAA'
+   - `conference`: The appropriate conference name
+   - `status`: 'active'
+   - `logo_url`: ESPN CDN URL
 
-**New State Variables:**
-- `selectedTeams: Team[]` - Array of teams added to cart
-- `showCartPanel: boolean` - Toggle cart visibility on mobile
+### Total Teams to Add
+- Big Ten: ~14 new teams
+- Big 12: ~14 new teams  
+- SEC: ~2 new teams (most already exist)
+- ACC: ~13 new teams
 
-**Team Card Updates:**
-- Replace "Reserve This Team" button with a checkbox for available teams
-- Show visual indicator (check mark, border highlight) when selected
-- Keep "Join Waitlist" for reserved teams unchanged
+**Approximate Total: 43 new NCAA teams**
 
-**New Cart Component:**
-- Floating panel (bottom sheet on mobile, sidebar on desktop)
-- Lists selected teams with team name and remove button
-- Shows pricing breakdown:
-  - Base: $149 x [count] = $[subtotal]
-  - If count >= 3: "Bulk Discount (20%): -$[discount]"
-  - Total: $[final_amount]
-- "Proceed to Checkout" button (disabled if no teams selected)
-- Discount badge/banner: "Select 3+ teams for 20% off!"
+## Technical Details
 
-### 2. Edge Function Updates (create-sponsor-checkout)
-
-**Updated Request Body:**
-```typescript
-{
-  teams: Array<{ teamId: string; teamName: string }>
-}
+### SQL Insert Statement Pattern
+```sql
+INSERT INTO teams (name, city, league, conference, logo_url, status)
+VALUES 
+  ('Wolverines', 'Michigan', 'NCAA', 'Big Ten', 'https://a.espncdn.com/i/teamlogos/ncaa/500/mich.png', 'active'),
+  -- ... more teams
+ON CONFLICT DO NOTHING;
 ```
 
-**Pricing Logic:**
-```typescript
-const DEPOSIT_PER_TEAM = 14900; // $149 in cents
-const BULK_DISCOUNT_THRESHOLD = 3;
-const BULK_DISCOUNT_PERCENT = 20;
+### Files to Modify
+- No code changes needed - this is a data-only update
+- Will execute SQL directly to add teams
 
-const teamCount = teams.length;
-const subtotal = DEPOSIT_PER_TEAM * teamCount;
-const discount = teamCount >= BULK_DISCOUNT_THRESHOLD 
-  ? Math.round(subtotal * BULK_DISCOUNT_PERCENT / 100) 
-  : 0;
-const total = subtotal - discount;
-```
+### After Insertion
+- Teams will immediately appear in `/sponsor` page
+- Teams will appear in Team Directory
+- Teams will be available for huddle creation
+- `sync-highlightly-teams` function can map them to Highlightly IDs for scores/highlights
 
-**Stripe Session:**
-- Create line items for each team OR single line item with quantity
-- Apply discount via Stripe coupon or adjusted pricing
-- Store all team IDs in metadata (comma-separated or JSON)
-
-### 3. Webhook Updates (stripe-sponsor-webhook)
-
-**Multi-Team Processing:**
-- Parse team IDs from metadata
-- Loop through and create reservation for each team
-- Send single confirmation email listing all reserved teams
-
-### 4. Deposit Info Section Update
-
-Update the static "Founding Partner Deposit" section to show:
-- "$149 per team"
-- Highlight: "Reserve 3+ teams and save 20%"
-
-### 5. Success Modal Update
-
-- Show all reserved team names (not just one)
-- Confirm total amount paid
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/pages/Sponsor.tsx` | Add multi-select state, cart UI, checkout logic |
-| `supabase/functions/create-sponsor-checkout/index.ts` | Accept array of teams, calculate discount, create session |
-| `supabase/functions/stripe-sponsor-webhook/index.ts` | Process multiple team reservations |
-
-## Pricing Examples
-
-| Teams Selected | Subtotal | Discount | Total |
-|----------------|----------|----------|-------|
-| 1 team | $149 | $0 | $149 |
-| 2 teams | $298 | $0 | $298 |
-| 3 teams | $447 | -$89.40 (20%) | $357.60 |
-| 5 teams | $745 | -$149 (20%) | $596 |
-| 10 teams | $1,490 | -$298 (20%) | $1,192 |
-
-## Edge Cases
-
-- **Team becomes reserved while in cart:** Check availability before checkout, remove unavailable teams with notification
-- **Promo code + bulk discount:** Both can apply (Stripe handles promo codes separately)
-- **Empty cart:** Disable checkout button
-- **Max teams:** No artificial limit, but could add one if needed
-
-## UI Wireframe Concept
-
-```text
-┌─────────────────────────────────────────────┐
-│  Team Card (Available)                      │
-│  ┌──────┐                                   │
-│  │ Logo │  Chicago Bears                    │
-│  └──────┘  NFL                              │
-│            ● Available                      │
-│            Est: $499-$699/mo                │
-│  ┌─────────────────────────────────────┐    │
-│  │ ☑ Add to Reservation                │    │
-│  └─────────────────────────────────────┘    │
-└─────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────┐
-│  YOUR RESERVATION (3 teams)         [Hide]  │
-├─────────────────────────────────────────────┤
-│  ✓ Chicago Bears  (NFL)               [×]   │
-│  ✓ Green Bay Packers  (NFL)           [×]   │
-│  ✓ Los Angeles Lakers  (NBA)          [×]   │
-├─────────────────────────────────────────────┤
-│  🎉 20% bulk discount applied!              │
-│                                             │
-│  Subtotal: $447.00                          │
-│  Discount: -$89.40                          │
-│  ─────────────────────────                  │
-│  Total: $357.60                             │
-│                                             │
-│  ┌─────────────────────────────────────┐    │
-│  │     Proceed to Checkout             │    │
-│  └─────────────────────────────────────┘    │
-└─────────────────────────────────────────────┘
-```
-
-## Implementation Order
-
-1. Update Edge Function to accept multiple teams + discount logic
-2. Update Webhook to process multiple reservations  
-3. Add frontend cart state and selection logic
-4. Build cart UI component
-5. Update success modal for multi-team display
-6. Test end-to-end flow
+## Verification Steps
+1. Run the insert SQL
+2. Verify teams appear on sponsor page with correct logos
+3. Confirm no duplicate teams were created
+4. Test that new teams can be selected for sponsorship
