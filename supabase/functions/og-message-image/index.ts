@@ -13,12 +13,15 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Handle HEAD requests for crawlers that probe first
+  const isHead = req.method === 'HEAD';
+
   try {
     const url = new URL(req.url);
     const messageId = url.searchParams.get('id');
 
     if (!messageId) {
-      return redirectToDefault();
+      return serveDefaultImage(isHead);
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -34,7 +37,7 @@ Deno.serve(async (req) => {
 
     if (messageError || !message) {
       console.log(`[og-message-image] Message not found: ${messageId}`);
-      return redirectToDefault();
+      return serveDefaultImage(isHead);
     }
 
     // Decode HTML entities in media_url
@@ -62,11 +65,21 @@ Deno.serve(async (req) => {
       }
 
       if (!imageUrl || !isImageUrl(imageUrl, null)) {
-        return redirectToDefault();
+        return serveDefaultImage(isHead);
       }
     }
 
     console.log(`[og-message-image] Proxying image for message ${messageId}: ${imageUrl}`);
+
+    // For HEAD requests, just return headers without fetching the full image
+    if (isHead) {
+      const headers = new Headers();
+      headers.set('content-type', inferContentType(imageUrl));
+      headers.set('cache-control', 'public, max-age=86400');
+      headers.set('x-content-type-options', 'nosniff');
+      Object.entries(corsHeaders).forEach(([k, v]) => headers.set(k, v));
+      return new Response(null, { status: 200, headers });
+    }
 
     // Fetch the image
     const imageResponse = await fetch(imageUrl, {
@@ -79,7 +92,7 @@ Deno.serve(async (req) => {
 
     if (!imageResponse.ok) {
       console.error(`[og-message-image] Failed to fetch image: ${imageResponse.status}`);
-      return redirectToDefault();
+      return serveDefaultImage(isHead);
     }
 
     // Get content type from response or infer from URL
@@ -99,12 +112,44 @@ Deno.serve(async (req) => {
     return new Response(imageBuffer, { status: 200, headers });
   } catch (error) {
     console.error('[og-message-image] Error:', error);
-    return redirectToDefault();
+    return serveDefaultImage(isHead);
   }
 });
 
-function redirectToDefault(): Response {
-  return Response.redirect(DEFAULT_OG_IMAGE, 302);
+// Serve the default image as actual bytes (not a redirect) for crawler compatibility
+async function serveDefaultImage(isHead: boolean): Promise<Response> {
+  const headers = new Headers();
+  headers.set('content-type', 'image/png');
+  headers.set('cache-control', 'public, max-age=86400');
+  headers.set('x-content-type-options', 'nosniff');
+  Object.entries(corsHeaders).forEach(([k, v]) => headers.set(k, v));
+
+  if (isHead) {
+    return new Response(null, { status: 200, headers });
+  }
+
+  try {
+    const response = await fetch(DEFAULT_OG_IMAGE, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SideHuddleBot/1.0)',
+        'Accept': 'image/*',
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`[og-message-image] Failed to fetch default image: ${response.status}`);
+      return new Response(null, { status: 404, headers });
+    }
+
+    const contentType = response.headers.get('content-type') || 'image/png';
+    headers.set('content-type', contentType);
+
+    const buffer = await response.arrayBuffer();
+    return new Response(buffer, { status: 200, headers });
+  } catch (err) {
+    console.error('[og-message-image] Error fetching default image:', err);
+    return new Response(null, { status: 500, headers });
+  }
 }
 
 function decodeHtmlEntities(text: string | null): string {
