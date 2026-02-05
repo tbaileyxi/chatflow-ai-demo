@@ -104,7 +104,10 @@ export const ChatMessage = memo(function ChatMessage({
 
   const handleShare = useCallback(async () => {
     // Use edge function URL for rich social previews
-    const shareUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-message?id=${message.id}`;
+    // Include the destination URL so the edge function can redirect correctly in any environment
+    const destinationUrl = `${window.location.origin}/message/${message.id}`;
+    const shareUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-message?id=${message.id}&u=${encodeURIComponent(destinationUrl)}`;
+
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);

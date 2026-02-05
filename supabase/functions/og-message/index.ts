@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.80.0';
 
-// Social crawler User-Agent patterns (comprehensive for Apple/iMessage)
+// Social crawler User-Agent patterns (kept for logging/diagnostics)
 const CRAWLER_PATTERNS = [
   'Twitterbot',
   'facebookexternalhit',
@@ -14,10 +14,15 @@ const CRAWLER_PATTERNS = [
   'bingbot',
   'Applebot',
   'Apple-Messages',
-  'MobileSafari',
-  'CFNetwork', // iOS URL preview fetcher
-  'com.apple.WebKit', // Apple WebKit
+  'CFNetwork', // iOS URL preview fetcher (often iMessage)
+  'com.apple.WebKit', // Apple WebKit networking
 ];
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+};
 
 const DEFAULT_OG_IMAGE = 'https://sidehuddlesports.com/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png';
 const SITE_URL = 'https://sidehuddlesports.com';
@@ -25,12 +30,7 @@ const SITE_URL = 'https://sidehuddlesports.com';
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { 
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-      }
-    });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -38,29 +38,26 @@ Deno.serve(async (req) => {
     const messageId = url.searchParams.get('id');
 
     if (!messageId) {
-      return new Response('Missing message ID', { status: 400 });
+      return new Response('Missing message ID', { status: 400, headers: corsHeaders });
     }
 
     const userAgent = req.headers.get('user-agent') || '';
-    
-    // More aggressive crawler detection - if it looks like any bot, serve OG tags
-    const isCrawler = CRAWLER_PATTERNS.some(pattern => 
-      userAgent.toLowerCase().includes(pattern.toLowerCase())
-    ) || userAgent.includes('bot') || userAgent.includes('Bot') || userAgent.includes('preview');
+    const isLikelyCrawler =
+      CRAWLER_PATTERNS.some((pattern) => userAgent.toLowerCase().includes(pattern.toLowerCase())) ||
+      userAgent.includes('bot') ||
+      userAgent.includes('Bot') ||
+      userAgent.toLowerCase().includes('preview');
 
-    console.log(`[og-message] Request for message ${messageId}, UA: ${userAgent.slice(0, 100)}, isCrawler: ${isCrawler}`);
+    // Destination URL for human click-through (passed from the app)
+    const destinationUrl =
+      normalizeDestinationUrl(url.searchParams.get('u')) || `${SITE_URL}/message/${messageId}`;
 
-    // For regular browsers, redirect to the SPA
-    if (!isCrawler) {
-      return new Response(null, {
-        status: 302,
-        headers: {
-          'Location': `${SITE_URL}/message/${messageId}`,
-        },
-      });
-    }
+    console.log(
+      `[og-message] Request for message ${messageId}, UA: ${userAgent.slice(0, 100)}, likelyCrawler: ${isLikelyCrawler}, dest: ${destinationUrl}`,
+    );
 
-    // For crawlers, fetch data and return OG-rich HTML
+    // Always return OG-rich HTML (with minimal body + JS redirect).
+    // This makes iMessage previews reliable even when the preview fetcher uses a "normal" Safari-like UA.
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -68,7 +65,7 @@ Deno.serve(async (req) => {
     // Fetch message
     const { data: message, error: messageError } = await supabase
       .from('huddle_messages')
-      .select('id, content, media_url, user_id, huddle_id, created_at')
+      .select('id, content, media_url, media_type, user_id, huddle_id, created_at')
       .eq('id', messageId)
       .single();
 
@@ -78,7 +75,7 @@ Deno.serve(async (req) => {
         title: 'Post from Side Huddle',
         description: 'Join the conversation on Side Huddle',
         image: DEFAULT_OG_IMAGE,
-        url: `${SITE_URL}/message/${messageId}`,
+        url: destinationUrl,
       });
     }
 
@@ -109,11 +106,17 @@ Deno.serve(async (req) => {
 
     const username = profile?.username || profile?.display_name || 'fan';
     const huddleName = huddle?.name || 'Side Huddle';
-    
-    // Cleaner title format
-    const title = `Post from Side Huddle`;
-    const description = message.content ? message.content.slice(0, 160) : `@${username} in ${huddleName}`;
-    const image = message.media_url || teamLogo || DEFAULT_OG_IMAGE;
+
+    const title = 'Post from Side Huddle';
+    const description = message.content
+      ? String(message.content).slice(0, 160)
+      : `@${username} in ${huddleName}`;
+
+    const safeMessageImage = isShareableImageUrl(message.media_url, message.media_type)
+      ? message.media_url
+      : null;
+
+    const image = safeMessageImage || teamLogo || DEFAULT_OG_IMAGE;
 
     console.log(`[og-message] Serving OG for message ${messageId}: ${title}, image: ${image}`);
 
@@ -121,14 +124,40 @@ Deno.serve(async (req) => {
       title,
       description,
       image,
-      url: `${SITE_URL}/message/${messageId}`,
+      url: destinationUrl,
     });
-
   } catch (error) {
     console.error('[og-message] Error:', error);
-    return new Response('Internal server error', { status: 500 });
+    return new Response('Internal server error', { status: 500, headers: corsHeaders });
   }
 });
+
+function normalizeDestinationUrl(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw);
+
+    // Prevent open-redirect abuse: only allow our known domains.
+    const allowedRoots = ['sidehuddlesports.com', 'lovable.app', 'lovable.dev'];
+    const hostOk = allowedRoots.some(
+      (root) => parsed.hostname === root || parsed.hostname.endsWith(`.${root}`),
+    );
+
+    if (parsed.protocol !== 'https:' || !hostOk) return null;
+
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function isShareableImageUrl(url: string | null, mediaType: string | null): url is string {
+  if (!url) return false;
+  if (mediaType && mediaType !== 'image') return false;
+
+  // Basic heuristic: common image extensions or image transforms.
+  return /\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(url);
+}
 
 function generateOgHtml(meta: {
   title: string;
@@ -136,7 +165,10 @@ function generateOgHtml(meta: {
   image: string;
   url: string;
 }): Response {
-  // Minimal HTML with proper OG tags for social previews
+  // Minimal HTML with proper OG tags for social previews.
+  // Keep the <body> extremely small so iMessage doesn't show raw "document text" previews.
+  const safeUrl = escapeHtml(meta.url);
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -147,24 +179,25 @@ function generateOgHtml(meta: {
 <meta property="og:title" content="${escapeHtml(meta.title)}">
 <meta property="og:description" content="${escapeHtml(meta.description)}">
 <meta property="og:image" content="${escapeHtml(meta.image)}">
-<meta property="og:url" content="${escapeHtml(meta.url)}">
+<meta property="og:image:secure_url" content="${escapeHtml(meta.image)}">
+<meta property="og:url" content="${safeUrl}">
 <meta property="og:site_name" content="Side Huddle">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escapeHtml(meta.title)}">
 <meta name="twitter:description" content="${escapeHtml(meta.description)}">
 <meta name="twitter:image" content="${escapeHtml(meta.image)}">
-<link rel="canonical" href="${escapeHtml(meta.url)}">
+<link rel="canonical" href="${safeUrl}">
 </head>
 <body>
-<script>window.location.replace("${escapeHtml(meta.url)}");</script>
-<noscript><meta http-equiv="refresh" content="0;url=${escapeHtml(meta.url)}"></noscript>
-<p>Redirecting to <a href="${escapeHtml(meta.url)}">Side Huddle</a>...</p>
+<a href="${safeUrl}">Open post</a>
+<script>window.location.replace("${safeUrl}");</script>
 </body>
 </html>`;
 
   return new Response(html, {
     status: 200,
     headers: {
+      ...corsHeaders,
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'public, max-age=300',
       'X-Content-Type-Options': 'nosniff',
