@@ -123,3 +123,6 @@ verify_jwt = false
 
 [functions.og-message]
 verify_jwt = false
+
+[functions.og-message-image]
+verify_jwt = false

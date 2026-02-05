@@ -104,9 +104,10 @@ export const ChatMessage = memo(function ChatMessage({
 
   const handleShare = useCallback(async () => {
     // Use edge function URL for rich social previews
-    // Include the destination URL so the edge function can redirect correctly in any environment
+    // Include destination URL + cache-buster to force fresh iMessage previews
     const destinationUrl = `${window.location.origin}/message/${message.id}`;
-    const shareUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-message?id=${message.id}&u=${encodeURIComponent(destinationUrl)}`;
+    const cacheBuster = encodeURIComponent(message.created_at);
+    const shareUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-message?id=${message.id}&u=${encodeURIComponent(destinationUrl)}&v=${cacheBuster}`;
 
     try {
       await navigator.clipboard.writeText(shareUrl);
@@ -116,7 +117,7 @@ export const ChatMessage = memo(function ChatMessage({
     } catch {
       toast({ title: "Copy failed", variant: "destructive" });
     }
-  }, [message.id, toast]);
+  }, [message.id, message.created_at, toast]);
   
   // Extract media from pulse content OR user uploads
   const hasInlineMedia = message.media_url && (
