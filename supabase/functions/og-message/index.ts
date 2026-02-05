@@ -18,6 +18,7 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const messageId = url.searchParams.get('id');
+    const cacheBuster = url.searchParams.get('v') || Date.now().toString();
 
     if (!messageId) {
       return new Response('Missing message ID', { status: 400, headers: corsHeaders });
@@ -40,52 +41,80 @@ Deno.serve(async (req) => {
       .eq('id', messageId)
       .single();
 
-    if (messageError || !message) {
-      console.log(`[og-message] Message not found: ${messageId}`);
-      return generateOgHtml({
-        title: 'Post from Side Huddle',
-        description: 'Join the conversation on Side Huddle',
-        image: DEFAULT_OG_IMAGE,
-        url: destinationUrl,
-      });
+    let title = 'Post from Side Huddle';
+    let description = 'Join the conversation on Side Huddle';
+    let image = DEFAULT_OG_IMAGE;
+
+    if (!messageError && message) {
+      // Fetch profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name, username, avatar_url')
+        .eq('user_id', message.user_id)
+        .single();
+
+      // Fetch huddle
+      const { data: huddle } = await supabase
+        .from('huddles')
+        .select('name, team_id')
+        .eq('id', message.huddle_id)
+        .single();
+
+      const username = profile?.username || profile?.display_name || 'fan';
+      const huddleName = huddle?.name || 'Side Huddle';
+
+      description = message.content
+        ? decodeHtmlEntities(String(message.content)).slice(0, 160)
+        : `@${username} in ${huddleName}`;
+
+      // Use our image proxy for reliable OG images
+      const hasShareableImage = isShareableImageUrl(decodeHtmlEntities(message.media_url), message.media_type);
+      image = hasShareableImage
+        ? `https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/og-message-image?id=${messageId}`
+        : DEFAULT_OG_IMAGE;
     }
 
-    // Fetch profile
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('display_name, username, avatar_url')
-      .eq('user_id', message.user_id)
-      .single();
+    console.log(`[og-message] Generating OG for message ${messageId}: ${title}, image: ${image}`);
 
-    // Fetch huddle
-    const { data: huddle } = await supabase
-      .from('huddles')
-      .select('name, team_id')
-      .eq('id', message.huddle_id)
-      .single();
-
-    const username = profile?.username || profile?.display_name || 'fan';
-    const huddleName = huddle?.name || 'Side Huddle';
-
-    const title = 'Post from Side Huddle';
-    const description = message.content
-      ? decodeHtmlEntities(String(message.content)).slice(0, 160)
-      : `@${username} in ${huddleName}`;
-
-    // Use our image proxy for reliable OG images
-    const hasShareableImage = isShareableImageUrl(decodeHtmlEntities(message.media_url), message.media_type);
-    const image = hasShareableImage
-      ? `https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/og-message-image?id=${messageId}`
-      : DEFAULT_OG_IMAGE;
-
-    console.log(`[og-message] Serving OG for message ${messageId}: ${title}, image: ${image}, hasMedia: ${hasShareableImage}`);
-
-    return generateOgHtml({
+    // Generate the HTML content
+    const html = generateOgHtml({
       title,
       description,
       image,
       url: destinationUrl,
     });
+
+    // Convert HTML string to Uint8Array for proper binary upload
+    const encoder = new TextEncoder();
+    const htmlBytes = encoder.encode(html);
+
+    // Upload to storage bucket as binary with proper content type
+    const storagePath = `message/${messageId}.html`;
+    const { error: uploadError } = await supabase.storage
+      .from('og-pages')
+      .upload(storagePath, htmlBytes, {
+        contentType: 'text/html; charset=utf-8',
+        upsert: true,
+        cacheControl: '300',
+      });
+
+    if (uploadError) {
+      console.error(`[og-message] Failed to upload to storage: ${uploadError.message}`);
+      // Fallback: return HTML directly (may not work for iMessage but better than nothing)
+      const headers = new Headers();
+      headers.set('content-type', 'text/html; charset=utf-8');
+      headers.set('cache-control', 'public, max-age=300');
+      Object.entries(corsHeaders).forEach(([k, v]) => headers.set(k, v));
+      return new Response(html, { status: 200, headers });
+    }
+
+    // Get public URL and redirect
+    const storageUrl = `https://${SUPABASE_PROJECT_REF}.supabase.co/storage/v1/object/public/og-pages/${storagePath}?v=${cacheBuster}`;
+    
+    console.log(`[og-message] Redirecting to storage: ${storageUrl}`);
+
+    // Return 302 redirect
+    return Response.redirect(storageUrl, 302);
   } catch (error) {
     console.error('[og-message] Error:', error);
     return new Response('Internal server error', { status: 500, headers: corsHeaders });
@@ -133,13 +162,13 @@ function generateOgHtml(meta: {
   description: string;
   image: string;
   url: string;
-}): Response {
+}): string {
   const safeUrl = escapeHtml(meta.url);
   const safeTitle = escapeHtml(meta.title);
   const safeDescription = escapeHtml(meta.description);
   const safeImage = escapeHtml(meta.image);
 
-  const html = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -163,15 +192,6 @@ function generateOgHtml(meta: {
 <a href="${safeUrl}">Open post</a>
 </body>
 </html>`;
-
-  // Use Headers object for explicit content-type control
-  const headers = new Headers();
-  headers.set('content-type', 'text/html; charset=utf-8');
-  headers.set('cache-control', 'public, max-age=300');
-  headers.set('x-content-type-options', 'nosniff');
-  Object.entries(corsHeaders).forEach(([k, v]) => headers.set(k, v));
-
-  return new Response(html, { status: 200, headers });
 }
 
 function escapeHtml(text: string): string {

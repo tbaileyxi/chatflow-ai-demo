@@ -103,11 +103,16 @@ export const ChatMessage = memo(function ChatMessage({
   }, [onReply, message]);
 
   const handleShare = useCallback(async () => {
-    // Use edge function URL for rich social previews
-    // Include destination URL + cache-buster to force fresh iMessage previews
-    const destinationUrl = `${window.location.origin}/message/${message.id}`;
+    // Trigger OG page generation in storage first (fire and forget)
     const cacheBuster = encodeURIComponent(message.created_at);
-    const shareUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-message?id=${message.id}&u=${encodeURIComponent(destinationUrl)}&v=${cacheBuster}`;
+    const destinationUrl = `https://sidehuddlesports.com/message/${message.id}`;
+    const ogUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-message?id=${message.id}&u=${encodeURIComponent(destinationUrl)}&v=${cacheBuster}`;
+    
+    fetch(ogUrl, { method: 'HEAD' }).catch(() => {});
+    
+    // Share the edge function URL - it will redirect to the storage HTML page
+    // The storage page has OG tags and meta refresh to redirect users to the destination
+    const shareUrl = ogUrl;
 
     try {
       await navigator.clipboard.writeText(shareUrl);
