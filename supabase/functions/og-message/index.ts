@@ -1,14 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.80.0';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Social crawler User-Agent patterns
+// Social crawler User-Agent patterns (comprehensive for Apple/iMessage)
 const CRAWLER_PATTERNS = [
   'Twitterbot',
   'facebookexternalhit',
+  'Facebot',
   'LinkedInBot',
   'Slackbot',
   'Discordbot',
@@ -16,8 +12,11 @@ const CRAWLER_PATTERNS = [
   'WhatsApp',
   'Googlebot',
   'bingbot',
-  'iMessage',
   'Applebot',
+  'Apple-Messages',
+  'MobileSafari',
+  'CFNetwork', // iOS URL preview fetcher
+  'com.apple.WebKit', // Apple WebKit
 ];
 
 const DEFAULT_OG_IMAGE = 'https://sidehuddlesports.com/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png';
@@ -26,7 +25,12 @@ const SITE_URL = 'https://sidehuddlesports.com';
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { 
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      }
+    });
   }
 
   try {
@@ -34,13 +38,15 @@ Deno.serve(async (req) => {
     const messageId = url.searchParams.get('id');
 
     if (!messageId) {
-      return new Response('Missing message ID', { status: 400, headers: corsHeaders });
+      return new Response('Missing message ID', { status: 400 });
     }
 
     const userAgent = req.headers.get('user-agent') || '';
+    
+    // More aggressive crawler detection - if it looks like any bot, serve OG tags
     const isCrawler = CRAWLER_PATTERNS.some(pattern => 
       userAgent.toLowerCase().includes(pattern.toLowerCase())
-    );
+    ) || userAgent.includes('bot') || userAgent.includes('Bot') || userAgent.includes('preview');
 
     console.log(`[og-message] Request for message ${messageId}, UA: ${userAgent.slice(0, 100)}, isCrawler: ${isCrawler}`);
 
@@ -49,7 +55,6 @@ Deno.serve(async (req) => {
       return new Response(null, {
         status: 302,
         headers: {
-          ...corsHeaders,
           'Location': `${SITE_URL}/message/${messageId}`,
         },
       });
@@ -70,7 +75,7 @@ Deno.serve(async (req) => {
     if (messageError || !message) {
       console.log(`[og-message] Message not found: ${messageId}`);
       return generateOgHtml({
-        title: 'Side Huddle',
+        title: 'Post from Side Huddle',
         description: 'Join the conversation on Side Huddle',
         image: DEFAULT_OG_IMAGE,
         url: `${SITE_URL}/message/${messageId}`,
@@ -103,12 +108,14 @@ Deno.serve(async (req) => {
     }
 
     const username = profile?.username || profile?.display_name || 'fan';
-    const huddleName = huddle?.name || 'a Huddle';
-    const title = `@${username} in ${huddleName}`;
-    const description = message.content.slice(0, 160);
+    const huddleName = huddle?.name || 'Side Huddle';
+    
+    // Cleaner title format
+    const title = `Post from Side Huddle`;
+    const description = message.content ? message.content.slice(0, 160) : `@${username} in ${huddleName}`;
     const image = message.media_url || teamLogo || DEFAULT_OG_IMAGE;
 
-    console.log(`[og-message] Serving OG for message ${messageId}: ${title}`);
+    console.log(`[og-message] Serving OG for message ${messageId}: ${title}, image: ${image}`);
 
     return generateOgHtml({
       title,
@@ -119,7 +126,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('[og-message] Error:', error);
-    return new Response('Internal server error', { status: 500, headers: corsHeaders });
+    return new Response('Internal server error', { status: 500 });
   }
 });
 
@@ -129,33 +136,29 @@ function generateOgHtml(meta: {
   image: string;
   url: string;
 }): Response {
+  // Minimal HTML with proper OG tags for social previews
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(meta.title)} | Side Huddle</title>
-  
-  <!-- Open Graph -->
-  <meta property="og:type" content="article" />
-  <meta property="og:title" content="${escapeHtml(meta.title)}" />
-  <meta property="og:description" content="${escapeHtml(meta.description)}" />
-  <meta property="og:image" content="${escapeHtml(meta.image)}" />
-  <meta property="og:url" content="${escapeHtml(meta.url)}" />
-  <meta property="og:site_name" content="Side Huddle" />
-  
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="${escapeHtml(meta.title)}" />
-  <meta name="twitter:description" content="${escapeHtml(meta.description)}" />
-  <meta name="twitter:image" content="${escapeHtml(meta.image)}" />
-  
-  <!-- Redirect for browsers that somehow get here -->
-  <meta http-equiv="refresh" content="0;url=${escapeHtml(meta.url)}" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(meta.title)}</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="${escapeHtml(meta.title)}">
+<meta property="og:description" content="${escapeHtml(meta.description)}">
+<meta property="og:image" content="${escapeHtml(meta.image)}">
+<meta property="og:url" content="${escapeHtml(meta.url)}">
+<meta property="og:site_name" content="Side Huddle">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${escapeHtml(meta.title)}">
+<meta name="twitter:description" content="${escapeHtml(meta.description)}">
+<meta name="twitter:image" content="${escapeHtml(meta.image)}">
+<link rel="canonical" href="${escapeHtml(meta.url)}">
 </head>
 <body>
-  <p>Redirecting to <a href="${escapeHtml(meta.url)}">${escapeHtml(meta.title)}</a>...</p>
-  <script>window.location.href = "${escapeHtml(meta.url)}";</script>
+<script>window.location.replace("${escapeHtml(meta.url)}");</script>
+<noscript><meta http-equiv="refresh" content="0;url=${escapeHtml(meta.url)}"></noscript>
+<p>Redirecting to <a href="${escapeHtml(meta.url)}">Side Huddle</a>...</p>
 </body>
 </html>`;
 
@@ -163,7 +166,8 @@ function generateOgHtml(meta: {
     status: 200,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'public, max-age=300',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }
