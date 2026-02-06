@@ -106,7 +106,7 @@ export const ChatMessage = memo(function ChatMessage({
     const cacheBuster = encodeURIComponent(message.created_at);
     // Share via Cloudflare Worker URL — serves proper text/html for iMessage previews
     // TODO: Replace YOUR_SUBDOMAIN with your actual Cloudflare workers.dev subdomain
-    const shareUrl = `https://sh-og.YOUR_SUBDOMAIN.workers.dev/message/${message.id}?v=${cacheBuster}`;
+    const shareUrl = `https://sh-og.ty-eb5.workers.dev/message/${message.id}?v=${cacheBuster}`;
 
     // Pre-warm the OG page generation (fire and forget)
     const supabaseOgUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-message?id=${message.id}&raw=1`;
