@@ -103,16 +103,14 @@ export const ChatMessage = memo(function ChatMessage({
   }, [onReply, message]);
 
   const handleShare = useCallback(async () => {
-    // Trigger OG page generation in storage first (fire and forget)
     const cacheBuster = encodeURIComponent(message.created_at);
-    const destinationUrl = `https://sidehuddlesports.com/message/${message.id}`;
-    const ogUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-message?id=${message.id}&u=${encodeURIComponent(destinationUrl)}&v=${cacheBuster}`;
-    
-    fetch(ogUrl, { method: 'HEAD' }).catch(() => {});
-    
-    // Share the edge function URL - it will redirect to the storage HTML page
-    // The storage page has OG tags and meta refresh to redirect users to the destination
-    const shareUrl = ogUrl;
+    // Share via Cloudflare Worker URL — serves proper text/html for iMessage previews
+    // TODO: Replace YOUR_SUBDOMAIN with your actual Cloudflare workers.dev subdomain
+    const shareUrl = `https://sh-og.YOUR_SUBDOMAIN.workers.dev/message/${message.id}?v=${cacheBuster}`;
+
+    // Pre-warm the OG page generation (fire and forget)
+    const supabaseOgUrl = `https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-message?id=${message.id}&raw=1`;
+    fetch(supabaseOgUrl, { method: 'HEAD' }).catch(() => {});
 
     try {
       await navigator.clipboard.writeText(shareUrl);
