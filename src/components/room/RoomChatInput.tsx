@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Mic, Camera, Bot, X } from 'lucide-react';
+import { Send, Mic, Camera, Bot, X, ImagePlus, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -44,6 +44,7 @@ export const RoomChatInput = forwardRef<RoomChatInputRef, RoomChatInputProps>(fu
   const [showCameraModal, setShowCameraModal] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   // Expose insertEmoji and focus methods
   useImperativeHandle(ref, () => ({
@@ -145,6 +146,25 @@ export const RoomChatInput = forwardRef<RoomChatInputRef, RoomChatInputProps>(fu
     e.target.value = '';
   }, [handleFileUpload]);
 
+  const handleGallerySelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+    e.target.value = '';
+  }, [handleFileUpload]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const files = e.clipboardData?.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('image/')) {
+        e.preventDefault();
+        handleFileUpload(file);
+      }
+    }
+  }, [handleFileUpload]);
+
   return (
     <>
       {/* Hidden camera input */}
@@ -154,6 +174,14 @@ export const RoomChatInput = forwardRef<RoomChatInputRef, RoomChatInputProps>(fu
         accept="image/*"
         capture="environment"
         onChange={handleCameraCapture}
+        style={{ display: 'none' }}
+      />
+      {/* Hidden gallery input (no capture = opens photo library) */}
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleGallerySelect}
         style={{ display: 'none' }}
       />
 
@@ -206,16 +234,30 @@ export const RoomChatInput = forwardRef<RoomChatInputRef, RoomChatInputProps>(fu
             value={message}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={placeholder}
             disabled={disabled || sending}
             className={cn(
-              "resize-none min-h-[40px] max-h-[100px] pl-4 pr-4 py-3",
+              "resize-none min-h-[40px] max-h-[100px] pl-4 pr-10 py-3",
               "border border-border/50 focus:border-primary transition-colors",
               "bg-background/50 backdrop-blur-sm text-foreground placeholder:text-muted-foreground",
               "rounded-xl"
             )}
             rows={1}
           />
+          <button
+            type="button"
+            onClick={() => galleryInputRef.current?.click()}
+            disabled={disabled || uploading}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+            aria-label="Upload photo from gallery"
+          >
+            {uploading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <ImagePlus className="w-4 h-4" />
+            )}
+          </button>
         </div>
         
         {/* Send button */}
