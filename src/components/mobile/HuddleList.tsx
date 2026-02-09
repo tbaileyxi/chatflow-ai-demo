@@ -297,7 +297,7 @@ export const HuddleList = () => {
                           <span className="font-medium text-foreground truncate">{huddle.name}</span>
                           {huddle.is_verified && (
                             <Badge variant="outline" className="h-5 px-1.5 text-[10px] border-emerald-500/50 text-emerald-500">
-                              VERIFIED
+                              HOSTED
                             </Badge>
                           )}
                           {huddle.unread_count > 0 && (

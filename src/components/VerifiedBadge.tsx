@@ -23,7 +23,7 @@ export const VerifiedBadge = ({ className, size = "md" }: VerifiedBadgeProps) =>
       />
       {size !== "sm" && (
         <span className="text-xs font-medium text-verified-primary">
-          VERIFIED
+          HOSTED
         </span>
       )}
     </div>

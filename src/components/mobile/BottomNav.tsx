@@ -22,7 +22,7 @@ export const BottomNav = () => {
   // Navigation items for logged-in users (Home, Discover, Ledger, Profile)
   const loggedInNavItems: NavItem[] = [
     { icon: Grid, label: 'Home', to: '/' },
-    { icon: Compass, label: 'Discover', to: '/huddle-search' },
+    { icon: Compass, label: 'Hosted', to: '/huddle-search' },
     { icon: Receipt, label: 'Ledger', to: '/ledger', authRequired: true },
     { icon: User, label: 'Profile', to: '/profile', authRequired: true },
   ];
@@ -30,7 +30,7 @@ export const BottomNav = () => {
   // Navigation items for anonymous users
   const anonymousNavItems: NavItem[] = [
     { icon: Grid, label: 'Home', to: '/' },
-    { icon: Compass, label: 'Discover', to: '/huddle-search' },
+    { icon: Compass, label: 'Hosted', to: '/huddle-search' },
   ];
 
   const navItems = user ? loggedInNavItems : anonymousNavItems;

@@ -60,8 +60,8 @@ export const HuddleVerificationDialog = ({
             className="border-verified-primary text-verified-primary hover:bg-verified-background h-8 px-2 gap-1 sm:h-9 sm:px-3"
           >
             <Shield className="w-4 h-4 mr-1" />
-            <span className="hidden sm:inline">Get Verified</span>
-            <span className="sm:hidden inline">Verify</span>
+            <span className="hidden sm:inline">Get Hosted</span>
+            <span className="sm:hidden inline">Host</span>
           </Button>
         )}
       </DialogTrigger>
@@ -70,7 +70,7 @@ export const HuddleVerificationDialog = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-verified-primary" />
-            Upgrade to Verified Huddle
+            Upgrade to Hosted Huddle
           </DialogTitle>
         </DialogHeader>
         
@@ -79,7 +79,7 @@ export const HuddleVerificationDialog = ({
             <CardHeader className="pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Shield className="w-5 h-5 text-verified-primary" />
-                Verified Huddle Features
+                Hosted Huddle Features
               </CardTitle>
               <CardDescription>
                 Premium features for serious communities

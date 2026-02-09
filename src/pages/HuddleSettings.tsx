@@ -175,7 +175,7 @@ export const HuddleSettings = () => {
     } else if (verificationStatus === 'cancelled') {
       toast({
         title: "Payment Cancelled",
-        description: "Huddle verification was cancelled.",
+        description: "Hosted huddle setup was cancelled.",
       });
       
       // Clean up URL parameters
@@ -295,7 +295,7 @@ export const HuddleSettings = () => {
                 <div className="flex items-center gap-2">
                   <Shield className="w-6 h-6 text-verified-primary" />
                   <h3 className="text-lg font-bold text-verified-primary">
-                    {subscriptionStatus?.is_verified ? 'VERIFIED' : 'Huddle Verification'}
+                    {subscriptionStatus?.is_verified ? 'HOSTED' : 'Hosted Status'}
                   </h3>
                 </div>
                 {!subscriptionStatus?.is_verified && (
@@ -315,7 +315,7 @@ export const HuddleSettings = () => {
                 <div className="flex items-center gap-3 p-4 bg-verified-primary/10 border border-verified-primary/30 rounded-lg">
                   <Shield className="w-6 h-6 text-verified-primary shrink-0" />
                   <div className="flex-1">
-                    <p className="font-semibold text-verified-primary">✓ Verified Huddle</p>
+                    <p className="font-semibold text-verified-primary">✓ Hosted Huddle</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Active until {subscriptionStatus.expires_at ? new Date(subscriptionStatus.expires_at).toLocaleDateString() : 'N/A'}
                     </p>
