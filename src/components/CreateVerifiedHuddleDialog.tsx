@@ -95,7 +95,7 @@ export const CreateVerifiedHuddleDialog = ({ onHuddleCreated, trigger }: CreateV
     if (!user?.id) {
       toast({
         title: "Authentication Error",
-        description: "You must be logged in to create a verified huddle",
+        description: "You must be logged in to create a hosted huddle",
         variant: "destructive"
       });
       return;
@@ -136,7 +136,7 @@ export const CreateVerifiedHuddleDialog = ({ onHuddleCreated, trigger }: CreateV
       onHuddleCreated?.();
     } catch (error) {
       console.error('Error creating verified huddle:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create verified huddle';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create hosted huddle';
       toast({
         title: "Error",
         description: errorMessage,
@@ -156,7 +156,7 @@ export const CreateVerifiedHuddleDialog = ({ onHuddleCreated, trigger }: CreateV
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-verified-primary" />
-            Create Verified Huddle
+            Create Hosted Huddle
           </DialogTitle>
         </DialogHeader>
         
@@ -166,7 +166,7 @@ export const CreateVerifiedHuddleDialog = ({ onHuddleCreated, trigger }: CreateV
               <div className="flex items-start gap-3 mb-3">
                 <VerifiedBadge size="lg" />
                 <div className="text-sm">
-                  <p className="font-medium mb-1 text-verified-primary">What is a Verified Huddle?</p>
+                  <p className="font-medium mb-1 text-verified-primary">What is a Hosted Huddle?</p>
                   <ul className="text-muted-foreground space-y-1 text-xs">
                     <li>• Set subscription rates and earn. Members pay to join. Or make it free!</li>
                     <li>• Official verification badge</li>

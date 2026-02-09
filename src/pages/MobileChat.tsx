@@ -299,7 +299,7 @@ const { data: messagesData, error: messagesError } = await supabase
     } else if (verificationStatus === 'cancelled') {
       toast({
         title: "Payment Cancelled",
-        description: "Huddle verification was cancelled.",
+        description: "Hosted huddle setup was cancelled.",
       });
       
       // Clean up URL parameters

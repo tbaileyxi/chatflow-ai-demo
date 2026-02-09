@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,6 +27,8 @@ interface Huddle {
   owner_profile?: {
     display_name?: string;
     username?: string;
+    avatar_url?: string;
+    bio?: string;
   };
   pricing?: {
     is_enabled: boolean;
@@ -41,7 +42,7 @@ export const HuddleSearch = () => {
   const [loading, setLoading] = useState(false);
   const [expandedBio, setExpandedBio] = useState<string | null>(null);
   const { toast } = useToast();
-  const { user } = useAuth(); // Optional - for showing join status
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchHuddles();
@@ -50,7 +51,6 @@ export const HuddleSearch = () => {
   const fetchHuddles = async () => {
     setLoading(true);
     try {
-      // Only fetch verified huddles since those are the only ones discoverable
       const { data, error } = await supabase
         .from("huddles")
         .select(`
@@ -75,11 +75,11 @@ export const HuddleSearch = () => {
 
       if (error) throw error;
 
-      // Fetch owner profiles separately
+      // Fetch owner profiles separately (including avatar_url and bio)
       const ownerIds = data?.map(h => h.owner_id) || [];
       const { data: ownerProfiles } = await supabase
         .from("profiles")
-        .select("user_id, display_name, username")
+        .select("user_id, display_name, username, avatar_url, bio")
         .in("user_id", ownerIds);
 
       const formattedHuddles = data?.map(huddle => ({
@@ -91,9 +91,9 @@ export const HuddleSearch = () => {
 
       setVerifiedHuddles(formattedHuddles);
     } catch (error: any) {
-      console.error("Error fetching verified huddles:", error);
+      console.error("Error fetching hosted huddles:", error);
       toast({
-        title: "Failed to load verified huddles",
+        title: "Failed to load hosted huddles",
         description: error.message,
         variant: "destructive",
       });
@@ -111,14 +111,17 @@ export const HuddleSearch = () => {
     );
   };
 
-  const renderHuddleCard = (huddle: Huddle) => (
-    <div 
-      key={huddle.id} 
-      className="bg-card/50 border border-border/30 rounded-xl p-4 hover:bg-card/70 transition-all"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <Avatar className="w-12 h-12 rounded-xl ring-2 ring-primary/20">
+  const renderHuddleCard = (huddle: Huddle) => {
+    const ownerName = huddle.owner_profile?.display_name || huddle.owner_profile?.username || 'Unknown';
+    const huddleBio = huddle.bio;
+
+    return (
+      <div 
+        key={huddle.id} 
+        className="bg-card/50 border border-border/30 rounded-xl p-4 hover:bg-card/70 transition-all"
+      >
+        <div className="flex items-start gap-3">
+          <Avatar className="w-12 h-12 rounded-xl ring-2 ring-primary/20 shrink-0">
             <AvatarImage src={huddle.team.logo_url} />
             <AvatarFallback className="rounded-xl bg-muted text-sm font-bold">
               {huddle.team.name.substring(0, 2).toUpperCase()}
@@ -130,25 +133,26 @@ export const HuddleSearch = () => {
               {huddle.is_verified && <VerifiedBadge size="sm" />}
             </div>
             <p className="text-sm text-muted-foreground truncate">{huddle.team.name}</p>
-            <div className="flex items-center gap-3 mt-1">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Users className="w-3 h-3" />
-                {huddle.member_count}
-              </span>
-              {huddle.pricing?.is_enabled ? (
-                <span className="text-xs font-medium text-green-500">
-                  ${(huddle.pricing.price_per_month / 100).toFixed(2)}/mo
-                </span>
-              ) : (
-                <span className="text-xs font-medium text-primary">FREE</span>
-              )}
+            
+            {/* Hosted by line */}
+            <div className="flex items-center gap-1.5 mt-2">
+              <span className="text-xs text-muted-foreground">Hosted by</span>
+              <Avatar className="w-5 h-5">
+                <AvatarImage src={huddle.owner_profile?.avatar_url || undefined} />
+                <AvatarFallback className="text-[8px]">
+                  {ownerName.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-xs font-medium text-foreground">{ownerName}</span>
             </div>
-            {huddle.bio && (
+
+            {/* Bio */}
+            {huddleBio && (
               <div className="mt-2">
                 <p className={`text-xs text-muted-foreground ${expandedBio !== huddle.id ? 'line-clamp-2' : ''}`}>
-                  {huddle.bio}
+                  {huddleBio}
                 </p>
-                {huddle.bio.length > 100 && (
+                {huddleBio.length > 100 && (
                   <button 
                     onClick={() => setExpandedBio(expandedBio === huddle.id ? null : huddle.id)}
                     className="text-xs text-primary hover:underline mt-1 font-medium"
@@ -158,27 +162,43 @@ export const HuddleSearch = () => {
                 )}
               </div>
             )}
+
+            {/* Price + Join */}
+            <div className="flex items-center justify-between mt-3">
+              <div className="flex items-center gap-3">
+                {huddle.pricing?.is_enabled ? (
+                  <span className="text-sm font-semibold text-green-500">
+                    ${(huddle.pricing.price_per_month / 100).toFixed(2)}/mo
+                  </span>
+                ) : (
+                  <span className="text-sm font-semibold text-primary">FREE</span>
+                )}
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  {huddle.member_count}
+                </span>
+              </div>
+              <HuddleJoinButton 
+                huddle={huddle} 
+                onJoinSuccess={fetchHuddles}
+                membershipRequired={huddle.pricing?.is_enabled || false}
+                membershipPrice={huddle.pricing?.price_per_month || 0}
+              />
+            </div>
           </div>
         </div>
-        <HuddleJoinButton 
-          huddle={huddle} 
-          onJoinSuccess={fetchHuddles}
-          membershipRequired={huddle.pricing?.is_enabled || false}
-          membershipPrice={huddle.pricing?.price_per_month || 0}
-        />
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <div className="relative flex flex-col h-screen">
         <GlassHeader 
-          title="Discover Huddles"
+          title="Hosted Huddles"
           onBack={() => window.history.back()}
         />
         
-        {/* Sign in prompt for anonymous users */}
         {!user && (
           <div className="bg-primary/10 border-b border-primary/30 p-3">
             <div className="container mx-auto max-w-4xl flex items-center justify-between gap-3">
@@ -200,14 +220,14 @@ export const HuddleSearch = () => {
           <div className="container mx-auto p-4 max-w-4xl">
             <div className="mb-6">
               <p className="text-muted-foreground text-sm">
-                Browse verified team huddles. {!user && "Sign in to join and participate in conversations."}
+                Browse hosted team huddles. {!user && "Sign in to join and participate in conversations."}
               </p>
             </div>
 
             <div className="relative mb-6">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Search verified huddles or teams..."
+                placeholder="Search hosted huddles or teams..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 h-12 bg-muted/30 border-border/50 rounded-xl text-base"
@@ -219,10 +239,10 @@ export const HuddleSearch = () => {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <Shield className="w-4 h-4 text-primary" />
-                    <span className="font-semibold text-foreground text-sm">Verified Huddles</span>
+                    <span className="font-semibold text-foreground text-sm">Hosted Huddles</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    These huddles have been verified and are open for join requests.
+                    These huddles are hosted by creators and open to join.
                   </p>
                 </div>
                 <CreateVerifiedHuddleDialog 
@@ -238,14 +258,14 @@ export const HuddleSearch = () => {
             </div>
 
             {loading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading verified huddles...</div>
+              <div className="text-center py-8 text-muted-foreground">Loading hosted huddles...</div>
             ) : (
               <div className="grid gap-3 pb-4">
                 {filteredHuddles().length > 0 ? (
                   filteredHuddles().map(renderHuddleCard)
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
-                    {searchQuery ? "No verified huddles found matching your search" : "No verified huddles available yet"}
+                    {searchQuery ? "No hosted huddles found matching your search" : "No hosted huddles available yet"}
                   </div>
                 )}
               </div>

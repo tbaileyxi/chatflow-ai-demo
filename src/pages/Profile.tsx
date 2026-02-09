@@ -292,7 +292,7 @@ export const Profile = () => {
                 </div>
                 {profile.verified_huddle_promo_code && (
                   <div className="mt-3 p-3 rounded-lg bg-background/80 border border-yellow-400/30">
-                    <div className="text-xs text-muted-foreground mb-1">Your Lifetime Verified Huddle Code:</div>
+                    <div className="text-xs text-muted-foreground mb-1">Your Lifetime Hosted Huddle Code:</div>
                     <div className="flex items-center gap-2">
                       <code className="text-yellow-400 font-mono text-lg">{profile.verified_huddle_promo_code}</code>
                       <Button 
@@ -306,7 +306,7 @@ export const Profile = () => {
                         Copy
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">Use when creating a Verified Huddle • Never expires</p>
+                    <p className="text-xs text-muted-foreground mt-1">Use when creating a Hosted Huddle • Never expires</p>
                   </div>
                 )}
               </div>

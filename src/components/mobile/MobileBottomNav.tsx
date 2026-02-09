@@ -30,7 +30,7 @@ export const MobileBottomNav = ({ onPickEmClick, showPickEm }: MobileBottomNavPr
       onClick: onPickEmClick,
       tooltip: 'Heat Check - Test your predictions!'
     }] : []),
-    { icon: Compass, label: 'Discover', to: '/huddle-search' },
+    { icon: Compass, label: 'Hosted', to: '/huddle-search' },
     { icon: Sparkles, label: 'Spotlight', to: '/spotlight' },
     { icon: User, label: 'Profile', to: '/profile' },
   ];

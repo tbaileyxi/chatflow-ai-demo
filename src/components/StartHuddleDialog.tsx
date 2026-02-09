@@ -266,7 +266,7 @@ export const StartHuddleDialog = ({ onHuddleCreated, trigger, parentTeamId, isCr
                 className="w-full text-verified-primary hover:text-verified-primary/80 gap-1 p-0 h-auto"
               >
                 <Shield className="w-4 h-4" />
-                Get verified? 
+                Get hosted? 
                 <ArrowRight className="w-3 h-3" />
               </Button>
             }

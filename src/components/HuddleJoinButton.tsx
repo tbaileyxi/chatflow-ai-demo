@@ -155,7 +155,7 @@ export const HuddleJoinButton = ({
                 <span className="font-medium text-primary">Premium Membership Required</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                This verified huddle requires a <strong>${(membershipPrice / 100).toFixed(2)}/month</strong> subscription.
+                This hosted huddle requires a <strong>${(membershipPrice / 100).toFixed(2)}/month</strong> subscription.
                 You'll get <strong>instant access</strong> after payment is confirmed.
               </p>
             </div>
@@ -165,10 +165,10 @@ export const HuddleJoinButton = ({
             <div className="p-4 bg-verified-background border border-verified-border rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <Shield className="w-4 h-4 text-verified-primary" />
-                <span className="font-medium text-verified-primary">Free Verified Huddle</span>
+                <span className="font-medium text-verified-primary">Free Hosted Huddle</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                This is a free verified huddle. You'll get <strong>instant access</strong> when you join.
+                This is a free hosted huddle. You'll get <strong>instant access</strong> when you join.
               </p>
             </div>
           )}
