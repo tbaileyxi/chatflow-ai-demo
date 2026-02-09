@@ -151,7 +151,8 @@ export default function Home() {
           <div className="w-10" />
           <div className="flex flex-col items-center gap-1">
             <img src={shLogo} alt="Side Huddle" className="h-12 object-contain" />
-            <p className="text-sm font-medium text-muted-foreground">Your Team. Your Crew. Live.</p>
+            <p className="text-sm font-bold text-foreground">All your best team socials. One huddle.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Chat with fans while the best team posts and clips are automatically pulled into one place.</p>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
