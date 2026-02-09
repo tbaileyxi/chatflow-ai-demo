@@ -370,10 +370,13 @@ export default function Sponsor() {
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent" />
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-            Own the Official Fan Huddle for Your Team
+            Own the Team's Live Fan Feed
           </h1>
-          <p className="text-xl text-muted-foreground mb-8">
-            One exclusive sponsor per team. Reserve your spot before launch.
+          <p className="text-xl text-muted-foreground mb-4">
+            One exclusive founding sponsor per team.
+          </p>
+          <p className="text-base text-muted-foreground mb-8 max-w-2xl mx-auto">
+            Your brand lives inside the automatically curated team feed where fans react, chat, and share.
           </p>
           <Button
             size="lg"
@@ -386,38 +389,83 @@ export default function Sponsor() {
         </div>
       </section>
 
-      {/* How It Works */}
+      {/* What You're Reserving */}
       <section className="py-16 px-4 bg-muted/30">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl font-bold text-center text-foreground mb-10">How It Works</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/20 flex items-center justify-center">
-                <Users className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="font-semibold text-foreground mb-2">One Founding Sponsor Per Team</h3>
-              <p className="text-sm text-muted-foreground">
-                Exclusive sponsorship rights for your chosen team's fan community.
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/20 flex items-center justify-center">
-                <MessageSquare className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="font-semibold text-foreground mb-2">Brand Visibility Everywhere</h3>
-              <p className="text-sm text-muted-foreground">
-                Your brand appears in fan chats, AI recaps, and badges.
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/20 flex items-center justify-center">
-                <Award className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="font-semibold text-foreground mb-2">Priority Access & Pricing</h3>
-              <p className="text-sm text-muted-foreground">
-                Founding partners lock priority access and launch pricing.
-              </p>
-            </div>
+          <h2 className="text-2xl font-bold text-center text-foreground mb-4">What You're Reserving</h2>
+          <p className="text-center text-muted-foreground mb-10 max-w-2xl mx-auto">
+            This is not a banner or a logo slot. It's a position inside a living team huddle — where the best posts, clips, and moments about a team are pulled in automatically and discussed by fans in real time. Your brand is part of that loop.
+          </p>
+
+          <h3 className="text-xl font-bold text-center text-foreground mb-8">How It Works</h3>
+
+          <div className="grid md:grid-cols-2 gap-8 mb-12">
+            {/* Curated Moments */}
+            <Card className="bg-card/50 border-border">
+              <CardContent className="p-6">
+                <div className="w-12 h-12 mb-4 rounded-full bg-primary/20 flex items-center justify-center">
+                  <MessageSquare className="w-6 h-6 text-primary" />
+                </div>
+                <h4 className="font-semibold text-foreground mb-2">Curated Team Moments, All in One Place</h4>
+                <p className="text-sm text-muted-foreground mb-3">Each huddle continuously pulls in:</p>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>The best social posts about the team</li>
+                  <li>Game clips, reactions, and moments</li>
+                  <li>What fans are actually sharing and talking about</li>
+                </ul>
+                <p className="text-sm text-muted-foreground mt-3">
+                  Fans don't chase content. It shows up — and the conversation happens around it.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* One Founding Sponsor */}
+            <Card className="bg-card/50 border-border">
+              <CardContent className="p-6">
+                <div className="w-12 h-12 mb-4 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-primary" />
+                </div>
+                <h4 className="font-semibold text-foreground mb-2">One Founding Sponsor Per Team</h4>
+                <p className="text-sm text-muted-foreground">
+                  Each team has one founding sponsor embedded in its feed and conversations. Once claimed, that position is closed.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Brand Presence */}
+            <Card className="bg-card/50 border-border">
+              <CardContent className="p-6">
+                <div className="w-12 h-12 mb-4 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Award className="w-6 h-6 text-primary" />
+                </div>
+                <h4 className="font-semibold text-foreground mb-2">Brand Presence Inside the Conversation</h4>
+                <p className="text-sm text-muted-foreground mb-3">Your brand appears:</p>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Alongside curated team posts & clips</li>
+                  <li>Inside live fan chat threads</li>
+                  <li>In AI-generated "what fans are talking about" summaries</li>
+                  <li>On founding sponsor badges visible to members</li>
+                </ul>
+                <p className="text-sm text-muted-foreground mt-3">This is in-context visibility, not interruption.</p>
+              </CardContent>
+            </Card>
+
+            {/* Early Access */}
+            <Card className="bg-card/50 border-border">
+              <CardContent className="p-6">
+                <div className="w-12 h-12 mb-4 rounded-full bg-primary/20 flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-primary" />
+                </div>
+                <h4 className="font-semibold text-foreground mb-2">Early Access & Launch Pricing</h4>
+                <p className="text-sm text-muted-foreground mb-3">Founding partners lock:</p>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>First-in placement inside the feed</li>
+                  <li>Category exclusivity</li>
+                  <li>Launch-only pricing before the network scales</li>
+                </ul>
+                <p className="text-sm text-muted-foreground mt-3">Reservation deposits apply toward future activation.</p>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
