@@ -1,43 +1,98 @@
 
 
-## Add Photo Upload to Mobile Chat Input
+## Rename "Verified" to "Hosted" + Add Host Profile to Hosted Page
 
-### The Problem
-There's no way to upload an existing photo from your phone's gallery. The Camera button correctly opens the native camera for video, but there's no photo library picker. Copy-pasting photos also doesn't work.
+### 1. Bottom Nav: "Discover" -> "Hosted"
 
-### The Solution
-Add a small image/photo icon **inside the text input area** (right side) instead of adding another button to the already-crowded row. This is the same pattern iMessage and WhatsApp use. Also add paste support for images.
+**File: `src/components/mobile/BottomNav.tsx`**
+- Change label from `'Discover'` to `'Hosted'` in both `loggedInNavItems` and `anonymousNavItems`
 
-### Layout (before vs after)
+**File: `src/components/mobile/MobileBottomNav.tsx`**
+- Change the `'Discover'` nav item label to `'Hosted'`
+
+### 2. Global Terminology: "Verified" -> "Hosted"
+
+All user-facing text referencing "Verified" will change to "Hosted" across these files:
+
+**`src/components/VerifiedBadge.tsx`**
+- Badge text: "VERIFIED" -> "HOSTED"
+
+**`src/pages/HuddleSearch.tsx`** (the Hosted page)
+- Header title: "Discover Huddles" -> "Hosted Huddles"
+- Description: "Browse verified team huddles" -> "Browse hosted team huddles"
+- Search placeholder: "Search verified huddles or teams..." -> "Search hosted huddles or teams..."
+- Info banner: "Verified Huddles" -> "Hosted Huddles" with updated description
+- Loading/empty states updated
+- Create button text stays "Create"
+
+**`src/components/CreateVerifiedHuddleDialog.tsx`**
+- Dialog title: "Create Verified Huddle" -> "Create Hosted Huddle"
+- "What is a Verified Huddle?" -> "What is a Hosted Huddle?"
+- Bullet points remain the same (they describe features, not naming)
+- Error messages updated
+
+**`src/components/HuddleVerificationDialog.tsx`**
+- Dialog title: "Upgrade to Verified Huddle" -> "Upgrade to Hosted Huddle"
+- Card title: "Verified Huddle Features" -> "Hosted Huddle Features"
+- Button text: "Get Verified" / "Verify" -> "Get Hosted" / "Host"
+
+**`src/pages/HuddleSettings.tsx`**
+- Section header: "VERIFIED" -> "HOSTED" / "Huddle Verification" -> "Hosted Status"
+- Status text: "Verified Huddle" -> "Hosted Huddle"
+- Toast messages updated
+
+**`src/components/HuddleJoinButton.tsx`**
+- "Free Verified Huddle" -> "Free Hosted Huddle"
+- "This verified huddle requires..." -> "This hosted huddle requires..."
+
+**`src/components/mobile/HuddleList.tsx`**
+- Badge text: "VERIFIED" -> "HOSTED"
+
+**`src/components/StartHuddleDialog.tsx`**
+- "Get verified?" link text -> "Get hosted?"
+
+**`src/pages/Profile.tsx`**
+- "Your Lifetime Verified Huddle Code" -> "Your Lifetime Hosted Huddle Code"
+- "Use when creating a Verified Huddle" -> "Use when creating a Hosted Huddle"
+
+### 3. Hosted Page Card Redesign: Add Host Profile
+
+**File: `src/pages/HuddleSearch.tsx`**
+
+The current card layout shows: huddle name, team name, member count, price. The new layout will be:
 
 ```text
-BEFORE:  [Camera] [Coach] [____text input____] [Send]
-
-AFTER:   [Camera] [Coach] [____text input___📷] [Send]
-                                              ^
-                                    small icon inside input
+[Team Logo]  Browns Again (huddle name)
+             Browns (team)
+             Hosted by [Avatar] Ty Bailey
+             Bio text if populated...
+             
+             FREE        [Join Huddle]
 ```
 
-### What Changes
+Technical changes:
+- Update the Supabase query for owner profiles to also fetch `avatar_url` and `bio` (currently only fetches `display_name` and `username`)
+- Update the `owner_profile` interface to include `avatar_url`
+- Redesign `renderHuddleCard` to show the host's avatar, display name, and huddle bio in the new order:
+  1. Huddle name + hosted badge
+  2. Team name
+  3. "Hosted by" line with small avatar + display name
+  4. Bio (if populated)
+  5. Price label (FREE or $X.XX/mo) + Join button
 
-**File: `src/components/room/RoomChatInput.tsx`**
+### Files Changed (total: 10)
 
-1. Add a second hidden file input (without `capture` attribute) so it opens the photo library instead of the camera
-2. Add an `ImagePlus` icon (from lucide-react) positioned absolutely inside the textarea wrapper, right-aligned
-3. Tapping that icon triggers the photo library file picker (accepts images only)
-4. Reuse the existing `handleFileUpload` function -- it already uploads to Supabase storage and sends the message
-5. Add an `onPaste` handler on the textarea that detects image data on the clipboard and uploads it automatically
-6. Show a small loading spinner on the icon while uploading
+1. `src/components/mobile/BottomNav.tsx` -- nav label
+2. `src/components/mobile/MobileBottomNav.tsx` -- nav label
+3. `src/components/VerifiedBadge.tsx` -- badge text
+4. `src/pages/HuddleSearch.tsx` -- page copy + card redesign with host profile
+5. `src/components/CreateVerifiedHuddleDialog.tsx` -- dialog copy
+6. `src/components/HuddleVerificationDialog.tsx` -- dialog copy
+7. `src/pages/HuddleSettings.tsx` -- settings section copy
+8. `src/components/HuddleJoinButton.tsx` -- join dialog copy
+9. `src/components/mobile/HuddleList.tsx` -- badge text
+10. `src/components/StartHuddleDialog.tsx` -- link text
+11. `src/pages/Profile.tsx` -- promo code label
 
-### Technical Details
-
-- Import `ImagePlus` from lucide-react (small photo icon, distinct from Camera)
-- New hidden input: `<input type="file" accept="image/*" />` (no `capture` attribute = opens gallery)
-- Position the icon with `absolute right-3 top-1/2 -translate-y-1/2` inside the textarea wrapper
-- Add right padding to the textarea (`pr-10`) so text doesn't overlap the icon
-- Paste handler: listen for `onPaste`, check `e.clipboardData.files`, if an image is found call `handleFileUpload`
-- While uploading, swap the icon for a small spinner and disable the input
-
-### Single file changed
-Only `src/components/room/RoomChatInput.tsx` needs to be modified. No new files, no new dependencies.
+Note: Database column names (`is_verified`) and CSS class names (`verified-primary`) remain unchanged -- only user-facing text is updated.
 
