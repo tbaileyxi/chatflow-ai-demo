@@ -2447,6 +2447,10 @@ export type Database = {
         Args: { p_promo_code: string; p_tier: string; p_user_id: string }
         Returns: number
       }
+      delete_team_cascade: {
+        Args: { team_id_input: string }
+        Returns: undefined
+      }
       get_current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]

@@ -195,19 +195,16 @@ export const TeamManagement = () => {
   };
 
   const handleDelete = async (teamId: string) => {
-    if (!confirm('Are you sure you want to delete this team?')) return;
+    if (!confirm('Are you sure you want to delete this team? This will also delete all associated huddles, messages, and data.')) return;
 
     try {
-      const { error } = await supabase
-        .from('teams')
-        .delete()
-        .eq('id', teamId);
+      const { error } = await supabase.rpc('delete_team_cascade', { team_id_input: teamId });
 
       if (error) throw error;
       
       toast({
         title: "Success",
-        description: "Team deleted successfully",
+        description: "Team and all associated data deleted successfully",
       });
       
       fetchTeams();
