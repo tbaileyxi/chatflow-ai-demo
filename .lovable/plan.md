@@ -1,60 +1,45 @@
 
 
-## Add All 32 NHL Teams to Side Huddle Sports
+## Add "HOSTED" Badge to Your Huddles + Make Hosted Page Cards Clickable for Members
 
-### What We're Doing
-Insert all 32 NHL teams into the `teams` table following the exact same pattern used for NBA and MLB teams. The NHL filter already exists in the team directory, so once the data is in, everything will just work.
+### Problem 1: No "HOSTED" designation in Your Huddles
+When a user is a member of a Hosted Huddle, it shows up under "Private" in the Your Huddles section on the homepage. While hosted huddles already have a green background and "HOSTED" badge in the HuddleList (My Huddles tab), the **YourHuddlesSection on the Home page** does not distinguish them -- they all show with a Lock icon as "private" type.
 
-### Logo Source
-ESPN CDN pattern: `https://a.espncdn.com/i/teamlogos/nhl/500/{slug}.png`
-(Same pattern as NBA/MLB, just with `nhl` instead)
+### Problem 2: Can't enter Hosted Huddles from the Hosted page
+On the Hosted Huddles discovery page, the Join button always shows even if the user is already a member or owner. Members/owners should see an "Enter Huddle" button that navigates them directly.
 
-### All 32 NHL Teams
+---
 
-**Eastern Conference -- Atlantic Division**
-- Boston Bruins (bos)
-- Buffalo Sabres (buf)
-- Detroit Red Wings (det)
-- Florida Panthers (fla)
-- Montreal Canadiens (mtl)
-- Ottawa Senators (ott)
-- Tampa Bay Lightning (tb)
-- Toronto Maple Leafs (tor)
+### Changes
 
-**Eastern Conference -- Metropolitan Division**
-- Carolina Hurricanes (car)
-- Columbus Blue Jackets (cbj)
-- New Jersey Devils (nj)
-- New York Islanders (nyi)
-- New York Rangers (nyr)
-- Philadelphia Flyers (phi)
-- Pittsburgh Penguins (pit)
-- Washington Capitals (wsh)
+**File 1: `src/components/home/YourHuddlesSection.tsx`**
+- Split the "Private" section into two groups: **Hosted Huddles** and **Private Huddles**
+- Hosted huddles (`is_verified === true`) get their own subsection with a "Hosted" header and a distinct visual style (emerald/green accent with ShieldCheck icon instead of Lock icon)
+- Regular private huddles remain under "Private" with the Lock icon
+- Add "HOSTED" badge next to the huddle name for hosted ones
 
-**Western Conference -- Central Division**
-- Arizona/Utah Hockey Club (utah)
-- Chicago Blackhawks (chi)
-- Colorado Avalanche (col)
-- Dallas Stars (dal)
-- Minnesota Wild (min)
-- Nashville Predators (nsh)
-- St. Louis Blues (stl)
-- Winnipeg Jets (wpg)
+**File 2: `src/pages/HuddleSearch.tsx`**
+- Fetch the user's huddle memberships (query `huddle_members` for current user) to know which hosted huddles the user already belongs to
+- In `renderHuddleCard`: if the user is already a member or is the owner, show an **"Enter Huddle"** button (navigates to `/huddle/{id}`) instead of the `HuddleJoinButton`
+- The "Enter Huddle" button will use a distinct style (outline or secondary) to differentiate from the Join action
 
-**Western Conference -- Pacific Division**
-- Anaheim Ducks (ana)
-- Calgary Flames (cgy)
-- Edmonton Oilers (edm)
-- Los Angeles Kings (la)
-- San Jose Sharks (sj)
-- Seattle Kraken (sea)
-- Vancouver Canucks (van)
-- Vegas Golden Knights (vgk)
+---
 
 ### Technical Details
 
-- **Single SQL migration** inserting 32 rows into the `teams` table
-- Fields: `name`, `city`, `league` (NHL), `conference` (Eastern/Western), `division` (Atlantic/Metropolitan/Central/Pacific), `logo_url`, `status` (active), `featured_order` (999)
-- Logo URLs follow ESPN CDN pattern matching NBA/MLB
-- No code changes needed -- the NHL filter tab already exists in the team directory
+**YourHuddlesSection changes:**
+- Import `ShieldCheck` from lucide-react and `Badge` from UI components
+- Filter `privateHuddles` into `hostedHuddles` (where `is_verified === true`) and `regularPrivateHuddles` (where `is_verified !== true`)
+- Add a new section between Public and Private for hosted huddles with emerald styling
+- In the `HuddleCard` component, add a third type `'hosted'` with ShieldCheck icon and emerald accent colors
+
+**HuddleSearch changes:**
+- Add a state `memberHuddleIds: Set<string>` to track which huddles the user is in
+- On mount (when user exists), query `huddle_members` filtered by `user_id` to get all the user's huddle IDs
+- Also check `owner_id` match against the user
+- In `renderHuddleCard`, conditionally render either a navigate button ("Enter Huddle") or the existing `HuddleJoinButton`
+
+### Files Modified (2 total)
+1. `src/components/home/YourHuddlesSection.tsx` -- add hosted huddle section with badge
+2. `src/pages/HuddleSearch.tsx` -- check membership, show "Enter Huddle" for members/owners
 
