@@ -5,7 +5,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Search, Users, Shield } from "lucide-react";
+import { Search, Users, Shield, ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { HuddleJoinButton } from "@/components/HuddleJoinButton";
 import { MobileLayout } from "@/components/mobile/MobileLayout";
@@ -41,12 +42,26 @@ export const HuddleSearch = () => {
   const [verifiedHuddles, setVerifiedHuddles] = useState<Huddle[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedBio, setExpandedBio] = useState<string | null>(null);
+  const [memberHuddleIds, setMemberHuddleIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchHuddles();
-  }, []);
+    if (user) fetchMemberships();
+  }, [user]);
+
+  const fetchMemberships = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("huddle_members")
+      .select("huddle_id")
+      .eq("user_id", user.id);
+    if (data) {
+      setMemberHuddleIds(new Set(data.map(m => m.huddle_id)));
+    }
+  };
 
   const fetchHuddles = async () => {
     setLoading(true);
@@ -178,12 +193,24 @@ export const HuddleSearch = () => {
                   {huddle.member_count}
                 </span>
               </div>
-              <HuddleJoinButton 
-                huddle={huddle} 
-                onJoinSuccess={fetchHuddles}
-                membershipRequired={huddle.pricing?.is_enabled || false}
-                membershipPrice={huddle.pricing?.price_per_month || 0}
-              />
+              {(memberHuddleIds.has(huddle.id) || huddle.owner_id === user?.id) ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => { e.stopPropagation(); navigate(`/huddle/${huddle.id}`); }}
+                  className="border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10"
+                >
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                  Enter Huddle
+                </Button>
+              ) : (
+                <HuddleJoinButton 
+                  huddle={huddle} 
+                  onJoinSuccess={() => { fetchHuddles(); if (user) fetchMemberships(); }}
+                  membershipRequired={huddle.pricing?.is_enabled || false}
+                  membershipPrice={huddle.pricing?.price_per_month || 0}
+                />
+              )}
             </div>
           </div>
         </div>
