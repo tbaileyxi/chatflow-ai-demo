@@ -67,9 +67,12 @@ export const ChatBottomBar = memo(function ChatBottomBar({
     if (onOpenLedger) {
       onOpenLedger();
     } else {
-      navigate('/ledger');
+      const params = new URLSearchParams();
+      if (teamId) params.set('teamId', teamId);
+      if (huddleId) params.set('huddleId', huddleId);
+      navigate(`/ledger${params.toString() ? '?' + params.toString() : ''}`);
     }
-  }, [onOpenLedger, navigate]);
+  }, [onOpenLedger, navigate, teamId, huddleId]);
 
   // Handle badges
   const handleBadges = useCallback(() => {
