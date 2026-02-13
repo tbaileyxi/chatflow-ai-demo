@@ -16,13 +16,119 @@ const SPORT_SERIES: Record<string, string[]> = {
   MLB: ['KXMLB'],
 };
 
-async function fetchKalshiMarkets(seriesTicker: string, apiKeyId: string, privateKey: string) {
+// Map series ticker -> our DB league value
+const TICKER_TO_LEAGUE: Record<string, string> = {
+  KXNBA: 'NBA',
+  KXNFL: 'NFL',
+  KXNHL: 'NHL',
+  KXNCAAB: 'NCAA',
+  KXNCAAF: 'NCAA',
+  KXMLB: 'MLB',
+};
+
+interface TeamRecord {
+  id: string;
+  name: string;
+  city: string;
+  league: string;
+}
+
+/**
+ * Build per-league matching structures.
+ * Returns a map: league -> { fullNames, mascots, cities }
+ * where each sub-map goes from lowercase search term -> team record.
+ * Cities that are ambiguous (multiple teams share the same city within a league) are excluded.
+ */
+function buildLeagueTeamMaps(teams: TeamRecord[]) {
+  const leagueTeams = new Map<string, TeamRecord[]>();
+  for (const t of teams) {
+    const list = leagueTeams.get(t.league) || [];
+    list.push(t);
+    leagueTeams.set(t.league, list);
+  }
+
+  const result = new Map<string, {
+    fullNames: Map<string, TeamRecord>;
+    mascots: Map<string, TeamRecord>;
+    cities: Map<string, TeamRecord>;
+  }>();
+
+  for (const [league, roster] of leagueTeams.entries()) {
+    const fullNames = new Map<string, TeamRecord>();
+    const mascots = new Map<string, TeamRecord>();
+    const cityCount = new Map<string, number>();
+    const cityMap = new Map<string, TeamRecord>();
+
+    for (const t of roster) {
+      const full = `${t.city} ${t.name}`.toLowerCase();
+      fullNames.set(full, t);
+      mascots.set(t.name.toLowerCase(), t);
+
+      const cityKey = t.city.toLowerCase();
+      cityCount.set(cityKey, (cityCount.get(cityKey) || 0) + 1);
+      cityMap.set(cityKey, t);
+    }
+
+    // Only keep unambiguous cities (exactly 1 team with that city in this league)
+    const safeCities = new Map<string, TeamRecord>();
+    for (const [city, count] of cityCount.entries()) {
+      if (count === 1) {
+        safeCities.set(city, cityMap.get(city)!);
+      }
+    }
+
+    result.set(league, { fullNames, mascots, cities: safeCities });
+  }
+
+  return result;
+}
+
+/**
+ * Match a market title to a team within the correct league.
+ * Priority: full name (longest match) > mascot > city (unambiguous only)
+ */
+function matchTeam(
+  title: string,
+  league: string,
+  leagueMaps: ReturnType<typeof buildLeagueTeamMaps>,
+): { team: TeamRecord | null; matchType: string } {
+  const maps = leagueMaps.get(league);
+  if (!maps) return { team: null, matchType: 'no_league_data' };
+
+  const titleLower = title.toLowerCase();
+
+  // 1. Full name match (longest first for accuracy)
+  const fullEntries = [...maps.fullNames.entries()].sort((a, b) => b[0].length - a[0].length);
+  for (const [key, team] of fullEntries) {
+    if (titleLower.includes(key)) {
+      return { team, matchType: 'full_name' };
+    }
+  }
+
+  // 2. Mascot/team name match (longest first)
+  const mascotEntries = [...maps.mascots.entries()].sort((a, b) => b[0].length - a[0].length);
+  for (const [key, team] of mascotEntries) {
+    if (titleLower.includes(key)) {
+      return { team, matchType: 'mascot' };
+    }
+  }
+
+  // 3. City match (unambiguous only, longest first)
+  const cityEntries = [...maps.cities.entries()].sort((a, b) => b[0].length - a[0].length);
+  for (const [key, team] of cityEntries) {
+    if (titleLower.includes(key)) {
+      return { team, matchType: 'city' };
+    }
+  }
+
+  return { team: null, matchType: 'no_match' };
+}
+
+async function fetchKalshiMarkets(seriesTicker: string) {
   try {
     const url = `${KALSHI_BASE}/markets?series_ticker=${seriesTicker}&status=open&limit=200`;
     const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json',
-      },
+      headers: { 'Accept': 'application/json' },
     });
 
     if (!response.ok) {
@@ -38,7 +144,7 @@ async function fetchKalshiMarkets(seriesTicker: string, apiKeyId: string, privat
   }
 }
 
-async function fetchResolvedMarkets(apiKeyId: string, privateKey: string) {
+async function fetchResolvedMarkets() {
   try {
     const url = `${KALSHI_BASE}/markets?status=settled&limit=100`;
     const response = await fetch(url, {
@@ -61,48 +167,41 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const apiKeyId = Deno.env.get('KALSHI_API_KEY_ID') || '';
-    const privateKey = Deno.env.get('KALSHI_PRIVATE_KEY') || '';
-    
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Fetch all teams for matching
+    // Fetch all active teams for matching
     const { data: teams } = await supabase
       .from('teams')
       .select('id, name, city, league')
       .eq('status', 'active');
 
-    const teamMap = new Map<string, { id: string; name: string; city: string }>();
-    (teams || []).forEach(t => {
-      teamMap.set(t.name.toLowerCase(), t);
-      teamMap.set(`${t.city} ${t.name}`.toLowerCase(), t);
-      // Also add just the city for matching
-      teamMap.set(t.city.toLowerCase(), t);
-    });
+    const leagueMaps = buildLeagueTeamMaps((teams || []) as TeamRecord[]);
 
     let totalUpserted = 0;
     let totalSettled = 0;
+    const matchLog: Array<{ ticker: string; title: string; league: string; matchType: string; matchedTeam: string | null }> = [];
 
     // Fetch open markets for each sport
-    for (const [league, seriesTickers] of Object.entries(SPORT_SERIES)) {
+    for (const [_league, seriesTickers] of Object.entries(SPORT_SERIES)) {
       for (const seriesTicker of seriesTickers) {
-        const markets = await fetchKalshiMarkets(seriesTicker, apiKeyId, privateKey);
+        const league = TICKER_TO_LEAGUE[seriesTicker];
+        const markets = await fetchKalshiMarkets(seriesTicker);
 
         for (const m of markets) {
-          // Try to match to our teams
-          const title = (m.title || m.subtitle || '').toLowerCase();
-          let matchedTeamId: string | null = null;
+          const title = m.title || m.subtitle || '';
+          const { team, matchType } = matchTeam(title, league, leagueMaps);
 
-          for (const [key, team] of teamMap.entries()) {
-            if (title.includes(key)) {
-              matchedTeamId = team.id;
-              break;
-            }
-          }
+          matchLog.push({
+            ticker: m.ticker,
+            title,
+            league,
+            matchType,
+            matchedTeam: team ? `${team.city} ${team.name}` : null,
+          });
 
           // Determine market type
           let marketType = 'other';
-          const titleLower = title;
+          const titleLower = title.toLowerCase();
           if (titleLower.includes('spread') || titleLower.includes('cover')) marketType = 'spread';
           else if (titleLower.includes('total') || titleLower.includes('over') || titleLower.includes('under')) marketType = 'total';
           else if (titleLower.includes('win') || titleLower.includes('winner') || titleLower.includes('moneyline')) marketType = 'winner';
@@ -114,7 +213,7 @@ Deno.serve(async (req) => {
             .from('kalshi_markets')
             .upsert({
               kalshi_ticker: m.ticker,
-              team_id: matchedTeamId,
+              team_id: team?.id || null,
               question: m.title || m.subtitle || m.ticker,
               current_yes_price: Math.max(1, Math.min(99, yesPrice)),
               market_type: marketType,
@@ -130,8 +229,17 @@ Deno.serve(async (req) => {
             }, { onConflict: 'kalshi_ticker' });
 
           if (!error) totalUpserted++;
+          else console.error(`Upsert error for ${m.ticker}:`, error.message);
         }
       }
+    }
+
+    // Log match summary for debugging
+    const matched = matchLog.filter(l => l.matchedTeam);
+    const unmatched = matchLog.filter(l => !l.matchedTeam);
+    console.log(`Match summary: ${matched.length} matched, ${unmatched.length} unmatched`);
+    if (unmatched.length > 0) {
+      console.log('Unmatched markets:', unmatched.slice(0, 10).map(u => `${u.league}: "${u.title}"`));
     }
 
     // Check for resolved markets in our DB
@@ -142,8 +250,7 @@ Deno.serve(async (req) => {
       .lt('event_start_time', new Date().toISOString());
 
     if (unresolvedMarkets && unresolvedMarkets.length > 0) {
-      // Fetch settled markets from Kalshi
-      const resolvedKalshi = await fetchResolvedMarkets(apiKeyId, privateKey);
+      const resolvedKalshi = await fetchResolvedMarkets();
       const resolvedMap = new Map(resolvedKalshi.map((m: any) => [m.ticker, m.result]));
 
       for (const market of unresolvedMarkets) {
@@ -163,6 +270,11 @@ Deno.serve(async (req) => {
       success: true,
       markets_upserted: totalUpserted,
       bets_settled: totalSettled,
+      match_summary: {
+        total: matchLog.length,
+        matched: matchLog.filter(l => l.matchedTeam).length,
+        unmatched: matchLog.filter(l => !l.matchedTeam).length,
+      },
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
