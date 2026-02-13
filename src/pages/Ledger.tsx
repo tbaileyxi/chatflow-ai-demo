@@ -1,19 +1,90 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { useShadowBets } from '@/hooks/useShadowBets';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, TrendingUp, TrendingDown, Trophy, Clock, Check, X, Target, Coins } from 'lucide-react';
+import { ArrowLeft, TrendingUp, TrendingDown, Trophy, Clock, Check, X, Target, Coins, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isPast, formatDistanceToNow } from 'date-fns';
+
+interface KalshiMarket {
+  id: string;
+  question: string;
+  current_yes_price: number | null;
+  event_start_time: string | null;
+  is_resolved: boolean | null;
+  resolution: string | null;
+  team_id: string | null;
+  huddle_id: string | null;
+}
+
+interface TeamMarkets {
+  team_name: string;
+  team_logo: string | null;
+  markets: KalshiMarket[];
+}
 
 export default function Ledger() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { portfolio, loading: portfolioLoading, winRate, profit } = usePortfolio();
   const { openBets, pendingBets, closedBets, loading: betsLoading } = useShadowBets();
+  const [teamMarkets, setTeamMarkets] = useState<TeamMarkets[]>([]);
+  const [marketsLoading, setMarketsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMarkets();
+  }, []);
+
+  const fetchMarkets = async () => {
+    try {
+      const { data: markets } = await supabase
+        .from('kalshi_markets')
+        .select('id, question, current_yes_price, event_start_time, is_resolved, resolution, team_id, huddle_id')
+        .order('event_start_time', { ascending: true });
+
+      if (!markets?.length) {
+        setTeamMarkets([]);
+        setMarketsLoading(false);
+        return;
+      }
+
+      // Get unique team IDs
+      const teamIds = [...new Set(markets.filter(m => m.team_id).map(m => m.team_id!))];
+      
+      const { data: teams } = await supabase
+        .from('teams')
+        .select('id, name, logo_url')
+        .in('id', teamIds);
+
+      const teamMap = new Map(teams?.map(t => [t.id, { name: t.name, logo: t.logo_url }]) || []);
+
+      // Group by team
+      const grouped = new Map<string, { team_name: string; team_logo: string | null; markets: KalshiMarket[] }>();
+      
+      for (const m of markets) {
+        const key = m.team_id || 'general';
+        const teamInfo = m.team_id ? teamMap.get(m.team_id) : null;
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            team_name: teamInfo?.name || 'General',
+            team_logo: teamInfo?.logo || null,
+            markets: []
+          });
+        }
+        grouped.get(key)!.markets.push(m);
+      }
+
+      setTeamMarkets(Array.from(grouped.values()).sort((a, b) => a.team_name.localeCompare(b.team_name)));
+    } catch (err) {
+      console.error('Error fetching markets:', err);
+    } finally {
+      setMarketsLoading(false);
+    }
+  };
 
   if (!user) {
     navigate('/auth');
@@ -158,6 +229,62 @@ export default function Ledger() {
                       Picked {bet.position} • {bet.market?.resolution ? `Resolved: ${bet.market.resolution}` : ''}
                     </div>
                   </Card>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Browse All Markets by Team */}
+          <section>
+            <h3 className="font-bold text-sm text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" /> Browse Markets ({teamMarkets.reduce((sum, t) => sum + t.markets.length, 0)})
+            </h3>
+            {marketsLoading ? (
+              <Card className="p-6 text-center text-sm text-muted-foreground">Loading markets...</Card>
+            ) : teamMarkets.length === 0 ? (
+              <Card className="p-6 text-center text-sm text-muted-foreground border-dashed">
+                No markets available yet. Markets sync automatically before games.
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {teamMarkets.map((group) => (
+                  <div key={group.team_name}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {group.team_logo && (
+                        <img src={group.team_logo} alt={group.team_name} className="h-5 w-5 rounded-full object-contain" />
+                      )}
+                      <p className="text-sm font-bold text-foreground">{group.team_name}</p>
+                      <span className="text-xs text-muted-foreground">({group.markets.length})</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {group.markets.map((market) => (
+                        <Card key={market.id} className={cn(
+                          "p-3 border-border/50",
+                          market.is_resolved && "opacity-60"
+                        )}>
+                          <p className="text-xs font-medium text-foreground mb-1">{market.question}</p>
+                          <div className="flex items-center justify-between">
+                            {market.current_yes_price != null ? (
+                              <span className="text-[10px] text-muted-foreground">
+                                YES {market.current_yes_price}¢ / NO {100 - market.current_yes_price}¢
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">Price unavailable</span>
+                            )}
+                            {market.is_resolved ? (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                                Resolved: {market.resolution}
+                              </span>
+                            ) : market.event_start_time ? (
+                              <span className="text-[10px] text-muted-foreground">
+                                {formatDistanceToNow(new Date(market.event_start_time), { addSuffix: true })}
+                              </span>
+                            ) : null}
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

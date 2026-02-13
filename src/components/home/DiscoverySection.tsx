@@ -132,7 +132,7 @@ export const DiscoverySection = () => {
       navigate(`/huddle/${team.huddle_id}`);
     } else {
       // Navigate to team feed for teams without huddles
-      navigate(`/team/${team.id}`);
+      navigate(`/teams/${team.id}`);
     }
   };
 
