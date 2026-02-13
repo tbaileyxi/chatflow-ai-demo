@@ -16,10 +16,6 @@ import { cn } from '@/lib/utils';
 import { HuddlePeopleSheet } from '@/components/HuddlePeopleSheet';
 import { SignupPromptModal } from '@/components/SignupPromptModal';
 import { BadgesModal } from '@/components/badges/BadgesModal';
-import { FadesSidebar } from '@/components/fades/FadesSidebar';
-import { GameFadeCards } from '@/components/fades/GameFadeCards';
-import { CashModeUpgradeModal } from '@/components/fades/CashModeUpgradeModal';
-import { LedgerModal } from '@/components/fades/LedgerModal';
 import { GamePulseHeader } from '@/components/game-pulse/GamePulseHeader';
 
 export const Huddle = () => {
@@ -35,9 +31,6 @@ export const Huddle = () => {
   const [teamName, setTeamName] = useState<string>('');
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [showBadgesModal, setShowBadgesModal] = useState(false);
-  const [showFadesSidebar, setShowFadesSidebar] = useState(false);
-  const [showLedgerModal, setShowLedgerModal] = useState(false);
-  const [showCashModeModal, setShowCashModeModal] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [liveGame, setLiveGame] = useState<any>(null);
@@ -492,20 +485,7 @@ export const Huddle = () => {
 
       {/* Main Chat Area - UnifiedChat component handles messages only */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Inline Game Fade Cards - shows upcoming game betting options for any team huddle */}
-        {huddle?.team_id && (
-          <GameFadeCards
-            huddleId={huddleId!}
-            teamName={teamName}
-            teamLeague={huddle?.team?.league || 'NCAA'}
-            isPrivate={huddle?.is_private}
-            onViewLedger={() => setShowLedgerModal(true)}
-          />
-        )}
-        
-        {/* Fades now embedded in chat message bubbles via FadeMessageAction */}
-        
-        <UnifiedChat 
+        <UnifiedChat
           huddleId={huddleId!}
           team1Id={huddle?.team_id}
           team2Id={null}
@@ -521,7 +501,6 @@ export const Huddle = () => {
           }}
           onCancelReply={() => setReplyTo(null)}
           isPrivate={huddle?.is_private}
-          onCashModeRequired={() => setShowCashModeModal(true)}
         />
       </main>
 
@@ -554,7 +533,6 @@ export const Huddle = () => {
             <ChatBottomBar
               huddleId={huddleId!}
               huddleName={huddle?.name}
-              onOpenFades={() => setShowFadesSidebar(true)}
               onOpenBadgesModal={() => setShowBadgesModal(true)}
             />
           </>
@@ -575,16 +553,6 @@ export const Huddle = () => {
           </div>
         )}
       </div>
-
-      {/* Yellow FABs - bottom right */}
-      {/* Fades Sidebar - slide over */}
-      <FadesSidebar
-        huddleId={huddleId!}
-        teamName={teamName}
-        teamLeague={huddle?.team?.league || huddle?.teams?.league || 'NCAA'}
-        open={showFadesSidebar}
-        onClose={() => setShowFadesSidebar(false)}
-      />
 
       {/* Pick 'Em Dialog */}
       {pickEmDialog.instanceId && (
@@ -614,18 +582,6 @@ export const Huddle = () => {
         onClose={() => setShowBadgesModal(false)}
       />
 
-      {/* Ledger Modal */}
-      <LedgerModal
-        open={showLedgerModal}
-        onOpenChange={setShowLedgerModal}
-        huddleId={huddleId}
-      />
-
-      {/* Cash Mode Upgrade Modal */}
-      <CashModeUpgradeModal
-        open={showCashModeModal}
-        onOpenChange={setShowCashModeModal}
-      />
     </div>
   );
 };

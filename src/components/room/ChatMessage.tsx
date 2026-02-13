@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { UserBadgeIcon } from '@/components/badges/UserBadgeIcon';
-import { FadeMessageAction } from './FadeMessageAction';
+import { PredictionCardInMessage } from '@/components/predictions/PredictionCardInMessage';
 import { useToast } from '@/hooks/use-toast';
 
 // Maximum character length before truncating
@@ -66,7 +66,6 @@ interface ChatMessageProps {
   onBadgeClick?: (emoji: string) => void;
   huddleId?: string;
   isPrivate?: boolean;
-  onCashModeRequired?: () => void;
 }
 
 export const ChatMessage = memo(function ChatMessage({
@@ -81,7 +80,6 @@ export const ChatMessage = memo(function ChatMessage({
   onBadgeClick,
   huddleId,
   isPrivate,
-  onCashModeRequired
 }: ChatMessageProps) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
@@ -91,6 +89,7 @@ export const ChatMessage = memo(function ChatMessage({
   const avatarUrl = profile?.avatar_url;
   const isCoach = message.is_bot_message || message.message_type === 'coach_response';
   const isPulse = message.pulse_source || message.message_type === 'pulse';
+  const isPredictionCard = message.message_type === 'prediction_card';
   const isFadeNotification = message.message_type === 'fade_notification';
   
   // Check if content needs truncation
@@ -305,13 +304,11 @@ export const ChatMessage = memo(function ChatMessage({
             </div>
           )}
 
-          {/* Fade Action Button - embedded in chat bubble */}
-          {isFadeNotification && huddleId && (
-            <FadeMessageAction
-              messageContent={message.content}
+          {/* Prediction Card - renders inline market cards */}
+          {isPredictionCard && huddleId && (
+            <PredictionCardInMessage
+              content={message.content}
               huddleId={huddleId}
-              isPrivate={isPrivate}
-              onCashModeRequired={onCashModeRequired}
             />
           )}
         </div>

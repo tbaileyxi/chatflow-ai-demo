@@ -53,7 +53,6 @@ interface UnifiedChatProps {
   onReply?: (message: Message, displayName: string) => void;
   onCancelReply?: () => void;
   isPrivate?: boolean;
-  onCashModeRequired?: () => void;
 }
 
 export const UnifiedChat = memo(function UnifiedChat({
@@ -66,7 +65,6 @@ export const UnifiedChat = memo(function UnifiedChat({
   onReply,
   onCancelReply,
   isPrivate = false,
-  onCashModeRequired
 }: UnifiedChatProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -445,7 +443,6 @@ export const UnifiedChat = memo(function UnifiedChat({
                   onBadgeClick={onBadgeClick}
                   huddleId={huddleId}
                   isPrivate={isPrivate}
-                  onCashModeRequired={onCashModeRequired}
                 />
                 {/* Inline Thread Replies */}
                 {replies.length > 0 && (

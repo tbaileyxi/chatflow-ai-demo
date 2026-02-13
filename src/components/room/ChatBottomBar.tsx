@@ -13,7 +13,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Users, Trophy } from 'lucide-react';
-import { LedgerModal } from '@/components/fades/LedgerModal';
 
 interface Team {
   id: string;
@@ -47,7 +46,6 @@ export const ChatBottomBar = memo(function ChatBottomBar({
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showPrivateDialog, setShowPrivateDialog] = useState(false);
-  const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamsLoaded, setTeamsLoaded] = useState(false);
   const [formData, setFormData] = useState({ name: '', team_id: teamId || '' });
@@ -64,14 +62,14 @@ export const ChatBottomBar = memo(function ChatBottomBar({
     }
   }, [huddleId]);
 
-  // Handle ledger - opens ledger modal
+  // Handle ledger - navigate to ledger page
   const handleLedger = useCallback(() => {
     if (onOpenLedger) {
       onOpenLedger();
     } else {
-      setShowLedgerModal(true);
+      navigate('/ledger');
     }
-  }, [onOpenLedger]);
+  }, [onOpenLedger, navigate]);
 
   // Handle badges
   const handleBadges = useCallback(() => {
@@ -298,12 +296,6 @@ export const ChatBottomBar = memo(function ChatBottomBar({
         </DialogContent>
       </Dialog>
 
-      {/* Ledger Modal */}
-      <LedgerModal
-        open={showLedgerModal}
-        onOpenChange={setShowLedgerModal}
-        huddleId={huddleId}
-      />
     </>
   );
 });
