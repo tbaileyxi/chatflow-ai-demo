@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { useShadowBets } from '@/hooks/useShadowBets';
@@ -29,24 +29,42 @@ interface TeamMarkets {
 
 export default function Ledger() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const filterTeamId = searchParams.get('teamId');
+  const filterHuddleId = searchParams.get('huddleId');
   const { user } = useAuth();
   const { portfolio, loading: portfolioLoading, winRate, profit } = usePortfolio();
   const { openBets, pendingBets, closedBets, loading: betsLoading } = useShadowBets();
   const [teamMarkets, setTeamMarkets] = useState<TeamMarkets[]>([]);
   const [marketsLoading, setMarketsLoading] = useState(true);
+  const [filterTeamName, setFilterTeamName] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMarkets();
-  }, []);
+  }, [filterTeamId, filterHuddleId]);
 
   const fetchMarkets = async () => {
     try {
-      const { data: markets } = await supabase
+      let query = supabase
         .from('kalshi_markets')
         .select('id, question, current_yes_price, event_start_time, is_resolved, resolution, team_id, huddle_id')
         .order('event_start_time', { ascending: true });
 
+      // Filter by team or huddle if provided
+      if (filterTeamId) {
+        query = query.eq('team_id', filterTeamId);
+      } else if (filterHuddleId) {
+        query = query.eq('huddle_id', filterHuddleId);
+      }
+
+      const { data: markets } = await query;
+
       if (!markets?.length) {
+        // Still fetch team name for header even if no markets
+        if (filterTeamId) {
+          const { data: team } = await supabase.from('teams').select('name').eq('id', filterTeamId).single();
+          setFilterTeamName(team?.name || null);
+        }
         setTeamMarkets([]);
         setMarketsLoading(false);
         return;
@@ -61,6 +79,10 @@ export default function Ledger() {
         .in('id', teamIds);
 
       const teamMap = new Map(teams?.map(t => [t.id, { name: t.name, logo: t.logo_url }]) || []);
+
+      if (filterTeamId && teamMap.has(filterTeamId)) {
+        setFilterTeamName(teamMap.get(filterTeamId)!.name);
+      }
 
       // Group by team
       const grouped = new Map<string, { team_name: string; team_logo: string | null; markets: KalshiMarket[] }>();
@@ -101,7 +123,17 @@ export default function Ledger() {
           <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="h-9 w-9 p-0 rounded-full">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-xl font-bold">Prediction Ledger</h1>
+          <div className="flex-1">
+            <h1 className="text-xl font-bold">Prediction Ledger</h1>
+            {filterTeamName && (
+              <p className="text-xs text-muted-foreground">{filterTeamName} markets</p>
+            )}
+          </div>
+          {filterTeamId && (
+            <Button variant="outline" size="sm" onClick={() => navigate('/ledger')} className="text-xs">
+              View All
+            </Button>
+          )}
         </div>
       </div>
 

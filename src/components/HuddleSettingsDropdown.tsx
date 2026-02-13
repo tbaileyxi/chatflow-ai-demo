@@ -181,7 +181,13 @@ export const HuddleSettingsDropdown: React.FC<HuddleSettingsDropdownProps> = ({
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem onClick={() => navigate('/ledger')}>
+          <DropdownMenuItem onClick={() => {
+            const teamId = huddle?.team_id;
+            const params = new URLSearchParams();
+            if (teamId) params.set('teamId', teamId);
+            params.set('huddleId', huddleId);
+            navigate(`/ledger?${params.toString()}`);
+          }}>
             <Receipt className="mr-2 h-4 w-4" />
             View Ledger
           </DropdownMenuItem>
