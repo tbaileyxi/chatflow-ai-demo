@@ -1926,6 +1926,44 @@ export type Database = {
           },
         ]
       }
+      referrals: {
+        Row: {
+          created_at: string | null
+          id: string
+          joined_at: string | null
+          new_user_id: string | null
+          referral_code: string | null
+          referred_by: string
+          source_share_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          joined_at?: string | null
+          new_user_id?: string | null
+          referral_code?: string | null
+          referred_by: string
+          source_share_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          joined_at?: string | null
+          new_user_id?: string | null
+          referral_code?: string | null
+          referred_by?: string
+          source_share_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_source_share_id_fkey"
+            columns: ["source_share_id"]
+            isOneToOne: false
+            referencedRelation: "shares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shadow_bets: {
         Row: {
           chips_risked: number
@@ -1979,6 +2017,41 @@ export type Database = {
             columns: ["market_id"]
             isOneToOne: false
             referencedRelation: "kalshi_markets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shares: {
+        Row: {
+          bet_id: string | null
+          created_at: string | null
+          id: string
+          platform: string
+          shared_content_type: string
+          user_id: string
+        }
+        Insert: {
+          bet_id?: string | null
+          created_at?: string | null
+          id?: string
+          platform: string
+          shared_content_type?: string
+          user_id: string
+        }
+        Update: {
+          bet_id?: string | null
+          created_at?: string | null
+          id?: string
+          platform?: string
+          shared_content_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shares_bet_id_fkey"
+            columns: ["bet_id"]
+            isOneToOne: false
+            referencedRelation: "shadow_bets"
             referencedColumns: ["id"]
           },
         ]

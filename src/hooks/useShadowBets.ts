@@ -26,7 +26,7 @@ interface ShadowBet {
   };
 }
 
-export function useShadowBets(huddleId?: string) {
+export function useShadowBets(huddleId?: string, limitDays?: number) {
   const { user } = useAuth();
   const [bets, setBets] = useState<ShadowBet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +50,13 @@ export function useShadowBets(huddleId?: string) {
       query = query.eq('huddle_id', huddleId);
     }
 
+    // Apply date filter for free users (30 days)
+    if (limitDays) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - limitDays);
+      query = query.gte('placed_at', cutoff.toISOString());
+    }
+
     const { data, error } = await query;
 
     if (error) {
@@ -58,7 +65,7 @@ export function useShadowBets(huddleId?: string) {
       setBets((data || []) as unknown as ShadowBet[]);
     }
     setLoading(false);
-  }, [user, huddleId]);
+  }, [user, huddleId, limitDays]);
 
   useEffect(() => {
     fetchBets();
