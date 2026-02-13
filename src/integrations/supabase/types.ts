@@ -963,6 +963,78 @@ export type Database = {
           },
         ]
       }
+      kalshi_markets: {
+        Row: {
+          created_at: string | null
+          current_yes_price: number | null
+          event_start_time: string | null
+          huddle_id: string | null
+          id: string
+          is_resolved: boolean | null
+          kalshi_event_ticker: string | null
+          kalshi_ticker: string
+          market_type: string | null
+          metadata: Json | null
+          posted_at: string | null
+          question: string
+          resolution: string | null
+          resolved_at: string | null
+          team_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_yes_price?: number | null
+          event_start_time?: string | null
+          huddle_id?: string | null
+          id?: string
+          is_resolved?: boolean | null
+          kalshi_event_ticker?: string | null
+          kalshi_ticker: string
+          market_type?: string | null
+          metadata?: Json | null
+          posted_at?: string | null
+          question: string
+          resolution?: string | null
+          resolved_at?: string | null
+          team_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_yes_price?: number | null
+          event_start_time?: string | null
+          huddle_id?: string | null
+          id?: string
+          is_resolved?: boolean | null
+          kalshi_event_ticker?: string | null
+          kalshi_ticker?: string
+          market_type?: string | null
+          metadata?: Json | null
+          posted_at?: string | null
+          question?: string
+          resolution?: string | null
+          resolved_at?: string | null
+          team_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kalshi_markets_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kalshi_markets_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       live_events: {
         Row: {
           created_at: string
@@ -1839,6 +1911,63 @@ export type Database = {
           },
         ]
       }
+      shadow_bets: {
+        Row: {
+          chips_risked: number
+          chips_won: number | null
+          huddle_id: string
+          id: string
+          is_settled: boolean | null
+          market_id: string
+          placed_at: string | null
+          position: string
+          potential_payout: number
+          user_id: string
+          won: boolean | null
+        }
+        Insert: {
+          chips_risked: number
+          chips_won?: number | null
+          huddle_id: string
+          id?: string
+          is_settled?: boolean | null
+          market_id: string
+          placed_at?: string | null
+          position: string
+          potential_payout?: number
+          user_id: string
+          won?: boolean | null
+        }
+        Update: {
+          chips_risked?: number
+          chips_won?: number | null
+          huddle_id?: string
+          id?: string
+          is_settled?: boolean | null
+          market_id?: string
+          placed_at?: string | null
+          position?: string
+          potential_payout?: number
+          user_id?: string
+          won?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shadow_bets_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shadow_bets_market_id_fkey"
+            columns: ["market_id"]
+            isOneToOne: false
+            referencedRelation: "kalshi_markets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_sources: {
         Row: {
           created_at: string
@@ -2409,6 +2538,39 @@ export type Database = {
           },
         ]
       }
+      user_portfolios: {
+        Row: {
+          created_at: string | null
+          last_reset_at: string | null
+          total_bets: number | null
+          total_chips: number | null
+          total_losses: number | null
+          total_wins: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          last_reset_at?: string | null
+          total_bets?: number | null
+          total_chips?: number | null
+          total_losses?: number | null
+          total_wins?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          last_reset_at?: string | null
+          total_bets?: number | null
+          total_chips?: number | null
+          total_losses?: number | null
+          total_wins?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -2461,6 +2623,21 @@ export type Database = {
           charter_count: number
           founding_count: number
           total_count: number
+        }[]
+      }
+      get_huddle_leaderboard: {
+        Args: { p_huddle_id: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          profit: number
+          rank: number
+          total_bets: number
+          total_chips: number
+          total_losses: number
+          total_wins: number
+          user_id: string
+          username: string
         }[]
       }
       get_huddle_subscription_status: {
@@ -2553,9 +2730,18 @@ export type Database = {
         Args: { _huddle_id: string; _user_id: string }
         Returns: boolean
       }
+      place_shadow_bet: {
+        Args: { p_huddle_id: string; p_market_id: string; p_position: string }
+        Returns: Json
+      }
       recalculate_entry_total: {
         Args: { _entry_id: string }
         Returns: undefined
+      }
+      reset_weekly_chips: { Args: never; Returns: number }
+      settle_shadow_bets: {
+        Args: { p_market_id: string; p_resolution: string }
+        Returns: number
       }
     }
     Enums: {

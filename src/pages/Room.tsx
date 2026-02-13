@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { UnifiedChat } from '@/components/room/UnifiedChat';
 import { ChatBottomBar } from '@/components/room/ChatBottomBar';
 import { RoomChatInput } from '@/components/room/RoomChatInput';
-import { FadesSidebar } from '@/components/fades/FadesSidebar';
 import { BadgesModal } from '@/components/badges/BadgesModal';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -73,7 +72,6 @@ export default function Room() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [showFadesSidebar, setShowFadesSidebar] = useState(false);
   const [showBadgesModal, setShowBadgesModal] = useState(false);
   
   // Live Context Engine - automatically detects if team is in a live game
@@ -496,7 +494,6 @@ export default function Room() {
             <ChatBottomBar
               huddleId={room.id}
               huddleName={event.name}
-              onOpenFades={() => setShowFadesSidebar(true)}
               onOpenBadgesModal={() => setShowBadgesModal(true)}
             />
           </>
@@ -509,15 +506,6 @@ export default function Room() {
           </div>
         )}
       </div>
-
-      {/* Fades Sidebar */}
-      <FadesSidebar
-        huddleId={room.id}
-        teamName={team1Name}
-        teamLeague={team1?.league || 'NCAA'}
-        open={showFadesSidebar}
-        onClose={() => setShowFadesSidebar(false)}
-      />
 
       {/* Badges Modal */}
       <BadgesModal 
