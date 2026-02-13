@@ -1,202 +1,170 @@
 
-# Premium Subscription and Wallet System
 
-## Overview
+# Post-Game Summaries, Viral Sharing, and Leaderboard Enhancements
 
-This plan introduces a Premium tier ($5/month via Stripe) that replaces the existing "Verified" terminology throughout the app. It changes how the virtual chip economy works (free users can hit 0 and get locked out, premium users have a 100-chip floor), adds advanced leaderboards, analytics, and a premium badge.
+## What's Already Done
+The Premium subscription system, wallet mechanics, chip floors, PremiumBadge, PremiumUpgradeModal, PremiumBanner, PremiumSettingsCard, Settings page, Stripe checkout/webhook/portal edge functions, and database schema (profiles + user_portfolios premium columns) are all implemented and functional.
 
-## Phase 1: Database Schema Changes
+## What This Plan Adds
 
-### profiles table -- add Premium columns
-- `is_premium` (boolean, default false)
-- `stripe_customer_id` (text, nullable)
-- `stripe_subscription_id` (text, nullable)
-- `premium_since` (timestamptz, nullable)
-- `premium_expires_at` (timestamptz, nullable) -- for grace period handling
+### 1. Post-Game Coach Bot Summary
 
-### user_portfolios table -- add Premium-aware columns
-- `is_premium` (boolean, default false)
-- `starting_chips` (integer, default 1000)
-- `minimum_chips` (integer, default 0)
+Currently the `kalshi-settle` edge function posts individual "Market resolved" messages per market. Replace that with a single consolidated game summary posted once per game/huddle.
 
-### Update `place_shadow_bet` DB function
-- Check `minimum_chips`: if free user (min=0), block at 0 chips. If premium (min=100), ensure chips don't drop below 100.
-- Update the insufficient chips error to indicate premium status.
+**Changes to `supabase/functions/kalshi-settle/index.ts`:**
+- After settling all markets for a game, group settled bets by huddle
+- For each huddle, generate ONE summary message:
+  - Final score (from game data or market context)
+  - Huddle performance: X correct / Y total (Z%)
+  - Top predictor (most wins that game, with profit)
+  - Biggest single win
+  - Community vs Kalshi accuracy comparison
+- Post as a single `huddle_messages` entry with `message_type: 'game_summary'`
+- Remove the per-market individual result posts
 
-### Update `reset_weekly_chips` DB function
-- Premium users reset to 1500 (not 1000)
-- Free users reset to 1000 when below 100
+### 2. Database: Shares and Referrals Tables
 
-## Phase 2: Stripe Integration -- Premium Subscription
+**New table: `shares`**
+- `id` (uuid, PK)
+- `user_id` (uuid, not null)
+- `bet_id` (uuid, not null, references shadow_bets)
+- `platform` (text: 'x', 'instagram', 'imessage', 'download', 'copy')
+- `shared_content_type` (text: 'win', 'loss', 'contrarian', 'huddle_summary')
+- `created_at` (timestamptz)
 
-### New Edge Function: `create-premium-checkout/index.ts`
-- Creates a Stripe Checkout session for a $5/month recurring subscription
-- Product: "Side Huddle Premium"
-- Success URL: `/ledger?premium=success`
-- Cancel URL: `/ledger?premium=cancelled`
-- Stores `stripe_customer_id` in profiles
+RLS: Users can insert their own shares, read their own shares.
 
-### New Edge Function: `stripe-premium-webhook/index.ts`
-- Handles events:
-  - `checkout.session.completed` -- activate premium, set `is_premium=true`, add 500 chips, set `minimum_chips=100`, `starting_chips=1500`
-  - `customer.subscription.deleted` -- downgrade: `is_premium=false`, `minimum_chips=0`, `starting_chips=1000`
-  - `invoice.payment_failed` -- set `premium_expires_at` to 3 days from now (grace period)
-- Config: `verify_jwt = false`
+**New table: `referrals`**
+- `id` (uuid, PK)
+- `referred_by` (uuid, not null)
+- `new_user_id` (uuid, nullable -- filled when someone signs up)
+- `source_share_id` (uuid, nullable, references shares)
+- `referral_code` (text, unique)
+- `joined_at` (timestamptz, nullable)
+- `created_at` (timestamptz)
 
-### New Edge Function: `create-premium-portal/index.ts`
-- Creates Stripe Customer Portal session for managing subscription
-- Returns portal URL for premium users
+RLS: Users can read their own referrals.
 
-### Secret needed
-- `STRIPE_PREMIUM_WEBHOOK_SECRET` -- user must configure this in Stripe Dashboard
+### 3. Share Button on Settled Bets (Ledger)
 
-## Phase 3: Frontend -- Premium Hooks and Context
+**Update `src/pages/Ledger.tsx`:**
+- Add a "Share" button (Share2 icon) on each settled bet card
+- On tap, open a share modal/sheet
+- More prominent on wins, subtle on losses
+- Track shares in the `shares` table
 
-### New hook: `src/hooks/usePremium.ts`
-- Reads `is_premium`, `premium_since` from profiles
-- Exposes: `isPremium`, `premiumSince`, `loading`
-- Real-time subscription for premium status changes
+**New component: `src/components/sharing/BetShareModal.tsx`**
+- Shows preview of the share card
+- Platform options: Share to X, Instagram Stories, iMessage, Download Image, Copy Link
+- Pre-filled text per platform:
+  - X wins: "Just called it on @SideHuddle! [bet question] [profit]. Join me: [link]"
+  - X losses: "Can't win 'em all. Still [winRate]% on @SideHuddle. [link]"
+  - X contrarian: "Faded the crowd and WON on @SideHuddle! [link]"
+- Uses Web Share API when available, falls back to copy link
+- Records share in database
 
-### Update `src/hooks/usePortfolio.ts`
-- Add `is_premium`, `starting_chips`, `minimum_chips` to Portfolio interface
-- Compute `profit` based on `starting_chips` (not hardcoded 1000)
-- Expose `isPremium`, `minimumChips`, `isOutOfChips` (chips <= minimum)
+### 4. Share Card Image Generation
 
-## Phase 4: Frontend -- UI Components
+**New component: `src/components/sharing/ShareCardGenerator.tsx`**
+- HTML canvas-based image generation (1080x1080 for IG, 1200x675 for X)
+- Three card variants:
+  - **Win card**: Team color gradient, "CALLED IT" headline, bet details, profit, user stats, "Join me on Side Huddle" footer
+  - **Loss card**: Darker gradient, "Can't win 'em all" headline, self-deprecating copy, positive season stats
+  - **Contrarian win card** (divergence >25%): Gold gradient, "CONTRARIAN WIN / FADED THE CROWD", shows how user bet against majority
+- Includes: bet question, result, profit/loss, win rate, total bets, community vs Kalshi stats
+- Compressed output under 500KB
+- Cached for 24 hours (in-memory or blob URL)
+- Fallback: text + link if canvas fails
 
-### New: `src/components/premium/PremiumUpgradeModal.tsx`
-- Modal shown when free user hits 0 chips
-- Copy as specified: "Out of Chips!" with feature list
-- "Upgrade to Premium" button launches Stripe checkout
-- "Maybe Later" closes modal but locks betting
+### 5. Huddle Summary Sharing
 
-### New: `src/components/premium/PremiumBadge.tsx`
-- Renders a star icon or "PRO" text next to username
-- Used in chat messages, leaderboards, and profiles
+**Update Coach Bot game summary (from item 1):**
+- Add a "Share Results" button at the bottom of the summary message in chat
+- Generates a huddle-wide share card with top 3 predictors, accuracy, best contrarian call
+- Anyone in the huddle can share it
+- Uses the same BetShareModal but with `shared_content_type: 'huddle_summary'`
 
-### New: `src/components/premium/PremiumBanner.tsx`
-- Persistent banner for free users at 0 chips: "Upgrade to Premium to keep playing"
-- Shown in Ledger and chat prediction cards
+### 6. Referral Tracking
 
-### New: `src/components/premium/PremiumSettingsCard.tsx`
-- Free users: Feature comparison table + Upgrade CTA
-- Premium users: "Premium Member since [date]", Manage Subscription button, Cancel option
+- Generate unique referral links: `sidehuddlesports.com/join/[user_id]` or short code
+- Track in `referrals` table when someone signs up via a shared link
+- In Ledger, show "Your Shares" section:
+  - Free users: total share count only
+  - Premium users: full analytics (platform breakdown, signups, conversion rate)
 
-### New: `src/pages/Settings.tsx`
-- New settings page with premium management
-- Legal disclaimer section
-- Route: `/settings`
+### 7. Leaderboard Enhancements in Ledger
 
-## Phase 5: Update Existing Components
+**Update `src/pages/Ledger.tsx` leaderboard section:**
 
-### `src/components/predictions/PredictionCard.tsx`
-- Before placing bet, check if user has enough chips considering their minimum floor
-- Free user at 0: show "Out of Chips!" + upgrade CTA inline
-- Premium user low: show warning "Low chips! Bet carefully."
-- Show balance + min floor for premium users
+Free users:
+- Top 10 in current huddle
+- Username, chips, win rate, bet count
+- Premium badge next to premium users
 
-### `src/pages/Ledger.tsx`
-- Add premium banner for locked-out free users
-- Enhanced leaderboard for premium users (filters, compare, detailed stats)
-- History: free users see last 30 days, premium see all-time
-- Add premium success callback handling from URL params
+Premium users additionally see:
+- Full rankings (not capped at 10)
+- Time period filter tabs: This Week / This Month / All-Time
+- Sort options: by chips, win rate, total bets
+- "Compare" button on each user row -- shows head-to-head stats
+- Cross-huddle option (see rankings across all huddles user belongs to)
 
-### `src/components/room/ChatBottomBar.tsx`
-- Enforce max 2 private huddles for free users when creating
-- Show upgrade prompt when limit reached
+**New component: `src/components/sharing/UserCompareModal.tsx`** (Premium only)
+- Shows side-by-side stats between current user and selected user
+- Win rate, total bets, profit, common bets where both picked
 
-### Chat message bubbles (ModernMessageBubble, RoomMessageBubble, etc.)
-- Show PremiumBadge next to premium users' display names
+### 8. Settled Bets History Filtering
 
-### Leaderboard display
-- Show star/PRO badge next to premium usernames
-- Premium users see "Compare" button and filter/sort options
-
-## Phase 6: Rename "Verified" to "Hosted" (Already Partially Done)
-
-The existing `VerifiedBadge` component already shows "HOSTED" text. The `is_verified` field on huddles relates to **huddle verification** (a separate paid feature for huddle owners), not user verification. This should remain separate from user Premium status.
-
-Key distinction:
-- **Premium** = user-level subscription ($5/month) for chip economy + features
-- **Hosted/Verified huddle** = huddle-level one-time payment for huddle owners
-
-No changes needed to the huddle verification system itself.
-
-## Phase 7: Private Huddle Limits
-
-### Update huddle creation logic
-- Before creating a private huddle, count user's existing private huddles
-- Free users: max 2 private huddles
-- Premium users: unlimited
-- Show upgrade prompt when free user exceeds limit
+- Free users: show last 30 days of settled bets only
+- Premium users: show all-time history
+- Add date filter in the `useShadowBets` hook
 
 ## Technical Details
 
-### Database Migration SQL (summary)
+### Database Migration
 
 ```text
--- profiles: add premium columns
-ALTER TABLE profiles ADD COLUMN is_premium boolean DEFAULT false;
-ALTER TABLE profiles ADD COLUMN stripe_customer_id text;
-ALTER TABLE profiles ADD COLUMN stripe_subscription_id text;
-ALTER TABLE profiles ADD COLUMN premium_since timestamptz;
-ALTER TABLE profiles ADD COLUMN premium_expires_at timestamptz;
+-- shares table
+CREATE TABLE shares (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  bet_id uuid REFERENCES shadow_bets(id),
+  platform text NOT NULL,
+  shared_content_type text NOT NULL DEFAULT 'win',
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE shares ENABLE ROW LEVEL SECURITY;
+-- Users can insert/read their own shares
 
--- user_portfolios: add premium-aware columns
-ALTER TABLE user_portfolios ADD COLUMN is_premium boolean DEFAULT false;
-ALTER TABLE user_portfolios ADD COLUMN starting_chips integer DEFAULT 1000;
-ALTER TABLE user_portfolios ADD COLUMN minimum_chips integer DEFAULT 0;
-
--- Update place_shadow_bet to enforce minimum_chips floor
--- Update reset_weekly_chips for premium starting chips
+-- referrals table
+CREATE TABLE referrals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  referred_by uuid NOT NULL,
+  new_user_id uuid,
+  source_share_id uuid REFERENCES shares(id),
+  referral_code text UNIQUE,
+  joined_at timestamptz,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
+-- Users can read their own referrals
 ```
-
-### Edge Function Config (config.toml additions)
-
-```text
-[functions.create-premium-checkout]
-verify_jwt = true
-
-[functions.stripe-premium-webhook]
-verify_jwt = false
-
-[functions.create-premium-portal]
-verify_jwt = true
-```
-
-### New Route
-- `/settings` -- Settings page with premium management
 
 ### Files Created (new)
-- `supabase/functions/create-premium-checkout/index.ts`
-- `supabase/functions/stripe-premium-webhook/index.ts`
-- `supabase/functions/create-premium-portal/index.ts`
-- `src/hooks/usePremium.ts`
-- `src/components/premium/PremiumUpgradeModal.tsx`
-- `src/components/premium/PremiumBadge.tsx`
-- `src/components/premium/PremiumBanner.tsx`
-- `src/components/premium/PremiumSettingsCard.tsx`
-- `src/pages/Settings.tsx`
+- `src/components/sharing/BetShareModal.tsx` -- share modal with platform options
+- `src/components/sharing/ShareCardGenerator.tsx` -- canvas-based image generation
+- `src/components/sharing/UserCompareModal.tsx` -- Premium head-to-head comparison
 
 ### Files Modified
-- `supabase/config.toml` -- add 3 new function configs
-- `src/App.tsx` -- add `/settings` route
-- `src/hooks/usePortfolio.ts` -- premium-aware portfolio
-- `src/components/predictions/PredictionCard.tsx` -- chip floor enforcement + upgrade prompts
-- `src/pages/Ledger.tsx` -- premium features, locked-out banner, premium success callback
-- `src/components/room/ChatBottomBar.tsx` -- private huddle limit enforcement
-- Chat bubble components -- show PremiumBadge
-- Database migration for schema changes
-- Update `place_shadow_bet` and `reset_weekly_chips` DB functions
+- `supabase/functions/kalshi-settle/index.ts` -- consolidated post-game summary instead of per-market messages
+- `src/pages/Ledger.tsx` -- share buttons on settled bets, leaderboard section with premium filters/compare, 30-day limit for free users, referral stats section
+- `src/hooks/useShadowBets.ts` -- add date filtering for free vs premium history
+- `src/integrations/supabase/types.ts` -- auto-updated by migration
 
 ### Implementation Order
-1. Database migration (schema + updated functions)
-2. Edge functions (checkout, webhook, portal)
-3. Frontend hooks (usePremium, updated usePortfolio)
-4. UI components (modal, badge, banner, settings)
-5. Integration into existing pages (Ledger, PredictionCard, ChatBottomBar)
-6. Testing end-to-end with Stripe test mode
-
-### Legal Disclaimer
-Added to Settings page:
-> "Virtual currency for entertainment purposes only. Cannot be redeemed for cash, prizes, or real-world value. Side Huddle is a game of skill and prediction, not gambling."
+1. Database migration (shares + referrals tables)
+2. Update `kalshi-settle` for consolidated game summaries
+3. Build ShareCardGenerator (canvas image gen)
+4. Build BetShareModal (share flow + tracking)
+5. Update Ledger with share buttons, leaderboard enhancements, and referral stats
+6. Update useShadowBets for date-filtered history
+7. Build UserCompareModal for premium comparisons
