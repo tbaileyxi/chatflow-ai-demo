@@ -33,6 +33,48 @@ interface TeamRecord {
   league: string;
 }
 
+// Kalshi uses abbreviated names for multi-team cities and short names for NCAA.
+// Map: league -> kalshi abbreviation -> our team name (mascot).
+const KALSHI_ALIASES: Record<string, Record<string, string>> = {
+  MLB: {
+    'los angeles d': 'Dodgers',
+    'los angeles a': 'Angels',
+    'new york y': 'Yankees',
+    'new york m': 'Mets',
+    'chicago c': 'Cubs',
+    'chicago ws': 'White Sox',
+    "a's": 'Athletics',
+  },
+  NBA: {
+    'los angeles l': 'Lakers',
+    'los angeles c': 'Clippers',
+    'new york k': 'Knicks',
+    'new york n': 'Nets',  
+  },
+  NFL: {
+    'los angeles r': 'Rams',
+    'los angeles ch': 'Chargers',
+    'new york g': 'Giants',
+    'new york j': 'Jets',
+  },
+  NCAA: {
+    'ohio st.': 'Buckeyes',
+    'ohio st': 'Buckeyes',
+    'ohio state': 'Buckeyes',
+    'penn st.': 'Nittany Lions',
+    'penn st': 'Nittany Lions',
+    'penn state': 'Nittany Lions',
+    'miami (fl)': 'Hurricanes',   // Not in our DB but alias anyway
+    'miami (oh)': 'RedHawks',     // Not in our DB
+    'ole miss': 'Rebels',         // Not in our DB
+    'auburn': 'Tigers',           // Maps to Auburn Tigers - not in Power Four
+    'lsu': 'Tigers',              // Maps to LSU Tigers - not in Power Four  
+    'tennessee': 'Volunteers',    // Not in Power Four DB
+    'tulane': 'Green Wave',       // Not in Power Four DB
+    'james madison': 'Dukes',     // Not in Power Four DB
+  },
+};
+
 /**
  * Build per-league matching structures.
  * Returns a map: league -> { fullNames, mascots, cities }
@@ -96,6 +138,20 @@ function matchTeam(
   if (!maps) return { team: null, matchType: 'no_league_data' };
 
   const titleLower = title.toLowerCase();
+
+  // 0. Check Kalshi abbreviation aliases first (handles "Los Angeles D", "Ohio St.", etc.)
+  const aliases = KALSHI_ALIASES[league] || {};
+  // Sort by alias length descending so longer aliases match first
+  const aliasSorted = Object.entries(aliases).sort((a, b) => b[0].length - a[0].length);
+  for (const [alias, mascot] of aliasSorted) {
+    if (titleLower.includes(alias)) {
+      // Find team by mascot name in this league
+      const team = maps.mascots.get(mascot.toLowerCase());
+      if (team) return { team, matchType: 'alias' };
+      // Alias matched but team not in our DB (e.g. non-Power Four NCAA)
+      return { team: null, matchType: 'alias_no_db_team' };
+    }
+  }
 
   // 1. Full name match (longest first for accuracy)
   const fullEntries = [...maps.fullNames.entries()].sort((a, b) => b[0].length - a[0].length);
