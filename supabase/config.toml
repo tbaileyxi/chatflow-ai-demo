@@ -70,12 +70,14 @@ verify_jwt = true
 [functions.stripe-verification-webhook]
 verify_jwt = false
 
-[functions.fades-get-odds]
+[functions.kalshi-sync-markets]
 verify_jwt = false
 
-[functions.fades-settle]
+[functions.kalshi-post-predictions]
 verify_jwt = false
-on_schedule = "0 */3 * * *"
+
+[functions.kalshi-settle]
+verify_jwt = false
 
 [functions.reddit-social-buzz]
 verify_jwt = false
@@ -115,11 +117,6 @@ verify_jwt = false
 [functions.pulse-test]
 verify_jwt = false
 
-[functions.create-cashmode-checkout]
-verify_jwt = true
-
-[functions.stripe-cashmode-webhook]
-verify_jwt = false
 
 [functions.og-message]
 verify_jwt = false
