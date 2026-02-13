@@ -12,7 +12,9 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, Trophy } from 'lucide-react';
+import { Plus, Users, Trophy, Star } from 'lucide-react';
+import { usePremium } from '@/hooks/usePremium';
+import { PremiumUpgradeModal } from '@/components/premium/PremiumUpgradeModal';
 
 interface Team {
   id: string;
@@ -45,7 +47,9 @@ export const ChatBottomBar = memo(function ChatBottomBar({
 }: ChatBottomBarProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { isPremium } = usePremium();
   const [showPrivateDialog, setShowPrivateDialog] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamsLoaded, setTeamsLoaded] = useState(false);
   const [formData, setFormData] = useState({ name: '', team_id: teamId || '' });
@@ -89,9 +93,23 @@ export const ChatBottomBar = memo(function ChatBottomBar({
       toast.info('Please sign in to create a private huddle');
       return;
     }
+
+    // Check huddle limit for free users
+    if (!isPremium) {
+      const { count } = await supabase
+        .from('huddles')
+        .select('id', { count: 'exact', head: true })
+        .eq('owner_id', user.id)
+        .eq('is_private', true);
+
+      if ((count || 0) >= 2) {
+        setShowUpgradeModal(true);
+        return;
+      }
+    }
+
     setShowPrivateDialog(true);
     
-    // Fetch teams if not loaded
     if (!teamsLoaded) {
       const { data, error } = await supabase
         .from('teams')
@@ -106,11 +124,10 @@ export const ChatBottomBar = memo(function ChatBottomBar({
       }
     }
     
-    // Pre-fill team if we have one
     if (teamId) {
       setFormData(prev => ({ ...prev, team_id: teamId }));
     }
-  }, [user, teamsLoaded, teamId]);
+  }, [user, teamsLoaded, teamId, isPremium]);
 
   const handleCreateHuddle = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -299,6 +316,7 @@ export const ChatBottomBar = memo(function ChatBottomBar({
         </DialogContent>
       </Dialog>
 
+      <PremiumUpgradeModal open={showUpgradeModal} onOpenChange={setShowUpgradeModal} />
     </>
   );
 });

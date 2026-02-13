@@ -9,6 +9,9 @@ interface Portfolio {
   total_wins: number;
   total_losses: number;
   last_reset_at: string;
+  is_premium: boolean;
+  starting_chips: number;
+  minimum_chips: number;
 }
 
 export function usePortfolio() {
@@ -33,9 +36,13 @@ export function usePortfolio() {
     }
 
     if (data) {
-      setPortfolio(data as Portfolio);
+      setPortfolio({
+        ...data,
+        is_premium: (data as any).is_premium ?? false,
+        starting_chips: (data as any).starting_chips ?? 1000,
+        minimum_chips: (data as any).minimum_chips ?? 0,
+      } as Portfolio);
     } else {
-      // Create default portfolio
       const { data: newPortfolio } = await supabase
         .from('user_portfolios')
         .insert({ user_id: user.id, total_chips: 1000 })
@@ -43,7 +50,12 @@ export function usePortfolio() {
         .single();
       
       if (newPortfolio) {
-        setPortfolio(newPortfolio as Portfolio);
+        setPortfolio({
+          ...newPortfolio,
+          is_premium: false,
+          starting_chips: 1000,
+          minimum_chips: 0,
+        } as Portfolio);
       }
     }
     setLoading(false);
@@ -53,7 +65,6 @@ export function usePortfolio() {
     fetchPortfolio();
   }, [fetchPortfolio]);
 
-  // Real-time subscription
   useEffect(() => {
     if (!user) return;
 
@@ -66,7 +77,13 @@ export function usePortfolio() {
         filter: `user_id=eq.${user.id}`
       }, (payload) => {
         if (payload.new) {
-          setPortfolio(payload.new as Portfolio);
+          const d = payload.new as any;
+          setPortfolio({
+            ...d,
+            is_premium: d.is_premium ?? false,
+            starting_chips: d.starting_chips ?? 1000,
+            minimum_chips: d.minimum_chips ?? 0,
+          });
         }
       })
       .subscribe();
@@ -74,11 +91,16 @@ export function usePortfolio() {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
+  const startingChips = portfolio?.starting_chips ?? 1000;
+  const minimumChips = portfolio?.minimum_chips ?? 0;
+  const isPremium = portfolio?.is_premium ?? false;
+  const isOutOfChips = portfolio ? portfolio.total_chips <= minimumChips : false;
+
   const winRate = portfolio && portfolio.total_bets > 0
     ? Math.round((portfolio.total_wins / portfolio.total_bets) * 100)
     : 0;
 
-  const profit = portfolio ? portfolio.total_chips - 1000 : 0;
+  const profit = portfolio ? portfolio.total_chips - startingChips : 0;
 
-  return { portfolio, loading, winRate, profit, refetch: fetchPortfolio };
+  return { portfolio, loading, winRate, profit, isPremium, minimumChips, isOutOfChips, startingChips, refetch: fetchPortfolio };
 }

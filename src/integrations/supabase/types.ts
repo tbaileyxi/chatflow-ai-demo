@@ -1655,11 +1655,16 @@ export type Database = {
           has_lifetime_verified_huddle_code: boolean | null
           id: string
           is_founding_member: boolean | null
+          is_premium: boolean | null
           last_login_at: string | null
           onboarding_completed: boolean
           phone_number: string | null
+          premium_expires_at: string | null
+          premium_since: string | null
           signup_method: string | null
           status: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           updated_at: string
           user_id: string
           username: string | null
@@ -1679,11 +1684,16 @@ export type Database = {
           has_lifetime_verified_huddle_code?: boolean | null
           id?: string
           is_founding_member?: boolean | null
+          is_premium?: boolean | null
           last_login_at?: string | null
           onboarding_completed?: boolean
           phone_number?: string | null
+          premium_expires_at?: string | null
+          premium_since?: string | null
           signup_method?: string | null
           status?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
           user_id: string
           username?: string | null
@@ -1703,11 +1713,16 @@ export type Database = {
           has_lifetime_verified_huddle_code?: boolean | null
           id?: string
           is_founding_member?: boolean | null
+          is_premium?: boolean | null
           last_login_at?: string | null
           onboarding_completed?: boolean
           phone_number?: string | null
+          premium_expires_at?: string | null
+          premium_since?: string | null
           signup_method?: string | null
           status?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
           user_id?: string
           username?: string | null
@@ -2541,7 +2556,10 @@ export type Database = {
       user_portfolios: {
         Row: {
           created_at: string | null
+          is_premium: boolean | null
           last_reset_at: string | null
+          minimum_chips: number | null
+          starting_chips: number | null
           total_bets: number | null
           total_chips: number | null
           total_losses: number | null
@@ -2551,7 +2569,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          is_premium?: boolean | null
           last_reset_at?: string | null
+          minimum_chips?: number | null
+          starting_chips?: number | null
           total_bets?: number | null
           total_chips?: number | null
           total_losses?: number | null
@@ -2561,7 +2582,10 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          is_premium?: boolean | null
           last_reset_at?: string | null
+          minimum_chips?: number | null
+          starting_chips?: number | null
           total_bets?: number | null
           total_chips?: number | null
           total_losses?: number | null
