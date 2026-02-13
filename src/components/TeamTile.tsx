@@ -32,7 +32,7 @@ export const TeamTile: React.FC<TeamTileProps> = ({ team, huddle, size = 'defaul
       navigate(`/huddle/${huddle.id}`);
     } else {
       // Navigate to team feed for teams without huddles
-      navigate(`/team/${team.id}`);
+      navigate(`/teams/${team.id}`);
     }
   };
 
