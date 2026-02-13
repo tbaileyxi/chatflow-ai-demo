@@ -123,3 +123,12 @@ verify_jwt = false
 
 [functions.og-message-image]
 verify_jwt = false
+
+[functions.create-premium-checkout]
+verify_jwt = false
+
+[functions.stripe-premium-webhook]
+verify_jwt = false
+
+[functions.create-premium-portal]
+verify_jwt = false
