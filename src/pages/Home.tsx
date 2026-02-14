@@ -8,7 +8,6 @@ import { useAuth } from '@/hooks/useAuth';
 import shLogo from '@/assets/sh-logo.png';
 
 // New modular components
-import { TopMoments } from '@/components/home/TopMoments';
 import { LiveEventCard } from '@/components/home/LiveEventCard';
 import { YourHuddlesSection } from '@/components/home/YourHuddlesSection';
 import { DiscoverySection } from '@/components/home/DiscoverySection';
@@ -177,9 +176,6 @@ export default function Home() {
       <div className="px-4 py-6 space-y-8">
         {/* SECTION 1: Live Event (conditional - only when live) */}
         {liveEvent && <LiveEventCard event={liveEvent} />}
-
-        {/* SECTION 2: Top Moments (primary feature) */}
-        <TopMoments />
 
         {/* SECTION 3: Your Huddles (returning users only) */}
         {user && hasHuddles && (
