@@ -32,5 +32,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   extra: {
     adminPhoneNumber: process.env.ADMIN_PHONE_NUMBER ?? "",
+    bypassPhoneNumber: process.env.BYPASS_PHONE_NUMBER ?? "5555555555",
   },
 });

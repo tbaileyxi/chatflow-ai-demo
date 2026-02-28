@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { View, Text, Alert, Image, Pressable } from "react-native";
+import { View, Text, Alert, Image, Pressable, Share } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation, type RouteProp } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Crown, Trash2, LogOut, Bot, X } from "lucide-react-native";
+import { ChevronLeft, Crown, Trash2, LogOut, Bot, X, Share2 } from "lucide-react-native";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useHuddleDetails } from "@/hooks/useHuddleDetails";
@@ -56,11 +56,11 @@ export function HuddleSettingsScreen() {
       .eq("id", huddleId);
     queryClient.invalidateQueries({ queryKey: ["huddle-details", huddleId] });
     setSaving(false);
-    Alert.alert("Saved", "Huddle bio updated.");
+    Alert.alert("Saved", "Side Huddle bio updated.");
   };
 
   const removeMember = (memberId: string, name: string) => {
-    Alert.alert("Remove Member", `Remove ${name} from this huddle?`, [
+    Alert.alert("Remove Member", `Remove ${name} from this Side Huddle?`, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Remove",
@@ -83,7 +83,7 @@ export function HuddleSettingsScreen() {
   };
 
   const leaveHuddle = () => {
-    Alert.alert("Leave Huddle", `Leave ${huddle.name}?`, [
+    Alert.alert("Leave Side Huddle", `Leave ${huddle.name}?`, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Leave",
@@ -102,10 +102,29 @@ export function HuddleSettingsScreen() {
     ]);
   };
 
+  const ownerLeaveHuddle = () => {
+    Alert.alert(
+      "Leave Side Huddle",
+      "You are the creator. Leaving will delete this Side Huddle and all messages.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave & Delete",
+          style: "destructive",
+          onPress: async () => {
+            await supabase.from("huddles").delete().eq("id", huddleId);
+            queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
+            navigation.navigate("MainTabs", { screen: "Home" });
+          },
+        },
+      ],
+    );
+  };
+
   const deleteHuddle = () => {
     Alert.alert(
-      "Delete Huddle",
-      "This will permanently delete this huddle and all messages. This cannot be undone.",
+      "Delete Side Huddle",
+      "This will permanently delete this Side Huddle and all messages. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -129,7 +148,7 @@ export function HuddleSettingsScreen() {
           <ChevronLeft color={colors.foreground} size={24} />
         </Pressable>
         <Text className="flex-1 text-lg font-bold text-foreground">
-          Huddle Settings
+          Side Huddle Settings
         </Text>
         {isOwner && (
           <Button
@@ -152,13 +171,13 @@ export function HuddleSettingsScreen() {
         {isOwner && (
           <Card>
             <CardHeader>
-              <CardTitle>Huddle Bio</CardTitle>
+              <CardTitle>Side Huddle Bio</CardTitle>
             </CardHeader>
             <CardContent className="gap-3">
               <Textarea
                 value={bio}
                 onChangeText={(t) => setBio(t.slice(0, 280))}
-                placeholder="Describe your huddle..."
+                placeholder="Describe your Side Huddle..."
                 maxLength={280}
               />
               <View className="flex-row items-center justify-between">
@@ -224,6 +243,25 @@ export function HuddleSettingsScreen() {
           </CardContent>
         </Card>
 
+        {/* Invite Link */}
+        <Button
+          variant="outline"
+          onPress={() => {
+            const inviteLink = `sidehuddle://join-huddle/${huddleId}`;
+            Share.share({
+              message: `Join my Side Huddle "${huddle.name}" on Side Huddle Sports! ${inviteLink}`,
+              url: inviteLink,
+            });
+          }}
+        >
+          <View className="flex-row items-center gap-2">
+            <Share2 color={colors.primary} size={16} />
+            <Text className="text-sm font-medium text-primary">
+              Invite Friends
+            </Text>
+          </View>
+        </Button>
+
         <Separator />
 
         {/* Actions */}
@@ -233,20 +271,30 @@ export function HuddleSettingsScreen() {
               <View className="flex-row items-center gap-2">
                 <LogOut color={colors.foreground} size={16} />
                 <Text className="text-sm font-medium text-foreground">
-                  Leave Huddle
+                  Leave Side Huddle
                 </Text>
               </View>
             </Button>
           )}
           {isOwner && (
-            <Button variant="destructive" onPress={deleteHuddle}>
-              <View className="flex-row items-center gap-2">
-                <Trash2 color={colors.destructiveForeground} size={16} />
-                <Text className="text-sm font-medium text-destructive-foreground">
-                  Delete Huddle
-                </Text>
-              </View>
-            </Button>
+            <>
+              <Button variant="outline" onPress={ownerLeaveHuddle}>
+                <View className="flex-row items-center gap-2">
+                  <LogOut color={colors.foreground} size={16} />
+                  <Text className="text-sm font-medium text-foreground">
+                    Leave Side Huddle
+                  </Text>
+                </View>
+              </Button>
+              <Button variant="destructive" onPress={deleteHuddle}>
+                <View className="flex-row items-center gap-2">
+                  <Trash2 color={colors.destructiveForeground} size={16} />
+                  <Text className="text-sm font-medium text-destructive-foreground">
+                    Delete Side Huddle
+                  </Text>
+                </View>
+              </Button>
+            </>
           )}
         </View>
       </ScreenWrapper>

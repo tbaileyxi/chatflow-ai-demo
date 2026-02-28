@@ -17,12 +17,15 @@ export type AuthStackParamList = {
 // Root stack (auth-gated)
 export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList> | undefined;
+  Onboarding: undefined;
   MainTabs: NavigatorScreenParams<TabParamList>;
   Huddle: { huddleId: string };
   HuddleSettings: { huddleId: string };
   HuddleCoachSettings: { huddleId: string };
   JoinHuddle: { huddleId: string };
   HuddleSearch: undefined;
+  CreateSideHuddle: undefined;
+  ManageTeams: undefined;
   TeamFeed: { teamId: string };
   Admin: undefined;
   Settings: undefined;

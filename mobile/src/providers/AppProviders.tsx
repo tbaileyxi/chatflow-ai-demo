@@ -44,6 +44,8 @@ const linking: LinkingOptions<RootStackParamList> = {
       HuddleCoachSettings: "huddle/:huddleId/coach-settings",
       JoinHuddle: "join-huddle/:huddleId",
       HuddleSearch: "huddle-search",
+      CreateSideHuddle: "create-side-huddle",
+      Onboarding: "onboarding",
       TeamFeed: "teams/:teamId",
       Admin: "admin",
       Settings: "settings",

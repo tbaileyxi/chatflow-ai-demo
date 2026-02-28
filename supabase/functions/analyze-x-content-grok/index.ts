@@ -191,17 +191,18 @@ serve(async (req) => {
     console.log('[analyze-x-content-grok] Selected model:', chosenModel);
 
     // Build analysis prompt
-    const systemPrompt = `You are an NFL/NCAA sports content analyzer. Analyze tweets and return ONLY valid JSON (no markdown, no code blocks).
+    const systemPrompt = `You are a professional sports content analyzer covering NFL, NCAA Football, NBA, MLB, and NHL. Analyze tweets and return ONLY valid JSON (no markdown, no code blocks).
 
 QUALITY SCORING (0-100):
 Base Score Rules:
 - Text-only posts: Max 40 base points
-- Posts with images: Max 60 base points  
+- Posts with images: Max 60 base points
 - Posts with video/highlights: Max 75 base points
 
 Bonuses:
 - Game highlights/big plays: +25
 - Breaking news/injury reports: +20
+- Trade/signing news: +20
 - High engagement (>100 likes): +10
 - Posted within 6 hours: +15
 - Posted within 24 hours: +10
@@ -213,13 +214,17 @@ Quality Thresholds:
 - <50: Reject (too low quality)
 
 TOPICS:
-game_highlights, injury_report, trade_news, practice_update, player_stats, 
+game_highlights, injury_report, trade_news, practice_update, player_stats,
 game_recap, coaching_news, roster_move, social_moment, pregame_hype
 
-TEAMS DATABASE (match by keywords):
-- Buffalo Bills: bills, buffalo, josh allen, stefon diggs
-- Cleveland Browns: browns, cleveland, deshaun watson, myles garrett  
-- Colorado Buffaloes: buffs, colorado, deion sanders, travis hunter, shedeur sanders
+LEAGUES COVERED:
+- NFL: All 32 NFL teams
+- NCAA: All FBS college football teams
+- NBA: All 30 NBA teams
+- MLB: All 30 MLB teams
+- NHL: All 32 NHL teams
+
+Identify the team(s) mentioned in the content by their official name, city, players, or common nicknames. Match to the correct league.
 
 Return JSON only:
 {

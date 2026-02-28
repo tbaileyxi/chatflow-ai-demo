@@ -38,12 +38,15 @@ export function OTPVerificationScreen() {
     if (code.length !== CODE_LENGTH) return;
 
     setLoading(true);
+    console.log("Verifying OTP - phone:", phone, "code:", code);
     try {
       const { data, error } = await supabase.auth.verifyOtp({
         phone,
         token: code,
         type: "sms",
       });
+
+      console.log("Verify result - error:", error?.message, "user:", data?.user?.id);
 
       if (error) {
         Alert.alert("Verification Failed", error.message);

@@ -154,13 +154,13 @@ export function HuddleSearchScreen() {
           <ChevronLeft color={colors.foreground} size={24} />
         </Pressable>
         <Text className="flex-1 text-lg font-bold text-foreground">
-          Find Huddles
+          Find Side Huddles
         </Text>
       </View>
 
       <View className="px-4 pb-3">
         <Input
-          placeholder="Search huddles..."
+          placeholder="Search Side Huddles..."
           value={search}
           onChangeText={setSearch}
         />
@@ -180,7 +180,7 @@ export function HuddleSearchScreen() {
           contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingBottom: 32 }}
           ListEmptyComponent={
             <Text className="py-8 text-center text-muted-foreground">
-              No huddles found
+              No Side Huddles found
             </Text>
           }
         />

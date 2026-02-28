@@ -71,7 +71,7 @@ export function AdminDashboard() {
       <View className="flex-row gap-3">
         <StatCard
           icon={<Layers color={colors.accent} size={20} />}
-          label="Huddles"
+          label="Side Huddles"
           value={stats?.huddles ?? 0}
         />
         <StatCard

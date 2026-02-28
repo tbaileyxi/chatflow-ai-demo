@@ -1,9 +1,11 @@
 import { View, ActivityIndicator } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { colors } from "@/theme/colors";
 import { TabNavigator } from "./TabNavigator";
 import { AuthNavigator } from "./AuthNavigator";
+import { OnboardingScreen } from "@/screens/onboarding/OnboardingScreen";
 import { HuddleScreen } from "@/screens/huddle/HuddleScreen";
 import { HuddleSettingsScreen } from "@/screens/huddle-settings/HuddleSettingsScreen";
 import { HuddleCoachSettingsScreen } from "@/screens/huddle-settings/HuddleCoachSettingsScreen";
@@ -11,6 +13,8 @@ import { AdminScreen } from "@/screens/admin/AdminScreen";
 import { TeamFeedScreen } from "@/screens/team-feed/TeamFeedScreen";
 import { HuddleSearchScreen } from "@/screens/huddle-search/HuddleSearchScreen";
 import { JoinHuddleScreen } from "@/screens/join-huddle/JoinHuddleScreen";
+import { CreateSideHuddleScreen } from "@/screens/create-side-huddle/CreateSideHuddleScreen";
+import { ManageTeamsScreen } from "@/screens/manage-teams/ManageTeamsScreen";
 import { FAQScreen } from "@/screens/faq/FAQScreen";
 import type { RootStackParamList } from "./types";
 
@@ -18,14 +22,17 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
   const { user, loading } = useAuth();
+  const { data: profile, isLoading: profileLoading } = useProfile();
 
-  if (loading) {
+  if (loading || (user && profileLoading)) {
     return (
       <View className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
+
+  const needsOnboarding = user && !profile?.onboardingCompleted;
 
   return (
     <Stack.Navigator
@@ -34,7 +41,19 @@ export function RootNavigator() {
         contentStyle: { backgroundColor: colors.background },
       }}
     >
-      {user ? (
+      {!user ? (
+        <Stack.Screen
+          name="Auth"
+          component={AuthNavigator}
+          options={{ animationTypeForReplace: "pop" }}
+        />
+      ) : needsOnboarding ? (
+        <Stack.Screen
+          name="Onboarding"
+          component={OnboardingScreen}
+          options={{ animation: "fade" }}
+        />
+      ) : (
         <>
           <Stack.Screen name="MainTabs" component={TabNavigator} />
           <Stack.Screen
@@ -73,17 +92,21 @@ export function RootNavigator() {
             options={{ animation: "slide_from_right" }}
           />
           <Stack.Screen
+            name="CreateSideHuddle"
+            component={CreateSideHuddleScreen}
+            options={{ animation: "slide_from_bottom" }}
+          />
+          <Stack.Screen
+            name="ManageTeams"
+            component={ManageTeamsScreen}
+            options={{ animation: "slide_from_right" }}
+          />
+          <Stack.Screen
             name="FAQ"
             component={FAQScreen}
             options={{ animation: "slide_from_right" }}
           />
         </>
-      ) : (
-        <Stack.Screen
-          name="Auth"
-          component={AuthNavigator}
-          options={{ animationTypeForReplace: "pop" }}
-        />
       )}
     </Stack.Navigator>
   );

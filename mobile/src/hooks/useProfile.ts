@@ -9,6 +9,7 @@ export type UserProfile = {
   phoneNumber: string | null;
   bio: string | null;
   avatarUrl: string | null;
+  onboardingCompleted: boolean;
 };
 
 export function useProfile() {
@@ -24,7 +25,7 @@ export function useProfile() {
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "user_id, display_name, username, phone_number, bio, avatar_url",
+          "user_id, display_name, username, phone_number, bio, avatar_url, onboarding_completed",
         )
         .eq("user_id", user.id)
         .maybeSingle();
@@ -38,6 +39,7 @@ export function useProfile() {
         phoneNumber: data.phone_number,
         bio: data.bio,
         avatarUrl: data.avatar_url,
+        onboardingCompleted: data.onboarding_completed ?? false,
       };
     },
   });

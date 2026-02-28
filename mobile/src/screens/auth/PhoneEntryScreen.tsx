@@ -41,13 +41,17 @@ export function PhoneEntryScreen() {
     setLoading(true);
     try {
       const fullPhone = formatPhoneForSupabase(countryCode, phone);
+      console.log("Sending OTP to:", fullPhone);
+
       const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone });
 
       if (error) {
+        console.log("OTP send error:", error.message);
         Alert.alert("Error", error.message);
         return;
       }
 
+      console.log("OTP sent successfully, navigating to verification");
       navigation.navigate("OTPVerification", {
         phone: fullPhone,
       });

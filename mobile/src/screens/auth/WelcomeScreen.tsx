@@ -18,7 +18,9 @@ export function WelcomeScreen() {
           <Text className="text-3xl font-bold text-primary-foreground">SH</Text>
         </View>
 
-        <Text className="text-3xl font-bold text-foreground">Side Huddle</Text>
+        <Text className="text-3xl font-bold text-foreground">
+          Side Huddle Sports
+        </Text>
 
         <Text className="mt-3 text-center text-lg text-muted-foreground">
           Your team. Your huddle.

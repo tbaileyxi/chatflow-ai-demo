@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -10,6 +10,7 @@ export type HuddleMessage = {
   createdAt: string;
   mediaUrl: string | null;
   mediaType: string | null;
+  messageType: string | null;
   isBotMessage: boolean;
   isTeamAgent: boolean;
   replyToId: string | null;
@@ -19,47 +20,99 @@ export type HuddleMessage = {
   avatarUrl: string | null;
 };
 
-const MESSAGE_LIMIT = 100;
+const PAGE_SIZE = 50;
+const INITIAL_DAYS = 10;
 
-async function fetchMessages(huddleId: string): Promise<HuddleMessage[]> {
-  const { data, error } = await supabase
-    .from("huddle_messages")
-    .select("*")
-    .eq("huddle_id", huddleId)
-    .order("created_at", { ascending: false })
-    .limit(MESSAGE_LIMIT);
+function getDateCutoff(daysAgo: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return d.toISOString();
+}
 
-  if (error || !data) return [];
+type RawRow = Record<string, any>;
 
-  // Batch fetch profiles for all unique user_ids
-  const userIds = [...new Set(data.map((m) => m.user_id))];
+function mapRow(m: RawRow, profileMap: Map<string, any>): HuddleMessage {
+  const profile = profileMap.get(m.user_id);
+  return {
+    id: m.id,
+    huddleId: m.huddle_id,
+    userId: m.user_id,
+    content: m.content,
+    createdAt: m.created_at,
+    mediaUrl: m.media_url,
+    mediaType: m.media_type,
+    messageType: m.message_type ?? null,
+    isBotMessage: m.is_bot_message ?? false,
+    isTeamAgent: m.is_team_agent_message ?? false,
+    replyToId: m.reply_to_id,
+    displayName: profile?.display_name ?? null,
+    username: profile?.username ?? null,
+    avatarUrl: profile?.avatar_url ?? null,
+  };
+}
+
+async function fetchProfiles(userIds: string[]) {
+  if (userIds.length === 0) return new Map<string, any>();
   const { data: profiles } = await supabase
     .from("profiles")
     .select("user_id, display_name, username, avatar_url")
     .in("user_id", userIds);
+  return new Map((profiles ?? []).map((p) => [p.user_id, p]));
+}
 
-  const profileMap = new Map(
-    (profiles ?? []).map((p) => [p.user_id, p]),
-  );
+// Fetch newest messages first (descending), with date cutoff for initial load
+async function fetchMessages(
+  huddleId: string,
+  cutoff: string,
+): Promise<{ messages: HuddleMessage[]; hasMore: boolean }> {
+  const { data, error } = await supabase
+    .from("huddle_messages")
+    .select("*")
+    .eq("huddle_id", huddleId)
+    .gte("created_at", cutoff)
+    .order("created_at", { ascending: false })
+    .limit(PAGE_SIZE + 1);
 
-  return data.map((m) => {
-    const profile = profileMap.get(m.user_id);
-    return {
-      id: m.id,
-      huddleId: m.huddle_id,
-      userId: m.user_id,
-      content: m.content,
-      createdAt: m.created_at,
-      mediaUrl: m.media_url,
-      mediaType: m.media_type,
-      isBotMessage: m.is_bot_message ?? false,
-      isTeamAgent: m.is_team_agent_message ?? false,
-      replyToId: m.reply_to_id,
-      displayName: profile?.display_name ?? null,
-      username: profile?.username ?? null,
-      avatarUrl: profile?.avatar_url ?? null,
-    };
-  });
+  if (error || !data) return { messages: [], hasMore: false };
+
+  const hasMore = data.length > PAGE_SIZE;
+  const rows = hasMore ? data.slice(0, PAGE_SIZE) : data;
+
+  const userIds = [...new Set(rows.map((m) => m.user_id))];
+  const profileMap = await fetchProfiles(userIds);
+
+  // Return in newest-first order
+  return {
+    messages: rows.map((m) => mapRow(m, profileMap)),
+    hasMore,
+  };
+}
+
+// Fetch older messages before the oldest currently loaded message
+async function fetchOlderMessages(
+  huddleId: string,
+  beforeDate: string,
+): Promise<{ messages: HuddleMessage[]; hasMore: boolean }> {
+  const { data, error } = await supabase
+    .from("huddle_messages")
+    .select("*")
+    .eq("huddle_id", huddleId)
+    .lt("created_at", beforeDate)
+    .order("created_at", { ascending: false })
+    .limit(PAGE_SIZE + 1);
+
+  if (error || !data) return { messages: [], hasMore: false };
+
+  const hasMore = data.length > PAGE_SIZE;
+  const rows = hasMore ? data.slice(0, PAGE_SIZE) : data;
+
+  const userIds = [...new Set(rows.map((m) => m.user_id))];
+  const profileMap = await fetchProfiles(userIds);
+
+  return {
+    messages: rows.map((m) => mapRow(m, profileMap)),
+    hasMore,
+  };
 }
 
 export function useHuddleMessages(huddleId: string) {
@@ -67,12 +120,40 @@ export function useHuddleMessages(huddleId: string) {
   const [realtimeMessage, setRealtimeMessage] = useState<HuddleMessage | null>(
     null,
   );
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const cutoff = useRef(getDateCutoff(INITIAL_DAYS));
 
   const query = useQuery({
     queryKey: ["huddle-messages", huddleId],
-    queryFn: () => fetchMessages(huddleId),
+    queryFn: async () => {
+      const result = await fetchMessages(huddleId, cutoff.current);
+      setHasMore(result.hasMore);
+      return result.messages;
+    },
     enabled: !!huddleId,
   });
+
+  // Load older messages (append to end of list since list is newest-first)
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !query.data || query.data.length === 0) return;
+    setLoadingMore(true);
+
+    // Oldest loaded message is at the end of the array (newest-first order)
+    const oldestDate = query.data[query.data.length - 1].createdAt;
+    const result = await fetchOlderMessages(huddleId, oldestDate);
+
+    if (result.messages.length > 0) {
+      queryClient.setQueryData<HuddleMessage[]>(
+        ["huddle-messages", huddleId],
+        (old) => (old ? [...old, ...result.messages] : result.messages),
+      );
+    }
+
+    setHasMore(result.hasMore);
+    setLoadingMore(false);
+  }, [huddleId, loadingMore, query.data, queryClient]);
 
   // Realtime subscription for new messages
   useEffect(() => {
@@ -91,30 +172,10 @@ export function useHuddleMessages(huddleId: string) {
         async (payload) => {
           const msg = payload.new as any;
 
-          // Fetch profile for new message author
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("user_id, display_name, username, avatar_url")
-            .eq("user_id", msg.user_id)
-            .maybeSingle();
+          const profileMap = await fetchProfiles([msg.user_id]);
+          const newMessage = mapRow(msg, profileMap);
 
-          const newMessage: HuddleMessage = {
-            id: msg.id,
-            huddleId: msg.huddle_id,
-            userId: msg.user_id,
-            content: msg.content,
-            createdAt: msg.created_at,
-            mediaUrl: msg.media_url,
-            mediaType: msg.media_type,
-            isBotMessage: msg.is_bot_message ?? false,
-            isTeamAgent: msg.is_team_agent_message ?? false,
-            replyToId: msg.reply_to_id,
-            displayName: profile?.display_name ?? null,
-            username: profile?.username ?? null,
-            avatarUrl: profile?.avatar_url ?? null,
-          };
-
-          // Prepend to cache
+          // Prepend to cache (newest first)
           queryClient.setQueryData<HuddleMessage[]>(
             ["huddle-messages", huddleId],
             (old) => (old ? [newMessage, ...old] : [newMessage]),
@@ -131,11 +192,12 @@ export function useHuddleMessages(huddleId: string) {
   }, [huddleId, queryClient]);
 
   const sendMessage = useCallback(
-    async (content: string, userId: string) => {
+    async (content: string, userId: string, replyToId?: string) => {
       const { error } = await supabase.from("huddle_messages").insert({
         huddle_id: huddleId,
         user_id: userId,
         content,
+        ...(replyToId ? { reply_to_id: replyToId } : {}),
       });
       return { error };
     },
@@ -146,5 +208,8 @@ export function useHuddleMessages(huddleId: string) {
     ...query,
     sendMessage,
     realtimeMessage,
+    hasMore,
+    loadMore,
+    loadingMore,
   };
 }

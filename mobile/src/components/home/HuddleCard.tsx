@@ -1,5 +1,5 @@
 import { Pressable, View, Text, Image } from "react-native";
-import { Globe, Lock, ShieldCheck } from "lucide-react-native";
+import { Lock, Users } from "lucide-react-native";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { colors } from "@/theme/colors";
@@ -11,22 +11,6 @@ type Props = {
 };
 
 export function HuddleCard({ huddle, onPress }: Props) {
-  const displayName = huddle.isOfficialTeam
-    ? huddle.teamName ?? huddle.name
-    : huddle.name;
-
-  const TypeIcon = huddle.isOfficialTeam
-    ? Globe
-    : huddle.isVerified
-      ? ShieldCheck
-      : Lock;
-
-  const typeColor = huddle.isOfficialTeam
-    ? colors.secondary
-    : huddle.isVerified
-      ? colors.verified.primary
-      : colors.mutedForeground;
-
   return (
     <Pressable
       className="flex-row items-center gap-3 rounded-lg border border-border bg-card p-3 active:opacity-80"
@@ -47,7 +31,7 @@ export function HuddleCard({ huddle, onPress }: Props) {
           />
         ) : (
           <Text className="text-lg font-bold text-muted-foreground">
-            {displayName.charAt(0)}
+            {huddle.name.charAt(0)}
           </Text>
         )}
       </View>
@@ -55,9 +39,9 @@ export function HuddleCard({ huddle, onPress }: Props) {
       {/* Content */}
       <View className="flex-1 gap-0.5">
         <View className="flex-row items-center gap-1.5">
-          <TypeIcon color={typeColor} size={14} />
+          <Lock color={colors.mutedForeground} size={14} />
           <Text className="flex-1 text-base font-semibold text-foreground" numberOfLines={1}>
-            {displayName}
+            {huddle.name}
           </Text>
           {huddle.hasUnread && <Badge variant="default">New</Badge>}
         </View>
@@ -68,6 +52,13 @@ export function HuddleCard({ huddle, onPress }: Props) {
             {huddle.latestMessage}
           </Text>
         )}
+
+        <View className="flex-row items-center gap-1">
+          <Users color={colors.mutedForeground} size={11} />
+          <Text className="text-xs text-muted-foreground">
+            {huddle.memberCount}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );

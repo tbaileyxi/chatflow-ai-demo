@@ -1,13 +1,18 @@
 import { useMemo, useState, useCallback } from "react";
-import { View, Text, ScrollView, RefreshControl } from "react-native";
+import { View, Text, ScrollView, RefreshControl, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Coins, Target, Clock, Trophy } from "lucide-react-native";
+import { Coins, Target, Clock, Trophy, TrendingUp } from "lucide-react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useShadowBets } from "@/hooks/useShadowBets";
+import {
+  useFollowedTeamMarkets,
+  type TeamMarketGroup,
+} from "@/hooks/useFollowedTeamMarkets";
 import { PortfolioCard } from "@/components/ledger/PortfolioCard";
 import { BetCard } from "@/components/ledger/BetCard";
+import { PredictionCard } from "@/components/predictions/PredictionCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { colors } from "@/theme/colors";
@@ -17,6 +22,8 @@ export function LedgerScreen() {
   const queryClient = useQueryClient();
   const { data: portfolio, isLoading: portfolioLoading } = usePortfolio();
   const { data: bets, isLoading: betsLoading } = useShadowBets();
+  const { data: teamMarkets, isLoading: marketsLoading } =
+    useFollowedTeamMarkets();
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
@@ -24,6 +31,9 @@ export function LedgerScreen() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["portfolio", user?.id] }),
       queryClient.invalidateQueries({ queryKey: ["shadow-bets", user?.id] }),
+      queryClient.invalidateQueries({
+        queryKey: ["followed-team-markets", user?.id],
+      }),
     ]);
     setRefreshing(false);
   }, [queryClient, user?.id]);
@@ -67,6 +77,33 @@ export function LedgerScreen() {
             <PortfolioCard portfolio={portfolio} />
           ) : null}
 
+          {/* Live Markets — grouped by followed team */}
+          {marketsLoading ? (
+            <View className="gap-2">
+              <Skeleton className="h-6 w-40" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </View>
+          ) : teamMarkets && teamMarkets.length > 0 ? (
+            <View className="gap-4">
+              <View className="flex-row items-center gap-2">
+                <TrendingUp color={colors.primary} size={18} />
+                <Text className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  Live Markets
+                </Text>
+              </View>
+              {teamMarkets.map((group) => (
+                <TeamMarketsSection key={group.teamId} group={group} />
+              ))}
+            </View>
+          ) : null}
+
+          {(teamMarkets && teamMarkets.length > 0) ||
+          openBets.length > 0 ||
+          pendingBets.length > 0 ? (
+            <Separator />
+          ) : null}
+
           {/* Open Bets */}
           {openBets.length > 0 && (
             <BetSection
@@ -106,14 +143,15 @@ export function LedgerScreen() {
               bets={settledBets}
             />
           ) : (
-            !isLoading && (
+            !isLoading &&
+            (!teamMarkets || teamMarkets.length === 0) && (
               <View className="items-center py-8">
                 <Coins color={colors.mutedForeground} size={32} />
                 <Text className="mt-2 text-base font-medium text-muted-foreground">
                   No bets yet
                 </Text>
                 <Text className="text-sm text-muted-foreground">
-                  Place predictions in a huddle chat
+                  Follow teams and place predictions below
                 </Text>
               </View>
             )
@@ -121,6 +159,50 @@ export function LedgerScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function TeamMarketsSection({ group }: { group: TeamMarketGroup }) {
+  // Use the official team huddle for placing bets from the Ledger.
+  // If no official huddle exists, betting is disabled (huddleId required by RPC).
+  const huddleId = group.huddleId ?? "";
+
+  return (
+    <View className="gap-2">
+      {/* Team header */}
+      <View className="flex-row items-center gap-2">
+        <View className="h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-muted">
+          {group.teamLogoUrl ? (
+            <Image
+              source={{ uri: group.teamLogoUrl }}
+              className="h-full w-full"
+              resizeMode="cover"
+            />
+          ) : (
+            <Text className="text-xs font-bold text-muted-foreground">
+              {group.teamName.charAt(0)}
+            </Text>
+          )}
+        </View>
+        <Text className="text-base font-semibold text-foreground">
+          {group.teamCity} {group.teamName}
+        </Text>
+        <View className="rounded-full bg-muted px-2 py-0.5">
+          <Text className="text-xs font-semibold text-muted-foreground">
+            {group.markets.length}
+          </Text>
+        </View>
+      </View>
+
+      {/* Market cards */}
+      {group.markets.map((market) => (
+        <PredictionCard
+          key={market.id}
+          market={market}
+          huddleId={huddleId}
+        />
+      ))}
+    </View>
   );
 }
 

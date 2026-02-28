@@ -73,7 +73,7 @@ export function HuddleCoachSettingsScreen() {
       user_id: user.id,
       content: "@coach test - what's happening with the team?",
     });
-    Alert.alert("Sent", "Test message sent to the huddle.");
+    Alert.alert("Sent", "Test message sent to the Side Huddle.");
   };
 
   if (loading) {
@@ -103,7 +103,7 @@ export function HuddleCoachSettingsScreen() {
           <CardHeader>
             <CardTitle>Coach Chatbot</CardTitle>
             <CardDescription>
-              AI-powered coach that answers questions in your huddle
+              AI-powered coach that answers questions in your Side Huddle
             </CardDescription>
           </CardHeader>
           <CardContent>

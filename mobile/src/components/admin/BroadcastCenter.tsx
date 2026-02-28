@@ -75,7 +75,7 @@ export function BroadcastCenter() {
         .in("team_id", [...selectedTeams]);
 
       if (!huddles || huddles.length === 0) {
-        Alert.alert("No Huddles", "No official huddles found for selected teams.");
+        Alert.alert("No Channels", "No broadcast channels found for selected teams.");
         setSending(false);
         return;
       }
@@ -96,7 +96,7 @@ export function BroadcastCenter() {
         setSent(huddles.length);
         Alert.alert(
           "Broadcast Sent",
-          `Message sent to ${huddles.length} huddle${huddles.length > 1 ? "s" : ""}.`,
+          `Message sent to ${huddles.length} team${huddles.length > 1 ? "s" : ""}.`,
         );
         setContent("");
         setSelectedTeams(new Set());

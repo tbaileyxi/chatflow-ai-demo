@@ -42,7 +42,7 @@ export function JoinHuddleScreen() {
       .insert({ huddle_id: huddleId, user_id: user.id });
 
     if (error) {
-      Alert.alert("Error", "Failed to join huddle.");
+      Alert.alert("Error", "Failed to join Side Huddle.");
       return;
     }
 
@@ -107,12 +107,12 @@ export function JoinHuddleScreen() {
                     navigation.navigate("Huddle", { huddleId })
                   }
                 >
-                  Go to Huddle
+                  Go to Side Huddle
                 </Button>
               </View>
             ) : (
               <Button size="lg" className="w-full" onPress={handleJoin}>
-                Join Huddle
+                Join Side Huddle
               </Button>
             )}
 
