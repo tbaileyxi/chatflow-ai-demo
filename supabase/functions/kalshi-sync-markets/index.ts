@@ -252,7 +252,12 @@ Deno.serve(async (req) => {
 
     let totalUpserted = 0;
     let totalSettled = 0;
+    let totalSkipped = 0;
     const matchLog: Array<{ ticker: string; title: string; league: string; matchType: string; matchedTeam: string | null }> = [];
+
+    // Only sync markets closing within the next 48 hours
+    const now = new Date();
+    const cutoff48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
     // Fetch open markets for each sport
     for (const [_league, seriesTickers] of Object.entries(SPORT_SERIES)) {
@@ -261,6 +266,12 @@ Deno.serve(async (req) => {
         const markets = await fetchKalshiMarkets(seriesTicker);
 
         for (const m of markets) {
+          // Skip markets closing beyond 48 hours from now
+          const closeTime = m.close_time || m.expiration_time;
+          if (closeTime && new Date(closeTime).getTime() > cutoff48h.getTime()) {
+            totalSkipped++;
+            continue;
+          }
           const title = m.title || m.subtitle || '';
           const { team, matchType } = matchTeam(title, league, leagueMaps);
 
@@ -342,6 +353,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       markets_upserted: totalUpserted,
+      markets_skipped_beyond_48h: totalSkipped,
       bets_settled: totalSettled,
       match_summary: {
         total: matchLog.length,

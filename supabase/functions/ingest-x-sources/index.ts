@@ -184,14 +184,11 @@ Deno.serve(async (req) => {
             console.error(`[Tweet ${tweet.id}] Grok analysis failed:`, grokError);
           }
 
-          // Phase B: Filter out low-quality content (<50)
-          if (qualityScore < 50) {
-            console.log(`[Tweet ${tweet.id}] Filtered out (quality ${qualityScore} < 50)`);
-            continue; // Skip this tweet
-          }
-
           // Strip t.co URLs from content since we're using embed codes
           const cleanContent = tweet.text.replace(/https?:\/\/t\.co\/\w+/gi, '').trim();
+
+          // Determine status: 70+ auto-approve, <50 auto-reject, 50-69 pending
+          const status = qualityScore >= 70 ? 'approved' : qualityScore < 50 ? 'rejected' : 'pending';
 
           const trendingData = {
             team_id: source.team_id,
@@ -203,7 +200,7 @@ Deno.serve(async (req) => {
             retweets: metrics.retweet_count || 0,
             replies: metrics.reply_count || 0,
             rank_score: rankScore,
-            status: autoApprove ? 'approved' : 'pending',
+            status,
             created_at: tweet.created_at || new Date().toISOString(),
             fetched_at: new Date().toISOString(),
             // Phase B: Grok metadata

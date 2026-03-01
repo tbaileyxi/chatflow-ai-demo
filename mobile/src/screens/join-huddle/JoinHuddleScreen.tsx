@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Users, MessageSquare } from "lucide-react-native";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { useHuddleDetails } from "@/hooks/useHuddleDetails";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +20,7 @@ export function JoinHuddleScreen() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { data: profile } = useProfile();
   const { huddleId } = route.params;
   const { data: huddle, isLoading } = useHuddleDetails(huddleId);
 
@@ -48,6 +50,15 @@ export function JoinHuddleScreen() {
 
     queryClient.invalidateQueries({ queryKey: ["huddle-details", huddleId] });
     queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
+
+    // Notify the huddle captain
+    const memberName = profile?.displayName ?? profile?.username ?? "Someone";
+    supabase.functions
+      .invoke("send-push-notification", {
+        body: { type: "member_joined", huddleId, memberName },
+      })
+      .catch(() => {});
+
     navigation.navigate("Huddle", { huddleId });
   };
 

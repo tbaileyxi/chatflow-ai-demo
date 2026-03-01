@@ -2,6 +2,7 @@ import { View, ActivityIndicator } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useNotifications } from "@/hooks/useNotifications";
 import { colors } from "@/theme/colors";
 import { TabNavigator } from "./TabNavigator";
 import { AuthNavigator } from "./AuthNavigator";
@@ -23,6 +24,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export function RootNavigator() {
   const { user, loading } = useAuth();
   const { data: profile, isLoading: profileLoading } = useProfile();
+  useNotifications(); // Register push token and handle notification taps
 
   if (loading || (user && profileLoading)) {
     return (

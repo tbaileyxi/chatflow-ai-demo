@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Check, Lock } from "lucide-react-native";
+import { ChevronLeft, Check, Lock, Search } from "lucide-react-native";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -104,10 +104,20 @@ export function CreateSideHuddleScreen() {
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [filterLeague, setFilterLeague] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const filtered = filterLeague
-    ? teams?.filter((t) => t.league.toUpperCase() === filterLeague)
-    : teams;
+  const filtered = teams?.filter((t) => {
+    if (filterLeague && t.league.toUpperCase() !== filterLeague) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      if (
+        !t.name.toLowerCase().includes(q) &&
+        !t.city.toLowerCase().includes(q)
+      )
+        return false;
+    }
+    return true;
+  });
 
   const handleCreate = async () => {
     if (!user || !name.trim() || !selectedTeamId) return;
@@ -239,60 +249,71 @@ export function CreateSideHuddleScreen() {
               ? ` Selected: ${selectedTeam.city} ${selectedTeam.name}`
               : ""}
           </Text>
+
+          {/* Team search */}
+          <View className="mt-3 flex-row items-center gap-2 rounded-lg border border-input bg-muted px-3">
+            <Search color={colors.mutedForeground} size={16} />
+            <Input
+              placeholder="Search teams..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              className="flex-1 border-0 bg-transparent px-0"
+            />
+          </View>
         </View>
 
         {/* League filter */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
-          className="mt-3"
-          style={{ flexGrow: 0 }}
-        >
-          <Pressable
-            className={cn(
-              "rounded-full px-4 py-2",
-              !filterLeague
-                ? "bg-primary"
-                : "border border-border bg-transparent",
-            )}
-            onPress={() => setFilterLeague(null)}
+        <View style={{ paddingVertical: 8 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
           >
-            <Text
-              className={cn(
-                "text-sm font-medium",
-                !filterLeague
-                  ? "text-primary-foreground"
-                  : "text-muted-foreground",
-              )}
-            >
-              All
-            </Text>
-          </Pressable>
-          {LEAGUES.map((l) => (
             <Pressable
-              key={l}
               className={cn(
                 "rounded-full px-4 py-2",
-                filterLeague === l
+                !filterLeague
                   ? "bg-primary"
                   : "border border-border bg-transparent",
               )}
-              onPress={() => setFilterLeague(filterLeague === l ? null : l)}
+              onPress={() => setFilterLeague(null)}
             >
               <Text
                 className={cn(
                   "text-sm font-medium",
-                  filterLeague === l
+                  !filterLeague
                     ? "text-primary-foreground"
                     : "text-muted-foreground",
                 )}
               >
-                {l}
+                All
               </Text>
             </Pressable>
-          ))}
-        </ScrollView>
+            {LEAGUES.map((l) => (
+              <Pressable
+                key={l}
+                className={cn(
+                  "rounded-full px-4 py-2",
+                  filterLeague === l
+                    ? "bg-primary"
+                    : "border border-border bg-transparent",
+                )}
+                onPress={() => setFilterLeague(filterLeague === l ? null : l)}
+              >
+                <Text
+                  className={cn(
+                    "text-sm font-medium",
+                    filterLeague === l
+                      ? "text-primary-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {l}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
 
         {/* Team grid */}
         <ScrollView

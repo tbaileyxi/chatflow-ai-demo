@@ -81,6 +81,19 @@ export function useHuddlePresence(huddleId: string) {
               displayName,
               avatarUrl: profile?.avatar_url ?? null,
             });
+
+            // Notify other members that this user entered (throttled server-side)
+            supabase.functions
+              .invoke("send-push-notification", {
+                body: {
+                  type: "presence_active",
+                  huddleId,
+                  userId: user.id,
+                  displayName,
+                },
+              })
+              .catch(() => {});
+
             // Delay setting trackedRef so we don't show banners for initial presence state
             setTimeout(() => {
               trackedRef.current = true;

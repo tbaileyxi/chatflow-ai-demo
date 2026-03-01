@@ -6,11 +6,12 @@ import {
   ScrollView,
   RefreshControl,
   Pressable,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation, type RouteProp } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Heart, MapPin } from "lucide-react-native";
+import { ChevronLeft, Heart, MapPin, Twitter, ExternalLink, Zap } from "lucide-react-native";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,19 @@ type Post = {
   id: string;
   content: string;
   mediaUrl: string | null;
+  createdAt: string;
+};
+
+type TrendingPost = {
+  id: string;
+  postId: string;
+  embedUrl: string;
+  content: string | null;
+  authorUsername: string | null;
+  likes: number;
+  retweets: number;
+  qualityScore: number | null;
+  hasMedia: boolean;
   createdAt: string;
 };
 
@@ -97,7 +111,35 @@ function useTeamFeed(teamId: string) {
     },
   });
 
-  return { teamQuery, postsQuery, followQuery };
+  const trendingQuery = useQuery({
+    queryKey: ["team-trending", teamId],
+    queryFn: async (): Promise<TrendingPost[]> => {
+      const { data } = await supabase
+        .from("team_trending")
+        .select(
+          "id, post_id, embed_url, content, author_username, likes, retweets, quality_score, has_media, created_at",
+        )
+        .eq("team_id", teamId)
+        .in("status", ["approved", "broadcasted"])
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (!data) return [];
+      return data.map((t: any) => ({
+        id: t.id,
+        postId: t.post_id,
+        embedUrl: t.embed_url,
+        content: t.content,
+        authorUsername: t.author_username,
+        likes: t.likes ?? 0,
+        retweets: t.retweets ?? 0,
+        qualityScore: t.quality_score,
+        hasMedia: t.has_media ?? false,
+        createdAt: t.created_at,
+      }));
+    },
+  });
+
+  return { teamQuery, postsQuery, trendingQuery, followQuery };
 }
 
 export function TeamFeedScreen() {
@@ -106,16 +148,21 @@ export function TeamFeedScreen() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { teamId } = route.params;
-  const { teamQuery, postsQuery, followQuery } = useTeamFeed(teamId);
+  const { teamQuery, postsQuery, trendingQuery, followQuery } = useTeamFeed(teamId);
   const [refreshing, setRefreshing] = useState(false);
 
   const team = teamQuery.data;
   const posts = postsQuery.data;
   const isFollowing = followQuery.data ?? false;
 
+  const trending = trendingQuery.data;
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await queryClient.invalidateQueries({ queryKey: ["team-posts", teamId] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["team-posts", teamId] }),
+      queryClient.invalidateQueries({ queryKey: ["team-trending", teamId] }),
+    ]);
     setRefreshing(false);
   }, [queryClient, teamId]);
 
@@ -226,6 +273,64 @@ export function TeamFeedScreen() {
         </View>
 
         <Separator />
+
+        {/* Trending from X */}
+        {trending && trending.length > 0 && (
+          <View className="gap-3 px-4 pt-4">
+            <View className="flex-row items-center gap-2">
+              <Zap color={"#EAB308"} size={16} fill={"#EAB308"} />
+              <Text className="text-base font-bold text-foreground">Trending</Text>
+            </View>
+            {trending.map((t) => (
+              <Pressable
+                key={t.id}
+                onPress={() => Linking.openURL(t.embedUrl)}
+              >
+                <Card>
+                  <CardContent className="gap-2 pt-3">
+                    <View className="flex-row items-center gap-2">
+                      <Twitter color={colors.mutedForeground} size={14} />
+                      {t.authorUsername && (
+                        <Text className="text-xs font-medium text-muted-foreground">
+                          @{t.authorUsername}
+                        </Text>
+                      )}
+                      {t.qualityScore != null && t.qualityScore >= 85 && (
+                        <View className="ml-auto rounded-full bg-yellow-500/20 px-2 py-0.5">
+                          <Text className="text-[10px] font-bold" style={{ color: "#EAB308" }}>
+                            HIGHLIGHT
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    {t.content && (
+                      <Text className="text-sm leading-5 text-foreground" numberOfLines={4}>
+                        {t.content}
+                      </Text>
+                    )}
+                    <View className="flex-row items-center gap-3">
+                      {t.likes > 0 && (
+                        <Text className="text-xs text-muted-foreground">
+                          {t.likes.toLocaleString()} likes
+                        </Text>
+                      )}
+                      {t.retweets > 0 && (
+                        <Text className="text-xs text-muted-foreground">
+                          {t.retweets.toLocaleString()} reposts
+                        </Text>
+                      )}
+                      <View className="ml-auto flex-row items-center gap-1">
+                        <ExternalLink color={colors.primary} size={12} />
+                        <Text className="text-xs font-medium text-primary">View on X</Text>
+                      </View>
+                    </View>
+                  </CardContent>
+                </Card>
+              </Pressable>
+            ))}
+            <Separator className="mt-1" />
+          </View>
+        )}
 
         {/* Posts */}
         <View className="gap-3 px-4 pt-4">

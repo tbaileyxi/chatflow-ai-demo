@@ -1,13 +1,93 @@
-import { useRef, useState } from "react";
-import { View, Text, Image, Pressable, Share, Modal } from "react-native";
-import { MessageSquareReply, Share2, X } from "lucide-react-native";
+import { useRef, useState, useCallback } from "react";
+import { View, Text, Image, Pressable, Share, Modal, Dimensions } from "react-native";
+import { MessageSquareReply, Share2, X, Play, Pause, Mic } from "lucide-react-native";
+import { Audio } from "expo-av";
 import { cn } from "@/lib/utils";
 import { colors } from "@/theme/colors";
 import { PredictionCardInMessage } from "@/components/predictions/PredictionCardInMessage";
+import { PulseBubble } from "@/components/huddle/PulseBubble";
 import type { HuddleMessage } from "@/hooks/useHuddleMessages";
 import type { ReactionSummary } from "@/hooks/useMessageReactions";
 
 const REACTION_PICKER_EMOJIS = ["W", "L", "🔥"] as const;
+
+function AudioBubble({ uri }: { uri: string }) {
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const togglePlayback = async () => {
+    if (playing && sound) {
+      await sound.pauseAsync();
+      setPlaying(false);
+      return;
+    }
+
+    if (sound) {
+      await sound.playAsync();
+      setPlaying(true);
+      return;
+    }
+
+    try {
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri },
+        { shouldPlay: true },
+        (status) => {
+          if (status.isLoaded) {
+            setPosition(status.positionMillis ?? 0);
+            setDuration(status.durationMillis ?? 0);
+            if (status.didJustFinish) {
+              setPlaying(false);
+              setPosition(0);
+              newSound.setPositionAsync(0);
+            }
+          }
+        },
+      );
+      setSound(newSound);
+      setPlaying(true);
+    } catch (err) {
+      console.error("Playback error:", err);
+    }
+  };
+
+  const progress = duration > 0 ? position / duration : 0;
+  const formatMs = (ms: number) => {
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    return `${m}:${(s % 60).toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <Pressable
+      onPress={togglePlayback}
+      className="flex-row items-center gap-2.5 rounded-2xl bg-primary/15 px-4 py-2.5"
+    >
+      <View className="h-8 w-8 items-center justify-center rounded-full bg-primary">
+        {playing ? (
+          <Pause color={colors.primaryForeground} size={14} />
+        ) : (
+          <Play color={colors.primaryForeground} size={14} style={{ marginLeft: 2 }} />
+        )}
+      </View>
+      <View className="flex-1 gap-1">
+        {/* Waveform placeholder / progress bar */}
+        <View className="h-2 overflow-hidden rounded-full bg-muted">
+          <View
+            className="h-full rounded-full bg-primary"
+            style={{ width: `${Math.max(progress * 100, 2)}%` }}
+          />
+        </View>
+        <Text className="text-xs text-muted-foreground">
+          {duration > 0 ? formatMs(playing ? position : duration) : "Voice message"}
+        </Text>
+      </View>
+      <Mic color={colors.primary} size={14} />
+    </Pressable>
+  );
+}
 
 type Props = {
   message: HuddleMessage;
@@ -56,6 +136,11 @@ export function ChatMessage({
       : message.displayName ?? message.username ?? "User";
   const initial = displayName.charAt(0).toUpperCase();
   const isPredictionCard = message.messageType === "prediction_card";
+  const isPulse =
+    message.isPulseMoment ||
+    message.messageType === "pulse" ||
+    message.messageType === "highlight" ||
+    (message.embedCode != null && !isPredictionCard);
 
   const handleDoubleTap = () => {
     const now = Date.now();
@@ -139,8 +224,22 @@ export function ChatMessage({
                 </Text>
               </View>
 
-              {/* Prediction Card — render inline market cards */}
-              {isPredictionCard ? (
+              {/* Quoted reply context */}
+              {replyTo && (
+                <View className="rounded-xl border-l-2 border-primary/50 bg-muted/50 px-3 py-1.5 mb-1">
+                  <Text className="text-xs font-semibold text-primary" numberOfLines={1}>
+                    {replyTo.displayName}
+                  </Text>
+                  <Text className="text-xs text-muted-foreground" numberOfLines={2}>
+                    {replyTo.content}
+                  </Text>
+                </View>
+              )}
+
+              {/* Pulse / Social Embed — X posts, Reddit buzz */}
+              {isPulse ? (
+                <PulseBubble message={message} />
+              ) : isPredictionCard ? (
                 <PredictionCardInMessage content={message.content} huddleId={huddleId} />
               ) : (
                 <View
@@ -159,7 +258,18 @@ export function ChatMessage({
 
               {/* Media */}
               {message.mediaUrl && message.mediaType === "image" && (
-                <Pressable onPress={() => setImageViewerVisible(true)}>
+                <Pressable
+                  onPress={() => {
+                    const now = Date.now();
+                    if (now - lastTapRef.current < 300) {
+                      onReact?.("W");
+                    } else {
+                      setImageViewerVisible(true);
+                    }
+                    lastTapRef.current = now;
+                  }}
+                  onLongPress={handleLongPress}
+                >
                   <Image
                     source={{ uri: message.mediaUrl }}
                     className="mt-1 w-full rounded-lg"
@@ -167,6 +277,11 @@ export function ChatMessage({
                     resizeMode="cover"
                   />
                 </Pressable>
+              )}
+
+              {/* Audio / Voice message */}
+              {message.mediaUrl && message.mediaType === "audio" && (
+                <AudioBubble uri={message.mediaUrl} />
               )}
 
               {/* Reactions display — only show when reactions exist */}
@@ -183,7 +298,7 @@ export function ChatMessage({
                       )}
                       onPress={() => onReact?.(r.emoji)}
                     >
-                      <Text className="text-sm">{r.emoji}</Text>
+                      <Text className="text-sm text-foreground">{r.emoji}</Text>
                       <Text className="text-sm text-muted-foreground">{r.count}</Text>
                     </Pressable>
                   ))}
@@ -192,49 +307,51 @@ export function ChatMessage({
             </View>
           </View>
 
-          {/* Long-press reaction picker */}
-          {showPicker && (
-            <View
-              className={cn(
-                "absolute top-0 z-50 flex-row items-center gap-1.5 rounded-full border border-border bg-card px-3 py-2 shadow-lg",
-                isOwnMessage ? "right-14" : "left-14",
-              )}
-              style={{ elevation: 8 }}
-            >
-              {REACTION_PICKER_EMOJIS.map((emoji) => (
-                <Pressable
-                  key={emoji}
-                  onPress={() => handlePickReaction(emoji)}
-                  className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
-                >
-                  <Text className="text-lg font-bold">{emoji}</Text>
-                </Pressable>
-              ))}
-              <View className="mx-0.5 h-6 w-px bg-border" />
-              <Pressable
-                onPress={handleReply}
-                className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
-              >
-                <MessageSquareReply color={colors.mutedForeground} size={20} />
-              </Pressable>
-              <Pressable
-                onPress={handleShare}
-                className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
-              >
-                <Share2 color={colors.mutedForeground} size={20} />
-              </Pressable>
-            </View>
-          )}
         </View>
       </Pressable>
 
-      {/* Dismiss picker overlay */}
-      {showPicker && (
+      {/* Reaction picker modal */}
+      <Modal
+        visible={showPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPicker(false)}
+      >
         <Pressable
-          className="absolute inset-0 z-40"
+          className="flex-1 items-center justify-center"
+          style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
           onPress={() => setShowPicker(false)}
-        />
-      )}
+        >
+          <Pressable
+            className="flex-row items-center gap-1.5 rounded-full border border-border bg-card px-3 py-2 shadow-lg"
+            style={{ elevation: 8 }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {REACTION_PICKER_EMOJIS.map((emoji) => (
+              <Pressable
+                key={emoji}
+                onPress={() => handlePickReaction(emoji)}
+                className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
+              >
+                <Text className="text-lg font-bold text-foreground">{emoji}</Text>
+              </Pressable>
+            ))}
+            <View className="mx-0.5 h-6 w-px bg-border" />
+            <Pressable
+              onPress={handleReply}
+              className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
+            >
+              <MessageSquareReply color={colors.mutedForeground} size={20} />
+            </Pressable>
+            <Pressable
+              onPress={handleShare}
+              className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
+            >
+              <Share2 color={colors.mutedForeground} size={20} />
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Full-screen image viewer */}
       {message.mediaUrl && (

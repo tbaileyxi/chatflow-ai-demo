@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, type RouteProp } from "@react-navigation/native";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { useHuddleDetails } from "@/hooks/useHuddleDetails";
 import { useHuddleMessages, type HuddleMessage } from "@/hooks/useHuddleMessages";
 import { useMessageReactions, useToggleReaction } from "@/hooks/useMessageReactions";
@@ -19,7 +20,13 @@ import { HuddleHeader } from "@/components/huddle/HuddleHeader";
 import { PresenceBar } from "@/components/huddle/PresenceBar";
 import { ChatMessage } from "@/components/huddle/ChatMessage";
 import { MessageInput } from "@/components/huddle/MessageInput";
+import { PredictionCard } from "@/components/predictions/PredictionCard";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useTeamMarkets } from "@/hooks/useTeamMarkets";
+import {
+  useLiveGameContext,
+  getGameState,
+} from "@/hooks/useLiveGameContext";
 import { supabase } from "@/integrations/supabase/client";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
@@ -140,6 +147,7 @@ export function HuddleScreen() {
   const route = useRoute<Route>();
   const { huddleId } = route.params;
   const { user } = useAuth();
+  const { data: profile } = useProfile();
   const { data: huddle, isLoading: huddleLoading } = useHuddleDetails(huddleId);
   const {
     data: messages,
@@ -151,6 +159,12 @@ export function HuddleScreen() {
   } = useHuddleMessages(huddleId);
   const flatListRef = useRef<FlatList<ListItem>>(null);
   const { presentUsers, entryBanner } = useHuddlePresence(huddleId);
+
+  // Kalshi markets for this huddle's team
+  const teamId = huddle?.teamId;
+  const { data: teamMarkets } = useTeamMarkets(teamId);
+  const { data: game } = useLiveGameContext(teamId);
+  const gameState = getGameState(game ?? null);
 
   // Reply state
   const [replyTo, setReplyTo] = useState<{
@@ -203,11 +217,50 @@ export function HuddleScreen() {
     );
   }
 
-  const handleSend = async (content: string, replyToId?: string) => {
+  const handleSend = async (
+    content: string,
+    replyToId?: string,
+    media?: { uri: string; type: "image" | "audio" },
+  ) => {
     if (!user) return { error: new Error("Not authenticated") };
-    const result = await sendMessage(content, user.id, replyToId);
+    const senderName = profile?.displayName ?? profile?.username ?? "Someone";
+    const huddleName = huddle?.name ?? "";
+    const result = await sendMessage(content, user.id, replyToId, media, {
+      senderName,
+      huddleName,
+    });
+    // Scroll to top (newest message) after sending
+    setTimeout(() => {
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    }, 300);
     return result;
   };
+
+  const scrollToBottom = useCallback(() => {
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
+  const handleReply = useCallback(
+    (msg: HuddleMessage) => {
+      setReplyTo({
+        id: msg.id,
+        displayName: msg.displayName ?? msg.username ?? "User",
+        content: msg.content,
+      });
+      // Scroll to the replied message
+      const index = listItems.findIndex(
+        (item) => item.type === "message" && item.data.id === msg.id,
+      );
+      if (index >= 0) {
+        flatListRef.current?.scrollToIndex({
+          index,
+          animated: true,
+          viewPosition: 0.5,
+        });
+      }
+    },
+    [listItems],
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
@@ -224,6 +277,7 @@ export function HuddleScreen() {
             onSend={handleSend}
             replyTo={replyTo}
             onCancelReply={() => setReplyTo(null)}
+            onFocus={scrollToBottom}
           />
         )}
 
@@ -270,7 +324,8 @@ export function HuddleScreen() {
               }
 
               const msg = item.data;
-              const isReply = !!msg.replyToId && messageMap.has(msg.replyToId);
+              const parentMsg = msg.replyToId ? messageMap.get(msg.replyToId) : undefined;
+              const isReply = !!parentMsg;
 
               return (
                 <ChatMessage
@@ -282,20 +337,51 @@ export function HuddleScreen() {
                   onReact={(emoji) =>
                     toggleReaction(msg.id, emoji, huddleId)
                   }
-                  onReply={() =>
-                    setReplyTo({
-                      id: msg.id,
-                      displayName:
-                        msg.displayName ?? msg.username ?? "User",
-                      content: msg.content,
-                    })
-                  }
+                  onReply={() => handleReply(msg)}
                   isReply={isReply}
+                  replyTo={
+                    parentMsg
+                      ? {
+                          displayName:
+                            parentMsg.displayName ?? parentMsg.username ?? "User",
+                          content: parentMsg.content,
+                        }
+                      : null
+                  }
                 />
               );
             }}
+            ListHeaderComponent={
+              teamMarkets && teamMarkets.length > 0 && gameState !== "none" ? (
+                <View className="gap-2 px-4 py-3 border-b border-border bg-muted/20">
+                  <Text className="text-xs font-bold uppercase tracking-wider text-primary">
+                    {gameState === "live"
+                      ? "Live Predictions"
+                      : gameState === "postgame"
+                        ? "Game Predictions"
+                        : "Pregame Predictions"}
+                  </Text>
+                  {teamMarkets.slice(0, 3).map((market) => (
+                    <PredictionCard
+                      key={market.id}
+                      market={market}
+                      huddleId={huddleId}
+                    />
+                  ))}
+                </View>
+              ) : null
+            }
             contentContainerStyle={{ paddingVertical: 8 }}
             keyboardShouldPersistTaps="handled"
+            onScrollToIndexFailed={(info) => {
+              setTimeout(() => {
+                flatListRef.current?.scrollToIndex({
+                  index: info.index,
+                  animated: true,
+                  viewPosition: 0.5,
+                });
+              }, 500);
+            }}
           />
         )}
       </KeyboardAvoidingView>

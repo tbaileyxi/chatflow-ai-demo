@@ -15,9 +15,9 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Find unposted, unresolved markets with a team assignment.
-    // For daily game markets: event within 24h. For futures: any unposted future market.
+    // Find unposted, unresolved markets closing within the next 48 hours.
     const now = new Date();
+    const cutoff48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
     const { data: markets } = await supabase
       .from('kalshi_markets')
@@ -26,6 +26,7 @@ Deno.serve(async (req) => {
       .eq('is_resolved', false)
       .not('team_id', 'is', null)
       .gte('event_start_time', now.toISOString())
+      .lte('event_start_time', cutoff48h.toISOString())
       .order('event_start_time', { ascending: true })
       .limit(500);
 

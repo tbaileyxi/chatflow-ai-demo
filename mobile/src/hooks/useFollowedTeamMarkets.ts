@@ -58,7 +58,10 @@ export function useFollowedTeamMarkets() {
         (huddles ?? []).map((h) => [h.team_id, h.id]),
       );
 
-      // Fetch unresolved markets for followed teams
+      // Fetch unresolved markets for followed teams (next 48 hours only)
+      const now = new Date();
+      const cutoff48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+
       const { data: markets } = await supabase
         .from("kalshi_markets")
         .select(
@@ -66,7 +69,8 @@ export function useFollowedTeamMarkets() {
         )
         .in("team_id", teamIds)
         .eq("is_resolved", false)
-        .gte("event_start_time", new Date().toISOString())
+        .gte("event_start_time", now.toISOString())
+        .lte("event_start_time", cutoff48h.toISOString())
         .order("event_start_time", { ascending: true });
 
       if (!markets || !teams) return [];

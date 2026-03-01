@@ -14,6 +14,11 @@ export type HuddleMessage = {
   isBotMessage: boolean;
   isTeamAgent: boolean;
   replyToId: string | null;
+  // Pulse / social embed fields
+  embedCode: string | null;
+  isPulseMoment: boolean;
+  pulseSource: string | null;
+  pulseExpiresAt: string | null;
   // Joined profile data
   displayName: string | null;
   username: string | null;
@@ -45,6 +50,10 @@ function mapRow(m: RawRow, profileMap: Map<string, any>): HuddleMessage {
     isBotMessage: m.is_bot_message ?? false,
     isTeamAgent: m.is_team_agent_message ?? false,
     replyToId: m.reply_to_id,
+    embedCode: m.embed_code ?? null,
+    isPulseMoment: m.is_pulse_moment ?? false,
+    pulseSource: m.pulse_source ?? null,
+    pulseExpiresAt: m.pulse_expires_at ?? null,
     displayName: profile?.display_name ?? null,
     username: profile?.username ?? null,
     avatarUrl: profile?.avatar_url ?? null,
@@ -192,13 +201,72 @@ export function useHuddleMessages(huddleId: string) {
   }, [huddleId, queryClient]);
 
   const sendMessage = useCallback(
-    async (content: string, userId: string, replyToId?: string) => {
+    async (
+      content: string,
+      userId: string,
+      replyToId?: string,
+      media?: { uri: string; type: "image" | "audio" },
+      notifContext?: { senderName: string; huddleName: string },
+    ) => {
+      let mediaUrl: string | null = null;
+      let mediaType: string | null = null;
+
+      // Upload media to Supabase storage if provided
+      if (media) {
+        try {
+          const ext = media.type === "audio" ? "m4a" : "jpg";
+          const fileName = `${huddleId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+          const response = await fetch(media.uri);
+          const blob = await response.blob();
+
+          const { error: uploadError } = await supabase.storage
+            .from("huddle-media")
+            .upload(fileName, blob, {
+              contentType: media.type === "audio" ? "audio/m4a" : "image/jpeg",
+              upsert: false,
+            });
+
+          if (uploadError) {
+            console.error("Upload error:", uploadError);
+            return { error: uploadError };
+          }
+
+          const { data: urlData } = supabase.storage
+            .from("huddle-media")
+            .getPublicUrl(fileName);
+
+          mediaUrl = urlData.publicUrl;
+          mediaType = media.type;
+        } catch (err) {
+          console.error("Media upload failed:", err);
+          return { error: err };
+        }
+      }
+
       const { error } = await supabase.from("huddle_messages").insert({
         huddle_id: huddleId,
         user_id: userId,
         content,
         ...(replyToId ? { reply_to_id: replyToId } : {}),
+        ...(mediaUrl ? { media_url: mediaUrl, media_type: mediaType } : {}),
       });
+
+      // Fire push notification (edge function handles 30-min throttle)
+      if (!error && notifContext) {
+        supabase.functions
+          .invoke("send-push-notification", {
+            body: {
+              type: "new_message",
+              huddleId,
+              senderId: userId,
+              senderName: notifContext.senderName,
+              content: content.slice(0, 100),
+              huddleName: notifContext.huddleName,
+            },
+          })
+          .catch(() => {});
+      }
+
       return { error };
     },
     [huddleId],

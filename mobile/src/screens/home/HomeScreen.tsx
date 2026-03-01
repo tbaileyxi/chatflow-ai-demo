@@ -12,7 +12,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Users, Settings, Share2 } from "lucide-react-native";
+import { Plus, Users, Settings, Share2, Zap } from "lucide-react-native";
+import { TweetEmbed, parseTweetId } from "@/components/embeds/TweetEmbed";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserHuddles, type UserHuddle } from "@/hooks/useUserHuddles";
@@ -188,6 +189,24 @@ function SuperHuddleTab({
     [posts],
   );
 
+  // Unique teams from feed for team icon strip
+  const uniqueTeams = useMemo(() => {
+    if (!posts) return [];
+    const seen = new Set<string>();
+    const teams: { id: string; name: string; logoUrl: string | null }[] = [];
+    for (const p of posts) {
+      if (!seen.has(p.teamId)) {
+        seen.add(p.teamId);
+        teams.push({
+          id: p.teamId,
+          name: p.teamName,
+          logoUrl: p.teamLogoUrl,
+        });
+      }
+    }
+    return teams;
+  }, [posts]);
+
   if (isLoading) {
     return (
       <View className="gap-3 px-4 pt-4">
@@ -229,24 +248,6 @@ function SuperHuddleTab({
       </ScrollView>
     );
   }
-
-  // Unique teams from feed for team icon strip
-  const uniqueTeams = useMemo(() => {
-    if (!posts) return [];
-    const seen = new Set<string>();
-    const teams: { id: string; name: string; logoUrl: string | null }[] = [];
-    for (const p of posts) {
-      if (!seen.has(p.teamId)) {
-        seen.add(p.teamId);
-        teams.push({
-          id: p.teamId,
-          name: p.teamName,
-          logoUrl: p.teamLogoUrl,
-        });
-      }
-    }
-    return teams;
-  }, [posts]);
 
   return (
     <View className="flex-1">
@@ -396,19 +397,45 @@ function SuperHuddleChatBubble({
                 </Text>
               </View>
 
-              <View className="rounded-2xl bg-secondary/10 px-4 py-2.5">
-                <Text className="text-base text-foreground">
-                  {post.content}
-                </Text>
-              </View>
+              {/* Trending X embed */}
+              {post.source === "trending" && post.embedUrl ? (() => {
+                const tid = parseTweetId(post.embedUrl);
+                if (tid) {
+                  return (
+                    <View className="gap-1">
+                      <View className="flex-row items-center gap-1.5">
+                        <Zap color="#EAB308" size={11} fill="#EAB308" />
+                        <Text className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#EAB308" }}>Trending</Text>
+                        {post.authorUsername && (
+                          <Text className="text-[10px] text-muted-foreground">@{post.authorUsername}</Text>
+                        )}
+                      </View>
+                      <TweetEmbed tweetId={tid} />
+                    </View>
+                  );
+                }
+                return (
+                  <View className="rounded-2xl bg-secondary/10 px-4 py-2.5">
+                    <Text className="text-base text-foreground">{post.content}</Text>
+                  </View>
+                );
+              })() : (
+                <>
+                  <View className="rounded-2xl bg-secondary/10 px-4 py-2.5">
+                    <Text className="text-base text-foreground">
+                      {post.content}
+                    </Text>
+                  </View>
 
-              {post.mediaUrl && (
-                <Image
-                  source={{ uri: post.mediaUrl }}
-                  className="mt-1 w-full rounded-lg"
-                  style={{ height: 200 }}
-                  resizeMode="cover"
-                />
+                  {post.mediaUrl && (
+                    <Image
+                      source={{ uri: post.mediaUrl }}
+                      className="mt-1 w-full rounded-lg"
+                      style={{ height: 200 }}
+                      resizeMode="cover"
+                    />
+                  )}
+                </>
               )}
 
               {/* Reaction pills */}
@@ -425,7 +452,7 @@ function SuperHuddleChatBubble({
                       )}
                       onPress={() => onReact?.(r.reactionType)}
                     >
-                      <Text className="text-sm">{r.reactionType}</Text>
+                      <Text className="text-sm text-foreground">{r.reactionType}</Text>
                       <Text className="text-sm text-muted-foreground">
                         {r.count}
                       </Text>
@@ -448,7 +475,7 @@ function SuperHuddleChatBubble({
                   onPress={() => handlePickReaction(type)}
                   className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
                 >
-                  <Text className="text-lg font-bold">{type}</Text>
+                  <Text className="text-lg font-bold text-foreground">{type}</Text>
                 </Pressable>
               ))}
               <View className="mx-0.5 h-6 w-px bg-border" />

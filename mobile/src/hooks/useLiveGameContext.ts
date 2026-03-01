@@ -60,11 +60,27 @@ export function formatGameClock(game: GameContext): string {
   return `${diffMins}m`;
 }
 
+/** Returns the right polling interval based on game state */
+function getRefetchInterval(data: GameContext | null | undefined): number | false {
+  if (!data) return 5 * 60 * 1000; // 5 min when no game found (check for new games)
+  const state = getGameState(data);
+  if (state === "live") return 60 * 1000; // 60s during live games
+  if (state === "pregame") {
+    // Faster polling as game approaches
+    const msUntilStart = new Date(data.startTime).getTime() - Date.now();
+    if (msUntilStart < 30 * 60 * 1000) return 60 * 1000; // <30min: every 60s
+    if (msUntilStart < 2 * 60 * 60 * 1000) return 2 * 60 * 1000; // <2h: every 2min
+    return 5 * 60 * 1000; // >2h: every 5min
+  }
+  // postgame — stop polling after a while
+  return false;
+}
+
 export function useLiveGameContext(teamId: string | undefined) {
   return useQuery({
     queryKey: ["live-game-context", teamId],
     enabled: !!teamId,
-    refetchInterval: 30000, // Poll every 30s for live updates
+    refetchInterval: (query) => getRefetchInterval(query.state.data),
     queryFn: async (): Promise<GameContext | null> => {
       if (!teamId) return null;
 
