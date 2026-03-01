@@ -12,9 +12,22 @@ export type TeamMarket = {
   kalshi_ticker: string;
 };
 
+function mapMarket(m: any): TeamMarket {
+  return {
+    id: m.id,
+    question: m.question ?? "",
+    current_yes_price: m.current_yes_price ?? 50,
+    market_type: m.market_type ?? "other",
+    event_start_time: m.event_start_time ?? "",
+    is_resolved: m.is_resolved ?? false,
+    resolution: m.resolution ?? null,
+    kalshi_ticker: m.kalshi_ticker ?? "",
+  };
+}
+
 /**
  * Fetch active Kalshi markets for a specific team.
- * Returns unresolved markets whose event hasn't passed, ordered by start time.
+ * Prefers game-day markets (next 48h), falls back to any active market (futures).
  */
 export function useTeamMarkets(teamId: string | undefined) {
   return useQuery({
@@ -24,10 +37,11 @@ export function useTeamMarkets(teamId: string | undefined) {
     queryFn: async (): Promise<TeamMarket[]> => {
       if (!teamId) return [];
 
+      // First try game-day markets (next 48h), then fall back to any active market
       const now = new Date();
       const cutoff48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
-      const { data, error } = await supabase
+      const { data: gameDayData } = await supabase
         .from("kalshi_markets")
         .select(
           "id, question, current_yes_price, market_type, event_start_time, is_resolved, resolution, kalshi_ticker",
@@ -39,18 +53,24 @@ export function useTeamMarkets(teamId: string | undefined) {
         .order("event_start_time", { ascending: true })
         .limit(10);
 
-      if (error || !data) return [];
+      // If we have game-day markets, use those
+      if (gameDayData && gameDayData.length > 0) {
+        return gameDayData.map(mapMarket);
+      }
 
-      return data.map((m) => ({
-        id: m.id,
-        question: m.question ?? "",
-        current_yes_price: m.current_yes_price ?? 50,
-        market_type: m.market_type ?? "other",
-        event_start_time: m.event_start_time ?? "",
-        is_resolved: m.is_resolved ?? false,
-        resolution: m.resolution ?? null,
-        kalshi_ticker: m.kalshi_ticker ?? "",
-      }));
+      // Fall back to any unresolved market for this team (futures, championship, etc.)
+      const { data, error } = await supabase
+        .from("kalshi_markets")
+        .select(
+          "id, question, current_yes_price, market_type, event_start_time, is_resolved, resolution, kalshi_ticker",
+        )
+        .eq("team_id", teamId)
+        .eq("is_resolved", false)
+        .order("event_start_time", { ascending: true })
+        .limit(5);
+
+      if (error || !data) return [];
+      return data.map(mapMarket);
     },
   });
 }

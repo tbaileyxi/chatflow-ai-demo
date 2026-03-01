@@ -350,14 +350,14 @@ export function HuddleScreen() {
               );
             }}
             ListHeaderComponent={
-              teamMarkets && teamMarkets.length > 0 && gameState !== "none" ? (
+              teamMarkets && teamMarkets.length > 0 ? (
                 <View className="gap-2 px-4 py-3 border-b border-border bg-muted/20">
                   <Text className="text-xs font-bold uppercase tracking-wider text-primary">
                     {gameState === "live"
                       ? "Live Predictions"
                       : gameState === "postgame"
                         ? "Game Predictions"
-                        : "Pregame Predictions"}
+                        : "Predictions"}
                   </Text>
                   {teamMarkets.slice(0, 3).map((market) => (
                     <PredictionCard

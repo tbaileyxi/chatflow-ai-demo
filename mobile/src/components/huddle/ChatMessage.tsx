@@ -130,17 +130,25 @@ export function ChatMessage({
   const [showPicker, setShowPicker] = useState(false);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
 
-  const displayName =
-    message.isBotMessage
-      ? "@coach"
-      : message.displayName ?? message.username ?? "User";
-  const initial = displayName.charAt(0).toUpperCase();
   const isPredictionCard = message.messageType === "prediction_card";
   const isPulse =
     message.isPulseMoment ||
     message.messageType === "pulse" ||
     message.messageType === "highlight" ||
     (message.embedCode != null && !isPredictionCard);
+
+  // Pulse bot messages show source, not "@coach"
+  const displayName =
+    message.isBotMessage && isPulse
+      ? message.pulseSource === "x"
+        ? "X Buzz"
+        : message.pulseSource === "reddit"
+          ? "Reddit"
+          : "Buzz"
+      : message.isBotMessage
+        ? "@coach"
+        : message.displayName ?? message.username ?? "User";
+  const initial = displayName.charAt(0).toUpperCase();
 
   const handleDoubleTap = () => {
     const now = Date.now();
