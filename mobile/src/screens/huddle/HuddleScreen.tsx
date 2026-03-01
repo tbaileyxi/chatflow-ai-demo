@@ -209,6 +209,31 @@ export function HuddleScreen() {
       .then(() => {});
   }, [user, huddleId, messages?.length]);
 
+  const scrollToBottom = useCallback(() => {
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
+  const handleReply = useCallback(
+    (msg: HuddleMessage) => {
+      setReplyTo({
+        id: msg.id,
+        displayName: msg.displayName ?? msg.username ?? "User",
+        content: msg.content,
+      });
+      const index = listItems.findIndex(
+        (item) => item.type === "message" && item.data.id === msg.id,
+      );
+      if (index >= 0) {
+        flatListRef.current?.scrollToIndex({
+          index,
+          animated: true,
+          viewPosition: 0.5,
+        });
+      }
+    },
+    [listItems],
+  );
+
   if (huddleLoading || !huddle) {
     return (
       <SafeAreaView className="flex-1 bg-background">
@@ -229,38 +254,11 @@ export function HuddleScreen() {
       senderName,
       huddleName,
     });
-    // Scroll to top (newest message) after sending
     setTimeout(() => {
       flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
     }, 300);
     return result;
   };
-
-  const scrollToBottom = useCallback(() => {
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-  }, []);
-
-  const handleReply = useCallback(
-    (msg: HuddleMessage) => {
-      setReplyTo({
-        id: msg.id,
-        displayName: msg.displayName ?? msg.username ?? "User",
-        content: msg.content,
-      });
-      // Scroll to the replied message
-      const index = listItems.findIndex(
-        (item) => item.type === "message" && item.data.id === msg.id,
-      );
-      if (index >= 0) {
-        flatListRef.current?.scrollToIndex({
-          index,
-          animated: true,
-          viewPosition: 0.5,
-        });
-      }
-    },
-    [listItems],
-  );
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
