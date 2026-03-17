@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/hooks/useAuth";
 import { HelmetProvider } from "react-helmet-async";
@@ -10,6 +10,7 @@ import { useJoinRequestNotifications } from "@/hooks/useJoinRequestNotifications
 import { DevBanner } from "@/components/debug/DevBanner";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
+import LandingPage from "./pages/LandingPage";
 import { Admin } from "./pages/Admin";
 import { Auth } from "./pages/Auth";
 import { BillsChatDemo } from "./components/BillsChatDemo";
@@ -43,15 +44,15 @@ const JoinHuddleRedirect = () => {
 const AppContent = () => {
   // Initialize global join request notifications
   useJoinRequestNotifications();
+  const location = useLocation();
+  const isLanding = location.pathname === '/';
 
   return (
     <div className="min-h-screen w-full bg-background">
-      {/* DEV BANNER - Remove after debugging */}
-      <DevBanner />
-      
-      <div className="relative flex-1 overflow-hidden pt-6">
+      {!isLanding && <DevBanner />}
+      <div className={`relative flex-1 overflow-hidden ${isLanding ? '' : 'pt-6'}`}>
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/bills-demo" element={<BillsChatDemo />} />
           <Route path="/retro-demo" element={<RetroDemo />} />
           <Route path="/onboard" element={<Home />} />
