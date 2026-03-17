@@ -57,9 +57,30 @@ Deno.serve(async (req) => {
     let sent = 0;
 
     // ─── TYPE 1: New message in a huddle ───
-    // Only notify members who haven't had the huddle open in 30+ minutes
+    // Only notify members who haven't had the huddle open in 30+ minutes.
+    // Skips bot messages and public huddles.
     if (type === 'new_message') {
-      const { huddleId, senderId, senderName, content, huddleName } = body;
+      const { huddleId, senderId, senderName, content, huddleName, isBot } = body;
+
+      // Skip bot-generated messages entirely
+      if (isBot) {
+        return new Response(JSON.stringify({ sent: 0, skipped: 'bot' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Only notify for private huddles
+      const { data: huddle } = await supabase
+        .from('huddles')
+        .select('is_private')
+        .eq('id', huddleId)
+        .single();
+
+      if (!huddle?.is_private) {
+        return new Response(JSON.stringify({ sent: 0, skipped: 'public_huddle' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
@@ -150,9 +171,23 @@ Deno.serve(async (req) => {
     }
 
     // ─── TYPE 3: Someone entered (became active in) a huddle ───
-    // Notify other members, throttled to 1 notification per user per hour
+    // Notify other members, throttled to 1 notification per user per hour.
+    // Private huddles only.
     if (type === 'presence_active') {
       const { huddleId, userId, displayName } = body;
+
+      // Only notify for private huddles
+      const { data: presenceHuddle } = await supabase
+        .from('huddles')
+        .select('is_private')
+        .eq('id', huddleId)
+        .single();
+
+      if (!presenceHuddle?.is_private) {
+        return new Response(JSON.stringify({ sent: 0, skipped: 'public_huddle' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       // Check throttle: was a presence notification already sent for this user
       // in this huddle within the last hour?
