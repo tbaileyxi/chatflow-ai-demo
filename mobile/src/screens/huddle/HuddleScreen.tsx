@@ -270,15 +270,6 @@ export function HuddleScreen() {
         <HuddleHeader huddle={huddle} />
         <PresenceBar users={presentUsers} entryBanner={entryBanner} />
 
-        {user && huddle.isMember && (
-          <MessageInput
-            onSend={handleSend}
-            replyTo={replyTo}
-            onCancelReply={() => setReplyTo(null)}
-            onFocus={scrollToBottom}
-          />
-        )}
-
         {messagesLoading ? (
           <LoadingSpinner className="flex-1" />
         ) : (
@@ -380,6 +371,15 @@ export function HuddleScreen() {
                 });
               }, 500);
             }}
+          />
+        )}
+
+        {user && huddle.isMember && (
+          <MessageInput
+            onSend={handleSend}
+            replyTo={replyTo}
+            onCancelReply={() => setReplyTo(null)}
+            onFocus={scrollToBottom}
           />
         )}
       </KeyboardAvoidingView>

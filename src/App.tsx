@@ -9,6 +9,7 @@ import { HelmetProvider } from "react-helmet-async";
 import LandingPage from "./pages/LandingPage";
 import HuddleInvitePage from "./pages/HuddleInvitePage";
 import AdminEventsPage from "./pages/AdminEventsPage";
+import PickSharePage from "./pages/PickSharePage";
 
 const queryClient = new QueryClient();
 
@@ -18,6 +19,7 @@ const AppContent = () => (
       <Route path="/" element={<LandingPage />} />
       <Route path="/h/:huddleId" element={<HuddleInvitePage />} />
       <Route path="/admin/events" element={<AdminEventsPage />} />
+      <Route path="/picks/:betId" element={<PickSharePage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   </div>

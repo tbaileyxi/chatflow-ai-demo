@@ -37,9 +37,9 @@ export function useTeamMarkets(teamId: string | undefined) {
     queryFn: async (): Promise<TeamMarket[]> => {
       if (!teamId) return [];
 
-      // First try game-day markets (next 48h), then fall back to any active market
+      // First try game-day markets (next 7 days), then fall back to any active market
       const now = new Date();
-      const cutoff48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+      const cutoff7d = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
       const { data: gameDayData } = await supabase
         .from("kalshi_markets")
@@ -49,7 +49,7 @@ export function useTeamMarkets(teamId: string | undefined) {
         .eq("team_id", teamId)
         .eq("is_resolved", false)
         .gte("event_start_time", now.toISOString())
-        .lte("event_start_time", cutoff48h.toISOString())
+        .lte("event_start_time", cutoff7d.toISOString())
         .order("event_start_time", { ascending: true })
         .limit(10);
 
