@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { HelmetProvider } from "react-helmet-async";
 import LandingPage from "./pages/LandingPage";
 import HuddleInvitePage from "./pages/HuddleInvitePage";
+import AdminEventsPage from "./pages/AdminEventsPage";
 
 const queryClient = new QueryClient();
 
@@ -16,6 +17,7 @@ const AppContent = () => (
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/h/:huddleId" element={<HuddleInvitePage />} />
+      <Route path="/admin/events" element={<AdminEventsPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   </div>
