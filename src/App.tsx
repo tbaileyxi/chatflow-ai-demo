@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/hooks/useAuth";
 import { HelmetProvider } from "react-helmet-async";
 import LandingPage from "./pages/LandingPage";
+import HuddleInvitePage from "./pages/HuddleInvitePage";
 
 const queryClient = new QueryClient();
 
@@ -14,6 +15,7 @@ const AppContent = () => (
   <div className="min-h-screen w-full bg-background">
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/h/:huddleId" element={<HuddleInvitePage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   </div>
