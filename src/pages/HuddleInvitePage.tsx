@@ -131,14 +131,14 @@ export default function HuddleInvitePage() {
         <meta property="og:description" content={ogDesc} />
         <meta property="og:url" content={inviteUrl} />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content={`${SITE_URL}/og-invite.png`} />
+        <meta property="og:image" content={`${SITE_URL}/og-invite.svg`} />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         {/* Twitter card */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={ogTitle} />
         <meta name="twitter:description" content={ogDesc} />
-        <meta name="twitter:image" content={`${SITE_URL}/og-invite.png`} />
+        <meta name="twitter:image" content={`${SITE_URL}/og-invite.svg`} />
         {/* Deep link for app — when app is installed it opens directly */}
         <meta name="apple-itunes-app" content={`app-id=YOURAPPID, app-argument=sidehuddle://huddle/${huddle?.id}`} />
       </Helmet>

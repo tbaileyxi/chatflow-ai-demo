@@ -35,7 +35,7 @@ export default function LandingPage() {
       {/* ── Nav ── */}
       <nav className="flex items-center justify-between px-6 py-4 max-w-5xl mx-auto">
         <div className="flex items-center gap-2">
-          <img src={shLogo} alt="Side Huddle Sports" className="h-8 w-8 object-contain" />
+          <img src={shLogo} alt="Side Huddle Sports" className="h-8 w-8 object-contain rounded-full" />
           <span className="font-orbitron font-bold text-base text-[#FFD700] tracking-wide">
             SIDE HUDDLE
           </span>
@@ -204,7 +204,7 @@ export default function LandingPage() {
       <footer className="border-t border-white/5 px-6 py-8">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <img src={shLogo} alt="Side Huddle" className="h-5 w-5 object-contain opacity-60" />
+            <img src={shLogo} alt="Side Huddle" className="h-5 w-5 object-contain rounded-full opacity-60" />
             <span className="text-xs text-white/30 font-orbitron">SIDE HUDDLE SPORTS</span>
           </div>
           <div className="flex items-center gap-6 text-xs text-white/30">
