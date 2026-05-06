@@ -1,54 +1,35 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import React, { useMemo, useRef, useState } from 'react';
 import shLogo from '@/assets/sh-logo-updated.png';
 
-// ─── Brand palette (matches sidehuddlesports.com) ──────────────────────────
+// ─── Brand palette ────────────────────────────────────────────────────────────
 const G = {
-  bg: '#0a0a0a',
-  surface: '#111111',
-  surface2: '#181818',
-  border: '#222222',
-  gold: '#FFD700',
-  goldDim: '#C9A84C',
-  white: '#ffffff',
-  muted: '#666666',
-  muted2: '#999999',
-  green: '#3d6b22',
-  red: '#6b2222',
+  bg: '#0a0a0a', surface: '#111111', surface2: '#181818', border: '#222222',
+  gold: '#FFD700', goldDim: '#C9A84C', white: '#ffffff',
+  muted: '#666666', muted2: '#999999', green: '#3d6b22', red: '#6b2222',
 };
-
 const FONT_H = "'Barlow Condensed', 'Orbitron', sans-serif";
 const FONT_B = "'Barlow', 'Inter', sans-serif";
 
-type LeagueFilter = 'ALL' | 'NCAA' | 'NFL' | 'NBA' | 'MLB' | 'NHL';
+type League = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'NCAA';
+type LeagueFilter = 'ALL' | League;
 
-interface Team {
-  id: string;
-  name: string;
-  city: string;
-  league: string | null;
-  logo_url: string | null;
-  sponsorStatus: 'available' | 'confirmed';
-}
+interface StaticTeam { city: string; name: string; league: League; }
+function teamKey(t: StaticTeam) { return `${t.league}|${t.city}|${t.name}`; }
 
-// Billing starts Sep 1. June/Jul/Aug = free runway.
+const LEAGUE_LABELS: Record<string, string> = { NCAA: 'CFB', NFL: 'NFL', NBA: 'NBA', MLB: 'MLB', NHL: 'NHL' };
+function displayLeague(l: string) { return LEAGUE_LABELS[l] || l; }
+
 function freeMonths(d = new Date()) {
   const sep1 = new Date(d.getFullYear(), 8, 1);
   if (d >= sep1) return 0;
-  // months remaining before Sep 1
   const diff = (sep1.getFullYear() - d.getFullYear()) * 12 + (sep1.getMonth() - d.getMonth());
-  return Math.min(diff, 3); // cap at 3
+  return Math.min(diff, 3);
 }
 function freeLabel(n: number) {
   if (n >= 3) return 'June, July & August FREE — 3 months on us';
   if (n === 2) return 'July & August FREE — 2 months on us';
   if (n === 1) return 'August FREE — 1 month on us';
   return 'Season live — first charge today';
-}
-function billingDate(n: number) {
-  if (n === 0) return 'Charged immediately';
-  return 'First charge September 1';
 }
 function bundlePrice(count: number): { total: number; label: string } {
   if (count >= 10) return { total: 1800, label: '$180/team' };
@@ -57,114 +38,240 @@ function bundlePrice(count: number): { total: number; label: string } {
   return { total: count * 250, label: '$250/team' };
 }
 
-const LEAGUE_LABELS: Record<string, string> = {
-  NCAA: 'CFB', NFL: 'NFL', NBA: 'NBA', MLB: 'MLB', NHL: 'NHL',
-};
-function displayLeague(l: string | null) {
-  return LEAGUE_LABELS[l || ''] || l || '—';
-}
+// ─── All teams — no Supabase needed ──────────────────────────────────────────
+const ALL_TEAMS: StaticTeam[] = [
+  // NFL
+  { city: 'Arizona',       name: 'Cardinals',  league: 'NFL' },
+  { city: 'Atlanta',       name: 'Falcons',    league: 'NFL' },
+  { city: 'Baltimore',     name: 'Ravens',     league: 'NFL' },
+  { city: 'Buffalo',       name: 'Bills',      league: 'NFL' },
+  { city: 'Carolina',      name: 'Panthers',   league: 'NFL' },
+  { city: 'Chicago',       name: 'Bears',      league: 'NFL' },
+  { city: 'Cincinnati',    name: 'Bengals',    league: 'NFL' },
+  { city: 'Cleveland',     name: 'Browns',     league: 'NFL' },
+  { city: 'Dallas',        name: 'Cowboys',    league: 'NFL' },
+  { city: 'Denver',        name: 'Broncos',    league: 'NFL' },
+  { city: 'Detroit',       name: 'Lions',      league: 'NFL' },
+  { city: 'Green Bay',     name: 'Packers',    league: 'NFL' },
+  { city: 'Houston',       name: 'Texans',     league: 'NFL' },
+  { city: 'Indianapolis',  name: 'Colts',      league: 'NFL' },
+  { city: 'Jacksonville',  name: 'Jaguars',    league: 'NFL' },
+  { city: 'Kansas City',   name: 'Chiefs',     league: 'NFL' },
+  { city: 'Las Vegas',     name: 'Raiders',    league: 'NFL' },
+  { city: 'Los Angeles',   name: 'Chargers',   league: 'NFL' },
+  { city: 'Los Angeles',   name: 'Rams',       league: 'NFL' },
+  { city: 'Miami',         name: 'Dolphins',   league: 'NFL' },
+  { city: 'Minnesota',     name: 'Vikings',    league: 'NFL' },
+  { city: 'New England',   name: 'Patriots',   league: 'NFL' },
+  { city: 'New Orleans',   name: 'Saints',     league: 'NFL' },
+  { city: 'New York',      name: 'Giants',     league: 'NFL' },
+  { city: 'New York',      name: 'Jets',       league: 'NFL' },
+  { city: 'Philadelphia',  name: 'Eagles',     league: 'NFL' },
+  { city: 'Pittsburgh',    name: 'Steelers',   league: 'NFL' },
+  { city: 'San Francisco', name: '49ers',      league: 'NFL' },
+  { city: 'Seattle',       name: 'Seahawks',   league: 'NFL' },
+  { city: 'Tampa Bay',     name: 'Buccaneers', league: 'NFL' },
+  { city: 'Tennessee',     name: 'Titans',     league: 'NFL' },
+  { city: 'Washington',    name: 'Commanders', league: 'NFL' },
+  // NBA
+  { city: 'Atlanta',       name: 'Hawks',         league: 'NBA' },
+  { city: 'Boston',        name: 'Celtics',        league: 'NBA' },
+  { city: 'Brooklyn',      name: 'Nets',           league: 'NBA' },
+  { city: 'Charlotte',     name: 'Hornets',        league: 'NBA' },
+  { city: 'Chicago',       name: 'Bulls',          league: 'NBA' },
+  { city: 'Cleveland',     name: 'Cavaliers',      league: 'NBA' },
+  { city: 'Dallas',        name: 'Mavericks',      league: 'NBA' },
+  { city: 'Denver',        name: 'Nuggets',        league: 'NBA' },
+  { city: 'Detroit',       name: 'Pistons',        league: 'NBA' },
+  { city: 'Golden State',  name: 'Warriors',       league: 'NBA' },
+  { city: 'Houston',       name: 'Rockets',        league: 'NBA' },
+  { city: 'Indiana',       name: 'Pacers',         league: 'NBA' },
+  { city: 'Los Angeles',   name: 'Clippers',       league: 'NBA' },
+  { city: 'Los Angeles',   name: 'Lakers',         league: 'NBA' },
+  { city: 'Memphis',       name: 'Grizzlies',      league: 'NBA' },
+  { city: 'Miami',         name: 'Heat',           league: 'NBA' },
+  { city: 'Milwaukee',     name: 'Bucks',          league: 'NBA' },
+  { city: 'Minnesota',     name: 'Timberwolves',   league: 'NBA' },
+  { city: 'New Orleans',   name: 'Pelicans',       league: 'NBA' },
+  { city: 'New York',      name: 'Knicks',         league: 'NBA' },
+  { city: 'Oklahoma City', name: 'Thunder',        league: 'NBA' },
+  { city: 'Orlando',       name: 'Magic',          league: 'NBA' },
+  { city: 'Philadelphia',  name: '76ers',          league: 'NBA' },
+  { city: 'Phoenix',       name: 'Suns',           league: 'NBA' },
+  { city: 'Portland',      name: 'Trail Blazers',  league: 'NBA' },
+  { city: 'Sacramento',    name: 'Kings',          league: 'NBA' },
+  { city: 'San Antonio',   name: 'Spurs',          league: 'NBA' },
+  { city: 'Toronto',       name: 'Raptors',        league: 'NBA' },
+  { city: 'Utah',          name: 'Jazz',           league: 'NBA' },
+  { city: 'Washington',    name: 'Wizards',        league: 'NBA' },
+  // MLB
+  { city: 'Arizona',       name: 'Diamondbacks', league: 'MLB' },
+  { city: 'Atlanta',       name: 'Braves',       league: 'MLB' },
+  { city: 'Baltimore',     name: 'Orioles',      league: 'MLB' },
+  { city: 'Boston',        name: 'Red Sox',      league: 'MLB' },
+  { city: 'Chicago',       name: 'Cubs',         league: 'MLB' },
+  { city: 'Chicago',       name: 'White Sox',    league: 'MLB' },
+  { city: 'Cincinnati',    name: 'Reds',         league: 'MLB' },
+  { city: 'Cleveland',     name: 'Guardians',    league: 'MLB' },
+  { city: 'Colorado',      name: 'Rockies',      league: 'MLB' },
+  { city: 'Detroit',       name: 'Tigers',       league: 'MLB' },
+  { city: 'Houston',       name: 'Astros',       league: 'MLB' },
+  { city: 'Kansas City',   name: 'Royals',       league: 'MLB' },
+  { city: 'Los Angeles',   name: 'Angels',       league: 'MLB' },
+  { city: 'Los Angeles',   name: 'Dodgers',      league: 'MLB' },
+  { city: 'Miami',         name: 'Marlins',      league: 'MLB' },
+  { city: 'Milwaukee',     name: 'Brewers',      league: 'MLB' },
+  { city: 'Minnesota',     name: 'Twins',        league: 'MLB' },
+  { city: 'New York',      name: 'Mets',         league: 'MLB' },
+  { city: 'New York',      name: 'Yankees',      league: 'MLB' },
+  { city: 'Oakland',       name: 'Athletics',    league: 'MLB' },
+  { city: 'Philadelphia',  name: 'Phillies',     league: 'MLB' },
+  { city: 'Pittsburgh',    name: 'Pirates',      league: 'MLB' },
+  { city: 'San Diego',     name: 'Padres',       league: 'MLB' },
+  { city: 'San Francisco', name: 'Giants',       league: 'MLB' },
+  { city: 'Seattle',       name: 'Mariners',     league: 'MLB' },
+  { city: 'St. Louis',     name: 'Cardinals',    league: 'MLB' },
+  { city: 'Tampa Bay',     name: 'Rays',         league: 'MLB' },
+  { city: 'Texas',         name: 'Rangers',      league: 'MLB' },
+  { city: 'Toronto',       name: 'Blue Jays',    league: 'MLB' },
+  { city: 'Washington',    name: 'Nationals',    league: 'MLB' },
+  // NHL
+  { city: 'Anaheim',       name: 'Ducks',        league: 'NHL' },
+  { city: 'Boston',        name: 'Bruins',       league: 'NHL' },
+  { city: 'Buffalo',       name: 'Sabres',       league: 'NHL' },
+  { city: 'Calgary',       name: 'Flames',       league: 'NHL' },
+  { city: 'Carolina',      name: 'Hurricanes',   league: 'NHL' },
+  { city: 'Chicago',       name: 'Blackhawks',   league: 'NHL' },
+  { city: 'Colorado',      name: 'Avalanche',    league: 'NHL' },
+  { city: 'Columbus',      name: 'Blue Jackets', league: 'NHL' },
+  { city: 'Dallas',        name: 'Stars',        league: 'NHL' },
+  { city: 'Detroit',       name: 'Red Wings',    league: 'NHL' },
+  { city: 'Edmonton',      name: 'Oilers',       league: 'NHL' },
+  { city: 'Florida',       name: 'Panthers',     league: 'NHL' },
+  { city: 'Los Angeles',   name: 'Kings',        league: 'NHL' },
+  { city: 'Minnesota',     name: 'Wild',         league: 'NHL' },
+  { city: 'Montreal',      name: 'Canadiens',    league: 'NHL' },
+  { city: 'Nashville',     name: 'Predators',    league: 'NHL' },
+  { city: 'New Jersey',    name: 'Devils',       league: 'NHL' },
+  { city: 'New York',      name: 'Islanders',    league: 'NHL' },
+  { city: 'New York',      name: 'Rangers',      league: 'NHL' },
+  { city: 'Ottawa',        name: 'Senators',     league: 'NHL' },
+  { city: 'Philadelphia',  name: 'Flyers',       league: 'NHL' },
+  { city: 'Pittsburgh',    name: 'Penguins',     league: 'NHL' },
+  { city: 'San Jose',      name: 'Sharks',       league: 'NHL' },
+  { city: 'Seattle',       name: 'Kraken',       league: 'NHL' },
+  { city: 'St. Louis',     name: 'Blues',        league: 'NHL' },
+  { city: 'Tampa Bay',     name: 'Lightning',    league: 'NHL' },
+  { city: 'Toronto',       name: 'Maple Leafs',  league: 'NHL' },
+  { city: 'Utah',          name: 'Hockey Club',  league: 'NHL' },
+  { city: 'Vancouver',     name: 'Canucks',      league: 'NHL' },
+  { city: 'Vegas',         name: 'Golden Knights', league: 'NHL' },
+  { city: 'Washington',    name: 'Capitals',     league: 'NHL' },
+  { city: 'Winnipeg',      name: 'Jets',         league: 'NHL' },
+  // NCAA CFB
+  { city: 'Alabama',        name: 'Crimson Tide',    league: 'NCAA' },
+  { city: 'Arkansas',       name: 'Razorbacks',      league: 'NCAA' },
+  { city: 'Auburn',         name: 'Tigers',          league: 'NCAA' },
+  { city: 'Baylor',         name: 'Bears',           league: 'NCAA' },
+  { city: 'BYU',            name: 'Cougars',         league: 'NCAA' },
+  { city: 'Clemson',        name: 'Tigers',          league: 'NCAA' },
+  { city: 'Colorado',       name: 'Buffaloes',       league: 'NCAA' },
+  { city: 'Duke',           name: 'Blue Devils',     league: 'NCAA' },
+  { city: 'Florida',        name: 'Gators',          league: 'NCAA' },
+  { city: 'Florida State',  name: 'Seminoles',       league: 'NCAA' },
+  { city: 'Georgia',        name: 'Bulldogs',        league: 'NCAA' },
+  { city: 'Georgia Tech',   name: 'Yellow Jackets',  league: 'NCAA' },
+  { city: 'Iowa',           name: 'Hawkeyes',        league: 'NCAA' },
+  { city: 'Iowa State',     name: 'Cyclones',        league: 'NCAA' },
+  { city: 'Kansas',         name: 'Jayhawks',        league: 'NCAA' },
+  { city: 'Kansas State',   name: 'Wildcats',        league: 'NCAA' },
+  { city: 'Kentucky',       name: 'Wildcats',        league: 'NCAA' },
+  { city: 'LSU',            name: 'Tigers',          league: 'NCAA' },
+  { city: 'Louisville',     name: 'Cardinals',       league: 'NCAA' },
+  { city: 'Michigan',       name: 'Wolverines',      league: 'NCAA' },
+  { city: 'Michigan State', name: 'Spartans',        league: 'NCAA' },
+  { city: 'Mississippi St', name: 'Bulldogs',        league: 'NCAA' },
+  { city: 'Missouri',       name: 'Tigers',          league: 'NCAA' },
+  { city: 'Nebraska',       name: 'Cornhuskers',     league: 'NCAA' },
+  { city: 'North Carolina', name: 'Tar Heels',       league: 'NCAA' },
+  { city: 'Notre Dame',     name: 'Fighting Irish',  league: 'NCAA' },
+  { city: 'Ohio State',     name: 'Buckeyes',        league: 'NCAA' },
+  { city: 'Oklahoma',       name: 'Sooners',         league: 'NCAA' },
+  { city: 'Oklahoma State', name: 'Cowboys',         league: 'NCAA' },
+  { city: 'Ole Miss',       name: 'Rebels',          league: 'NCAA' },
+  { city: 'Oregon',         name: 'Ducks',           league: 'NCAA' },
+  { city: 'Penn State',     name: 'Nittany Lions',   league: 'NCAA' },
+  { city: 'Purdue',         name: 'Boilermakers',    league: 'NCAA' },
+  { city: 'South Carolina', name: 'Gamecocks',       league: 'NCAA' },
+  { city: 'Tennessee',      name: 'Volunteers',      league: 'NCAA' },
+  { city: 'Texas',          name: 'Longhorns',       league: 'NCAA' },
+  { city: 'Texas A&M',      name: 'Aggies',          league: 'NCAA' },
+  { city: 'USC',            name: 'Trojans',         league: 'NCAA' },
+  { city: 'Utah',           name: 'Utes',            league: 'NCAA' },
+  { city: 'Vanderbilt',     name: 'Commodores',      league: 'NCAA' },
+  { city: 'Virginia Tech',  name: 'Hokies',          league: 'NCAA' },
+  { city: 'Washington',     name: 'Huskies',         league: 'NCAA' },
+  { city: 'Wisconsin',      name: 'Badgers',         league: 'NCAA' },
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Sponsor() {
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [league, setLeague] = useState<LeagueFilter>('ALL');
-  const [inquireFor, setInquireFor] = useState<Team | null>(null);
-  const [buyFor, setBuyFor]         = useState<Team | null>(null);
-  const teamsRef = useRef<HTMLDivElement>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search,   setSearch]   = useState('');
+  const [league,   setLeague]   = useState<LeagueFilter>('ALL');
+  const formRef = useRef<HTMLDivElement>(null);
   const free = freeMonths();
 
-  // Featured team for diagram (Chicago Bears)
-  const featured = useMemo(
-    () => teams.find(t => t.name === 'Bears' || (t.city === 'Chicago' && t.league === 'NFL')) || teams.find(t => t.league === 'NFL'),
-    [teams]
-  );
-
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      // Pull real teams with logos
-      const { data: teamsData } = await supabase
-        .from('teams')
-        .select('id, name, city, league, logo_url')
-        .in('league', ['NFL', 'NCAA', 'NBA', 'MLB', 'NHL'])
-        .neq('status', 'inactive')
-        .order('league').order('city');
-
-      // Pull confirmed sponsor claims
-      const { data: claimed } = await supabase
-        .from('sponsor_teams' as any)
-        .select('team_id')
-        .eq('status', 'confirmed');
-
-      if (!active) return;
-      const claimedSet = new Set((claimed || []).map((r: any) => r.team_id));
-      const merged: Team[] = (teamsData || []).map((t: any) => ({
-        id: t.id,
-        name: t.name,
-        city: t.city,
-        league: t.league,
-        logo_url: t.logo_url,
-        sponsorStatus: claimedSet.has(t.id) ? 'confirmed' : 'available',
-      }));
-      setTeams(merged);
-      setLoading(false);
-    })();
-
-    // Realtime for live status updates
-    const ch = supabase.channel('sponsor_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sponsor_teams' }, (p: any) => {
-        if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
-          const row = p.new;
-          if (row.status === 'confirmed') {
-            setTeams(prev => prev.map(t => t.id === row.team_id ? { ...t, sponsorStatus: 'confirmed' } : t));
-          }
-        }
-      })
-      .subscribe();
-
-    return () => { active = false; supabase.removeChannel(ch); };
-  }, []);
+  const featured = ALL_TEAMS.find(t => t.city === 'Chicago' && t.league === 'NFL')!;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return teams.filter(t => {
+    return ALL_TEAMS.filter(t => {
       if (league !== 'ALL' && t.league !== league) return false;
-      if (q) {
-        const full = `${t.city} ${t.name}`.toLowerCase();
-        if (!full.includes(q)) return false;
-      }
+      if (q && !`${t.city} ${t.name}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [teams, search, league]);
+  }, [search, league]);
 
-  const scroll = () => teamsRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const selectedTeams = ALL_TEAMS.filter(t => selected.has(teamKey(t)));
+  const price = bundlePrice(selectedTeams.length);
+
+  function toggle(t: StaticTeam) {
+    const k = teamKey(t);
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(k) ? next.delete(k) : next.add(k);
+      return next;
+    });
+  }
+
+  const scrollToForm = () => formRef.current?.scrollIntoView({ behavior: 'smooth' });
 
   return (
     <div style={{ background: G.bg, color: G.white, fontFamily: FONT_B, minHeight: '100vh' }}>
       <style>{css}</style>
       <Nav />
-      <Hero onCta={scroll} />
+      <Hero onCta={scrollToForm} />
       <Moment featured={featured} />
       <PlatformPreview />
       <WhatYouGet />
       <ROISection />
       <RateCard free={free} />
-      <div ref={teamsRef}>
+      <div ref={formRef}>
         <TeamPicker
-          teams={filtered} loading={loading}
+          filtered={filtered} selected={selected} toggle={toggle}
           search={search} setSearch={setSearch}
           league={league} setLeague={setLeague}
           free={free}
-          onInquire={setInquireFor}
-          onBuy={setBuyFor}
         />
+        {selectedTeams.length > 0 && (
+          <ContactForm
+            selectedTeams={selectedTeams} price={price} free={free}
+            onClearAll={() => setSelected(new Set())}
+          />
+        )}
       </div>
-      <Footer onCta={scroll} />
-
-      {inquireFor && <InquireModal team={inquireFor} free={free} onClose={() => setInquireFor(null)} />}
-      {buyFor && <BuyModal team={buyFor} free={free} allTeams={teams} onClose={() => setBuyFor(null)} />}
+      <Footer onCta={scrollToForm} />
     </div>
   );
 }
@@ -199,15 +306,13 @@ function Hero({ onCta }: { onCta: () => void }) {
         <p style={{ fontSize: 'clamp(15px, 1.6vw, 19px)', lineHeight: 1.6, color: '#aaa', maxWidth: 760, marginTop: 36, fontWeight: 400 }}>
           We're opening Side Huddle Founding Team Sponsorships for a limited time. Brands can secure exclusive access
           at <strong style={{ color: G.white }}>$250/month per team</strong> — locked for the duration of your sponsorship.
-          Pricing increases in stages as inventory fills. This is early access to a new fan engagement layer,
-          not just an ad product.
+          Pricing increases in stages as inventory fills.
         </p>
-        {/* Phase ladder */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 28 }}>
           {[
             { phase: 'Early Founding', price: '$250/mo', active: true },
-            { phase: 'Next Phase', price: 'Increased pricing', active: false },
-            { phase: 'Full Rollout', price: 'Market pricing', active: false },
+            { phase: 'Next Phase',     price: 'Increased pricing', active: false },
+            { phase: 'Full Rollout',   price: 'Market pricing',    active: false },
           ].map(p => (
             <div key={p.phase} style={{ padding: '10px 16px', border: `1px solid ${p.active ? G.gold : G.border}`, borderRadius: 4, background: p.active ? 'rgba(255,215,0,.08)' : 'transparent' }}>
               <div className="sh-label" style={{ color: p.active ? G.gold : G.muted }}>{p.phase}</div>
@@ -224,19 +329,19 @@ function Hero({ onCta }: { onCta: () => void }) {
   );
 }
 
-// ─── Section 2: The Moment + Diagram ─────────────────────────────────────────
+// ─── Section 1: The Moment ────────────────────────────────────────────────────
 const HUDDLE_BUBBLES = [
-  { name: 'The Boys Fantasy', live: 5 },
-  { name: 'Bears War Room',   live: 3 },
-  { name: 'Section 204 Crew', live: 8 },
-  { name: 'Sports Degenerates', live: 4 },
-  { name: 'Da Bears Diehards', live: 6 },
-  { name: 'Halftime Hustle',  live: 2 },
-  { name: 'Monsters of Midway', live: 7 },
-  { name: 'Sunday Ritual',   live: 4 },
+  { name: 'The Boys Fantasy',    live: 5 },
+  { name: 'Bears War Room',      live: 3 },
+  { name: 'Section 204 Crew',    live: 8 },
+  { name: 'Sports Degenerates',  live: 4 },
+  { name: 'Da Bears Diehards',   live: 6 },
+  { name: 'Halftime Hustle',     live: 2 },
+  { name: 'Monsters of Midway',  live: 7 },
+  { name: 'Sunday Ritual',       live: 4 },
 ];
 
-function Moment({ featured }: { featured?: Team }) {
+function Moment({ featured }: { featured: StaticTeam }) {
   return (
     <section className="sh-section" style={{ borderTop: `1px solid ${G.border}` }}>
       <div className="sh-label">01 — WHY THIS IS DIFFERENT</div>
@@ -250,7 +355,7 @@ function Moment({ featured }: { featured?: Team }) {
         highlights, and real-time updates. Your brand is on every message.{' '}
         <strong style={{ color: G.white }}>Not one impression. Hundreds of simultaneous moments, all game long.</strong>
       </p>
-      <HuddleMultiplier featured={featured} />
+      <HuddleMultiplier />
       <p style={{ textAlign: 'center', marginTop: 32, fontSize: 13, color: G.muted, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
         One team. One sponsor. Everywhere at once.
       </p>
@@ -258,17 +363,12 @@ function Moment({ featured }: { featured?: Team }) {
   );
 }
 
-function HuddleMultiplier({ featured }: { featured?: Team }) {
+function HuddleMultiplier() {
   return (
     <div style={{ position: 'relative', margin: '72px auto 0', height: 540, maxWidth: 900 }}>
-      {/* Center logo */}
       <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 120, height: 120, borderRadius: '50%', background: G.surface2, border: `2px solid ${G.gold}`, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, boxShadow: `0 0 48px rgba(255,215,0,.18)` }}>
-        {featured?.logo_url
-          ? <img src={featured.logo_url} alt={featured.name} style={{ width: 80, height: 80, objectFit: 'contain' }} />
-          : <img src={shLogo} alt="Side Huddle" style={{ width: 64, height: 64, objectFit: 'contain', borderRadius: '50%' }} />
-        }
+        <img src={shLogo} alt="Side Huddle" style={{ width: 64, height: 64, objectFit: 'contain', borderRadius: '50%' }} />
       </div>
-      {/* Bubbles */}
       {HUDDLE_BUBBLES.map((h, i) => {
         const a = (i / HUDDLE_BUBBLES.length) * Math.PI * 2 - Math.PI / 2;
         const r = 220;
@@ -289,7 +389,6 @@ function HuddleMultiplier({ featured }: { featured?: Team }) {
           </div>
         );
       })}
-      {/* SVG lines */}
       <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
         {HUDDLE_BUBBLES.map((_, i) => {
           const a = (i / HUDDLE_BUBBLES.length) * Math.PI * 2 - Math.PI / 2;
@@ -297,7 +396,8 @@ function HuddleMultiplier({ featured }: { featured?: Team }) {
             <line key={i} x1="50%" y1="50%"
               x2={`calc(50% + ${Math.cos(a) * 220}px)`}
               y2={`calc(50% + ${Math.sin(a) * 220}px)`}
-              stroke={G.gold} strokeOpacity={0.18} strokeWidth={1} strokeDasharray="3,5" />
+              stroke={G.gold} strokeOpacity="0.12" strokeWidth="1" strokeDasharray="4 6"
+            />
           );
         })}
       </svg>
@@ -305,26 +405,11 @@ function HuddleMultiplier({ featured }: { featured?: Team }) {
   );
 }
 
-// ─── Section 3: Platform Preview ─────────────────────────────────────────────
+// ─── Section 2: Platform Preview ──────────────────────────────────────────────
 const PLACEMENT_CARDS = [
-  {
-    num: '01',
-    title: 'Team Feed Badge',
-    sub: 'PRESENTED BY placement',
-    body: 'Your brand appears at the top of your team\'s live feed as "Presented by [Your Brand]" — visible to every fan who opens the feed, every session, all season long.',
-  },
-  {
-    num: '02',
-    title: '1 Message / Week In-Feed',
-    sub: 'SPONSORED DROP in team feed',
-    body: 'Once per week during the active season, your brand gets a full message card in the team feed — with optional QR code, promo code, or offer. Side Huddle approves before it goes live.',
-  },
-  {
-    num: '03',
-    title: 'All-Bot Sponsorship',
-    sub: 'POWERED BY on every bot card',
-    body: 'The Side Huddle AI bot is active in every fan huddle around your team — surfacing stats, highlights, and live updates. Every bot card carries your "powered by" attribution. All huddles. All game long.',
-  },
+  { num: '01', title: 'Team Feed Badge',          sub: 'PRESENTED BY placement',         body: 'Your brand appears at the top of your team\'s live feed as "Presented by [Your Brand]" — visible to every fan who opens the feed, every session, all season long.' },
+  { num: '02', title: '1 Message / Week In-Feed', sub: 'SPONSORED DROP in team feed',    body: 'Once per week during the active season, your brand gets a full message card in the team feed — with optional QR code, promo code, or offer. Side Huddle approves before it goes live.' },
+  { num: '03', title: 'All-Bot Sponsorship',       sub: 'POWERED BY on every bot card',  body: 'The Side Huddle AI bot is active in every fan huddle around your team — surfacing stats, highlights, and live updates. Every bot card carries your "powered by" attribution. All huddles. All game long.' },
 ];
 
 function PlatformPreview() {
@@ -337,8 +422,6 @@ function PlatformPreview() {
       <p style={{ color: '#999', marginTop: 16, maxWidth: 720, fontSize: 16, lineHeight: 1.6 }}>
         Your brand is embedded across three distinct surfaces — not one banner, not one impression. Always on, all game long.
       </p>
-
-      {/* Placement breakdown cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px,1fr))', gap: 20, marginTop: 48 }}>
         {PLACEMENT_CARDS.map(c => (
           <div key={c.num} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: '24px 24px 28px', position: 'relative' }}>
@@ -349,8 +432,6 @@ function PlatformPreview() {
           </div>
         ))}
       </div>
-
-      {/* Phone frames */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))', gap: 28, marginTop: 64 }}>
         <PhoneFrame label="TEAM FEED · Placement 01 & 02">
           <img src="/sponsor-screens/team-feed.png" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', borderRadius: 18 }} alt="Team feed sponsor placement" />
@@ -365,123 +446,25 @@ function PlatformPreview() {
     </section>
   );
 }
+
 function PhoneFrame({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
       <div className="sh-label" style={{ color: G.muted, marginBottom: 12 }}>{label}</div>
       <div style={{ background: '#000', border: `1.5px solid ${G.border}`, borderRadius: 32, padding: 10, maxWidth: 300, margin: '0 auto', boxShadow: '0 24px 64px rgba(0,0,0,.6)', aspectRatio: '9/19' }}>
-        <div style={{ background: G.bg, height: '100%', borderRadius: 24, padding: 14, fontSize: 11, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 9 }}>
+        <div style={{ background: G.bg, height: '100%', borderRadius: 24, overflow: 'hidden' }}>
           {children}
         </div>
       </div>
     </div>
   );
 }
-function YB({ size = 10 }: { size?: number }) {
-  return <span style={{ color: G.gold, fontWeight: 800, fontSize: size, letterSpacing: '0.1em', textShadow: `0 0 10px rgba(255,215,0,.4)` }}>YOUR BRAND</span>;
-}
-function BotBadge() {
-  return <span style={{ fontSize: 7, padding: '1px 5px', background: G.border, borderRadius: 3, color: G.muted2, fontWeight: 600, letterSpacing: '0.08em' }}>BOT</span>;
-}
-function FrameSponsorDrop() {
-  return (<>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e74c3c', flexShrink: 0 }} className="pulse-dot" />
-      <span className="sh-label" style={{ fontSize: 8 }}>LIVE FEED · CHICAGO BEARS</span>
-    </div>
-    {/* Sponsor card matching real app style */}
-    <div style={{ background: G.surface2, border: `1px solid ${G.gold}`, borderRadius: 8, padding: 12, marginTop: 4 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <div style={{ width: 28, height: 28, borderRadius: 6, background: G.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#000', flexShrink: 0 }}>YB</div>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 11 }}><YB /></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-            <span style={{ fontSize: 7, padding: '1px 5px', background: 'rgba(255,215,0,.2)', color: G.gold, borderRadius: 3, fontWeight: 700, letterSpacing: '0.08em' }}>SPONSOR</span>
-            <span style={{ fontSize: 8, color: G.muted }}>Week 12 · Game day</span>
-          </div>
-        </div>
-      </div>
-      <div style={{ background: G.bg, border: `1px solid ${G.border}`, borderRadius: 6, padding: 10 }}>
-        <div style={{ fontSize: 8, color: G.gold, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase' }}>BEARS FANS · THIS WEEK ONLY</div>
-        <div style={{ fontWeight: 700, fontSize: 11, marginTop: 6, lineHeight: 1.3 }}>$2 off any pour — show this at the bar</div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-          <button style={{ background: G.gold, color: '#000', fontWeight: 700, fontSize: 9, padding: '5px 10px', borderRadius: 12, border: 'none', cursor: 'pointer' }}>Claim offer →</button>
-          <span style={{ fontSize: 8, color: G.muted }}>code <strong style={{ color: G.white }}>SH-BEARS</strong></span>
-        </div>
-      </div>
-      <div style={{ marginTop: 8, fontSize: 8, color: G.muted }}>1 sponsor message / week during active season</div>
-    </div>
-    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-      <span style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 12, padding: '3px 8px', fontSize: 10 }}>🔥 41</span>
-      <span style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 12, padding: '3px 8px', fontSize: 10 }}>👍 28</span>
-    </div>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-      <span style={{ fontSize: 8, color: G.muted, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Powered by</span>
-      <YB size={8} />
-    </div>
-  </>);
-}
-function FrameFeed() {
-  return (<>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e74c3c', flexShrink: 0 }} className="pulse-dot" />
-      <span className="sh-label" style={{ fontSize: 8 }}>LIVE FEED · CHICAGO BEARS</span>
-    </div>
-    <div style={{ background: G.surface, border: `1px solid ${G.gold}`, borderRadius: 6, padding: 9 }}>
-      <div style={{ fontSize: 8, color: G.muted, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Bears Feed · Presented by</div>
-      <div style={{ marginTop: 5 }}><YB /></div>
-    </div>
-    <div style={{ background: G.surface2, border: `1px solid ${G.border}`, borderRadius: 6, padding: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <div style={{ width: 18, height: 18, borderRadius: '50%', background: G.gold, color: '#000', fontWeight: 800, fontSize: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>SH</div>
-        <span style={{ fontSize: 10, fontWeight: 700, color: G.gold }}>Bears Bot</span>
-        <BotBadge />
-      </div>
-      <p style={{ fontSize: 10, marginTop: 6, lineHeight: 1.4 }}>Caleb Williams just hit 300 yards — here's every 300-yd game in Bears history.</p>
-      <div style={{ borderTop: `1px solid ${G.border}`, marginTop: 8, paddingTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 8, color: G.muted, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Powered by</span>
-        <YB />
-      </div>
-    </div>
-    <div style={{ display: 'flex', gap: 6 }}>
-      <span style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 12, padding: '3px 8px', fontSize: 10 }}>🔥 41</span>
-      <span style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 12, padding: '3px 8px', fontSize: 10 }}>👍 28</span>
-    </div>
-  </>);
-}
-function FrameHuddle() {
-  return (<>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span style={{ fontSize: 9, color: '#7ec85f' }}>● 5 in the room</span>
-      <span className="sh-label" style={{ fontSize: 8 }}>HUDDLE</span>
-    </div>
-    <div style={{ background: G.gold, color: '#0a0a0a', borderRadius: '12px 12px 2px 12px', padding: '8px 10px', fontSize: 10, alignSelf: 'flex-end', maxWidth: '88%' }}>
-      Just got to the bar — section 204 anyone? 🍺
-    </div>
-    <div style={{ fontSize: 10 }}><strong>Dan:</strong> I'm in 206! come thru at halftime 🏈</div>
-    <div style={{ background: G.surface2, border: `1px solid ${G.gold}55`, borderRadius: 6, padding: 9 }}>
-      <div style={{ display: 'flex', gap: 5 }}><BotBadge /><span style={{ fontSize: 8, padding: '1px 5px', background: 'rgba(61,107,34,.4)', color: '#7ec85f', borderRadius: 3, fontWeight: 700, letterSpacing: '0.05em' }}>PREDICTION</span></div>
-      <div style={{ fontSize: 10, marginTop: 5 }}>Bears win Super Bowl LX?</div>
-      <div style={{ height: 4, background: G.border, borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: '34%', background: '#3d6b22', borderRadius: 2 }} />
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginTop: 4 }}>
-        <span style={{ color: '#7ec85f' }}>Yes 34¢</span><span style={{ color: '#c0392b' }}>No 66¢</span>
-      </div>
-    </div>
-    <div style={{ background: G.surface2, border: `1px solid ${G.gold}`, borderRadius: 6, padding: 9, marginTop: 2 }}>
-      <div style={{ fontSize: 8, color: G.muted, letterSpacing: '0.12em', textTransform: 'uppercase' }}>Sponsored · 1×/week</div>
-      <div style={{ fontWeight: 700, fontSize: 10, marginTop: 4 }}>Game day at <YB size={10} /> — $2 off any pour</div>
-      <div style={{ fontSize: 9, color: G.muted2, marginTop: 2 }}>Show this in the bar. Code: SH-BEARS</div>
-    </div>
-  </>);
-}
 
-// ─── Section 4: What You Get ──────────────────────────────────────────────────
+// ─── Section 3: What You Get ──────────────────────────────────────────────────
 function WhatYouGet() {
   const cards = [
-    { icon: '⚡', title: 'Bot Attribution', body: 'Every team-bot message carries a "powered by" line. One sponsor per team — no competitors in your community. Ever.' },
-    { icon: '🛡️', title: 'Team Feed Badge', body: '"Presented by" lockup at the top of your team\'s live feed. Visible to every fan in every session, all season.' },
+    { icon: '⚡', title: 'Bot Attribution',    body: 'Every team-bot message carries a "powered by" line. One sponsor per team — no competitors in your community. Ever.' },
+    { icon: '🛡️', title: 'Team Feed Badge',    body: '"Presented by" lockup at the top of your team\'s live feed. Visible to every fan in every session, all season.' },
     { icon: '📣', title: '1 Branded Drop / Week', body: 'One sponsor-controlled message per week during active season. Optional QR code for offers or traffic. Side Huddle approved before posting.', note: 'Drive fans to your location, offer, or event on game day.' },
   ];
   return (
@@ -502,7 +485,7 @@ function WhatYouGet() {
   );
 }
 
-// ─── Section 5: ROI ───────────────────────────────────────────────────────────
+// ─── Section 4: ROI ───────────────────────────────────────────────────────────
 function ROISection() {
   return (
     <section className="sh-section" style={{ borderTop: `1px solid ${G.border}` }}>
@@ -518,7 +501,7 @@ function ROISection() {
             A single local radio spot runs <strong>$500–1,500/week</strong>. One local TV placement: <strong>$2,000–5,000</strong>. A Side Huddle founding sponsorship is <strong style={{ color: G.gold }}>$250/month</strong> — exclusive, always-on, inside the conversation when fans are most engaged.
           </p>
           <p style={{ fontSize: 18, lineHeight: 1.65, color: '#ddd', marginTop: 16 }}>
-            Own the entire <strong style={{ color: G.white }}>SEC fanbase</strong> on Side Huddle for less than one radio ad per week.
+            Own an entire fanbase on Side Huddle for less than one radio ad per week.
           </p>
         </div>
       </div>
@@ -526,13 +509,13 @@ function ROISection() {
   );
 }
 
-// ─── Section 6: Rate Card ─────────────────────────────────────────────────────
+// ─── Section 5: Rate Card ─────────────────────────────────────────────────────
 function RateCard({ free }: { free: number }) {
   const urgency = [
-    { when: 'Start today',   detail: 'June, July & August FREE',   sub: '3 months · first charge Sep 1', active: free >= 3 },
-    { when: 'Start in June', detail: 'July & August FREE',         sub: '2 months · first charge Sep 1', active: free === 2 },
-    { when: 'Start in July', detail: 'August FREE',                sub: '1 month · first charge Sep 1',  active: free === 1 },
-    { when: 'Start Sep 1+',  detail: 'No free months',            sub: 'Season live — charged immediately', active: free === 0 },
+    { when: 'Start today',   detail: 'June, July & August FREE',  sub: '3 months · first charge Sep 1', active: free >= 3 },
+    { when: 'Start in June', detail: 'July & August FREE',        sub: '2 months · first charge Sep 1', active: free === 2 },
+    { when: 'Start in July', detail: 'August FREE',               sub: '1 month · first charge Sep 1',  active: free === 1 },
+    { when: 'Start Sep 1+',  detail: 'No free months',           sub: 'Season live — charged immediately', active: free === 0 },
   ];
   const infoCards = [
     { title: 'BILLING',     body: 'Month-to-month. No annual contract. Up to 3 free months for founding sponsors who start now. First charge September 1.' },
@@ -544,7 +527,6 @@ function RateCard({ free }: { free: number }) {
     <section className="sh-section" id="rate-card" style={{ borderTop: `1px solid ${G.border}` }}>
       <div className="sh-label">04 — FOUNDING SPONSOR PRICING</div>
 
-      {/* Urgency banner */}
       <div style={{ marginTop: 24, border: `1px solid ${G.gold}`, borderRadius: 8, padding: 'clamp(20px,3vw,32px)', background: 'rgba(255,215,0,.04)' }}>
         <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(20px,2.8vw,30px)', color: G.gold, textTransform: 'uppercase' }}>
           🏈 Start today — get June, July & August free.
@@ -561,7 +543,6 @@ function RateCard({ free }: { free: number }) {
         </div>
       </div>
 
-      {/* DUAL highlight: single team + bundle side by side */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 32 }}>
         <div style={{ border: `1px solid ${G.border}`, borderRadius: 8, padding: 24, background: G.surface }}>
           <div className="sh-label" style={{ color: G.muted }}>SINGLE TEAM</div>
@@ -578,8 +559,6 @@ function RateCard({ free }: { free: number }) {
         </div>
       </div>
 
-      <p style={{ color: '#999', marginTop: 24, maxWidth: 720, lineHeight: 1.6, fontSize: 14 }}>Month to month. No annual contract. Pick any teams across any league. Founding rate locked through your first active season.</p>
-
       <div style={{ overflowX: 'auto', marginTop: 24 }}>
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: 680 }}>
           <thead>
@@ -591,16 +570,16 @@ function RateCard({ free }: { free: number }) {
           </thead>
           <tbody>
             {[
-              { teams: '1 team',      monthly: '$250 / mo', perTeam: '$250',        savings: 'Up to $500/mo off standard',      highlight: false },
-              { teams: '3 teams',     monthly: '$650 / mo', perTeam: '~$217/team',  savings: 'Save ~$100/team vs. 1 at a time', highlight: false },
-              { teams: '6 teams',     monthly: '$1,200 / mo',perTeam: '$200/team',  savings: 'Save $50/team vs. 3-pack',        highlight: false },
-              { teams: '10+ teams ⭐',monthly: '$1,800 / mo',perTeam: '$180/team · floor', savings: 'Best rate — won\'t go lower', highlight: true },
+              { teams: '1 team',       monthly: '$250 / mo',    perTeam: '$250',             savings: 'Up to $500/mo off standard',      hl: false },
+              { teams: '3 teams',      monthly: '$650 / mo',    perTeam: '~$217/team',       savings: 'Save ~$100/team vs. 1 at a time', hl: false },
+              { teams: '6 teams',      monthly: '$1,200 / mo',  perTeam: '$200/team',        savings: 'Save $50/team vs. 3-pack',        hl: false },
+              { teams: '10+ teams ⭐', monthly: '$1,800 / mo',  perTeam: '$180/team · floor', savings: "Best rate — won't go lower",      hl: true  },
             ].map(t => (
-              <tr key={t.teams} style={{ background: t.highlight ? 'rgba(255,215,0,.06)' : 'transparent' }}>
-                <td style={{ padding: '18px 20px', borderBottom: `1px solid ${G.border}`, fontWeight: 700, color: t.highlight ? G.gold : G.white }}>{t.teams}</td>
+              <tr key={t.teams} style={{ background: t.hl ? 'rgba(255,215,0,.06)' : 'transparent' }}>
+                <td style={{ padding: '18px 20px', borderBottom: `1px solid ${G.border}`, fontWeight: 700, color: t.hl ? G.gold : G.white }}>{t.teams}</td>
                 <td style={{ padding: '18px 20px', borderBottom: `1px solid ${G.border}`, fontWeight: 700, fontSize: 18 }}>{t.monthly}</td>
                 <td style={{ padding: '18px 20px', borderBottom: `1px solid ${G.border}`, color: '#ccc' }}>{t.perTeam}</td>
-                <td style={{ padding: '18px 20px', borderBottom: `1px solid ${G.border}`, color: t.highlight ? '#7ec85f' : G.muted2, fontSize: 13 }}>{t.savings}</td>
+                <td style={{ padding: '18px 20px', borderBottom: `1px solid ${G.border}`, color: t.hl ? '#7ec85f' : G.muted2, fontSize: 13 }}>{t.savings}</td>
               </tr>
             ))}
           </tbody>
@@ -619,15 +598,17 @@ function RateCard({ free }: { free: number }) {
   );
 }
 
-// ─── Section 7: Team Picker ───────────────────────────────────────────────────
+// ─── Section 6: Team Picker ───────────────────────────────────────────────────
 const LEAGUES: LeagueFilter[] = ['ALL', 'NCAA', 'NFL', 'NBA', 'MLB', 'NHL'];
 const LEAGUE_DISPLAY: Record<LeagueFilter, string> = { ALL: 'ALL', NCAA: 'CFB', NFL: 'NFL', NBA: 'NBA', MLB: 'MLB', NHL: 'NHL' };
 
-function TeamPicker({ teams, loading, search, setSearch, league, setLeague, free, onInquire, onBuy }: {
-  teams: Team[]; loading: boolean; search: string; setSearch: (s: string) => void;
-  league: LeagueFilter; setLeague: (l: LeagueFilter) => void; free: number;
-  onInquire: (t: Team) => void; onBuy: (t: Team) => void;
+function TeamPicker({ filtered, selected, toggle, search, setSearch, league, setLeague, free }: {
+  filtered: StaticTeam[]; selected: Set<string>; toggle: (t: StaticTeam) => void;
+  search: string; setSearch: (s: string) => void;
+  league: LeagueFilter; setLeague: (l: LeagueFilter) => void;
+  free: number;
 }) {
+  const count = selected.size;
   return (
     <section className="sh-section" style={{ borderTop: `1px solid ${G.border}` }}>
       <div className="sh-label">05 — CLAIM YOUR TEAM</div>
@@ -635,11 +616,21 @@ function TeamPicker({ teams, loading, search, setSearch, league, setLeague, free
         First in <span style={{ color: G.gold }}>owns the team.</span>
       </h2>
       <p style={{ color: '#aaa', marginTop: 16, maxWidth: 720, fontSize: 17, lineHeight: 1.6 }}>
-        Available teams are open now. Once a team is claimed it's gone.
+        Pick the team(s) you want below — then fill out your info and we'll send an invoice within 2 hours.
         {free > 0 && <> Start today — <strong style={{ color: G.gold }}>{freeLabel(free)}</strong>.</>}
       </p>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 32, alignItems: 'center' }}>
+      {count > 0 && (
+        <div style={{ marginTop: 20, padding: '14px 20px', background: 'rgba(255,215,0,.06)', border: `1px solid ${G.gold}`, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 22, color: G.gold }}>{count} team{count !== 1 ? 's' : ''} selected</span>
+            <span style={{ color: G.muted2, fontSize: 14, marginLeft: 12 }}>${bundlePrice(count).total}/mo · {bundlePrice(count).label}</span>
+          </div>
+          <span style={{ fontSize: 13, color: '#7ec85f' }}>↓ Fill your info below to get an invoice</span>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 28, alignItems: 'center' }}>
         {LEAGUES.map(l => (
           <button key={l} onClick={() => setLeague(l)} className="sh-label"
             style={{ padding: '9px 18px', borderRadius: 4, border: `1px solid ${league === l ? G.gold : G.border}`, background: league === l ? 'rgba(255,215,0,.1)' : G.surface, color: league === l ? G.gold : G.muted, cursor: 'pointer' }}>
@@ -650,292 +641,142 @@ function TeamPicker({ teams, loading, search, setSearch, league, setLeague, free
           style={{ marginLeft: 8, maxWidth: 280, height: 40 }} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px,1fr))', gap: 12, marginTop: 32 }}>
-        {loading && <div style={{ gridColumn: '1/-1', color: G.muted, padding: 48, textAlign: 'center' }}>Loading teams…</div>}
-        {!loading && teams.length === 0 && <div style={{ gridColumn: '1/-1', color: G.muted, padding: 48, textAlign: 'center' }}>No teams match your search.</div>}
-        {teams.map(t => <TeamCard key={t.id} team={t} onInquire={onInquire} onBuy={onBuy} />)}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px,1fr))', gap: 10, marginTop: 28 }}>
+        {filtered.length === 0 && <div style={{ gridColumn: '1/-1', color: G.muted, padding: 48, textAlign: 'center' }}>No teams match your search.</div>}
+        {filtered.map(t => {
+          const on = selected.has(teamKey(t));
+          return (
+            <button key={teamKey(t)} onClick={() => toggle(t)}
+              style={{ background: on ? 'rgba(255,215,0,.08)' : G.surface, border: `1px solid ${on ? G.gold : G.border}`, borderRadius: 8, padding: '14px 16px', cursor: 'pointer', textAlign: 'left', transition: 'border-color .15s, background .15s', position: 'relative' }}>
+              {on && <span style={{ position: 'absolute', top: 8, right: 10, color: G.gold, fontWeight: 800, fontSize: 14 }}>✓</span>}
+              <div style={{ fontWeight: 700, fontSize: 14, color: on ? G.gold : G.white, lineHeight: 1.2 }}>{t.city} {t.name}</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
+                <span className="sh-label" style={{ fontSize: 9, color: on ? G.gold : G.muted }}>{displayLeague(t.league)}</span>
+                <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 18, color: on ? G.gold : G.muted2 }}>$250<span style={{ fontSize: 11, fontWeight: 400 }}>/mo</span></span>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </section>
   );
 }
 
-function TeamCard({ team, onInquire, onBuy }: { team: Team; onInquire: (t: Team) => void; onBuy: (t: Team) => void }) {
-  const taken = team.sponsorStatus === 'confirmed';
-  const fullName = team.city ? `${team.city} ${team.name}` : team.name;
-  return (
-    <div className={`team-card${taken ? ' taken' : ''}`}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {team.logo_url
-          ? <img src={team.logo_url} alt={team.name} style={{ width: 40, height: 40, objectFit: 'contain', flexShrink: 0 }} />
-          : <div style={{ width: 40, height: 40, borderRadius: '50%', background: G.surface2, border: `1px solid ${G.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🏆</div>
-        }
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.2 }}>{fullName}</div>
-          <span className="sh-label" style={{ fontSize: 9, color: G.muted }}>{displayLeague(team.league)}</span>
-        </div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 14 }}>
-        <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 26, color: G.gold }}>$250</span>
-        <span style={{ fontSize: 12, color: G.muted }}>/mo</span>
-      </div>
-      {taken ? (
-        <div className="sh-label" style={{ marginTop: 12, color: G.muted }}>● Claimed</div>
-      ) : (
-        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <button className="btn-outline" style={{ flex: 1, padding: '9px 10px', fontSize: 11 }} onClick={e => { e.stopPropagation(); onInquire(team); }}>Inquire →</button>
-          <button className="btn-gold"    style={{ flex: 1, padding: '9px 10px', fontSize: 11 }} onClick={e => { e.stopPropagation(); onBuy(team);     }}>Buy now →</button>
-        </div>
-      )}
-    </div>
-  );
-}
+// ─── Section 7: Contact Form (sends email directly) ───────────────────────────
+function ContactForm({ selectedTeams, price, free, onClearAll }: {
+  selectedTeams: StaticTeam[]; price: { total: number; label: string }; free: number; onClearAll: () => void;
+}) {
+  const [f, setF] = useState({ brand: '', name: '', email: '', phone: '', message: '' });
+  const [sent, setSent] = useState(false);
 
-// ─── Inquire Modal ────────────────────────────────────────────────────────────
-function InquireModal({ team, free, onClose }: { team: Team; free: number; onClose: () => void }) {
-  const [f, setF] = useState({ brand: '', name: '', email: '', phone: '', other: '', message: '' });
-  const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(false);
-  const fullName = team.city ? `${team.city} ${team.name}` : team.name;
-  async function submit() {
-    if (!f.brand || !f.name || !f.email) { toast.error('Brand name, your name, and email are required.'); return; }
-    setBusy(true);
-    const { error } = await supabase.from('sponsor_inquiries' as any).insert({
-      team_id: team.id, team_name: fullName, league: team.league || '', brand_name: f.brand,
-      contact_name: f.name, email: f.email, phone: f.phone || null, other_teams: f.other || null,
-      message: f.message || null, type: 'inquiry', free_months: free,
-    });
-    setBusy(false);
-    if (error) { toast.error('Could not submit — try partnerships@sidehuddle.com'); return; }
-    setDone(true);
-  }
-  return (
-    <Overlay onClose={onClose}>
-      {done ? (
-        <ModalSuccess title="Got it." body={`We'll confirm your spot for ${fullName} within 24 hours. Your founding rate is locked.`} onClose={onClose} />
-      ) : <>
-        <ModalHeader logo={team.logo_url} name={fullName} league={displayLeague(team.league)} price="$250 / mo" onClose={onClose} />
-        {free > 0 && <FreePill label={freeLabel(free)} />}
-        <BundleHint />
-        <form style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 20 }} onSubmit={e => { e.preventDefault(); submit(); }}>
-          <FF label="Brand / Company *" value={f.brand} onChange={v => setF({ ...f, brand: v })} />
-          <FF label="Your name *"       value={f.name}  onChange={v => setF({ ...f, name: v })} />
-          <FF label="Email *"           value={f.email} onChange={v => setF({ ...f, email: v })} type="email" />
-          <FF label="Phone (optional)"  value={f.phone} onChange={v => setF({ ...f, phone: v })} />
-          <FF label="Other teams you want?" value={f.other} onChange={v => setF({ ...f, other: v })} />
-          <FF label="Message (optional)"    value={f.message} onChange={v => setF({ ...f, message: v })} multiline />
-          <button className="btn-gold" type="submit" style={{ marginTop: 8, width: '100%' }} disabled={busy}>{busy ? 'Sending…' : 'Send inquiry →'}</button>
-        </form>
-      </>}
-    </Overlay>
-  );
-}
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!f.brand || !f.name || !f.email) return;
 
-// ─── Buy Modal (with bundle + checkout summary) ───────────────────────────────
-function BuyModal({ team, free, allTeams, onClose }: { team: Team; free: number; allTeams: Team[]; onClose: () => void }) {
-  const [bundle, setBundle] = useState<Team[]>([team]);
-  const [f, setF] = useState({ brand: '', name: '', email: '', phone: '' });
-  const [step, setStep] = useState<'build' | 'contact' | 'review' | 'done'>('build');
-  const [busy, setBusy] = useState(false);
-  const fullName = (t: Team) => t.city ? `${t.city} ${t.name}` : t.name;
+    const teamList = selectedTeams.map(t => `• ${t.city} ${t.name} (${displayLeague(t.league)})`).join('\n');
+    const subject = encodeURIComponent(`Founding Sponsor Inquiry — ${f.brand} — ${selectedTeams.length} team${selectedTeams.length !== 1 ? 's' : ''}`);
+    const body = encodeURIComponent(
+`FOUNDING SPONSOR INQUIRY
+========================
 
-  const price = bundlePrice(bundle.length);
-  const suggestions = useMemo(() =>
-    allTeams.filter(t => t.sponsorStatus !== 'confirmed' && t.league === team.league && t.id !== team.id).slice(0, 9),
-    [allTeams, team]
-  );
+TEAMS REQUESTED (${selectedTeams.length}):
+${teamList}
 
-  function toggle(t: Team) {
-    setBundle(prev => prev.find(p => p.id === t.id) ? prev.filter(p => p.id !== t.id) : [...prev, t]);
+PRICING: $${price.total}/mo (${price.label})
+FREE MONTHS: ${free > 0 ? freeLabel(free) : 'None — billing starts immediately'}
+BILLING START: ${free > 0 ? 'September 1' : 'Immediately'}
+
+BRAND INFO:
+Company: ${f.brand}
+Contact: ${f.name}
+Email: ${f.email}
+Phone: ${f.phone || 'Not provided'}
+
+MESSAGE:
+${f.message || 'No message provided'}
+
+---
+Submitted via sidehuddlesports.com/sponsors`
+    );
+
+    window.location.href = `mailto:partnerships@sidehuddle.com?subject=${subject}&body=${body}`;
+    setSent(true);
   }
 
-  async function submit() {
-    setBusy(true);
-    const rows = bundle.map(t => ({
-      team_id: t.id, team_name: fullName(t), league: t.league || '',
-      brand_name: f.brand, contact_name: f.name, email: f.email,
-      phone: f.phone || null, type: 'purchase',
-      bundle_size: bundle.length, monthly_total: price.total, free_months: free,
-      other_teams: bundle.filter(b => b.id !== t.id).map(b => `${fullName(b)} (${displayLeague(b.league)})`).join(', ') || null,
-    }));
-    const { error } = await supabase.from('sponsor_inquiries' as any).insert(rows);
-    setBusy(false);
-    if (error) { toast.error('Could not submit — try partnerships@sidehuddle.com'); return; }
-    setStep('done');
+  if (sent) {
+    return (
+      <section className="sh-section" style={{ borderTop: `1px solid ${G.border}` }}>
+        <div style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center', padding: '40px 0' }}>
+          <div style={{ fontSize: 56, marginBottom: 20 }}>🏆</div>
+          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 40, color: G.gold, textTransform: 'uppercase' }}>Your email is ready.</div>
+          <p style={{ color: '#ccc', marginTop: 16, fontSize: 17, lineHeight: 1.65 }}>
+            Your mail app opened with all your info pre-filled. Hit send and we'll have an invoice to you within 2 hours.
+          </p>
+          <p style={{ color: G.muted, marginTop: 12, fontSize: 14 }}>
+            No mail app? Email us directly: <a href="mailto:partnerships@sidehuddle.com" style={{ color: G.gold }}>partnerships@sidehuddle.com</a>
+          </p>
+          <button className="btn-outline" style={{ marginTop: 28 }} onClick={() => { setSent(false); onClearAll(); }}>Start over</button>
+        </div>
+      </section>
+    );
   }
 
   return (
-    <Overlay onClose={onClose}>
-      {step === 'done' ? (
-        <ModalSuccess
-          title="Your spot is held."
-          body={`We'll send your Stripe payment link within 2 hours. ${bundle.length} team${bundle.length > 1 ? 's' : ''} reserved at $${price.total}/mo${free > 0 ? ` — first charge September 1` : ''}.`}
-          onClose={onClose}
-        />
-      ) : <>
-        {/* Progress */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 24 }}>
-          {(['build','contact','review'] as const).map((s, i) => (
-            <div key={s} style={{ flex: 1, height: 3, borderRadius: 2, background: ['build','contact','review'].indexOf(step) >= i ? G.gold : G.border, transition: 'background .2s' }} />
-          ))}
-        </div>
+    <section className="sh-section" style={{ borderTop: `1px solid ${G.border}` }}>
+      <div className="sh-label">06 — YOUR INFO</div>
+      <h2 style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(36px, 5vw, 56px)', lineHeight: 1.0, marginTop: 16, textTransform: 'uppercase' }}>
+        Lock in your spot. <span style={{ color: G.gold }}>We'll handle the rest.</span>
+      </h2>
+      <p style={{ color: '#aaa', marginTop: 12, fontSize: 16, lineHeight: 1.6, maxWidth: 680 }}>
+        No payment today. We'll send you an invoice within 2 hours of receiving this.
+      </p>
 
-        <ModalHeader logo={team.logo_url} name={fullName(team)} league={displayLeague(team.league)} price={`$${price.total} / mo`} onClose={onClose} />
-        {free > 0 && <FreePill label={`${freeLabel(free)} — first charge September 1`} />}
-
-        {step === 'build' && <>
-          {suggestions.length > 0 && <>
-            <div className="sh-label" style={{ marginTop: 20, marginBottom: 10 }}>BUNDLE & SAVE — more teams, better rate</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px,1fr))', gap: 8 }}>
-              {suggestions.map(s => {
-                const on = !!bundle.find(b => b.id === s.id);
-                return (
-                  <button key={s.id} onClick={() => toggle(s)}
-                    style={{ padding: '10px 12px', borderRadius: 6, border: `1px solid ${on ? G.gold : G.border}`, background: on ? 'rgba(255,215,0,.1)' : G.bg, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {s.logo_url && <img src={s.logo_url} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} />}
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: on ? G.gold : G.white }}>{on ? '✓ ' : ''}{fullName(s)}</div>
-                      <div className="sh-label" style={{ fontSize: 8, color: G.muted }}>{displayLeague(s.league)}</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </>}
-          <PriceSummary bundle={bundle} price={price} free={free} fullName={fullName} />
-          <button className="btn-gold" style={{ marginTop: 20, width: '100%' }} onClick={() => setStep('contact')}>Continue to contact info →</button>
-        </>}
-
-        {step === 'contact' && <>
-          <form style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 20 }} onSubmit={e => { e.preventDefault(); setStep('review'); }}>
-            <FF label="Brand / Company *" value={f.brand} onChange={v => setF({ ...f, brand: v })} />
-            <FF label="Your name *"       value={f.name}  onChange={v => setF({ ...f, name: v })} />
-            <FF label="Email *"           value={f.email} onChange={v => setF({ ...f, email: v })} type="email" />
-            <FF label="Phone (optional)"  value={f.phone} onChange={v => setF({ ...f, phone: v })} />
-            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-              <button className="btn-outline" type="button" style={{ flex: 1 }} onClick={() => setStep('build')}>← Back</button>
-              <button className="btn-gold"    type="submit" style={{ flex: 2 }}
-                onClick={() => { if (!f.brand || !f.name || !f.email) toast.error('Brand, name, and email are required.'); }}>
-                Review order →
-              </button>
-            </div>
-          </form>
-        </>}
-
-        {step === 'review' && <>
-          <div style={{ marginTop: 20, background: G.bg, border: `1px solid ${G.border}`, borderRadius: 8, padding: 20 }}>
-            <div className="sh-label" style={{ marginBottom: 12 }}>ORDER SUMMARY</div>
-            {bundle.map(t => (
-              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: `1px solid ${G.border}` }}>
-                {t.logo_url && <img src={t.logo_url} alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />}
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{fullName(t)}</div>
-                  <div style={{ fontSize: 11, color: G.muted }}>{displayLeague(t.league)}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.1fr)', gap: 40, marginTop: 48, alignItems: 'start' }}>
+        {/* Order summary */}
+        <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: 28 }}>
+          <div className="sh-label" style={{ marginBottom: 16 }}>ORDER SUMMARY</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {selectedTeams.map(t => (
+              <div key={teamKey(t)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${G.border}` }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{t.city} {t.name}</div>
+                  <div className="sh-label" style={{ fontSize: 9, color: G.muted, marginTop: 2 }}>{displayLeague(t.league)}</div>
                 </div>
-                <div style={{ fontSize: 12, color: G.muted }}>{price.label}</div>
+                <div style={{ fontSize: 13, color: G.muted2 }}>{price.label}</div>
               </div>
             ))}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 16 }}>
-              <div className="sh-label">TOTAL / MONTH</div>
-              <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 32, color: G.gold }}>${price.total}<span style={{ fontSize: 13, color: G.muted, fontWeight: 400 }}>/mo</span></div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 20, paddingTop: 16, borderTop: `1px solid ${G.gold}44` }}>
+            <div className="sh-label">TOTAL / MONTH</div>
+            <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 36, color: G.gold }}>${price.total}<span style={{ fontSize: 13, color: G.muted, fontWeight: 400 }}>/mo</span></div>
+          </div>
+          {free > 0 && (
+            <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(255,215,0,.06)', border: `1px solid ${G.gold}44`, borderRadius: 6, fontSize: 13, color: G.gold }}>
+              🎁 {freeLabel(free)} — first charge September 1
             </div>
-            {free > 0 && <div style={{ marginTop: 8, fontSize: 13, color: '#7ec85f' }}>🎁 {freeLabel(free)} — first charge September 1</div>}
+          )}
+          <div style={{ marginTop: 16, padding: '12px 14px', background: G.bg, border: `1px solid ${G.border}`, borderRadius: 6, fontSize: 13, color: '#bbb', lineHeight: 1.6 }}>
+            <strong style={{ color: G.white }}>No card charged today.</strong> We'll send an invoice to your email within 2 hours. Your spot is held as soon as we receive this.
           </div>
-          <div style={{ marginTop: 16, background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: 16 }}>
-            <div className="sh-label" style={{ marginBottom: 8 }}>CONTACT</div>
-            <div style={{ fontSize: 14, color: '#ccc', lineHeight: 1.7 }}>
-              <div><strong>Brand:</strong> {f.brand}</div>
-              <div><strong>Contact:</strong> {f.name}</div>
-              <div><strong>Email:</strong> {f.email}</div>
-              {f.phone && <div><strong>Phone:</strong> {f.phone}</div>}
-            </div>
-          </div>
-          <div style={{ marginTop: 16, padding: 14, border: `1px solid ${G.gold}55`, borderRadius: 6, background: 'rgba(255,215,0,.04)', fontSize: 13, color: '#ccc', lineHeight: 1.6 }}>
-            <strong style={{ color: G.gold }}>No card charged today.</strong> We'll send a Stripe payment link to your email within 2 hours. Your spot is held as soon as you confirm.
-          </div>
-          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button className="btn-outline" style={{ flex: 1 }} onClick={() => setStep('contact')}>← Edit</button>
-            <button className="btn-gold"    style={{ flex: 2 }} disabled={busy} onClick={submit}>{busy ? 'Holding spot…' : 'Confirm & hold my spot →'}</button>
-          </div>
-        </>}
-      </>}
-    </Overlay>
-  );
-}
-
-function PriceSummary({ bundle, price, free, fullName }: { bundle: Team[]; price: { total: number; label: string }; free: number; fullName: (t: Team) => string }) {
-  return (
-    <div style={{ marginTop: 20, padding: 16, background: G.bg, border: `1px solid ${G.border}`, borderRadius: 6 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span className="sh-label">{bundle.length} TEAM{bundle.length !== 1 ? 'S' : ''}</span>
-        <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 28, color: G.gold }}>${price.total}<span style={{ fontSize: 12, color: G.muted, fontWeight: 400 }}>/mo</span></span>
-      </div>
-      <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>{price.label}</div>
-      {bundle.length >= 3 && <div style={{ fontSize: 12, color: '#7ec85f', marginTop: 6 }}>✓ Bundle discount applied</div>}
-    </div>
-  );
-}
-
-// ─── Shared modal pieces ──────────────────────────────────────────────────────
-function Overlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  useEffect(() => {
-    const fn = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', fn);
-    return () => window.removeEventListener('keydown', fn);
-  }, [onClose]);
-  return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>{children}</div>
-    </div>
-  );
-}
-function ModalHeader({ logo, name, league, price, onClose }: { logo?: string | null; name: string; league: string; price: string; onClose: () => void }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        {logo && <img src={logo} alt={name} style={{ width: 48, height: 48, objectFit: 'contain', flexShrink: 0 }} />}
-        <div>
-          <div className="sh-label" style={{ color: G.muted }}>{league}</div>
-          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 22, textTransform: 'uppercase', marginTop: 2 }}>{name}</div>
-          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 20, color: G.gold }}>{price}<span style={{ fontSize: 12, color: G.muted, fontWeight: 400, fontFamily: FONT_B }}> founding rate</span></div>
         </div>
+
+        {/* Contact form */}
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <FF label="Brand / Company *"    value={f.brand}   onChange={v => setF({ ...f, brand: v })} />
+          <FF label="Your name *"          value={f.name}    onChange={v => setF({ ...f, name: v })} />
+          <FF label="Email *"              value={f.email}   onChange={v => setF({ ...f, email: v })} type="email" />
+          <FF label="Phone (optional)"     value={f.phone}   onChange={v => setF({ ...f, phone: v })} />
+          <FF label="Message (optional)"   value={f.message} onChange={v => setF({ ...f, message: v })} multiline />
+          <button className="btn-gold" type="submit" style={{ marginTop: 8, width: '100%', fontSize: 15, padding: '16px 28px' }}
+            disabled={!f.brand || !f.name || !f.email}>
+            Send inquiry & get invoice →
+          </button>
+          <p style={{ fontSize: 12, color: G.muted, textAlign: 'center', marginTop: 4 }}>
+            This opens your email app with everything pre-filled. Just hit send.
+          </p>
+        </form>
       </div>
-      <button onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: 'none', color: G.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1, flexShrink: 0, padding: 4 }}>×</button>
-    </div>
-  );
-}
-function FreePill({ label }: { label: string }) {
-  return (
-    <div style={{ marginTop: 16, padding: '10px 14px', border: `1px solid ${G.gold}`, borderRadius: 6, background: 'rgba(255,215,0,.07)', fontSize: 13, color: G.gold, fontWeight: 600 }}>
-      🎁 {label}
-    </div>
-  );
-}
-function BundleHint() {
-  return (
-    <p style={{ color: G.muted2, fontSize: 13, marginTop: 12 }}>
-      Want more teams? <span style={{ color: G.white }}>3 = $650/mo · 6 = $1,200/mo · 10+ = $1,800/mo</span>
-    </p>
-  );
-}
-function ModalSuccess({ title, body, onClose }: { title: string; body: string; onClose: () => void }) {
-  return (
-    <div style={{ textAlign: 'center', padding: '16px 0' }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>🏆</div>
-      <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 32, color: G.gold, textTransform: 'uppercase' }}>{title}</div>
-      <p style={{ color: '#ccc', marginTop: 14, fontSize: 16, lineHeight: 1.65 }}>{body}</p>
-      <button className="btn-gold" style={{ marginTop: 28 }} onClick={onClose}>Close</button>
-    </div>
-  );
-}
-function FF({ label, value, onChange, type = 'text', multiline = false }: { label: string; value: string; onChange: (v: string) => void; type?: string; multiline?: boolean }) {
-  return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <span className="sh-label" style={{ color: G.muted }}>{label}</span>
-      {multiline
-        ? <textarea className="sh-input" rows={3} value={value} onChange={e => onChange(e.target.value)} style={{ resize: 'vertical' }} />
-        : <input className="sh-input" type={type} value={value} onChange={e => onChange(e.target.value)} />
-      }
-    </label>
+    </section>
   );
 }
 
@@ -958,16 +799,29 @@ function Footer({ onCta }: { onCta: () => void }) {
           <button className="btn-gold" style={{ marginTop: 20 }} onClick={onCta}>Claim your team →</button>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div className="sh-label" style={{ color: G.muted }}>BUNDLE INQUIRIES · 10+ TEAMS</div>
+          <div className="sh-label" style={{ color: G.muted }}>PARTNERSHIPS & BUNDLE INQUIRIES</div>
           <a href="mailto:partnerships@sidehuddle.com" style={{ display: 'block', marginTop: 8, color: G.gold, fontWeight: 700, fontSize: 16, textDecoration: 'none' }}>
             partnerships@sidehuddle.com
           </a>
         </div>
       </div>
       <div style={{ borderTop: `1px solid ${G.border}`, padding: '16px 32px', textAlign: 'center', fontSize: 12, color: G.muted }}>
-        © {new Date().getFullYear()} Side Huddle Sports · sponsors.sidehuddlesports.com
+        © {new Date().getFullYear()} Side Huddle Sports · sidehuddlesports.com/sponsors
       </div>
     </footer>
+  );
+}
+
+// ─── Shared form field ────────────────────────────────────────────────────────
+function FF({ label, value, onChange, type = 'text', multiline = false }: { label: string; value: string; onChange: (v: string) => void; type?: string; multiline?: boolean }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <span className="sh-label" style={{ color: G.muted }}>{label}</span>
+      {multiline
+        ? <textarea className="sh-input" rows={3} value={value} onChange={e => onChange(e.target.value)} style={{ resize: 'vertical' }} />
+        : <input className="sh-input" type={type} value={value} onChange={e => onChange(e.target.value)} />
+      }
+    </label>
   );
 }
 
@@ -977,23 +831,18 @@ const css = `
 .sh-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em; font-weight: 700; color: ${G.gold}; font-family: ${FONT_B}; }
 .btn-gold { background: ${G.gold}; color: #0a0a0a; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 14px 28px; border-radius: 4px; cursor: pointer; border: 1.5px solid ${G.gold}; transition: background .15s, border-color .15s; font-family: ${FONT_B}; font-size: 13px; }
 .btn-gold:hover { background: #ffe74a; border-color: #ffe74a; }
-.btn-gold:disabled { opacity: .6; cursor: not-allowed; }
+.btn-gold:disabled { opacity: .5; cursor: not-allowed; }
 .btn-outline { background: transparent; color: ${G.white}; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; padding: 14px 28px; border-radius: 4px; cursor: pointer; border: 1.5px solid ${G.border}; transition: border-color .15s, color .15s; font-family: ${FONT_B}; font-size: 13px; }
 .btn-outline:hover { border-color: ${G.gold}; color: ${G.gold}; }
 .sh-input { background: #080808; border: 1px solid ${G.border}; color: ${G.white}; padding: 11px 14px; border-radius: 4px; width: 100%; font-family: ${FONT_B}; font-size: 14px; outline: none; box-sizing: border-box; }
 .sh-input:focus { border-color: ${G.gold}; }
-.team-card { background: ${G.surface}; border: 1px solid ${G.border}; border-radius: 8px; padding: 18px; transition: border-color .15s, transform .15s; }
-.team-card:hover { border-color: ${G.gold}44; transform: translateY(-2px); }
-.team-card.taken { opacity: .3; pointer-events: none; }
 .badge-dot { display: flex; align-items: center; gap: 6px; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; }
 .pulse-dot { animation: pulseDot 2s ease-in-out infinite; }
 .pulse-gold { animation: pulseGold 2.5s ease-in-out infinite; }
 .bubble-in { animation: bubbleIn .55s ease-out backwards; position: absolute; }
-.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.88); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; animation: fadeIn .18s ease-out; overflow-y: auto; }
-.modal { background: ${G.surface}; border: 1px solid ${G.gold}55; border-radius: 10px; max-width: 560px; width: 100%; padding: 32px; position: relative; max-height: 90vh; overflow-y: auto; }
 @keyframes pulseDot { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(231,76,60,.4); } 50% { opacity: .7; box-shadow: 0 0 0 4px rgba(231,76,60,.1); } }
 @keyframes pulseGold { 0%,100% { opacity: .8; } 50% { opacity: 1; } }
 @keyframes bubbleIn { from { opacity: 0; transform: translate(-50%,-50%) scale(.88); } to { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@media (max-width: 700px) { .sh-section { padding: 64px 20px; } .modal { padding: 22px; } }
+@media (max-width: 700px) { .sh-section { padding: 64px 20px; } }
+@media (max-width: 860px) { .contact-grid { grid-template-columns: 1fr !important; } }
 `;
