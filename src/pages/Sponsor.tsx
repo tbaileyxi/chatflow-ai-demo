@@ -699,7 +699,7 @@ ${f.message || 'No message provided'}
 Submitted via sidehuddlesports.com/sponsors`
     );
 
-    window.location.href = `mailto:partnerships@sidehuddle.com?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:qb1@sidehuddlesports.com?subject=${subject}&body=${body}`;
     setSent(true);
   }
 
@@ -713,7 +713,7 @@ Submitted via sidehuddlesports.com/sponsors`
             Your mail app opened with all your info pre-filled. Hit send and we'll have an invoice to you within 2 hours.
           </p>
           <p style={{ color: G.muted, marginTop: 12, fontSize: 14 }}>
-            No mail app? Email us directly: <a href="mailto:partnerships@sidehuddle.com" style={{ color: G.gold }}>partnerships@sidehuddle.com</a>
+            No mail app? Email us directly: <a href="mailto:qb1@sidehuddlesports.com" style={{ color: G.gold }}>qb1@sidehuddlesports.com</a>
           </p>
           <button className="btn-outline" style={{ marginTop: 28 }} onClick={() => { setSent(false); onClearAll(); }}>Start over</button>
         </div>
@@ -800,8 +800,8 @@ function Footer({ onCta }: { onCta: () => void }) {
         </div>
         <div style={{ textAlign: 'right' }}>
           <div className="sh-label" style={{ color: G.muted }}>PARTNERSHIPS & BUNDLE INQUIRIES</div>
-          <a href="mailto:partnerships@sidehuddle.com" style={{ display: 'block', marginTop: 8, color: G.gold, fontWeight: 700, fontSize: 16, textDecoration: 'none' }}>
-            partnerships@sidehuddle.com
+          <a href="mailto:qb1@sidehuddlesports.com" style={{ display: 'block', marginTop: 8, color: G.gold, fontWeight: 700, fontSize: 16, textDecoration: 'none' }}>
+            qb1@sidehuddlesports.com
           </a>
         </div>
       </div>
