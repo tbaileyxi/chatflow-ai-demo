@@ -104,13 +104,24 @@ N. [COMPANY NAME]  ·  [Target title]  ·  [HQ city]
 
 After all cards, end with:
 
+**📄 Cards saved to:** `sponsor-outreach/YYYY-MM-DD-[batch-slug].md`
 **✅ Updated sponsors-tracker.md — added/updated N rows.**
 
 **Suggested order to work through:** [1-line ranking — who to hit first and why]
 
-# Tracker — ALWAYS update
+# Persisting outputs — ALWAYS do BOTH of these
 
-After generating all cards, update **`/Users/TysTempCloud/Documents/chatflow-ai-demo/sponsors-tracker.md`**:
+## 1. Save the full cards to a batch file (CRITICAL — chat scrolls away)
+
+The cards in chat get buried. **Always also write the full output to a file** the user can reopen anytime:
+
+- **File path:** `/Users/TysTempCloud/Documents/chatflow-ai-demo/sponsor-outreach/YYYY-MM-DD-[batch-slug].md`
+  - `batch-slug` = short kebab-case label for the run (e.g. `tx-auto-dealers`, `qsr-southeast`, `sportsbooks`)
+  - If the file already exists for today's slug, append to it with a `## Run [HH:MM]` separator
+- **Contents:** the full card output exactly as printed in chat — header summary line, all card blocks with separators, the final suggested order. The user opens this file and copy/pastes from it.
+- Create the `sponsor-outreach/` directory if it doesn't exist.
+
+## 2. Update `/Users/TysTempCloud/Documents/chatflow-ai-demo/sponsors-tracker.md`
 
 1. Read the tracker first.
 2. For each prospect:
@@ -118,8 +129,8 @@ After generating all cards, update **`/Users/TysTempCloud/Documents/chatflow-ai-
    - **If new**: append a Pipeline row with Date Added today, Status `Drafted`, Last Touch today, all the columns filled.
 3. For each prospect, also append to `## Prospect log`:
    - Find or create `### [Company]` heading
-   - Add: `- **YYYY-MM-DD** — Drafted via blitz: [bundle], $[X]/mo. Hook: [1-line].`
-4. Confirm with the "✅ Updated sponsors-tracker.md" line.
+   - Add: `- **YYYY-MM-DD** — Drafted via blitz: [bundle], $[X]/mo. Hook: [1-line]. Full drafts: [sponsor-outreach/YYYY-MM-DD-batch-slug.md](sponsor-outreach/YYYY-MM-DD-batch-slug.md)`
+4. Confirm with both the "📄 Cards saved" and "✅ Updated sponsors-tracker.md" lines.
 
 # Hard rules
 - **Never invent companies, contacts, names, URLs, or stats.** Flag unverifiable hooks with `(VERIFY)`.
