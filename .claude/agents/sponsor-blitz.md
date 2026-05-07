@@ -84,23 +84,35 @@ Then output one card per prospect, separated by `━━━━━━━━━━�
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 N. [COMPANY NAME]  ·  [Target title]  ·  [HQ city]
    🔗 LinkedIn: [Find the [title]](https://www.linkedin.com/search/results/people/?keywords=...)
+   🐦 Twitter/X: @[verified company handle] · [Search marketing team](https://x.com/search?q=from%3A%40handle%20marketing&f=user) · DM open: [Yes/No/Unknown]
    📦 Bundle: [team list]
    💰 $X,XXX/mo ([N]-team founding rate)
    🎯 Hook: [1-line — real fact + (VERIFY) flag if unverified]
 
-   ━ Connection note (XXX chars) ━
+   ━ LinkedIn connection note (XXX chars) ━
    > [paste-ready text]
 
-   ━ First DM (after they accept) ━
+   ━ LinkedIn first DM (after they accept) ━
    > [paste-ready text]
 
-   ━ Follow-up (5-7 days later if no reply) ━
+   ━ LinkedIn follow-up (5-7 days later) ━
    > [paste-ready text]
+
+   ━ Twitter/X DM (short, casual, 2-3 sentences max) ━
+   > [paste-ready text — anchor on the same hook but informal. End with the sponsors URL or a one-line ask.]
 
    ━ Email subject if they ask ━
    > [text]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
+
+## Twitter/X DM rules
+
+- Find the **company's verified Twitter handle** via WebSearch — never guess. If unverified, mark `(VERIFY)`.
+- Don't try to find the individual marketer's personal handle (too unreliable). Provide a search link the user can use to find the marketing team.
+- Note **DM open status** if you can verify it (most consumer-brand company accounts have open DMs; individual exec accounts often don't).
+- DM body: **2-3 sentences max**, casual tone, lowercase ok. Hook + one-line ask + URL. No "Hey [First]" — these often hit the company inbox.
+- Example tone: *"hey — we're building Side Huddle, an app where one team's fans split into hundreds of live game-day group chats with an AI bot in each. every bot card carries 'Powered by [Brand].' sportsbook-style attention, $250/team. quick look? sidehuddlesports.com/sponsors"*
 
 After all cards, end with:
 
