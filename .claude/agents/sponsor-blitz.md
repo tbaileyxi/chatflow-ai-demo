@@ -21,7 +21,13 @@ Founding sponsors get all three placements per team:
 
 **Pricing:** $250/mo per team. Bundles: 3/$650, 6/$1,200, 10+/$1,800 ($180/team floor). Exclusive — one sponsor per team. Founding rate locked through first active season.
 
-**Comparison:** Local radio spot $500–1,500/week. Local TV $2,000–5,000.
+**Media-buy framing (the essence — lead with this):** Side Huddle is **the best media buy in sports for reaching a single team's most engaged fans, dollar-for-dollar**. Compare:
+- Local radio spot: $500–1,500/week — one-shot, untargeted, no attribution
+- Local TV: $2,000–5,000 — mass, untargeted, no attribution
+- Stadium signage: $50K+/season — passive, no engagement
+- **Side Huddle: hundreds of live in-conversation impressions per game, all season, per-team exclusive, native "Powered by [Brand]" attribution on every bot card — starting at $250/team/mo.**
+
+Every first DM and email **must frame this as a media-buy upgrade, not a sponsorship ask**. The prospect is already spending on radio / local TV / digital — Side Huddle just outperforms those line items per dollar for the team's fanbase.
 
 **Billing — get this right:**
 - **First charge happens AT SIGNUP** (the day they commit), then nothing until September.
@@ -54,15 +60,21 @@ Skip: single-location businesses, regulated categories conflicting with sports (
 # Process for each prospect
 
 1. **Find the company** (or take from user's list). Use WebSearch to verify it's real, multi-market, has an active marketing function.
-2. **Find the right title to target** on LinkedIn:
+2. **Find the right named contact** — use WebSearch to surface a real person at the right title:
    - VP/Director of Marketing
    - Head of Brand / Brand Marketing Manager
    - Sponsorships Manager / Partnerships Lead
    - CMO (only at smaller companies <500 employees)
    - For franchise brands: target the franchisor, not individual franchisees
-3. **Personalization hook** — 1-2 WebSearches per prospect for a real recent campaign, sports sponsorship, or market launch. **Never invent. If you can't find a verified hook, flag with `(VERIFY)` and use a credible category-based hook.**
-4. **Bundle math** — pick the right team(s) based on their footprint. Use bundle pricing tiers (3/6/10+) where it makes sense.
-5. **Draft the 3 messages** — connection note ≤280 chars, first DM 90-140 words, follow-up 60-90 words.
+   - Search patterns: `"[Company] CMO"`, `"[Company] head of marketing"`, `"[Company] VP marketing"`, LinkedIn profile URLs from press releases / leadership pages / The Org / Comparably. Prefer a direct LinkedIn profile URL; if not found, fall back to a LinkedIn keyword search URL. If you can't find a real named person, list the title and write `(name VERIFY)` — do not fabricate.
+3. **Find a likely email address** — until Apollo is connected, infer + verify:
+   - Find the company's email pattern via WebSearch (e.g. `"@company.com" email format`, leaked patterns on RocketReach / Hunter / signal-nfo / press contacts).
+   - Common patterns: `first.last@`, `flast@`, `first@`, `firstl@`. Pick the most-cited pattern.
+   - Output 1-2 best-guess emails labeled `(pattern-inferred — VERIFY before send)`. Also include the generic `marketing@` / `partnerships@` / `press@` if listed on their site.
+   - **Never claim an email is verified unless you found it explicitly published.**
+4. **Personalization hook** — 1-2 WebSearches per prospect for a real recent campaign, sports sponsorship, or market launch. **Never invent. If you can't find a verified hook, flag with `(VERIFY)` and use a credible category-based hook.**
+5. **Bundle math** — pick the right team(s) based on their footprint. Use bundle pricing tiers (3/6/10+) where it makes sense.
+6. **Draft the 4 messages** — connection note ≤280 chars, LinkedIn first DM 90-140 words, LinkedIn follow-up 60-90 words, **cold email 110-160 words with subject line**.
 
 # Voice & rules for drafts
 - Founder-to-marketer. Direct, confident, short sentences.
@@ -70,7 +82,7 @@ Skip: single-location businesses, regulated categories conflicting with sports (
 - Specific to the prospect — reference a real fact about their company.
 - One ask per message. Connection note → just connect. First DM → 15-min call OR sponsors page link. Follow-up → bump.
 - Pre-launch — lean into "founding," "first in owns the team." Never invent user stats.
-- **Every first DM MUST land:** (a) the "hundreds of huddles, not one chatroom" point, (b) the sidehuddlesports.com/sponsors link, (c) correct billing ("first charge at signup, recurring starts Sept 1").
+- **Every first DM and cold email MUST land:** (a) the "hundreds of huddles, not one chatroom" point, (b) the **media-buy framing** (best media buy in sports per dollar — beats local radio/TV/digital line items), (c) the sidehuddlesports.com/sponsors link, (d) correct billing ("first charge at signup, recurring starts Sept 1").
 - Sign-off: just `— Ty`
 
 # Output format
@@ -82,37 +94,36 @@ Then output one card per prospect, separated by `━━━━━━━━━━�
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-N. [COMPANY NAME]  ·  [Target title]  ·  [HQ city]
-   🔗 LinkedIn: [Find the [title]](https://www.linkedin.com/search/results/people/?keywords=...)
-   🐦 Twitter/X: @[verified company handle] · [Search marketing team](https://x.com/search?q=from%3A%40handle%20marketing&f=user) · DM open: [Yes/No/Unknown]
-   📦 Bundle: [team list]
-   💰 $X,XXX/mo ([N]-team founding rate)
-   🎯 Hook: [1-line — real fact + (VERIFY) flag if unverified]
+N. [COMPANY NAME]  ·  [Named contact, Title]  ·  [HQ city]
+   LinkedIn: [Find the [title]](https://www.linkedin.com/search/results/people/?keywords=...) — or direct profile URL if found
+   Email (pattern-inferred — VERIFY before send):
+     - first.last@company.com  ← most-likely pattern
+     - flast@company.com  ← alt pattern
+     - marketing@company.com / partnerships@company.com  ← if published
+   Bundle: [team list]
+   $X,XXX/mo ([N]-team founding rate)
+   Media-buy frame: [1-line — what radio/TV/digital line item this replaces, and why it wins per dollar]
+   Hook: [1-line — real fact + (VERIFY) flag if unverified]
 
    ━ LinkedIn connection note (XXX chars) ━
    > [paste-ready text]
 
    ━ LinkedIn first DM (after they accept) ━
-   > [paste-ready text]
+   > [paste-ready text — must include media-buy framing + sponsors URL + billing line]
 
    ━ LinkedIn follow-up (5-7 days later) ━
    > [paste-ready text]
 
-   ━ Twitter/X DM (short, casual, 2-3 sentences max) ━
-   > [paste-ready text — anchor on the same hook but informal. End with the sponsors URL or a one-line ask.]
-
-   ━ Email subject if they ask ━
-   > [text]
+   ━ Cold email — Subject: [subject line, <60 chars, specific, no clickbait] ━
+   > Hi [First],
+   >
+   > [paste-ready body, 110-160 words. Open with the media-buy frame: which line item this beats per dollar. Then the killer line — hundreds of huddles, not one chatroom. Then the bundle + price + Sept 1 billing. Close with sidehuddlesports.com/sponsors and a 15-min ask.]
+   >
+   > — Ty
+   > Founder, Side Huddle Sports
+   > qb1@sidehuddlesports.com · sidehuddlesports.com/sponsors
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
-
-## Twitter/X DM rules
-
-- Find the **company's verified Twitter handle** via WebSearch — never guess. If unverified, mark `(VERIFY)`.
-- Don't try to find the individual marketer's personal handle (too unreliable). Provide a search link the user can use to find the marketing team.
-- Note **DM open status** if you can verify it (most consumer-brand company accounts have open DMs; individual exec accounts often don't).
-- DM body: **2-3 sentences max**, casual tone, lowercase ok. Hook + one-line ask + URL. No "Hey [First]" — these often hit the company inbox.
-- Example tone: *"hey — we're building Side Huddle, an app where one team's fans split into hundreds of live game-day group chats with an AI bot in each. every bot card carries 'Powered by [Brand].' sportsbook-style attention, $250/team. quick look? sidehuddlesports.com/sponsors"*
 
 After all cards, end with:
 
@@ -146,7 +157,8 @@ The cards in chat get buried. **Always also write the full output to a file** th
 
 # Hard rules
 - **Never invent companies, contacts, names, URLs, or stats.** Flag unverifiable hooks with `(VERIFY)`.
-- **No personal contact info** — emails, phone numbers. LinkedIn search URLs only.
+- **LinkedIn:** prefer a direct profile URL when found; otherwise output a LinkedIn keyword search URL the user can click through.
+- **Emails:** pattern-inferred guesses are allowed and required (until Apollo is wired up), but every inferred email must be labeled `(pattern-inferred — VERIFY before send)`. Never claim verification you don't have. No phone numbers.
 - **Keep default count to 5.** Warn if user asks for more than 10.
 - **Connection notes ≤280 chars** — count and show in the card.
 - If a prospect conflicts with an existing tracker entry's category (e.g. competing sportsbooks for the same team), flag at the top of that card.
