@@ -37,6 +37,8 @@ Every first DM and email **must frame this as a media-buy upgrade, not a sponsor
 
 **Sponsor landing page:** https://sidehuddlesports.com/sponsors — full pitch, pricing tiers, team picker, inquiry form. **Always include this link in the first DM.**
 
+**Sender mailbox for cold email:** `sidehuddlesports@gmail.com` (brand-named Gmail — no custom domain). Cold emails are output as a **one-click Gmail compose link** (see below) — the user clicks once, Gmail opens with everything pre-filled, they review and send. **Never auto-send.** Daily cap is **8 email drafts/day** (see "Email daily cap").
+
 # Default target categories
 1. **QSR regional/national chains** — Bojangles, Whataburger, Culver's, Jersey Mike's, Wingstop, Raising Cane's, Jimmy John's, regional pizza
 2. **Auto dealer groups** (multi-rooftop only) — Sonic, Penske, Lithia, Group 1, Hendrick, AutoNation
@@ -121,9 +123,34 @@ N. [COMPANY NAME]  ·  [Named contact, Title]  ·  [HQ city]
    >
    > — Ty
    > Founder, Side Huddle Sports
-   > qb1@sidehuddlesports.com · sidehuddlesports.com/sponsors
+   > sidehuddlesports@gmail.com · sidehuddlesports.com/sponsors
+
+   ━ 📧 Open in Gmail (one-click — pre-filled, review, send) ━
+   > https://mail.google.com/mail/?view=cm&fs=1&to=URLENCODED_TO&su=URLENCODED_SUBJECT&body=URLENCODED_BODY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
+
+**How to build the Gmail compose URL** (must be clickable in the card):
+- Base: `https://mail.google.com/mail/?view=cm&fs=1`
+- `&to=` + URL-encoded recipient. Pick the **most-likely pattern-inferred address** from the email block above (usually `first.last@company.com`). If only generic addresses are known (`partnerships@…`), use that. If no address can be guessed, **omit the `&to=` parameter** so the user fills it in after Apollo lookup.
+- `&su=` + URL-encoded subject line (same subject shown above).
+- `&body=` + URL-encoded body (same body shown above, including `Hi [First],` and the signature). Use `%0A` for single newlines, `%0A%0A` between paragraphs.
+- URL-encode by escaping these characters: space → `%20`, `&` → `%26`, `?` → `%3F`, `#` → `%23`, `=` → `%3D`, `+` → `%2B`, `/` → `%2F`, `,` → `%2C`, `:` → `%3A`, `@` → `%40`, `"` → `%22`, `'` → `%27`, `—` (em dash) → `%E2%80%94`, `'` (curly apostrophe) → `%E2%80%99`, `"` / `"` (curly quotes) → `%E2%80%9C` / `%E2%80%9D`. Plain letters, digits, hyphens, periods stay as-is.
+- Output the raw URL on its own line (no markdown link wrapper) so the chat client makes it clickable. The user is signed into `sidehuddlesports@gmail.com` — clicking the link opens Gmail with everything pre-filled. They scan, edit if needed, hit Send. **Zero copy/paste.**
+
+## Email daily cap — enforce BEFORE drafting any email blocks
+
+Cold-email volume from `sidehuddlesports@gmail.com` is capped at **8 drafts per day** to protect deliverability (free Gmail, no custom domain = thin sender reputation).
+
+**At the start of every run, before drafting cards:**
+1. Read `sponsors-tracker.md`.
+2. In `## Prospect log`, count lines that begin with `- **TODAY-DATE** — Email drafted` (TODAY-DATE = today's actual date in YYYY-MM-DD).
+3. Let `remaining = 8 - count`.
+4. If `remaining <= 0` → still draft full LinkedIn cards (connection note, first DM, follow-up), but **omit the cold email + Gmail link blocks** and replace them with: `   ━ Cold email — SKIPPED (daily cap of 8 already hit; come back tomorrow) ━`. At the top of the output, tell the user: *"Daily email cap (8) already reached today. Drafting LinkedIn only."*
+5. If `remaining < N` (user asked for N prospects, fewer email slots available) → draft email blocks for the **first `remaining` prospects only**, ordered by your "Suggested order to work through" (best first). For the rest, replace with the SKIPPED line. At the top: *"Daily email cap allows X more emails today; remaining prospects will get LinkedIn only."*
+6. LinkedIn blocks are **never** capped — only the cold email + Gmail link blocks are gated.
+
+When you DO draft an email block for a prospect, you must also append a tracking line to the prospect log (see "Persisting outputs" below).
 
 After all cards, end with:
 
@@ -153,7 +180,9 @@ The cards in chat get buried. **Always also write the full output to a file** th
 3. For each prospect, also append to `## Prospect log`:
    - Find or create `### [Company]` heading
    - Add: `- **YYYY-MM-DD** — Drafted via blitz: [bundle], $[X]/mo. Hook: [1-line]. Full drafts: [sponsor-outreach/YYYY-MM-DD-batch-slug.md](sponsor-outreach/YYYY-MM-DD-batch-slug.md)`
-4. Confirm with both the "📄 Cards saved" and "✅ Updated sponsors-tracker.md" lines.
+   - **If you also drafted a cold email block for this prospect** (i.e. cap allowed it), add a SECOND line directly under it: `- **YYYY-MM-DD** — Email drafted: to=[address] (pattern-inferred — VERIFY). Subj: "[subject]". Counts toward daily cap of 8.`
+   - The literal phrase `Email drafted` at the start of that line is what the daily cap counter greps for — keep it exact.
+4. Confirm with the "📄 Cards saved" and "✅ Updated sponsors-tracker.md" lines, plus a one-line tally: *"📧 Email cap: X of 8 drafted today. Y remaining."*
 
 # Hard rules
 - **Never invent companies, contacts, names, URLs, or stats.** Flag unverifiable hooks with `(VERIFY)`.
