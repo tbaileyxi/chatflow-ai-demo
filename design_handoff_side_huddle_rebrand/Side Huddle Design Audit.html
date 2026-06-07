@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Side Huddle — Design Audit & Rebrand Direction</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --black: #0A0A0B;
+    --black-2: #111113;
+    --black-3: #18181B;
+    --black-4: #222226;
+    --border: #2A2A2F;
+    --border-light: #333338;
+    --gold: #F5C518;
+    --gold-dim: #C9A214;
+    --gold-muted: rgba(245,197,24,0.12);
+    --gold-border: rgba(245,197,24,0.25);
+    --text: #F0F0F2;
+    --text-2: #A0A0A8;
+    --text-3: #606068;
+    --red: #E8453C;
+    --green: #22C55E;
+    --blue: #3B82F6;
+    --radius: 12px;
+  }
+
+  body {
+    background: var(--black);
+    color: var(--text);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Layout */
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px 120px; }
+
+  /* Header */
+  .audit-header {
+    display: flex; align-items: center; gap: 20px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+  .logo-mark {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: #000; border: 2px solid var(--gold-border);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .logo-text { font-size: 22px; font-weight: 800; color: var(--gold); letter-spacing: -0.5px; }
+  .audit-header h1 { font-size: 26px; font-weight: 700; color: var(--text); }
+  .audit-header p { font-size: 14px; color: var(--text-2); margin-top: 2px; }
+
+  /* Section */
+  .section { margin-bottom: 56px; }
+  .section-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--text-3);
+    margin-bottom: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* Cards */
+  .card {
+    background: var(--black-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 12px;
+  }
+  .card.gold-border { border-color: var(--gold-border); background: var(--gold-muted); }
+  .card.red-border { border-color: rgba(232,69,60,0.3); background: rgba(232,69,60,0.06); }
+  .card.green-border { border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.06); }
+
+  .card-title {
+    font-size: 15px; font-weight: 600; color: var(--text);
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-body { font-size: 14px; color: var(--text-2); line-height: 1.65; }
+
+  .tag {
+    display: inline-block;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 2px 8px; border-radius: 4px;
+  }
+  .tag.red { background: rgba(232,69,60,0.15); color: #E8453C; }
+  .tag.yellow { background: rgba(245,197,24,0.15); color: var(--gold); }
+  .tag.green { background: rgba(34,197,94,0.15); color: var(--green); }
+  .tag.blue { background: rgba(59,130,246,0.15); color: var(--blue); }
+
+  /* Two-col grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  /* Before/After */
+  .compare {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    margin-top: 16px;
+  }
+  @media (max-width: 640px) { .compare { grid-template-columns: 1fr; } }
+
+  .compare-panel {
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .compare-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 8px 12px;
+  }
+  .compare-panel.before .compare-label { background: rgba(232,69,60,0.15); color: #E8453C; }
+  .compare-panel.after .compare-label { background: rgba(34,197,94,0.15); color: var(--green); }
+  .compare-body {
+    padding: 16px;
+    background: var(--black-3);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 var(--radius) var(--radius);
+    font-size: 13px; color: var(--text-2); line-height: 1.65;
+  }
+
+  /* Color swatches */
+  .swatch-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .swatch {
+    display: flex; flex-direction: column; gap: 6px;
+    align-items: center;
+  }
+  .swatch-dot {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 1px solid var(--border);
+  }
+  .swatch-name { font-size: 10px; color: var(--text-3); font-family: 'DM Mono', monospace; text-align: center; }
+
+  /* Phone mockup */
+  .phone-row {
+    display: flex; gap: 20px; overflow-x: auto;
+    padding-bottom: 8px;
+    margin-top: 16px;
+  }
+  .phone {
+    flex-shrink: 0;
+    width: 200px;
+    background: var(--black-3);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    overflow: hidden;
+    position: relative;
+  }
+  .phone-notch {
+    width: 80px; height: 22px; background: var(--black-2);
+    border-radius: 0 0 14px 14px;
+    margin: 0 auto 0;
+    border: 1px solid var(--border);
+    border-top: none;
+  }
+  .phone-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--text-3);
+    text-align: center; padding: 6px;
+  }
+  .phone-screen {
+    padding: 0;
+    min-height: 360px;
+    display: flex; flex-direction: column;
+  }
+
+  /* Mock phone UI elements */
+  .mock-header {
+    padding: 12px 14px 10px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .mock-header.retro {
+    background: rgba(30,35,50,0.9);
+  }
+  .mock-header.clean {
+    background: rgba(17,17,19,0.95);
+  }
+  .mock-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--black-4); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; color: var(--gold); }
+  .mock-title { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.2; }
+  .mock-sub { font-size: 9px; color: var(--text-3); }
+
+  .mock-messages { flex: 1; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: var(--black); }
+
+  /* Retro bubble (before) */
+  .mock-bubble { font-size: 10px; line-height: 1.5; border-radius: 12px; padding: 6px 10px; max-width: 80%; }
+  .mock-bubble.retro-other { background: rgba(0,191,255,0.15); border: 1px solid rgba(0,191,255,0.3); color: #cdf; align-self: flex-start; box-shadow: 0 0 8px rgba(0,191,255,0.2); }
+  .mock-bubble.retro-own { background: rgba(255,200,0,0.25); border: 1px solid rgba(255,200,0,0.4); color: #ffd; align-self: flex-end; box-shadow: 0 0 8px rgba(255,200,0,0.2); }
+
+  /* Clean bubble (after) */
+  .mock-bubble.clean-other { background: var(--black-3); border: 1px solid var(--border); color: var(--text); align-self: flex-start; }
+  .mock-bubble.clean-own { background: var(--gold); color: #000; align-self: flex-end; font-weight: 500; }
+
+  /* Reddit-style (after) */
+  .mock-post { background: var(--black-3); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; margin-bottom: 4px; }
+  .mock-post-meta { font-size: 9px; color: var(--text-3); margin-bottom: 3px; }
+  .mock-post-body { font-size: 10px; color: var(--text); line-height: 1.5; }
+  .mock-post-bar { font-size: 9px; color: var(--text-3); margin-top: 5px; display: flex; gap: 10px; }
+  .mock-post-bar span { color: var(--gold); font-weight: 600; }
+
+  .mock-score-bar {
+    padding: 7px 12px;
+    background: var(--black-2);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 10px; color: var(--text);
+  }
+  .mock-score-live { background: var(--red); color: #fff; font-size: 8px; font-weight: 700; border-radius: 3px; padding: 1px 4px; letter-spacing: 0.05em; }
+  .mock-score-num { font-size: 13px; font-weight: 700; color: var(--text); }
+
+  .mock-bottom-nav {
+    display: flex; justify-content: space-around; align-items: center;
+    padding: 8px 6px 10px;
+    background: var(--black-2);
+    border-top: 1px solid var(--border);
+  }
+  .mock-nav-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .mock-nav-icon { font-size: 14px; }
+  .mock-nav-label { font-size: 8px; color: var(--text-3); }
+  .mock-nav-item.active .mock-nav-label { color: var(--gold); }
+  .mock-nav-item.active .mock-nav-icon { filter: brightness(1.5) sepia(1) saturate(4) hue-rotate(0deg); }
+
+  /* Type specimen */
+  .type-row { display: flex; align-items: baseline; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .type-label { font-size: 11px; color: var(--text-3); font-family: 'DM Mono'; width: 100px; flex-shrink: 0; }
+  .type-sample { color: var(--text); }
+
+  /* Issue list */
+  .issue-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-top: 0; }
+  .issue-item { display: flex; gap: 12px; align-items: flex-start; }
+  .issue-bullet { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; margin-top: 1px; }
+  .issue-bullet.red { background: rgba(232,69,60,0.2); color: var(--red); }
+  .issue-bullet.yellow { background: rgba(245,197,24,0.15); color: var(--gold); }
+  .issue-text { font-size: 14px; color: var(--text-2); }
+  .issue-text strong { color: var(--text); font-weight: 600; }
+
+  /* Priority table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border-light); color: var(--text-2); vertical-align: top; }
+  td:first-child { color: var(--text); font-weight: 500; }
+  tr:last-child td { border-bottom: none; }
+
+  /* Divider */
+  hr { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+
+  /* Callout */
+  .callout {
+    background: var(--gold-muted);
+    border: 1px solid var(--gold-border);
+    border-left: 3px solid var(--gold);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 14px; color: var(--text-2); line-height: 1.65;
+  }
+  .callout strong { color: var(--gold); }
+
+  /* CRT visual */
+  .crt-demo {
+    position: relative; border-radius: 10px; overflow: hidden;
+    background: #080814; padding: 16px; font-size: 12px;
+    font-family: 'DM Mono'; color: #0ff;
+    border: 1px solid rgba(0,255,255,0.2);
+  }
+  .crt-demo::after {
+    content: ''; position: absolute; inset: 0;
+    background: repeating-linear-gradient(transparent 0px, transparent 1px, rgba(0,0,0,0.15) 1px, rgba(0,0,0,0.15) 2px);
+    pointer-events: none; animation: crt 0.15s linear infinite;
+  }
+  @keyframes crt { 0%,100%{opacity:0.98} 50%{opacity:1} }
+  .crt-label { font-size: 10px; color: rgba(0,255,255,0.5); margin-bottom: 6px; }
+
+  /* Summary score */
+  .score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 600px) { .score-grid { grid-template-columns: repeat(2,1fr); } }
+  .score-card { background: var(--black-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; }
+  .score-num { font-size: 32px; font-weight: 700; color: var(--gold); }
+  .score-label { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+
+  /* Sticky nav */
+  .sticky-toc {
+    position: fixed; top: 20px; right: 20px;
+    background: var(--black-2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+    font-size: 11px; z-index: 100;
+    display: flex; flex-direction: column; gap: 6px;
+    max-width: 140px;
+  }
+  .sticky-toc a { color: var(--text-3); text-decoration: none; transition: color 0.15s; }
+  .sticky-toc a:hover { color: var(--gold); }
+  .toc-title { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
+  @media (max-width: 1100px) { .sticky-toc { display: none; } }
+
+  .divider-line { height: 1px; background: var(--border); margin: 32px 0; }
+
+  /* Font demo */
+  .font-before { font-family: 'Orbitron', monospace; }
+  .font-after { font-family: 'DM Sans', sans-serif; }
+
+  /* Scroll-aware highlight */
+  section { scroll-margin-top: 24px; }
+</style>
+</head>
+<body>
+
+<nav class="sticky-toc">
+  <div class="toc-title">Contents</div>
+  <a href="#verdict">TL;DR</a>
+  <a href="#identity">Identity</a>
+  <a href="#issues">Issues</a>
+  <a href="#colors">Colors</a>
+  <a href="#type">Typography</a>
+  <a href="#chat">Chat UX</a>
+  <a href="#nav">Navigation</a>
+  <a href="#live">Live/Scores</a>
+  <a href="#direction">Direction</a>
+  <a href="#roadmap">Roadmap</a>
+</nav>
+
+<div class="page">
+
+  <!-- Header -->
+  <div class="audit-header">
+    <div class="logo-mark">
+      <div class="logo-text">SH</div>
+    </div>
+    <div>
+      <h1>Side Huddle — Design Audit</h1>
+      <p>Rebrand direction & continuity recommendations &nbsp;·&nbsp; April 2026</p>
+    </div>
+  </div>
+
+  <!-- TL;DR -->
+  <section id="verdict">
+    <div class="section-label">TL;DR — Overall Verdict</div>
+
+    <div class="score-grid" style="margin-bottom:20px">
+      <div class="score-card">
+        <div class="score-num">🔥</div>
+        <div class="score-label">Logo &amp; Brand Mark</div>
+      </div>
+      <div class="score-card">
+        <div class="score-num" style="color:#E8453C">⚠️</div>
+        <div class="score-label">Visual Cohesion</div>
+      </div>
+      <div class="score-card">
+        <div class="score-num" style="color:#E8453C">⚠️</div>
+        <div class="score-label">Chat UX Direction</div>
+      </div>
+      <div class="score-card">
+        <div class="score-num" style="color:var(--green)">✓</div>
+        <div class="score-label">Tech Foundation</div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>The core brand is solid.</strong> Black + gold, the SH monogram, the "Huddle" concept — these are all strong. The problem is everything built on top of it. The app currently has an <strong>identity crisis</strong>: retro arcade CRT aesthetic layered on top of glassmorphism layered on top of iMessage bubbles. Each trend is fine in isolation — together they create visual noise that undermines what should be a clean, premium sports companion. The fix is surgical, not a full rebuild.
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- Identity -->
+  <section id="identity">
+    <div class="section-label">01 — Brand Identity</div>
+
+    <div class="card green-border" style="margin-bottom:20px">
+      <div class="card-title">✅ &nbsp;What's Working — Keep These</div>
+      <div class="card-body">
+        <ul style="padding-left:16px; display:flex; flex-direction:column; gap:6px;">
+          <li><strong>The logo mark is excellent.</strong> Black circle, bold gold SH — timeless, sports-appropriate, works at every size. Don't touch it.</li>
+          <li><strong>Black + Gold palette</strong> is the right anchor. It reads premium, sports-adjacent (think Prime Video Thursday Night Football), and works perfectly dark-first.</li>
+          <li><strong>"Huddle" / "Side Huddle" naming</strong> is memorable and product-descriptive. The metaphor carries through well.</li>
+          <li><strong>Tech stack &amp; architecture</strong> is solid — Supabase realtime, PWA, virtualized lists, safe area handling. This is the right foundation.</li>
+          <li><strong>The concept</strong> — aggregated social news feed + group chat + live scores + Kalshi markets — is genuinely differentiated.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card red-border">
+      <div class="card-title">❌ &nbsp;What's Hurting the Brand</div>
+      <div class="card-body">
+        The retro arcade theme (CRT flicker, scanlines, Orbitron font, neon glow animations, animated grid background) was likely an experiment that got committed to code. It creates friction with the premium sports-app positioning you're going for. The landing page mock you mentioned looks cleaner <em>because it doesn't have these effects</em>. The app interior needs to match.
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- Issues -->
+  <section id="issues">
+    <div class="section-label">02 — Specific Issues Found in Code</div>
+
+    <ul class="issue-list">
+      <li class="issue-item">
+        <div class="issue-bullet red">1</div>
+        <div class="issue-text">
+          <strong>CRT flicker on the root div.</strong> <code>crt-effect</code> animates opacity 0.98→1 at <code>0.15s linear infinite</code> on the entire <code>MobileHome</code> container. This is a battery drain, an accessibility violation (vestibular), and looks cheap rather than retro-cool. Remove immediately.
+        </div>
+      </li>
+      <li class="issue-item">
+        <div class="issue-bullet red">2</div>
+        <div class="issue-text">
+          <strong>5+ competing chat bubble components.</strong> <code>MessageBubble</code>, <code>ModernChatBubble</code>, <code>RetroMessageBubble</code>, <code>RoomMessageBubble</code>, <code>ModernMessageBubble</code>. Each was born from a design iteration that never got cleaned up. This is the source of your continuity problem. Pick one — <code>ModernChatBubble</code> is the most complete — and deprecate the rest.
+        </div>
+      </li>
+      <li class="issue-item">
+        <div class="issue-bullet red">3</div>
+        <div class="issue-text">
+          <strong>Chat direction mismatch.</strong> You describe a Reddit-style top-down interface, but <code>ModernChatBubble</code> uses <code>flex-row-reverse</code> for own messages — that's iMessage. The bubbles span full width (Reddit) but alternate sides (iMessage). You're in between. Pick one and commit.
+        </div>
+      </li>
+      <li class="issue-item">
+        <div class="issue-bullet red">4</div>
+        <div class="issue-text">
+          <strong>Animated retro grid in background.</strong> <code>retro-grid</code> in <code>MobileHome</code> animates at <code>20s linear infinite</code>. Background movement competes with foreground content and causes eye fatigue on mobile. Remove.
+        </div>
+      </li>
+      <li class="issue-item">
+        <div class="issue-bullet red">5</div>
+        <div class="issue-text">
+          <strong>4 font families loaded.</strong> <code>Orbitron</code>, <code>Press Start 2P</code>, <code>Exo 2</code>, <code>Inter</code>. That's 4 different personalities. A sports app should have at most 2 — one workhorse (UI text) and optionally one display font for scores/numbers.
+        </div>
+      </li>
+      <li class="issue-item">
+        <div class="issue-bullet red">6</div>
+        <div class="issue-text">
+          <strong>Glass header color mismatch.</strong> <code>glass-header</code> uses <code>hsla(217 33% 17% / 0.9)</code> — a blue-tinted slate. The rest of the app is neutral black. On dark backgrounds this looks like a navy bar floating over a pure-black screen. Should be <code>rgba(10,10,11,0.92)</code> with a subtle border.
+        </div>
+      </li>
+      <li class="issue-item">
+        <div class="issue-bullet yellow">7</div>
+        <div class="issue-text">
+          <strong>Nav label "Hosted" is confusing.</strong> The bottom nav says "Hosted" (for <code>/huddle-search</code>). Users will read this as "my hosted huddles" not "discover hosted huddles." Should be "Explore" or "Teams."
+        </div>
+      </li>
+      <li class="issue-item">
+        <div class="issue-bullet yellow">8</div>
+        <div class="issue-text">
+          <strong>Three competing neon accent colors.</strong> Gold primary, teal secondary, orange accent — all at full neon saturation. When everything glows, nothing is highlighted. The teal and orange should be functional colors (success, warning) not ambient decoration.
+        </div>
+      </li>
+      <li class="issue-item">
+        <div class="issue-bullet yellow">9</div>
+        <div class="issue-text">
+          <strong>Online status dot on every avatar.</strong> A hardcoded green dot <code>w-4 h-4 bg-green-500</code> shows on all avatars in <code>ModernChatBubble</code> — it's not data-driven. Either connect it to real presence data or remove it.
+        </div>
+      </li>
+      <li class="issue-item">
+        <div class="issue-bullet yellow">10</div>
+        <div class="issue-text">
+          <strong>Floating back button overlaps content.</strong> <code>MobileChat</code> has a <code>fixed top-20 left-4</code> back button layered over messages. Combined with the GlassHeader's own back button, there are two ways to go back. Pick one location.
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <hr>
+
+  <!-- Colors -->
+  <section id="colors">
+    <div class="section-label">03 — Color System</div>
+
+    <div class="compare">
+      <div class="compare-panel before">
+        <div class="compare-label">Current — Too many competing signals</div>
+        <div class="compare-body">
+          <div class="swatch-row">
+            <div class="swatch">
+              <div class="swatch-dot" style="background:#0a0a0a; box-shadow: 0 0 0 1px #333"></div>
+              <div class="swatch-name">bg<br>#0A0A0A</div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-dot" style="background:hsl(51,100%,50%); box-shadow: 0 0 12px hsl(51,100%,50%)"></div>
+              <div class="swatch-name">neon gold<br>primary</div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-dot" style="background:hsl(191,100%,50%); box-shadow: 0 0 12px hsl(191,100%,50%)"></div>
+              <div class="swatch-name">neon teal<br>secondary</div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-dot" style="background:hsl(30,100%,50%); box-shadow: 0 0 12px hsl(30,100%,50%)"></div>
+              <div class="swatch-name">neon orange<br>accent</div>
+            </div>
+          </div>
+          <p style="margin-top:12px; font-size:13px;">Three fully-saturated neon colors at equal visual weight = no hierarchy. Everything competes.</p>
+        </div>
+      </div>
+      <div class="compare-panel after">
+        <div class="compare-label">Recommended — One hero, rest are utility</div>
+        <div class="compare-body">
+          <div class="swatch-row">
+            <div class="swatch">
+              <div class="swatch-dot" style="background:#0A0A0B; border: 1px solid #222"></div>
+              <div class="swatch-name">bg<br>#0A0A0B</div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-dot" style="background:#F5C518"></div>
+              <div class="swatch-name">gold<br>#F5C518</div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-dot" style="background:#22C55E"></div>
+              <div class="swatch-name">live/win<br>#22C55E</div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-dot" style="background:#E8453C"></div>
+              <div class="swatch-name">loss/alert<br>#E8453C</div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-dot" style="background:#3B82F6"></div>
+              <div class="swatch-name">info/link<br>#3B82F6</div>
+            </div>
+          </div>
+          <p style="margin-top:12px; font-size:13px;">Gold owns the brand. Green/red/blue are semantic. UI surfaces stay monochromatic.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">Surface hierarchy (all dark, no blue tint)</div>
+      <div class="swatch-row">
+        <div class="swatch">
+          <div class="swatch-dot" style="background:#0A0A0B; border:1px solid #222"></div>
+          <div class="swatch-name">bg-base</div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-dot" style="background:#111113; border:1px solid #222"></div>
+          <div class="swatch-name">bg-raised</div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-dot" style="background:#18181B; border:1px solid #222"></div>
+          <div class="swatch-name">bg-card</div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-dot" style="background:#222226; border:1px solid #333"></div>
+          <div class="swatch-name">bg-input</div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-dot" style="background:#2A2A2F; border:1px solid #333"></div>
+          <div class="swatch-name">border</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- Typography -->
+  <section id="type">
+    <div class="section-label">04 — Typography</div>
+
+    <div class="compare">
+      <div class="compare-panel before">
+        <div class="compare-label">Current — 4 fonts, scattered use</div>
+        <div class="compare-body">
+          <div style="font-family:'Orbitron',monospace; font-size:14px; color:#FFD700; margin-bottom:8px;">ORBITRON — Headers</div>
+          <div style="font-family:'Inter',sans-serif; font-size:13px; color:#ccc; margin-bottom:8px;">Inter — Body text</div>
+          <div style="font-family:'Exo 2',sans-serif; font-size:13px; color:#aaa; margin-bottom:8px;">Exo 2 — Chat messages</div>
+          <div style="font-family:monospace; font-size:10px; color:#0ff; margin-bottom:8px;">Press Start 2P — Reactions</div>
+          <p style="font-size:12px; margin-top:8px;">Four fonts = no personality, bloated load, inconsistent feel.</p>
+        </div>
+      </div>
+      <div class="compare-panel after">
+        <div class="compare-label">Recommended — 2 fonts, clear roles</div>
+        <div class="compare-body">
+          <div style="font-family:'DM Sans',sans-serif; font-size:18px; font-weight:700; color:#F5C518; margin-bottom:6px;">DM Sans Bold — All UI</div>
+          <div style="font-family:'DM Sans',sans-serif; font-size:13px; color:#ccc; margin-bottom:8px;">DM Sans Regular — Body &amp; chat</div>
+          <div style="font-family:'DM Mono',monospace; font-size:15px; font-weight:600; color:#F5C518; margin-bottom:8px; letter-spacing:0.02em;">21 — 14 &nbsp; Scores/numbers</div>
+          <p style="font-size:12px; margin-top:8px;">DM Sans is sporty but clean. DM Mono for all tabular data (scores, odds, leaderboard).</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">Type scale — Mobile (390px)</div>
+      <div class="type-row"><div class="type-label">hero / score</div><div class="type-sample" style="font-size:32px; font-weight:700; font-family:'DM Mono',monospace; color:var(--gold);">24 — 17</div></div>
+      <div class="type-row"><div class="type-label">section title</div><div class="type-sample" style="font-size:18px; font-weight:700;">My Huddles</div></div>
+      <div class="type-row"><div class="type-label">list item</div><div class="type-sample" style="font-size:15px; font-weight:500;">Chicago Bears Public</div></div>
+      <div class="type-row"><div class="type-label">chat message</div><div class="type-sample" style="font-size:16px; font-weight:400; color:var(--text-2);">Did you see that play? Absolute robbery 😤</div></div>
+      <div class="type-row"><div class="type-label">meta / timestamp</div><div class="type-sample" style="font-size:12px; color:var(--text-3);">@tyrodgers · 2 min ago</div></div>
+      <div class="type-row" style="border:none"><div class="type-label">label / badge</div><div class="type-sample" style="font-size:11px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--gold);">LIVE · HOSTED · VERIFIED</div></div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- Chat -->
+  <section id="chat">
+    <div class="section-label">05 — Chat Interface Direction</div>
+
+    <div class="callout">
+      <strong>The core question:</strong> iMessage-style (alternating sides, personal) vs Reddit-style (single column, community feed)? You said Reddit — that's the right call for a group sports community. But your current code is iMessage. Pick one and go all-in.
+    </div>
+
+    <div class="phone-row">
+
+      <!-- Current (iMessage-ish) -->
+      <div>
+        <div class="phone-label">Current — iMessage hybrid</div>
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="mock-header retro">
+              <div class="mock-avatar">🐻</div>
+              <div><div class="mock-title" style="font-family:Orbitron,monospace; font-size:9px; color:#FFD700;">BEARS PUBLIC</div><div class="mock-sub">142 members</div></div>
+            </div>
+            <div class="mock-messages" style="background: linear-gradient(180deg,#080814,#0a0a0f);">
+              <div style="position:absolute; inset:0; background-image: linear-gradient(rgba(255,215,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.05) 1px, transparent 1px); background-size: 20px 20px; pointer-events:none;opacity:0.5"></div>
+              <div class="mock-bubble retro-other">Did you see Caleb today?? 🔥</div>
+              <div class="mock-bubble retro-own" style="margin-left:auto">Bro he was ELITE</div>
+              <div class="mock-bubble retro-other">Defense still 💩 tho</div>
+              <div class="mock-bubble retro-own" style="margin-left:auto">Facts lmaooo</div>
+            </div>
+            <div class="mock-bottom-nav">
+              <div class="mock-nav-item active"><div class="mock-nav-icon">⊞</div><div class="mock-nav-label" style="color:var(--gold)">Home</div></div>
+              <div class="mock-nav-item"><div class="mock-nav-icon">🧭</div><div class="mock-nav-label">Hosted</div></div>
+              <div class="mock-nav-item"><div class="mock-nav-icon">🧾</div><div class="mock-nav-label">Ledger</div></div>
+              <div class="mock-nav-item"><div class="mock-nav-icon">👤</div><div class="mock-nav-label">Profile</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reddit-style direction -->
+      <div>
+        <div class="phone-label">Recommended — Reddit/community style</div>
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="mock-header clean" style="flex-direction:column; align-items:flex-start; padding:10px 14px 8px;">
+              <div style="display:flex; align-items:center; gap:8px; width:100%">
+                <div class="mock-avatar">🐻</div>
+                <div><div class="mock-title">Bears Public</div><div class="mock-sub">142 members online now</div></div>
+                <div class="mock-score-live" style="margin-left:auto">LIVE</div>
+              </div>
+              <div class="mock-score-bar" style="background:transparent; border:none; padding:6px 0 0; width:100%">
+                <span style="font-size:9px; color:var(--text-3)">Bears</span>
+                <span class="mock-score-num">21</span>
+                <span style="font-size:9px; color:var(--text-3)">Q3 · 4:22</span>
+                <span class="mock-score-num">14</span>
+                <span style="font-size:9px; color:var(--text-3)">Lions</span>
+              </div>
+            </div>
+            <div class="mock-messages" style="padding:8px; gap:6px">
+              <div class="mock-post">
+                <div class="mock-post-meta">@tyrodgers · 2m</div>
+                <div class="mock-post-body">Did you see Caleb today?? absolute deal 🔥</div>
+                <div class="mock-post-bar">👍 <span>12</span> &nbsp;💬 3 &nbsp;🔥 8</div>
+              </div>
+              <div class="mock-post" style="border-color: rgba(245,197,24,0.25); background: rgba(245,197,24,0.05)">
+                <div class="mock-post-meta" style="color:var(--gold)">You · just now</div>
+                <div class="mock-post-body">Bro he was ELITE today</div>
+                <div class="mock-post-bar">👍 <span>4</span></div>
+              </div>
+              <div class="mock-post">
+                <div class="mock-post-meta">@bearsfan99 · 1m</div>
+                <div class="mock-post-body">Defense still needs work tho 😬</div>
+                <div class="mock-post-bar">👍 <span>7</span> &nbsp;💬 1</div>
+              </div>
+            </div>
+            <div class="mock-bottom-nav">
+              <div class="mock-nav-item active"><div class="mock-nav-icon">⊞</div><div class="mock-nav-label" style="color:var(--gold)">Home</div></div>
+              <div class="mock-nav-item"><div class="mock-nav-icon">🏈</div><div class="mock-nav-label">Teams</div></div>
+              <div class="mock-nav-item"><div class="mock-nav-icon">🎯</div><div class="mock-nav-label">Picks</div></div>
+              <div class="mock-nav-item"><div class="mock-nav-icon">👤</div><div class="mock-nav-label">Me</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Huddle list -->
+      <div>
+        <div class="phone-label">Home — Huddle list direction</div>
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="mock-header clean">
+              <div style="flex:1">
+                <div class="mock-title" style="font-size:14px; font-weight:700;">Side Huddle</div>
+                <div class="mock-sub">4 active</div>
+              </div>
+              <div style="background:var(--gold); color:#000; font-size:9px; font-weight:700; padding:4px 8px; border-radius:6px;">+ New</div>
+            </div>
+            <div style="flex:1; padding:10px; overflow:hidden; display:flex; flex-direction:column; gap:6px;">
+              <div style="font-size:9px; font-weight:600; color:var(--text-3); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:2px;">YOUR TEAMS</div>
+              <div style="background:var(--black-3); border:1px solid var(--border); border-radius:10px; padding:8px 10px; display:flex; gap:8px; align-items:center;">
+                <div style="width:32px; height:32px; background:var(--gold-muted); border:1px solid var(--gold-border); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px;">🐻</div>
+                <div style="flex:1; min-width:0">
+                  <div style="font-size:11px; font-weight:600; color:var(--text);">Chicago Bears</div>
+                  <div style="font-size:9px; color:var(--text-3);">3 new messages</div>
+                </div>
+                <div style="background:var(--red); color:#fff; font-size:8px; font-weight:700; border-radius:10px; padding:1px 5px;">3</div>
+              </div>
+              <div style="background:var(--black-3); border:1px solid var(--border); border-radius:10px; padding:8px 10px; display:flex; gap:8px; align-items:center;">
+                <div style="width:32px; height:32px; background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.2); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px;">⭐</div>
+                <div style="flex:1; min-width:0">
+                  <div style="font-size:11px; font-weight:600; color:var(--text);">Cubs Nation</div>
+                  <div style="font-size:9px; color:var(--text-3);">Caleb just posted a vid</div>
+                </div>
+              </div>
+              <div style="font-size:9px; font-weight:600; color:var(--text-3); letter-spacing:0.08em; text-transform:uppercase; margin:6px 0 2px;">YOUR HUDDLES</div>
+              <div style="background:var(--black-3); border:1px solid rgba(245,197,24,0.2); border-radius:10px; padding:8px 10px; display:flex; gap:8px; align-items:center;">
+                <div style="width:32px; height:32px; background:var(--gold-muted); border:1px solid var(--gold-border); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:var(--gold);">🔒</div>
+                <div style="flex:1; min-width:0">
+                  <div style="font-size:11px; font-weight:600; color:var(--text);">The Boys Fantasy</div>
+                  <div style="font-size:9px; color:var(--text-3);">Mike: trade proposal 👀</div>
+                </div>
+                <div style="background:var(--gold); color:#000; font-size:8px; font-weight:700; border-radius:10px; padding:1px 5px;">7</div>
+              </div>
+            </div>
+            <div class="mock-bottom-nav">
+              <div class="mock-nav-item active"><div class="mock-nav-icon">⊞</div><div class="mock-nav-label" style="color:var(--gold)">Home</div></div>
+              <div class="mock-nav-item"><div class="mock-nav-icon">🏈</div><div class="mock-nav-label">Teams</div></div>
+              <div class="mock-nav-item"><div class="mock-nav-icon">🎯</div><div class="mock-nav-label">Picks</div></div>
+              <div class="mock-nav-item"><div class="mock-nav-icon">👤</div><div class="mock-nav-label">Me</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">Reddit-style chat — Key rules</div>
+      <div class="card-body">
+        <ul style="padding-left:16px; display:flex; flex-direction:column; gap:6px;">
+          <li>All messages left-aligned, single column, avatar on left</li>
+          <li>Your own messages get a <strong>subtle gold left-border</strong> or very faint gold background tint — not a different position</li>
+          <li>Upvote/reaction count displayed under each post (not hidden in popover on hover)</li>
+          <li>Reply threads are indented below, collapsible (like Reddit)</li>
+          <li>Date dividers are sticky section headers, not just lines</li>
+          <li>Bot/News feed messages get a distinct card treatment (bordered, not a bubble)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- Navigation -->
+  <section id="nav">
+    <div class="section-label">06 — Navigation Structure</div>
+
+    <div class="compare">
+      <div class="compare-panel before">
+        <div class="compare-label">Current — Confusing labels</div>
+        <div class="compare-body">
+          <table style="width:100%; font-size:12px;">
+            <tr><td style="padding:4px 0; color:#ccc">⊞ Home</td><td style="padding:4px 0; color:#888">→ Huddle list</td></tr>
+            <tr><td style="padding:4px 0; color:#ccc">🧭 Hosted</td><td style="padding:4px 0; color:var(--red)">❌ Confusing — sounds like "my hosted"</td></tr>
+            <tr><td style="padding:4px 0; color:#ccc">🧾 Ledger</td><td style="padding:4px 0; color:#888">→ Prediction history</td></tr>
+            <tr><td style="padding:4px 0; color:#ccc">👤 Profile</td><td style="padding:4px 0; color:#888">→ User profile</td></tr>
+          </table>
+          <p style="font-size:12px; margin-top:8px; color:#888">4 items. Picks/markets buried. No "Teams" direct access.</p>
+        </div>
+      </div>
+      <div class="compare-panel after">
+        <div class="compare-label">Recommended — Clear, sports-first</div>
+        <div class="compare-body">
+          <table style="width:100%; font-size:12px;">
+            <tr><td style="padding:4px 0; color:#ccc">⊞ Home</td><td style="padding:4px 0; color:#888">→ Your huddles + feed</td></tr>
+            <tr><td style="padding:4px 0; color:#ccc">🏈 Teams</td><td style="padding:4px 0; color:#888">→ Team directory + follow</td></tr>
+            <tr><td style="padding:4px 0; color:var(--gold)">🎯 Picks</td><td style="padding:4px 0; color:#888">→ Pick'em + Kalshi + leaderboard</td></tr>
+            <tr><td style="padding:4px 0; color:#ccc">👤 Me</td><td style="padding:4px 0; color:#888">→ Profile + badges + ledger</td></tr>
+          </table>
+          <p style="font-size:12px; margin-top:8px; color:#888">Picks gets its own tab — it's a core differentiator worth surfacing. Ledger lives inside Me.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- Live Scores -->
+  <section id="live">
+    <div class="section-label">07 — Live Scores &amp; Game Pulse</div>
+
+    <div class="card">
+      <div class="card-title">Score ticker — inside the chat header, not above it</div>
+      <div class="card-body" style="margin-bottom:14px">
+        The <code>GamePulseHeader</code> component exists but is bolted on as a separate banner above the chat. The better approach: <strong>embed the live score directly in the chat header</strong> as a second row — only visible when a game is in progress. This saves vertical space and ties the score to its context.
+      </div>
+      <!-- Live score demo -->
+      <div style="background:var(--black-3); border:1px solid var(--border); border-radius:12px; overflow:hidden; max-width:380px">
+        <div style="padding:12px 16px; display:flex; align-items:center; gap:10px; border-bottom: 1px solid var(--border)">
+          <div style="width:32px; height:32px; background:var(--gold-muted); border:1px solid var(--gold-border); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px;">🐻</div>
+          <div style="flex:1">
+            <div style="font-size:15px; font-weight:600; color:var(--text)">Bears Public</div>
+            <div style="font-size:12px; color:var(--text-3)">142 members</div>
+          </div>
+          <div style="font-size:12px; color:var(--text-3)">···</div>
+        </div>
+        <!-- Score row -->
+        <div style="padding:10px 16px; display:flex; align-items:center; gap:12px; background:rgba(232,69,60,0.06); border-bottom:1px solid rgba(232,69,60,0.15)">
+          <div class="mock-score-live">● LIVE</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:space-between">
+            <span style="font-size:13px; color:var(--text-2); font-weight:500">Bears</span>
+            <span style="font-family:'DM Mono'; font-size:20px; font-weight:700; color:var(--text)">21</span>
+            <span style="font-size:11px; color:var(--text-3)">Q3 · 4:22</span>
+            <span style="font-family:'DM Mono'; font-size:20px; font-weight:700; color:var(--text-3)">14</span>
+            <span style="font-size:13px; color:var(--text-3)">Lions</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">Kalshi / Prediction market cards — inline, not modal</div>
+      <div class="card-body">
+        Kalshi shadow trades should appear as <strong>card posts</strong> in the feed — same width as a message, with odds displayed in DM Mono, clear team colors for each side, and a one-tap bet button. The leaderboard card should be pinned at the top of the chat when a Pick'em is active, collapsible with a tap.
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- Direction -->
+  <section id="direction">
+    <div class="section-label">08 — Rebrand Direction</div>
+
+    <div class="card gold-border" style="margin-bottom:20px">
+      <div class="card-title" style="font-size:17px;">🏆 &nbsp;"Sports Command Center" — the design north star</div>
+      <div class="card-body">
+        Think <strong>Prime Video TNF</strong> meets <strong>Discord</strong> — dark, premium, data-rich but never cluttered. Every screen should feel like you're in the war room. The gold is the identity accent; everything else is subordinate to it. Videos play inline. Scores are always present when live. Picks are a first-class feature.
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">❌ &nbsp;Remove these immediately</div>
+        <div class="card-body">
+          <ul style="padding-left:14px; display:flex; flex-direction:column; gap:5px; font-size:13px;">
+            <li>CRT flicker animation on root</li>
+            <li>Animated retro grid background</li>
+            <li>Scanline overlay</li>
+            <li>Neon glow on text (neon-text class)</li>
+            <li>Press Start 2P &amp; Orbitron fonts</li>
+            <li>Blue-tinted glass header</li>
+            <li>3-neon color palette</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">✅ &nbsp;Add / strengthen</div>
+        <div class="card-body">
+          <ul style="padding-left:14px; display:flex; flex-direction:column; gap:5px; font-size:13px;">
+            <li>DM Sans + DM Mono type system</li>
+            <li>Score ticker in chat header</li>
+            <li>Reddit-style single-column chat</li>
+            <li>Inline video (no modal, no new tab)</li>
+            <li>Picks tab in bottom nav</li>
+            <li>"Teams" replaces "Hosted" in nav</li>
+            <li>Unified single chat bubble component</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">On video in-app</div>
+      <div class="card-body">
+        Your video proxy via Supabase functions is already set up correctly — the render path just needs the inline player to be more prominent. When a video message appears in the feed: show a proper 16:9 thumbnail + play button overlay, tap to play <em>in-place</em> (no navigation, no modal). Portrait videos should show at 4:5. Audio defaults to muted on autoplay, unmutes on tap.
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- Roadmap -->
+  <section id="roadmap">
+    <div class="section-label">09 — Recommended Build Sequence</div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Priority</th>
+          <th>Change</th>
+          <th>Impact</th>
+          <th>Effort</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tag red">P0 — Now</span></td>
+          <td>Kill CRT flicker, animated grid, scanlines</td>
+          <td>Immediate polish + performance</td>
+          <td>~30 min</td>
+        </tr>
+        <tr>
+          <td><span class="tag red">P0 — Now</span></td>
+          <td>Fix glass header color (remove blue tint)</td>
+          <td>Visual consistency</td>
+          <td>~10 min</td>
+        </tr>
+        <tr>
+          <td><span class="tag red">P0 — Now</span></td>
+          <td>Rename "Hosted" → "Teams" in bottom nav</td>
+          <td>UX clarity, zero code risk</td>
+          <td>~5 min</td>
+        </tr>
+        <tr>
+          <td><span class="tag yellow">P1 — Soon</span></td>
+          <td>Swap to DM Sans / DM Mono, remove Orbitron + Press Start 2P</td>
+          <td>Brand cohesion, load perf</td>
+          <td>2–4 hrs</td>
+        </tr>
+        <tr>
+          <td><span class="tag yellow">P1 — Soon</span></td>
+          <td>Consolidate to one chat bubble component</td>
+          <td>Eliminates continuity drift</td>
+          <td>1–2 days</td>
+        </tr>
+        <tr>
+          <td><span class="tag yellow">P1 — Soon</span></td>
+          <td>Reddit-style chat layout (all left, gold tint for own)</td>
+          <td>Consistent with positioning</td>
+          <td>1 day</td>
+        </tr>
+        <tr>
+          <td><span class="tag yellow">P1 — Soon</span></td>
+          <td>Live score row embedded in chat header</td>
+          <td>Core product differentiator</td>
+          <td>4 hrs</td>
+        </tr>
+        <tr>
+          <td><span class="tag blue">P2 — Next</span></td>
+          <td>Picks tab in bottom nav (surface Pick'em + Kalshi)</td>
+          <td>Feature discovery</td>
+          <td>1 day</td>
+        </tr>
+        <tr>
+          <td><span class="tag blue">P2 — Next</span></td>
+          <td>Inline video player (tap-to-play, no navigation)</td>
+          <td>Core "play in-app" request</td>
+          <td>1–2 days</td>
+        </tr>
+        <tr>
+          <td><span class="tag green">P3 — Later</span></td>
+          <td>Full color token audit (remove neon teal/orange from CSS)</td>
+          <td>Clean design system</td>
+          <td>4–8 hrs</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout" style="margin-top:24px">
+      <strong>Bottom line:</strong> The brand has a strong foundation. The SH mark, the black/gold palette, and the product concept are all solid. What needs a rebrand is the CSS file — specifically the retro arcade layer. Strip that out, commit to one chat paradigm, surface Picks as a nav destination, and the app will look dramatically more cohesive and premium without a single component being rebuilt from scratch. The landing page mock you like is proof that the brand works when the CRT noise is removed.
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

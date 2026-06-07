@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Side Huddle Sports — Your Sports Group Chat</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:#0A0A0B;color:#F0F0F2;font-family:'DM Sans',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+
+/* ── tokens ── */
+:root{
+  --gold:#F5C518;--gold-dim:rgba(245,197,24,0.1);--gold-border:rgba(245,197,24,0.22);
+  --bg:#0A0A0B;--bg2:#111113;--bg3:#18181B;--border:#2A2A2F;
+  --text:#F0F0F2;--text2:#A0A0A8;--text3:#505058;
+  --red:#E8453C;--green:#22C55E;
+}
+
+/* ── nav ── */
+nav{display:flex;align-items:center;justify-content:space-between;padding:18px 32px;max-width:1100px;margin:0 auto;position:sticky;top:0;z-index:100;background:rgba(10,10,11,0.88);backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-mark{width:34px;height:34px;border-radius:50%;background:#000;border:1.5px solid var(--gold-border);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--gold);font-family:Georgia,serif;letter-spacing:-1px;flex-shrink:0}
+.nav-name{font-size:17px;font-weight:800;color:var(--text);letter-spacing:-0.4px}
+.nav-cta{background:var(--gold);color:#000;font-size:13px;font-weight:700;padding:8px 18px;border-radius:20px;text-decoration:none;transition:all .15s}
+.nav-cta:hover{background:#e6b800}
+
+/* ── hero ── */
+.hero{padding:80px 32px 60px;max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+@media(max-width:768px){.hero{grid-template-columns:1fr;padding:48px 24px 40px;gap:40px}}
+.hero-pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--gold-border);background:var(--gold-dim);border-radius:20px;padding:6px 14px;margin-bottom:24px}
+.hero-pill-dot{width:7px;height:7px;border-radius:50%;background:var(--gold);animation:pulse 1.5s infinite}
+.hero-pill span{font-size:11px;font-weight:700;color:var(--gold);letter-spacing:0.08em;text-transform:uppercase}
+.hero h1{font-size:clamp(36px,5vw,58px);font-weight:900;line-height:1.1;letter-spacing:-1.5px;color:var(--text);margin-bottom:20px}
+.hero h1 em{color:var(--gold);font-style:normal}
+.hero-sub{font-size:18px;color:var(--text2);line-height:1.6;margin-bottom:36px;max-width:480px}
+.store-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px}
+.store-btn{display:flex;align-items:center;gap:10px;border:1px solid var(--border);background:var(--bg3);border-radius:12px;padding:10px 18px;text-decoration:none;transition:all .15s;position:relative}
+.store-btn:hover{border-color:var(--gold-border);background:var(--gold-dim)}
+.store-btn-text{text-align:left}
+.store-btn-label{font-size:10px;color:var(--text3);line-height:1}
+.store-btn-name{font-size:15px;font-weight:700;color:var(--text);line-height:1.2;margin-top:2px}
+.soon-badge{position:absolute;top:-8px;right:-8px;background:var(--gold);color:#000;font-size:8px;font-weight:800;padding:2px 6px;border-radius:10px;text-transform:uppercase;letter-spacing:0.05em}
+.waitlist-row{display:flex;gap:10px;max-width:400px}
+.waitlist-input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 16px;font-size:14px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;transition:border-color .15s}
+.waitlist-input::placeholder{color:var(--text3)}
+.waitlist-input:focus{border-color:var(--gold-border)}
+.waitlist-btn{background:var(--gold);color:#000;font-size:14px;font-weight:700;padding:12px 20px;border-radius:12px;border:none;cursor:pointer;white-space:nowrap;transition:all .15s;font-family:'DM Sans',sans-serif}
+.waitlist-btn:hover{background:#e6b800}
+.waitlist-success{font-size:13px;color:var(--gold);border:1px solid var(--gold-border);background:var(--gold-dim);border-radius:12px;padding:12px 16px}
+
+/* ── phone mockup ── */
+.phone-wrap{display:flex;justify-content:center;align-items:center;position:relative}
+.phone-glow{position:absolute;width:260px;height:420px;background:rgba(245,197,24,0.07);border-radius:50%;filter:blur(60px)}
+.phone{width:260px;height:520px;border-radius:44px;background:#000;border:1.5px solid #2A2A2F;overflow:hidden;position:relative;box-shadow:0 40px 80px rgba(0,0,0,.5),0 0 0 8px #141416}
+.phone-island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:90px;height:26px;border-radius:16px;background:#000;z-index:10;border:1px solid #1a1a1a}
+.phone-status{display:flex;align-items:center;justify-content:space-between;padding:0 20px;padding-top:14px;margin-bottom:4px}
+.phone-time{font-size:12px;font-weight:600;color:var(--text)}
+.phone-screen{height:100%;display:flex;flex-direction:column}
+
+/* phone UI */
+.p-header{padding:10px 14px 8px;background:#111;border-bottom:1px solid #2A2A2F;display:flex;align-items:center;gap:10}
+.p-avatar{width:32px;height:32px;border-radius:9px;background:#0B162A;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.p-title{font-size:13px;font-weight:700;color:var(--text)}
+.p-sub{font-size:10px;color:var(--text3)}
+.p-live{display:flex;align-items:center;gap:4px;background:rgba(232,69,60,.15);border:1px solid rgba(232,69,60,.3);border-radius:10px;padding:2px 7px}
+.p-live-dot{width:5px;height:5px;border-radius:50%;background:#E8453C;animation:pulse 1.5s infinite}
+.p-live-text{font-size:9px;font-weight:700;color:#E8453C;letter-spacing:.06em}
+.p-score{padding:6px 14px;display:flex;align-items:center;justify-content:space-between;background:rgba(232,69,60,.05);border-bottom:1px solid rgba(232,69,60,.15)}
+.p-score-team{font-size:11px;font-weight:600;color:var(--text)}
+.p-score-num{font-family:'DM Mono',monospace;font-size:18px;font-weight:800;color:var(--text)}
+.p-score-num.dim{color:var(--text3)}
+.p-score-q{font-size:9px;color:var(--text3);text-align:center}
+.p-feed{flex:1;overflow:hidden;padding:8px 12px;display:flex;flex-direction:column;gap:8px}
+.p-bot-msg{background:rgba(245,197,24,.06);border:1px solid rgba(245,197,24,.15);border-radius:10px;padding:8px 10px}
+.p-bot-header{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.p-bot-mark{width:20px;height:20px;border-radius:50%;background:rgba(245,197,24,.1);border:1px solid rgba(245,197,24,.2);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:var(--gold);font-family:Georgia}
+.p-bot-name{font-size:10px;font-weight:700;color:var(--gold)}
+.p-bot-badge{font-size:7px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:rgba(245,197,24,.1);border:1px solid rgba(245,197,24,.2);color:var(--gold);border-radius:3px;padding:1px 4px}
+.p-bot-text{font-size:11px;color:var(--text);line-height:1.4}
+.p-reactions{display:flex;gap:5px;margin-top:5px}
+.p-react{display:flex;align-items:center;gap:3px;background:#18181B;border:1px solid #2A2A2F;border-radius:12px;padding:3px 7px;font-size:11px}
+.p-react-count{font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);font-weight:600}
+.p-user-msg{display:flex;gap:7px;align-items:flex-start}
+.p-user-avatar{width:22px;height:22px;border-radius:50%;background:#18181B;border:1px solid #2A2A2F;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px}
+.p-user-body{flex:1}
+.p-user-name{font-size:9px;font-weight:700;color:var(--text);margin-bottom:2px}
+.p-user-text{font-size:11px;color:var(--text2);line-height:1.4;background:#18181B;border:1px solid #2A2A2F;border-radius:10px;padding:5px 8px}
+.p-user-gold .p-user-name{color:var(--gold)}
+.p-user-gold .p-user-text{border-color:rgba(245,197,24,.2);border-left:2px solid var(--gold);background:rgba(245,197,24,.04)}
+.p-bottom-nav{display:flex;justify-content:space-around;align-items:center;padding:8px 0 14px;background:#0A0A0B;border-top:1px solid #2A2A2F}
+.p-nav-item{display:flex;flex-direction:column;align-items:center;gap:2px}
+.p-nav-icon{font-size:16px;line-height:1}
+.p-nav-label{font-size:8px;font-weight:600;color:var(--text3)}
+.p-nav-item.active .p-nav-label{color:var(--gold)}
+
+/* ── features ── */
+.features{padding:80px 32px;max-width:1100px;margin:0 auto}
+@media(max-width:768px){.features{padding:60px 24px}}
+.section-eyebrow{font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:12px}
+.section-title{font-size:clamp(28px,4vw,42px);font-weight:800;letter-spacing:-1px;color:var(--text);margin-bottom:48px;line-height:1.2}
+.section-title em{color:var(--gold);font-style:normal}
+.features-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+@media(max-width:600px){.features-grid{grid-template-columns:1fr}}
+.feature-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:24px;transition:border-color .2s}
+.feature-card:hover{border-color:var(--gold-border)}
+.feature-icon{width:44px;height:44px;border-radius:12px;background:var(--gold-dim);border:1px solid var(--gold-border);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px}
+.feature-title{font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px}
+.feature-desc{font-size:14px;color:var(--text2);line-height:1.6}
+
+/* ── how it works ── */
+.how{padding:80px 32px;background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+@media(max-width:768px){.how{padding:60px 24px}}
+.how-inner{max-width:900px;margin:0 auto}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;margin-top:48px}
+@media(max-width:600px){.steps{grid-template-columns:1fr}}
+.step{text-align:center}
+.step-num{font-family:'DM Mono',monospace;font-size:36px;font-weight:700;color:var(--gold-border);margin-bottom:12px}
+.step-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px}
+.step-desc{font-size:13px;color:var(--text2);line-height:1.6}
+
+/* ── leagues ── */
+.leagues{padding:48px 32px;max-width:1100px;margin:0 auto;text-align:center}
+.leagues-label{font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);margin-bottom:20px}
+.leagues-pills{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.league-pill{font-size:13px;font-weight:600;color:var(--text2);border:1px solid var(--border);border-radius:20px;padding:6px 16px;transition:all .15s;cursor:default}
+.league-pill:hover{border-color:var(--gold-border);color:var(--gold)}
+
+/* ── founding ── */
+.founding{padding:80px 32px;max-width:700px;margin:0 auto;text-align:center}
+@media(max-width:768px){.founding{padding:60px 24px}}
+.founding-badge{display:inline-flex;align-items:center;gap:8px;background:var(--gold-dim);border:1px solid var(--gold-border);border-radius:20px;padding:8px 18px;margin-bottom:28px}
+.founding-badge-star{font-size:16px}
+.founding-badge-text{font-size:12px;font-weight:700;color:var(--gold);letter-spacing:0.06em;text-transform:uppercase}
+.founding h2{font-size:clamp(28px,4vw,40px);font-weight:800;letter-spacing:-1px;color:var(--text);margin-bottom:16px;line-height:1.2}
+.founding h2 em{color:var(--gold);font-style:normal}
+.founding-sub{font-size:16px;color:var(--text2);line-height:1.6;margin-bottom:32px}
+.founding-perks{display:flex;flex-direction:column;gap:10px;margin-bottom:36px;text-align:left}
+.perk{display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px 16px}
+.perk-check{color:var(--gold);font-size:16px;flex-shrink:0}
+.perk-text{font-size:14px;color:var(--text2)}
+.perk-text strong{color:var(--text);font-weight:600}
+.founding-cta{display:inline-flex;align-items:center;gap:10px;background:var(--gold);color:#000;font-size:16px;font-weight:800;padding:16px 32px;border-radius:14px;text-decoration:none;transition:all .15s;letter-spacing:-0.3px}
+.founding-cta:hover{background:#e6b800;transform:translateY(-1px)}
+.founding-spots{font-size:12px;color:var(--text3);margin-top:12px}
+.founding-spots strong{color:var(--gold)}
+
+/* ── bottom CTA ── */
+.bottom-cta{padding:100px 32px;text-align:center;border-top:1px solid var(--border)}
+@media(max-width:768px){.bottom-cta{padding:60px 24px}}
+.bottom-cta h2{font-size:clamp(32px,5vw,52px);font-weight:900;letter-spacing:-1.5px;color:var(--text);margin-bottom:20px;line-height:1.1}
+.bottom-cta h2 em{color:var(--gold);font-style:normal}
+.bottom-cta-sub{font-size:17px;color:var(--text2);margin-bottom:40px;max-width:400px;margin-left:auto;margin-right:auto;line-height:1.6}
+.bottom-store-row{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+
+/* ── footer ── */
+footer{border-top:1px solid var(--border);padding:32px;max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.footer-logo{display:flex;align-items:center;gap:8px;text-decoration:none}
+.footer-logo-mark{width:24px;height:24px;border-radius:50%;background:#000;border:1px solid var(--gold-border);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:var(--gold);font-family:Georgia}
+.footer-logo-name{font-size:12px;font-weight:700;color:var(--text3);letter-spacing:0.04em}
+.footer-links{display:flex;gap:24px}
+.footer-links a{font-size:12px;color:var(--text3);text-decoration:none;transition:color .15s}
+.footer-links a:hover{color:var(--text2)}
+
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.85)}}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* ── animated feature tabs ── */
+.feature-tabs{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}
+.feature-tab{font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;border:1px solid var(--border);color:var(--text3);cursor:pointer;transition:all .15s;background:none;font-family:'DM Sans',sans-serif}
+.feature-tab.active{background:var(--gold-dim);border-color:var(--gold-border);color:var(--gold)}
+
+/* ── responsive nav ── */
+@media(max-width:600px){nav{padding:14px 20px}.nav-name{font-size:15px}}
+@media(max-width:600px){footer{flex-direction:column;align-items:flex-start}}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">
+    <div class="nav-mark">SH</div>
+    <span class="nav-name">Side Huddle</span>
+  </a>
+  <a class="nav-cta" href="#waitlist">Get Early Access</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div>
+    <div class="hero-pill">
+      <div class="hero-pill-dot"></div>
+      <span>Coming to App Store & Google Play</span>
+    </div>
+    <h1>Follow Your Teams.<br><em>Huddle With Your Crew.</em></h1>
+    <p class="hero-sub">Side Huddle pulls every player tweet, score update, and breaking news into one live group chat — so you and your friends never miss a moment.</p>
+    
+    <div class="store-row">
+      <a class="store-btn" href="#" onclick="return false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+        <div class="store-btn-text">
+          <div class="store-btn-label">Download on the</div>
+          <div class="store-btn-name">App Store</div>
+        </div>
+        <div class="soon-badge">Soon</div>
+      </a>
+      <a class="store-btn" href="#" onclick="return false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M3.18 23.5a2 2 0 01-.98-.27 2 2 0 01-1-1.73V2.5a2 2 0 011-1.73 2 2 0 012 0l18 10a2 2 0 010 3.46l-18 10a2 2 0 01-1.02.27z"/></svg>
+        <div class="store-btn-text">
+          <div class="store-btn-label">Get it on</div>
+          <div class="store-btn-name">Google Play</div>
+        </div>
+        <div class="soon-badge">Soon</div>
+      </a>
+    </div>
+
+    <div id="waitlist">
+      <p style="font-size:12px;color:var(--text3);margin-bottom:8px">Not in your region yet? Get notified when we launch.</p>
+      <form class="waitlist-row" id="waitlist-form" onsubmit="handleWaitlist(event)">
+        <input class="waitlist-input" type="email" placeholder="your@email.com" required id="waitlist-email"/>
+        <button class="waitlist-btn" type="submit">Notify me</button>
+      </form>
+      <div class="waitlist-success" id="waitlist-success" style="display:none">✓ You're on the list — we'll ping you when it drops.</div>
+    </div>
+  </div>
+
+  <!-- Phone mockup -->
+  <div class="phone-wrap">
+    <div class="phone-glow"></div>
+    <div class="phone">
+      <div class="phone-island"></div>
+      <div class="phone-screen">
+        <div class="phone-status">
+          <span class="phone-time">9:41</span>
+          <div style="display:flex;gap:4px;align-items:center">
+            <svg width="14" height="10" viewBox="0 0 14 10"><rect x="0" y="6" width="2.5" height="4" rx=".4" fill="rgba(240,240,242,0.6)"/><rect x="3.8" y="4" width="2.5" height="6" rx=".4" fill="rgba(240,240,242,0.6)"/><rect x="7.5" y="2" width="2.5" height="8" rx=".4" fill="rgba(240,240,242,0.8)"/><rect x="11.2" y="0" width="2.5" height="10" rx=".4" fill="#F0F0F2"/></svg>
+          </div>
+        </div>
+        <!-- header -->
+        <div class="p-header">
+          <div class="p-avatar">🐻</div>
+          <div style="flex:1">
+            <div class="p-title">Chicago Bears</div>
+            <div class="p-sub">Bot feed · 142 fans</div>
+          </div>
+          <div class="p-live"><div class="p-live-dot"></div><span class="p-live-text">LIVE</span></div>
+        </div>
+        <!-- score -->
+        <div class="p-score">
+          <span class="p-score-team">Bears</span>
+          <span class="p-score-num">21</span>
+          <div class="p-score-q"><div>Q3</div><div>4:22</div></div>
+          <span class="p-score-num dim">14</span>
+          <span class="p-score-team" style="color:var(--text3)">Lions</span>
+        </div>
+        <!-- feed -->
+        <div class="p-feed">
+          <!-- bot xpost -->
+          <div class="p-bot-msg">
+            <div class="p-bot-header">
+              <div class="p-bot-mark">SH</div>
+              <span class="p-bot-name">Bears Bot</span>
+              <span class="p-bot-badge">BOT</span>
+            </div>
+            <div class="p-bot-text">@CalebWilliams: BLOCK PARTY 🐻⬇️ #DaBears <span style="color:var(--text3)">[video]</span></div>
+            <div class="p-reactions"><div class="p-react">🔥 <span class="p-react-count">41</span></div><div class="p-react">👍 <span class="p-react-count">28</span></div></div>
+          </div>
+          <!-- bot kalshi -->
+          <div class="p-bot-msg" style="background:rgba(59,130,246,0.06);border-color:rgba(59,130,246,0.2)">
+            <div class="p-bot-header">
+              <div class="p-bot-mark" style="color:#60A5FA;border-color:rgba(59,130,246,0.3)">SH</div>
+              <span class="p-bot-name" style="color:#60A5FA">Bears Bot</span>
+              <span class="p-bot-badge" style="color:#60A5FA;border-color:rgba(59,130,246,0.3)">PICK</span>
+            </div>
+            <div class="p-bot-text" style="margin-bottom:6px">Bears win Super Bowl LX?</div>
+            <div style="display:flex;border-radius:4px;overflow:hidden;height:4px;margin-bottom:4px"><div style="flex:34;background:#22C55E"></div><div style="flex:66;background:#E8453C"></div></div>
+            <div style="display:flex;gap:6px">
+              <div style="flex:1;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);border-radius:6px;padding:4px;text-align:center;font-size:9px;font-weight:700;color:#22C55E">Yes 34¢</div>
+              <div style="flex:1;background:rgba(232,69,60,0.12);border:1px solid rgba(232,69,60,0.3);border-radius:6px;padding:4px;text-align:center;font-size:9px;font-weight:700;color:#E8453C">No 66¢</div>
+            </div>
+          </div>
+          <!-- user msg -->
+          <div class="p-user-msg p-user-gold">
+            <div class="p-user-avatar">😎</div>
+            <div class="p-user-body">
+              <div class="p-user-name">You</div>
+              <div class="p-user-text">Section 204 if anyone's at the bar 🍺</div>
+            </div>
+          </div>
+          <div class="p-user-msg">
+            <div class="p-user-avatar">🏈</div>
+            <div class="p-user-body">
+              <div class="p-user-name">TyRodgers</div>
+              <div class="p-user-text">206 here!! come through 🔥</div>
+            </div>
+          </div>
+        </div>
+        <!-- nav -->
+        <div class="p-bottom-nav">
+          <div class="p-nav-item active"><div class="p-nav-icon">⊞</div><div class="p-nav-label" style="color:var(--gold)">Home</div></div>
+          <div class="p-nav-item"><div class="p-nav-icon">🏈</div><div class="p-nav-label">Teams</div></div>
+          <div class="p-nav-item"><div class="p-nav-icon">🎯</div><div class="p-nav-label">Picks</div></div>
+          <div class="p-nav-item"><div class="p-nav-icon">👤</div><div class="p-nav-label">Me</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="section-eyebrow">What we do</div>
+  <div class="section-title">Everything your game day<br><em>crew actually needs.</em></div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🤖</div>
+      <div class="feature-title">Your team's bot is always in the chat</div>
+      <div class="feature-desc">Live scores, viral player tweets, breaking news and highlights — injected right into your group chat by the team bot. You never leave to find out what happened.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">💬</div>
+      <div class="feature-title">Private side huddles for your crew</div>
+      <div class="feature-desc">Create a private group tied to your team. React, reply, trash-talk. See who's watching the game right now. Snap-style energy, sports context built in.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🎯</div>
+      <div class="feature-title">Kalshi prediction markets, in your chat</div>
+      <div class="feature-desc">The bot surfaces real Kalshi shadow trades right in the feed. Pick Yes or No, see the odds shift, compete on the leaderboard with your friends.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">👀</div>
+      <div class="feature-title">See who's watching with you</div>
+      <div class="feature-desc">"Ty is watching 👀" — real presence, right in the huddle. Know who's in the chat, who just joined, who's typing. The second screen you actually want.</div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how">
+  <div class="how-inner">
+    <div class="section-eyebrow" style="text-align:center">How it works</div>
+    <div class="section-title" style="text-align:center;margin-bottom:0">Up and running in<br><em>under 60 seconds.</em></div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-title">Pick your teams</div>
+        <div class="step-desc">NFL, NBA, MLB, NCAA and more. Follow as many teams as you want across any league.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-title">Start a Side Huddle</div>
+        <div class="step-desc">Create a private group for your friends, tied to your team. Or join a public team feed and react.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-title">Watch together</div>
+        <div class="step-desc">The bot keeps everyone posted. You keep the conversation going. Game day, every day.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LEAGUES -->
+<section class="leagues">
+  <div class="leagues-label">Built for fans of</div>
+  <div class="leagues-pills">
+    <span class="league-pill">NFL</span>
+    <span class="league-pill">NBA</span>
+    <span class="league-pill">MLB</span>
+    <span class="league-pill">NHL</span>
+    <span class="league-pill">NCAA Football</span>
+    <span class="league-pill">NCAA Basketball</span>
+    <span class="league-pill">EPL</span>
+    <span class="league-pill">La Liga</span>
+    <span class="league-pill">UFC</span>
+    <span class="league-pill">March Madness</span>
+  </div>
+</section>
+
+<!-- FOUNDING MEMBERS -->
+<section class="founding">
+  <div class="founding-badge">
+    <span class="founding-badge-star">⭐</span>
+    <span class="founding-badge-text">Founding 300</span>
+  </div>
+  <h2>Lock in your spot.<br><em>Before it's gone.</em></h2>
+  <p class="founding-sub">The first 300 members get lifetime perks — yours forever, regardless of what we charge later.</p>
+  <div class="founding-perks">
+    <div class="perk"><span class="perk-check">✓</span><span class="perk-text"><strong>Founding Member badge</strong> — on your profile, forever</span></div>
+    <div class="perk"><span class="perk-check">✓</span><span class="perk-text"><strong>Lifetime free Hosted Huddle</strong> — no monthly fee, ever</span></div>
+    <div class="perk"><span class="perk-check">✓</span><span class="perk-text"><strong>Spot number locked in</strong> — #1 through #300, yours to keep</span></div>
+    <div class="perk"><span class="perk-check">✓</span><span class="perk-text"><strong>Priority access</strong> to every new feature we ship</span></div>
+  </div>
+  <a class="founding-cta" href="https://sidehuddlefounders.carrd.co" target="_blank">Claim your founding spot →</a>
+  <div class="founding-spots">Limited spots remaining · <strong>Founding 300 only</strong></div>
+</section>
+
+<!-- BOTTOM CTA -->
+<section class="bottom-cta">
+  <h2>Ready to<br><em>huddle up?</em></h2>
+  <p class="bottom-cta-sub">Download the app and bring your game-day crew together.</p>
+  <div class="bottom-store-row">
+    <a class="store-btn" href="#" onclick="return false" style="padding:12px 22px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+      <div class="store-btn-text"><div class="store-btn-label">Download on the</div><div class="store-btn-name">App Store</div></div>
+      <div class="soon-badge">Soon</div>
+    </a>
+    <a class="store-btn" href="#" onclick="return false" style="padding:12px 22px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M3.18 23.5a2 2 0 01-.98-.27 2 2 0 01-1-1.73V2.5a2 2 0 011-1.73 2 2 0 012 0l18 10a2 2 0 010 3.46l-18 10a2 2 0 01-1.02.27z"/></svg>
+      <div class="store-btn-text"><div class="store-btn-label">Get it on</div><div class="store-btn-name">Google Play</div></div>
+      <div class="soon-badge">Soon</div>
+    </a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <a class="footer-logo" href="#">
+    <div class="footer-logo-mark">SH</div>
+    <span class="footer-logo-name">SIDE HUDDLE SPORTS</span>
+  </a>
+  <div class="footer-links">
+    <a href="/faq">FAQ</a>
+    <a href="#">Privacy</a>
+    <a href="#">Terms</a>
+    <a href="https://x.com/sidehuddlesports" target="_blank">𝕏 @sidehuddlesports</a>
+  </div>
+</footer>
+
+<script>
+function handleWaitlist(e) {
+  e.preventDefault();
+  document.getElementById('waitlist-form').style.display = 'none';
+  document.getElementById('waitlist-success').style.display = 'block';
+}
+
+// Register tweaks
+window.addEventListener('message', e => {
+  if (e.data?.type === '__activate_edit_mode') document.getElementById('tweaks').style.display = 'flex';
+  if (e.data?.type === '__deactivate_edit_mode') document.getElementById('tweaks').style.display = 'none';
+});
+window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+</script>
+
+<!-- Tweaks panel -->
+<div id="tweaks" style="display:none;position:fixed;bottom:24px;right:24px;z-index:1000;background:#111113;border:1px solid #2A2A2F;border-radius:14px;padding:16px 18px;flex-direction:column;gap:12px;min-width:200px;box-shadow:0 8px 32px rgba(0,0,0,.5)">
+  <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#606068">Tweaks</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+    <span style="font-size:13px;color:#A0A0A8">Scroll to</span>
+    <div style="display:flex;gap:4px">
+      <button onclick="document.querySelector('.hero').scrollIntoView()" style="background:#222226;border:1px solid #2A2A2F;color:#A0A0A8;font-size:11px;padding:3px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif">Hero</button>
+      <button onclick="document.querySelector('.features').scrollIntoView()" style="background:#222226;border:1px solid #2A2A2F;color:#A0A0A8;font-size:11px;padding:3px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif">Features</button>
+      <button onclick="document.querySelector('.founding').scrollIntoView()" style="background:#222226;border:1px solid #2A2A2F;color:#A0A0A8;font-size:11px;padding:3px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif">Founding</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

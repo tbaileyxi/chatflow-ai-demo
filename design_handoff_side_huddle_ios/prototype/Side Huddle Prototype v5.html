@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Side Huddle v5 — Smart & Clean</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#06070A}
+body{display:flex;align-items:center;justify-content:center;font-family:'DM Sans',-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:0;height:0}
+
+/* ── palette: refined default (ink + restrained gold) ── */
+[data-theme]{
+  --bg:#0B0C0F; --elev:#101218; --surface:#171A21; --surface2:#1F222B;
+  --line:#272B35; --line-soft:#1A1D24;
+  --text:#ECEEF2; --text2:#969CA8; --text3:#5A616C;
+  --accent:#F7C325; --accent-dim:rgba(247,195,37,0.14); --accent-line:rgba(247,195,37,0.34); --on-accent:#0B0C0F;
+  --live:#FF5B4D; --live-dim:rgba(255,91,77,0.13); --live-line:rgba(255,91,77,0.32);
+  --pos:#3FBF79; --neg:#F0594C; --info:#5B8DEF;
+}
+[data-theme="amber"]{ --accent:#F4A52C; --accent-dim:rgba(244,165,44,0.14); --accent-line:rgba(244,165,44,0.34); --on-accent:#160E03; }
+[data-theme="court"]{ --accent:#33C27D; --accent-dim:rgba(51,194,125,0.13); --accent-line:rgba(51,194,125,0.32); --on-accent:#06140D; }
+[data-theme="night"]{ --accent:#6090F2; --accent-dim:rgba(96,144,242,0.15); --accent-line:rgba(96,144,242,0.34); --on-accent:#060B16; }
+[data-theme="mono"]{ --accent:#EDEFF2; --accent-dim:rgba(237,239,242,0.10); --accent-line:rgba(237,239,242,0.22); --on-accent:#0B0C0F; }
+
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.82)}}
+@keyframes rise{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes drop{from{transform:translateY(-8px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes sheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
+
+#tweaks-panel{position:fixed;bottom:24px;right:24px;z-index:1000;background:#101218;border:1px solid #272B35;border-radius:14px;padding:15px 17px;display:none;flex-direction:column;gap:13px;min-width:230px;box-shadow:0 12px 40px rgba(0,0,0,.6);font-family:'DM Sans',sans-serif}
+#tweaks-panel.visible{display:flex}
+.tw-title{font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#969CA8}
+.tw-row{display:flex;flex-direction:column;gap:7px}
+.tw-label{font-size:11px;color:#5A616C;font-weight:600}
+.tw-chips{display:flex;gap:5px;flex-wrap:wrap}
+.tw-b{background:#1F222B;border:1px solid #272B35;color:#969CA8;font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit;transition:.15s}
+.tw-b.on,.tw-b:hover{border-color:#E3B24E;color:#E3B24E;background:rgba(227,178,78,0.1)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="sh/sh-core.js"></script>
+<script type="text/babel" src="sh/sh-ui.jsx"></script>
+<script type="text/babel" src="sh/sh-screens.jsx"></script>
+<script type="text/babel">
+const { C, FONT } = window.SH;
+const { Home, Room, CreateRoom, Onboarding, BottomNav, Avatar, TeamMark } = window;
+
+function Stub({ title, sub, nav, active }){
+  return (
+    <div style={{height:'100%',display:'flex',flexDirection:'column',background:C.bg}}>
+      <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12,padding:'0 40px',textAlign:'center'}}>
+        <div style={{fontSize:22,fontWeight:800,color:C.text,letterSpacing:'-0.4px'}}>{title}</div>
+        <p style={{fontSize:13.5,color:C.text3,lineHeight:1.6}}>{sub}</p>
+        <button onClick={()=>nav('home')} style={{marginTop:6,padding:'10px 18px',borderRadius:11,background:C.accentDim,border:`1px solid ${C.accentLine}`,color:C.accent,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:FONT}}>← Back home</button>
+      </div>
+      <BottomNav active={active} nav={nav}/>
+    </div>
+  );
+}
+
+function App(){
+  const DEF = /*EDITMODE-BEGIN*/{
+    "startScreen": "home",
+    "palette": "default"
+  }/*EDITMODE-END*/;
+  const [screen,setScreen]=React.useState(DEF.startScreen||'home');
+  const [palette,setPalette]=React.useState(DEF.palette||'default');
+  const [room,setRoom]=React.useState(window.SH.MY_ROOMS[0]);
+  const [tweaks,setTweaks]=React.useState(false);
+
+  React.useEffect(()=>{
+    const h=e=>{ if(e.data?.type==='__activate_edit_mode')setTweaks(true); if(e.data?.type==='__deactivate_edit_mode')setTweaks(false); };
+    window.addEventListener('message',h);
+    window.parent.postMessage({type:'__edit_mode_available'},'*');
+    return ()=>window.removeEventListener('message',h);
+  },[]);
+
+  const nav=(dest,ctx)=>{
+    if(dest==='room'){ if(ctx)setRoom(ctx); setScreen('room'); }
+    else setScreen(dest);
+  };
+
+  const render=()=>{
+    switch(screen){
+      case 'onboard': return <Onboarding onDone={()=>setScreen('home')}/>;
+      case 'home':    return <Home nav={nav}/>;
+      case 'room':    return <Room room={room} nav={nav} onSwitch={r=>setRoom(r)}/>;
+      case 'create':  return <CreateRoom nav={nav}/>;
+      case 'picks':   return <Stub title="Picks" sub="Your prediction-market positions and weekly picks live here. Powered by Kalshi market data." nav={nav} active="picks"/>;
+      case 'me':      return <Stub title="Your profile" sub="Teams you follow, rooms you're in, and your pick history." nav={nav} active="me"/>;
+      case 'manage':  return <Stub title="Manage teams" sub="Add or remove the teams that feed your Super Huddle." nav={nav} active="home"/>;
+      default:        return <Home nav={nav}/>;
+    }
+  };
+
+  return (<>
+    <div style={{width:'100vw',height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#06070A',position:'relative'}}>
+      <div style={{position:'absolute',top:18,left:'50%',transform:'translateX(-50%)',display:'flex',alignItems:'center',gap:9,whiteSpace:'nowrap'}}>
+        <span style={{fontSize:11,fontWeight:600,color:'#3a3f48',letterSpacing:'0.08em'}}>SIDE HUDDLE v5 · smart &amp; clean · friends-first rooms · no emoji reactions</span>
+      </div>
+      <div data-theme={palette} style={{width:390,height:844,borderRadius:52,overflow:'hidden',background:'var(--bg)',boxShadow:'0 0 0 11px #14161b,0 0 0 13px #20242c,0 40px 90px rgba(0,0,0,.6)',position:'relative',flexShrink:0}}>
+        {/* notch */}
+        <div style={{position:'absolute',top:12,left:'50%',transform:'translateX(-50%)',width:118,height:33,borderRadius:20,background:'#000',zIndex:100}}/>
+        {/* status bar */}
+        <div style={{position:'absolute',top:0,left:0,right:0,height:54,zIndex:50,display:'flex',alignItems:'flex-end',justifyContent:'space-between',padding:'0 28px 7px',pointerEvents:'none'}}>
+          <span style={{fontWeight:600,fontSize:15,color:'var(--text)'}}>9:41</span>
+          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+            <svg width="17" height="11" viewBox="0 0 17 12"><rect x="0" y="8" width="3" height="4" rx=".5" fill="var(--text)"/><rect x="4.7" y="5.5" width="3" height="6.5" rx=".5" fill="var(--text)"/><rect x="9.4" y="3" width="3" height="9" rx=".5" fill="var(--text)"/><rect x="14" y="0" width="3" height="12" rx=".5" fill="var(--text)"/></svg>
+            <svg width="16" height="11" viewBox="0 0 16 12"><path d="M8 9.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" fill="var(--text)"/><path d="M4.5 7C5.8 5.7 7 5 8 5s2.2.7 3.5 2" stroke="var(--text)" strokeWidth="1.5" fill="none" strokeLinecap="round"/><path d="M1.5 4C3.3 2.2 5.5 1 8 1s4.7 1.2 6.5 3" stroke="var(--text)" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>
+            <svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.5" stroke="var(--text)" strokeOpacity=".35" fill="none"/><rect x="2" y="2" width="16" height="8" rx="2" fill="var(--text)"/><path d="M23 4v4c.8-.3 1.5-1.2 1.5-2s-.7-1.7-1.5-2z" fill="var(--text)" fillOpacity=".4"/></svg>
+          </div>
+        </div>
+        <div style={{position:'absolute',inset:0}}>{render()}</div>
+        {/* home indicator */}
+        <div style={{position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',width:134,height:5,borderRadius:100,background:'rgba(255,255,255,0.22)',zIndex:200,pointerEvents:'none'}}/>
+      </div>
+    </div>
+
+    <div id="tweaks-panel" className={tweaks?'visible':''}>
+      <div className="tw-title">Tweaks</div>
+      <div className="tw-row">
+        <span className="tw-label">Screen</span>
+        <div className="tw-chips">
+          {[['onboard','Intro'],['home','Home'],['room','Room'],['create','Create']].map(([s,l])=>(
+            <button key={s} className={'tw-b'+(screen===s?' on':'')} onClick={()=>nav(s)}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div className="tw-row">
+        <span className="tw-label">Switch room</span>
+        <div className="tw-chips">
+          {window.SH.MY_ROOMS.map(r=>(
+            <button key={r.id} className={'tw-b'+(room.id===r.id&&screen==='room'?' on':'')} onClick={()=>nav('room',r)}>{r.name.split(' ')[0]}</button>
+          ))}
+        </div>
+      </div>
+      <div className="tw-row">
+        <span className="tw-label">Palette</span>
+        <div className="tw-chips">
+          {[['default','Gold'],['amber','Amber'],['court','Court'],['night','Night'],['mono','Mono']].map(([p,l])=>(
+            <button key={p} className={'tw-b'+(palette===p?' on':'')} onClick={()=>{setPalette(p);window.parent.postMessage({type:'__edit_mode_set_keys',edits:{palette:p}},'*');}}>{l}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  </>);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

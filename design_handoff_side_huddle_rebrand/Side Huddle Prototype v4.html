@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Side Huddle v5 — Feed vs Huddle</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#0A0A0B}
+body{display:flex;align-items:center;justify-content:center;font-family:'DM Sans',-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+@keyframes slideDown{from{transform:translateY(-12px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes slideUp{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes popIn{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+@keyframes joinSlide{from{transform:translateY(-8px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes onboardIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+#tweaks-panel{position:fixed;bottom:24px;right:24px;z-index:1000;background:#111113;border:1px solid #2A2A2F;border-radius:14px;padding:16px 18px;display:none;flex-direction:column;gap:12px;min-width:240px;box-shadow:0 8px 32px rgba(0,0,0,.5);font-family:'DM Sans',sans-serif}
+#tweaks-panel.visible{display:flex}
+.tweak-title{font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#A0A0A8}
+.tweak-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.tweak-label{font-size:12px;color:#A0A0A8}
+.tb{background:#222226;border:1px solid #2A2A2F;color:#A0A0A8;font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.tb.active,.tb:hover{border-color:#F5C518;color:#F5C518;background:rgba(245,197,24,.1)}
+</style>
+</head>
+<body>
+<script type="text/babel">
+const T={
+  bg:'#0A0A0B',
+  bgHuddle:'#141418',
+  bgHuddleAlt:'#1A1A1F',
+  bg2:'#111113',
+  bg3:'#18181B',
+  bg4:'#222226',
+  border:'#2A2A2F',
+  borderSoft:'#1F1F22',
+  gold:'#F5C518',
+  goldDim:'rgba(245,197,24,0.1)',
+  goldBorder:'rgba(245,197,24,0.22)',
+  text:'#F0F0F2',
+  text2:'#A0A0A8',
+  text3:'#505058',
+  red:'#E8453C',
+  green:'#22C55E',
+  blue:'#3B82F6',
+  bubbleOther:'#222226',
+  bubbleMine:'#F5C518',
+};
+const SPORT_REACTIONS=['👍','🔥','😂','👎'];
+
+// ─── SPONSOR (one per team / huddle, swap via Tweaks) ──────────
+const SPONSORS={
+  draftpass:{id:'draftpass',name:'DraftPass',tagline:'Free-to-play picks',color:'#00C271',mark:'DP',promo:'Get $20 in picks credit when you make your first pick',code:'HUDDLE20'},
+  goalline:{id:'goalline',name:'Goal Line Brewing',tagline:'Game day, brewed local',color:'#E89B2A',mark:'GL',promo:'$2 off any pour — show this at the bar',code:'SH-BEARS'},
+  hashmark:{id:'hashmark',name:'Hashmark',tagline:'Sports cards, instantly',color:'#7C5CFF',mark:'HM',promo:'First pack on us when you sign up',code:'SIDEHUDDLE'},
+};
+
+const ALL_TEAMS={
+  nfl:[
+    {id:'t1',name:'Chicago Bears',abbr:'CHI',emoji:'🐻',color:'#0B162A'},
+    {id:'t2',name:'Green Bay Packers',abbr:'GB',emoji:'🧀',color:'#1B4B1B'},
+    {id:'t3',name:'Detroit Lions',abbr:'DET',emoji:'🦁',color:'#0076B6'},
+    {id:'t4',name:'Minnesota Vikings',abbr:'MIN',emoji:'⚔️',color:'#4F2683'},
+    {id:'t5',name:'Dallas Cowboys',abbr:'DAL',emoji:'⭐',color:'#002244'},
+    {id:'t6',name:'Kansas City Chiefs',abbr:'KC',emoji:'🏹',color:'#E31837'},
+  ],
+  nba:[
+    {id:'b1',name:'Chicago Bulls',abbr:'CHI',emoji:'🐂',color:'#CE1141'},
+    {id:'b2',name:'Los Angeles Lakers',abbr:'LAL',emoji:'💜',color:'#552583'},
+  ],
+};
+
+const LIVE_NOW=[
+  {id:'h1',name:'The Boys Fantasy',teamName:'Bears',leader:{name:'Ty',avatar:'🏆'},avatars:['🏆','🎩','🏈','⭐','🔥'],count:5,activity:'Mike just dropped a trade',accent:'#F5C518'},
+  {id:'h2',name:'Bears War Room',teamName:'Bears',leader:{name:'Greg',avatar:'🐻'},avatars:['🐻','🍺','🧢'],count:3,activity:'Score talk · Q3',accent:'#E8453C'},
+  {id:'h3',name:'Sports Degenerates',teamName:'Multi',leader:{name:'Dan',avatar:'💀'},avatars:['💀','⚡','🎯','🤡'],count:4,activity:'Kalshi market moving',accent:'#3B82F6'},
+];
+
+const MY_HUDDLES=[
+  {id:'h1',name:'The Boys Fantasy',emoji:'🏆',teamName:'Bears',members:8,unread:7,preview:'Mike: trade proposal 👀 you seeing this?'},
+  {id:'h2',name:'Bears War Room',emoji:'🎯',teamName:'Bears',members:14,unread:0,preview:'Bot: Bears up 21-14 Q3 · Dan: let\'s GOOO'},
+  {id:'h3',name:'Sports Degenerates',emoji:'💀',teamName:'Multi',members:22,unread:2,preview:'Bot: Kalshi Bears ML moved to +180 👀'},
+];
+
+const MY_TEAMS=[
+  {id:'t1',name:'Chicago Bears',emoji:'🐻',color:'#0B162A',unread:12,live:true,preview:'Caleb Williams TD · highlights flowing'},
+  {id:'b1',name:'Chicago Bulls',emoji:'🐂',color:'#CE1141',unread:3,live:false,preview:'DeMar 34pts — comeback W ✅'},
+  {id:'m1',name:'Chicago Cubs',emoji:'⚾',color:'#0E3386',unread:0,live:false,preview:'Spring training hype'},
+];
+
+const HUDDLE_MEMBERS=[
+  {uid:'u2',name:'Mike D',avatar:'🎩',status:'watching',lastSeen:'now'},
+  {uid:'u3',name:'Dan',avatar:'🏈',status:'typing',lastSeen:'now'},
+  {uid:'u4',name:'Sarah',avatar:'⭐',status:'online',lastSeen:'2m'},
+  {uid:'u5',name:'Ty',avatar:'🏆',status:'watching',lastSeen:'now'},
+  {uid:'u6',name:'BigMike',avatar:'🔥',status:'offline',lastSeen:'1h'},
+  {uid:'u7',name:'Jess',avatar:'⚡',status:'online',lastSeen:'5m'},
+  {uid:'u8',name:'Pat',avatar:'🧢',status:'offline',lastSeen:'3h'},
+];
+
+// HUDDLE messages — newest FIRST (top-down ordering)
+const buildHuddleMsgs=()=>[
+  {id:'m_new1',type:'msg',uid:'me',name:'You',avatar:'😎',time:'now',isOwn:true,text:'Just got to the bar — section 204 anyone around? 🍺',reactions:{},myReactions:[],replies:[{uid:'u3',name:'Dan',avatar:'🏈',text:'I\'m in 206! come thru at halftime'}]},
+  {id:'m_new2',type:'bot',uid:'bot',name:'Bears Bot',time:'30s',botType:'kalshi',data:{question:'Bears win Super Bowl LX?',yes:34,no:66,moved:'+4% today',myPick:null},reactions:{'🔥':7},myReactions:[]},
+  {id:'m_new3',type:'msg',uid:'u2',name:'Mike D',avatar:'🎩',time:'1m',text:'Dan told you!! trade deadline starts NOW I want all Bears skill players',reactions:{'😂':5,'👍':2},myReactions:[],replies:[{uid:'u3',name:'Dan',avatar:'🏈',text:'lmaooo bro you\'re too late 😂'}]},
+  {id:'m_new4',type:'bot',uid:'bot',name:'Bears Bot',time:'2m',botType:'xpost',data:{handle:'@CalebWilliams',verified:true,text:'BLOCK PARTY 🐻⬇️ #DaBears',hasVideo:true},reactions:{'🔥':19,'👍':11},myReactions:['🔥']},
+  {id:'m_new5',type:'bot',uid:'bot',name:'Bears Bot',time:'3m',botType:'score',data:{home:'Bears',homeScore:21,away:'Lions',awayScore:14,quarter:'Q3',clock:'4:22',event:'Caleb Williams 12-yd TD run 🏈'},reactions:{'🔥':12,'👍':8},myReactions:[]},
+  {id:'m_new6',type:'msg',uid:'u3',name:'Dan',avatar:'🏈',time:'5m',text:'Caleb has been ELITE today. Top 5 QB talk starting now',reactions:{'🔥':4,'👍':3},myReactions:[],replies:[{uid:'u2',name:'Mike D',avatar:'🎩',text:'Been saying this since week 3'},{uid:'u4',name:'Sarah',avatar:'⭐',text:'Top 3 easy. Tape don\'t lie'}]},
+  {id:'sys0',type:'system',text:'Ty joined the huddle 👀'},
+];
+
+const buildPublicFeed=()=>[
+  {id:'f_sponsor',type:'sponsor',time:'2h',data:{week:'Week 12'}},
+  {id:'f1',type:'bot',uid:'bot',name:'Bears Bot',time:'now',botType:'xpost',data:{handle:'@ChicagoBears',verified:true,text:'Caleb Williams is BUILT DIFFERENT. Watch this scramble drill. 🔥🔥🔥',hasVideo:true},reactions:{'🔥':41,'👍':28,'😂':9},myReactions:[]},
+  {id:'f2',type:'bot',uid:'bot',name:'Bears Bot',time:'5m',botType:'news',source:'ESPN',data:{headline:'Williams named NFC Offensive Player of the Week — 3rd time this season',hasImage:true},reactions:{'🔥':33,'👍':44},myReactions:[]},
+  {id:'f3',type:'bot',uid:'bot',name:'Bears Bot',time:'8m',botType:'kalshi',data:{question:'Bears win Super Bowl LX?',yes:34,no:66,moved:'+4% today',myPick:null},reactions:{'🔥':17,'👍':9},myReactions:[]},
+  {id:'f4',type:'bot',uid:'bot',name:'Bears Bot',time:'14m',botType:'xpost',data:{handle:'@AdamSchefter',verified:true,text:'Bears have requested tape on three defensive coordinators, per sources. Big offseason brewing in Chicago.',hasVideo:false},reactions:{'😂':22,'👍':15,'🔥':8},myReactions:['😂']},
+];
+
+function LivePill({label='LIVE'}){return(<div style={{display:'inline-flex',alignItems:'center',gap:5,background:'rgba(232,69,60,0.15)',border:'1px solid rgba(232,69,60,0.35)',borderRadius:20,padding:'2px 9px'}}><div style={{width:6,height:6,borderRadius:'50%',background:T.red,animation:'pulse 1.5s infinite'}}/><span style={{fontSize:10,fontWeight:800,color:T.red,letterSpacing:'0.09em'}}>{label}</span></div>);}
+
+function SHLogo({size=28}){return(<div style={{width:size,height:size,borderRadius:'50%',background:'#000',border:`1.5px solid rgba(245,197,24,0.35)`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:size*.38,fontWeight:800,color:T.gold,fontFamily:'Georgia,serif',letterSpacing:'-1px',flexShrink:0}}>SH</div>);}
+
+function BotAvatar({size=30}){return(<div style={{width:size,height:size,borderRadius:'50%',background:'rgba(245,197,24,0.08)',border:`1.5px solid rgba(245,197,24,0.25)`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:size*.38,fontWeight:800,color:T.gold,fontFamily:'Georgia,serif'}}>SH</div>);}
+
+function StatusDot({status}){
+  const c={watching:T.red,typing:T.green,online:T.green,offline:T.text3}[status]||T.text3;
+  return <div style={{width:8,height:8,borderRadius:'50%',background:c,flexShrink:0,animation:status==='watching'?'pulse 1.5s infinite':'none'}}/>;
+}
+
+function AvatarStack({avatars,size=22,max=4,bgRing}){
+  const ring=bgRing||T.bg;
+  const shown=avatars.slice(0,max);
+  return(<div style={{display:'flex'}}>
+    {shown.map((a,i)=>(<div key={i} style={{width:size,height:size,borderRadius:'50%',background:T.bg3,border:`2px solid ${ring}`,marginLeft:i>0?-size*0.32:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:size*.55,zIndex:max-i}}>{a}</div>))}
+  </div>);
+}
+
+function SourceBadge({source}){
+  const c={ESPN:{bg:'rgba(220,0,0,0.12)',b:'rgba(220,0,0,0.25)',t:'#FF6666'},Kalshi:{bg:'rgba(59,130,246,0.12)',b:'rgba(59,130,246,0.25)',t:'#60A5FA'},X:{bg:'rgba(255,255,255,0.06)',b:'rgba(255,255,255,0.1)',t:T.text2}}[source]||{bg:T.bg3,b:T.border,t:T.text2};
+  return <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.07em',textTransform:'uppercase',background:c.bg,border:`1px solid ${c.b}`,color:c.t,borderRadius:4,padding:'1px 5px'}}>{source}</span>;
+}
+
+function VideoCard({label,big}){
+  const [p,setP]=React.useState(false);
+  return(<div onClick={e=>{e.stopPropagation();setP(v=>!v)}} style={{position:'relative',width:'100%',aspectRatio:'16/9',background:'#000',borderRadius:big?12:10,overflow:'hidden',marginTop:8,cursor:'pointer',border:`1px solid ${T.border}`}}>
+    <div style={{position:'absolute',inset:0,background:'repeating-linear-gradient(45deg,#111 0,#111 10px,#0a0a0a 10px,#0a0a0a 20px)'}}/>
+    <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:8}}>
+      <div style={{width:big?56:44,height:big?56:44,borderRadius:'50%',background:'rgba(245,197,24,0.9)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+        {!p?<svg width="18" height="20" viewBox="0 0 16 18"><path d="M1 1l14 8-14 8V1z" fill="#000"/></svg>:<div style={{display:'flex',gap:3}}><div style={{width:5,height:16,background:'#000',borderRadius:2}}/><div style={{width:5,height:16,background:'#000',borderRadius:2}}/></div>}
+      </div>
+      <span style={{fontSize:10,color:T.text3,fontFamily:'DM Mono'}}>{p?'Playing…':label}</span>
+    </div>
+  </div>);
+}
+
+function ImageCard(){return(<div style={{width:'100%',aspectRatio:'16/9',background:'#111',borderRadius:10,overflow:'hidden',marginTop:8,border:`1px solid ${T.border}`}}><div style={{width:'100%',height:'100%',background:'repeating-linear-gradient(135deg,#111 0,#111 12px,#0d0d0d 12px,#0d0d0d 24px)',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:6}}><span style={{fontSize:24}}>📸</span><span style={{fontSize:10,color:T.text3,fontFamily:'DM Mono'}}>photo</span></div></div>);}
+
+function ReactionPicker({visible,onPick,onClose,align='left'}){
+  if(!visible) return null;
+  const pos=align==='right'?{right:0}:{left:0};
+  return(<div style={{position:'absolute',bottom:'calc(100% + 8px)',...pos,zIndex:60,animation:'popIn .2s ease forwards'}}>
+    <div style={{background:T.bg2,border:`1px solid ${T.border}`,borderRadius:30,padding:'7px 12px',display:'flex',gap:6,boxShadow:'0 8px 28px rgba(0,0,0,.6)'}}>
+      {SPORT_REACTIONS.map(e=>(
+        <button key={e} onClick={()=>{onPick(e);onClose();}} style={{fontSize:24,background:'none',border:'none',cursor:'pointer',padding:'2px 3px',WebkitTapHighlightColor:'transparent',lineHeight:1}}>{e}</button>
+      ))}
+    </div>
+  </div>);}
+
+function ReactionDisplay({reactions,myReactions,onReact,msgId,big,inverted}){
+  const active=Object.entries(reactions||{}).filter(([,v])=>v>0);
+  if(!active.length) return null;
+  return(<div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:5,justifyContent:inverted?'flex-end':'flex-start'}}>
+    {active.map(([e,count])=>{
+      const mine=(myReactions||[]).includes(e);
+      return(<button key={e} onClick={()=>onReact(msgId,e)} style={{display:'flex',alignItems:'center',gap:4,background:mine?T.goldDim:T.bg3,border:`1px solid ${mine?T.goldBorder:T.border}`,borderRadius:big?24:18,padding:big?'7px 14px':'4px 10px',cursor:'pointer',WebkitTapHighlightColor:'transparent',transition:'all .15s'}}>
+        <span style={{fontSize:big?18:13}}>{e}</span>
+        <span style={{fontFamily:'DM Mono',fontSize:big?14:11,fontWeight:700,color:mine?T.gold:T.text2}}>{count}</span>
+      </button>);
+    })}
+  </div>);}
+
+function BotScoreCard({data,big}){return(<div style={{background:'rgba(232,69,60,0.06)',border:'1px solid rgba(232,69,60,0.2)',borderRadius:12,overflow:'hidden'}}>
+  <div style={{padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+    <span style={{fontSize:14,fontWeight:700,color:T.text}}>{data.home}</span>
+    <span style={{fontFamily:'DM Mono',fontSize:big?32:26,fontWeight:800,color:T.text}}>{data.homeScore}</span>
+    <div style={{textAlign:'center'}}><div style={{fontSize:9,fontWeight:700,color:T.text3,letterSpacing:'0.05em'}}>{data.quarter}</div><div style={{fontSize:12,fontWeight:600,color:T.text2}}>{data.clock}</div></div>
+    <span style={{fontFamily:'DM Mono',fontSize:big?32:26,fontWeight:800,color:T.text3}}>{data.awayScore}</span>
+    <span style={{fontSize:14,fontWeight:500,color:T.text3}}>{data.away}</span>
+  </div>
+  <div style={{padding:'6px 12px 10px',display:'flex',alignItems:'center',gap:6,borderTop:`1px solid rgba(232,69,60,0.15)`}}>
+    <span style={{fontSize:12}}>🏈</span><span style={{fontSize:12,color:T.text,fontWeight:500}}>{data.event}</span>
+  </div>
+</div>);}
+
+function BotXPost({data,big}){return(<div style={{background:T.bg3,border:`1px solid ${T.border}`,borderRadius:12,padding:'10px 12px'}}>
+  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6}}>
+    <span style={{fontSize:12,fontWeight:700,color:T.text}}>{data.handle}</span>
+    {data.verified&&<span style={{fontSize:10,color:T.blue}}>✓</span>}
+    <SourceBadge source="X"/>
+  </div>
+  <p style={{fontSize:big?15:13,color:T.text,lineHeight:1.5}}>{data.text}</p>
+  {data.hasVideo&&<VideoCard label={`${data.handle} · Video`} big={big}/>}
+</div>);}
+
+function BotKalshiCard({data}){
+  const [myPick,setMyPick]=React.useState(data.myPick);
+  const [yes,setYes]=React.useState(data.yes);
+  const [no,setNo]=React.useState(data.no);
+  const total=yes+no; const yp=Math.round(yes/total*100);
+  const pick=side=>{
+    if(myPick===side) return;
+    if(myPick==='yes'){setYes(v=>v-1);setNo(v=>v+1);}else if(myPick==='no'){setNo(v=>v-1);setYes(v=>v+1);}
+    else{side==='yes'?setYes(v=>v+1):setNo(v=>v+1);}
+    setMyPick(side);
+  };
+  return(<div style={{background:'rgba(59,130,246,0.05)',border:'1px solid rgba(59,130,246,0.2)',borderRadius:12,overflow:'hidden'}}>
+    <div style={{padding:'8px 12px',borderBottom:'1px solid rgba(59,130,246,0.15)',display:'flex',alignItems:'center',gap:6}}>
+      <span style={{fontSize:11,fontWeight:700,color:'#60A5FA',letterSpacing:'0.05em'}}>🎯 PREDICTION</span>
+      <span style={{fontSize:11,color:T.green,fontWeight:700,marginLeft:'auto'}}>{data.moved}</span>
+    </div>
+    <div style={{padding:'10px 12px'}}>
+      <p style={{fontSize:14,fontWeight:600,color:T.text,marginBottom:10,lineHeight:1.4}}>{data.question}</p>
+      <div style={{display:'flex',borderRadius:6,overflow:'hidden',height:6,marginBottom:8}}>
+        <div style={{flex:yp,background:T.green,transition:'flex .4s'}}/><div style={{flex:100-yp,background:T.red,transition:'flex .4s'}}/>
+      </div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}>
+        <span style={{fontSize:11,color:T.text2}}>Yes <span style={{color:T.green,fontWeight:700,fontFamily:'DM Mono'}}>{yp}¢</span></span>
+        <span style={{fontSize:11,color:T.text2}}>No <span style={{color:T.red,fontWeight:700,fontFamily:'DM Mono'}}>{100-yp}¢</span></span>
+      </div>
+      {!myPick?(<div style={{display:'flex',gap:8}}>
+        <button onClick={()=>pick('yes')} style={{flex:1,padding:'9px',borderRadius:9,background:'rgba(34,197,94,0.12)',border:'1px solid rgba(34,197,94,0.3)',color:T.green,fontSize:13,fontWeight:700,cursor:'pointer'}}>✅ Yes</button>
+        <button onClick={()=>pick('no')} style={{flex:1,padding:'9px',borderRadius:9,background:'rgba(232,69,60,0.12)',border:'1px solid rgba(232,69,60,0.3)',color:T.red,fontSize:13,fontWeight:700,cursor:'pointer'}}>❌ No</button>
+      </div>):(<div style={{padding:'9px 12px',borderRadius:9,background:myPick==='yes'?'rgba(34,197,94,0.12)':'rgba(232,69,60,0.12)',border:`1px solid ${myPick==='yes'?'rgba(34,197,94,0.3)':'rgba(232,69,60,0.3)'}`,display:'flex',alignItems:'center',gap:8}}>
+        <span style={{fontSize:14}}>{myPick==='yes'?'✅':'❌'}</span>
+        <span style={{fontSize:12,fontWeight:700,color:myPick==='yes'?T.green:T.red}}>You picked {myPick.toUpperCase()}</span>
+        <button onClick={()=>setMyPick(null)} style={{marginLeft:'auto',fontSize:11,color:T.text3,background:'none',border:'none',cursor:'pointer'}}>change</button>
+      </div>)}
+    </div>
+  </div>);}
+
+function BotNewsCard({data,source}){return(<div style={{background:T.bg3,border:`1px solid ${T.border}`,borderRadius:12,padding:'10px 12px'}}>
+  <div style={{marginBottom:6}}><SourceBadge source={source}/></div>
+  <p style={{fontSize:14,fontWeight:600,color:T.text,lineHeight:1.45}}>{data.headline}</p>
+  {data.hasImage&&<ImageCard/>}
+</div>);}
+
+const renderBotInner=(msg,big)=>{switch(msg.botType){
+  case 'score':return <BotScoreCard data={msg.data} big={big}/>;
+  case 'xpost':return <BotXPost data={msg.data} big={big}/>;
+  case 'kalshi':return <BotKalshiCard data={msg.data}/>;
+  case 'news':return <BotNewsCard data={msg.data} source={msg.source}/>;
+  default:return null;
+}};
+
+// ─── SPONSOR PRIMITIVES ───────────────────────────────────────
+function SponsorMark({sponsor,size=18}){
+  return(<div style={{width:size,height:size,borderRadius:5,background:sponsor.color,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontFamily:'DM Mono,monospace',fontSize:size*0.45,fontWeight:800,color:'#000',letterSpacing:'-0.02em'}}>{sponsor.mark}</div>);
+}
+
+// "powered by [Brand]" — appears under team-bot messages (huddles + feed)
+function PoweredBy({sponsor,align='left'}){
+  return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:6,paddingLeft:2,opacity:0.78,justifyContent:align==='right'?'flex-end':'flex-start'}}>
+    <span style={{fontSize:9,fontWeight:600,color:T.text3,letterSpacing:'0.06em',textTransform:'uppercase'}}>Powered by</span>
+    <SponsorMark sponsor={sponsor} size={12}/>
+    <span style={{fontSize:10,fontWeight:700,color:T.text2,letterSpacing:'-0.01em'}}>{sponsor.name}</span>
+  </div>);
+}
+
+// "Presented by [Brand]" — sits under the feed header
+function PresentedByBar({sponsor}){
+  return(<div style={{display:'flex',alignItems:'center',gap:9,padding:'8px 12px',background:`linear-gradient(90deg, ${sponsor.color}14, transparent 70%)`,border:`1px solid ${sponsor.color}33`,borderRadius:10,marginBottom:10}}>
+    <SponsorMark sponsor={sponsor} size={22}/>
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{fontSize:9,fontWeight:700,color:T.text3,letterSpacing:'0.12em',textTransform:'uppercase',lineHeight:1}}>Presented by</div>
+      <div style={{fontSize:13,fontWeight:700,color:T.text,marginTop:2,lineHeight:1.1}}>{sponsor.name}</div>
+    </div>
+    <span style={{fontSize:10,color:T.text3,fontWeight:600,letterSpacing:'0.05em'}}>AD</span>
+  </div>);
+}
+
+// Fake QR — block grid placeholder
+function FakeQR({size=64,fg='#000',bg='#fff'}){
+  const cells=React.useMemo(()=>{
+    const seed='sidehuddle';const arr=[];
+    for(let i=0;i<11*11;i++){const v=(seed.charCodeAt(i%seed.length)*31+i*7)%5;arr.push(v<2);}
+    return arr;
+  },[]);
+  return(<div style={{width:size,height:size,background:bg,padding:size*0.07,borderRadius:6,flexShrink:0,position:'relative'}}>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(11,1fr)',gap:1,width:'100%',height:'100%'}}>
+      {cells.map((on,i)=>{
+        const col=i%11,row=Math.floor(i/11);
+        const corner=(row<3&&col<3)||(row<3&&col>7)||(row>7&&col<3);
+        return(<div key={i} style={{background:(on||corner)?fg:bg,borderRadius:1}}/>);
+      })}
+    </div>
+    {/* corner markers */}
+    {[[0,0],[0,1],[1,0]].map(([r,c],i)=>{
+      const sz=size*0.22;
+      const top=r==0?size*0.07:size*0.07+size*0.78;
+      const left=c==0?size*0.07:size*0.07+size*0.78;
+      return(<div key={i} style={{position:'absolute',top,left:c==1?size*0.07+size*0.78:left,width:sz,height:sz,border:`${size*0.04}px solid ${fg}`,borderRadius:size*0.04,background:bg}}>
+        <div style={{position:'absolute',inset:'18%',background:fg,borderRadius:size*0.02}}/>
+      </div>);
+    })}
+  </div>);
+}
+
+// Sponsor-controlled message — 1× per week in team feed during active season
+function SponsorFeedCard({sponsor,data}){
+  return(<div style={{padding:'18px 20px 20px',borderBottom:'1px solid #18181B',background:'#000',animation:'slideUp .25s ease',position:'relative'}}>
+    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+      <SponsorMark sponsor={sponsor} size={26}/>
+      <span style={{fontSize:13,fontWeight:700,color:T.text}}>{sponsor.name}</span>
+      <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.07em',background:`${sponsor.color}1f`,border:`1px solid ${sponsor.color}55`,color:sponsor.color,borderRadius:4,padding:'1px 5px'}}>SPONSOR</span>
+      <span style={{fontSize:11,color:T.text3,marginLeft:'auto'}}>{data.week} · {sponsor.tagline}</span>
+    </div>
+    <div style={{background:`linear-gradient(135deg, ${sponsor.color}14, ${sponsor.color}05)`,border:`1px solid ${sponsor.color}33`,borderRadius:12,padding:'14px 14px 14px',display:'flex',gap:14,alignItems:'center'}}>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.1em',textTransform:'uppercase',color:sponsor.color,marginBottom:6}}>Bears Fans · This Week Only</div>
+        <p style={{fontSize:15,fontWeight:700,color:T.text,lineHeight:1.35,marginBottom:8,letterSpacing:'-0.2px'}}>{sponsor.promo}</p>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:10}}>
+          <button style={{padding:'8px 14px',borderRadius:10,background:sponsor.color,border:'none',color:'#000',fontSize:12,fontWeight:800,cursor:'pointer',letterSpacing:'-0.2px'}}>Claim offer →</button>
+          <span style={{fontSize:10,color:T.text3,fontFamily:'DM Mono'}}>code <span style={{color:T.text2,fontWeight:700}}>{sponsor.code}</span></span>
+        </div>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4,flexShrink:0}}>
+        <FakeQR size={72}/>
+        <span style={{fontSize:9,color:T.text3,fontFamily:'DM Mono',letterSpacing:'0.04em'}}>scan</span>
+      </div>
+    </div>
+    <div style={{display:'flex',alignItems:'center',gap:6,marginTop:10,fontSize:10,color:T.text3}}>
+      <span>1 sponsor message / week during active season</span>
+      <span>·</span>
+      <span style={{textDecoration:'underline',cursor:'pointer'}}>Why am I seeing this?</span>
+    </div>
+  </div>);
+}
+
+// ─── HUDDLE BUBBLE (chat-style) ────────────────────────────────
+function HuddleBubble({msg,onReact,showAvatar,sponsor}){
+  const [pickerOpen,setPicker]=React.useState(false);
+  const [lastTap,setLastTap]=React.useState(0);
+  const isBot=msg.uid==='bot';
+  const isOwn=msg.isOwn;
+  const handleTap=()=>{const now=Date.now();if(now-lastTap<320)setPicker(true);setLastTap(now);};
+
+  if(msg.type==='system'){
+    return(<div style={{textAlign:'center',padding:'8px 16px',animation:'joinSlide .4s ease'}}>
+      <span style={{fontSize:11,color:T.text3,fontWeight:500,background:T.bgHuddleAlt,border:`1px solid ${T.borderSoft}`,borderRadius:14,padding:'4px 12px'}}>{msg.text}</span>
+    </div>);
+  }
+
+  if(isBot){
+    return(<div style={{padding:'8px 12px',animation:'slideDown .25s ease'}}>
+      <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:6,paddingLeft:2}}>
+        <BotAvatar size={20}/>
+        <span style={{fontSize:12,fontWeight:700,color:T.gold}}>Bears Bot</span>
+        <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.07em',background:T.goldDim,border:`1px solid ${T.goldBorder}`,color:T.gold,borderRadius:4,padding:'1px 5px'}}>BOT</span>
+        <span style={{fontSize:11,color:T.text3,marginLeft:'auto'}}>{msg.time}</span>
+      </div>
+      {renderBotInner(msg,false)}
+      <ReactionDisplay reactions={msg.reactions||{}} myReactions={msg.myReactions||[]} onReact={onReact} msgId={msg.id}/>
+      {sponsor&&<PoweredBy sponsor={sponsor}/>}
+    </div>);
+  }
+
+  return(<div style={{padding:'4px 10px 6px',animation:'slideDown .2s ease'}}>
+    <div style={{display:'flex',gap:7,flexDirection:isOwn?'row-reverse':'row',alignItems:'flex-end'}}>
+      <div style={{width:30,flexShrink:0}}>
+        {showAvatar&&(<div style={{width:30,height:30,borderRadius:'50%',background:isOwn?T.goldDim:T.bg3,border:`1px solid ${isOwn?T.goldBorder:T.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>{msg.avatar}</div>)}
+      </div>
+      <div style={{maxWidth:'78%',display:'flex',flexDirection:'column',alignItems:isOwn?'flex-end':'flex-start',position:'relative'}}>
+        {showAvatar&&!isOwn&&(<div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3,paddingLeft:2}}>
+          <span style={{fontSize:11,fontWeight:700,color:T.text}}>{msg.name}</span>
+          <span style={{fontSize:10,color:T.text3}}>{msg.time}</span>
+        </div>)}
+        <div onDoubleClick={()=>setPicker(true)} onClick={handleTap} style={{
+          background:isOwn?T.bubbleMine:T.bubbleOther,
+          color:isOwn?'#0A0A0B':T.text,
+          padding:'8px 12px',
+          borderRadius:18,
+          borderTopLeftRadius:!isOwn&&showAvatar?6:18,
+          borderTopRightRadius:isOwn&&showAvatar?6:18,
+          fontSize:14.5,
+          lineHeight:1.4,
+          fontWeight:isOwn?500:400,
+          cursor:'pointer',
+          position:'relative',
+        }}>
+          {msg.text.split(/(@\w+)/g).map((p,i)=>/^@\w+/.test(p)?<span key={i} style={{color:isOwn?'#0A0A0B':T.gold,fontWeight:700,textDecoration:isOwn?'underline':'none'}}>{p}</span>:<span key={i}>{p}</span>)}
+          <ReactionPicker visible={pickerOpen} onPick={e=>{onReact(msg.id,e);setPicker(false);}} onClose={()=>setPicker(false)} align={isOwn?'right':'left'}/>
+        </div>
+        {showAvatar&&isOwn&&(<span style={{fontSize:10,color:T.text3,marginTop:3,paddingRight:2}}>{msg.time}</span>)}
+        <ReactionDisplay reactions={msg.reactions||{}} myReactions={msg.myReactions||[]} onReact={onReact} msgId={msg.id} inverted={isOwn}/>
+        {msg.replies&&msg.replies.length>0&&(<div style={{marginTop:6,paddingLeft:isOwn?0:8,paddingRight:isOwn?8:0,borderLeft:isOwn?'none':`2px solid ${T.borderSoft}`,borderRight:isOwn?`2px solid ${T.borderSoft}`:'none',width:'100%'}}>
+          {msg.replies.map((r,ri)=>(<div key={ri} style={{display:'flex',gap:6,marginBottom:ri<msg.replies.length-1?5:0,flexDirection:isOwn?'row-reverse':'row'}}>
+            <div style={{width:18,height:18,borderRadius:'50%',background:T.bg4,border:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,flexShrink:0}}>{r.avatar}</div>
+            <p style={{fontSize:12,color:T.text2,lineHeight:1.4}}><span style={{fontWeight:700,color:T.text,marginRight:4}}>{r.name}</span>{r.text}</p>
+          </div>))}
+        </div>)}
+        <button style={{fontSize:11,color:T.text3,background:'none',border:'none',cursor:'pointer',marginTop:4,padding:0,fontFamily:'DM Sans,sans-serif'}}>↳ Reply</button>
+      </div>
+    </div>
+  </div>);
+}
+
+// ─── FEED CARD (passive, full-width) ──────────────────────────
+function FeedCard({msg,onReact,sponsor}){
+  const [pickerOpen,setPicker]=React.useState(false);
+  const [lastTap,setLastTap]=React.useState(0);
+  const handleTap=()=>{const now=Date.now();if(now-lastTap<320)setPicker(true);setLastTap(now);};
+  return(<div style={{padding:'18px 20px 20px',borderBottom:`1px solid #18181B`,background:'#000',animation:'slideUp .25s ease'}}>
+    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+      <BotAvatar size={26}/>
+      <span style={{fontSize:13,fontWeight:700,color:T.gold}}>Bears Bot</span>
+      <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.07em',background:T.goldDim,border:`1px solid ${T.goldBorder}`,color:T.gold,borderRadius:4,padding:'1px 5px'}}>BOT</span>
+      <span style={{fontSize:11,color:T.text3,marginLeft:'auto'}}>{msg.time}</span>
+    </div>
+    <div onDoubleClick={()=>setPicker(true)} onClick={handleTap} style={{position:'relative'}}>
+      {renderBotInner(msg,true)}
+      <ReactionPicker visible={pickerOpen} onPick={e=>{onReact(msg.id,e);setPicker(false);}} onClose={()=>setPicker(false)}/>
+    </div>
+    <ReactionDisplay reactions={msg.reactions||{}} myReactions={msg.myReactions||[]} onReact={onReact} msgId={msg.id} big/>
+    {sponsor&&<PoweredBy sponsor={sponsor}/>}
+  </div>);
+}
+
+// ─── WHO'S IN SHEET ───────────────────────────────────────────
+function WhoSheet({onClose}){
+  const watching=HUDDLE_MEMBERS.filter(m=>m.status==='watching'||m.status==='typing');
+  const online=HUDDLE_MEMBERS.filter(m=>m.status==='online');
+  const offline=HUDDLE_MEMBERS.filter(m=>m.status==='offline');
+  const Section=({title,members})=>(members.length===0?null:
+    <div style={{marginBottom:16}}>
+      <div style={{fontSize:11,fontWeight:700,letterSpacing:'0.09em',textTransform:'uppercase',color:T.text3,marginBottom:8,padding:'0 20px'}}>{title}</div>
+      {members.map(m=>(
+        <div key={m.uid} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 20px'}}>
+          <div style={{position:'relative'}}>
+            <div style={{width:40,height:40,borderRadius:'50%',background:T.bg3,border:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>{m.avatar}</div>
+            <div style={{position:'absolute',bottom:1,right:1,width:11,height:11,borderRadius:'50%',background:T.bg2,display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <StatusDot status={m.status}/>
+            </div>
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:14,fontWeight:600,color:T.text}}>{m.name}</div>
+            <div style={{fontSize:11,color:T.text3}}>
+              {m.status==='watching'?'👀 Watching game':m.status==='typing'?'✏️ Typing…':m.status==='online'?`Active ${m.lastSeen} ago`:`Last seen ${m.lastSeen} ago`}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+  return(
+    <div style={{position:'absolute',inset:0,zIndex:80,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+      <div onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.6)',animation:'fadeIn .2s ease'}}/>
+      <div style={{position:'relative',background:T.bgHuddle,borderRadius:'24px 24px 0 0',border:`1px solid ${T.border}`,borderBottom:'none',animation:'sheetUp .3s cubic-bezier(0.32,0.72,0,1)',maxHeight:'72%',display:'flex',flexDirection:'column'}}>
+        <div style={{display:'flex',justifyContent:'center',padding:'12px 0 4px'}}><div style={{width:36,height:4,borderRadius:2,background:T.border}}/></div>
+        <div style={{padding:'8px 20px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${T.border}`}}>
+          <div>
+            <div style={{fontSize:17,fontWeight:700,color:T.text}}>Who's in the Huddle</div>
+            <div style={{fontSize:12,color:T.text3,marginTop:2}}>
+              <span style={{color:T.green,fontWeight:600}}>{watching.length+online.length} online</span>
+              {' · '}{HUDDLE_MEMBERS.length} total
+            </div>
+          </div>
+          <button onClick={onClose} style={{width:28,height:28,borderRadius:'50%',background:T.bg3,border:`1px solid ${T.border}`,color:T.text2,fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+        </div>
+        <div style={{overflowY:'auto',flex:1,padding:'12px 0 20px'}}>
+          {watching.length>0&&<Section title={`👀 Watching now · ${watching.length}`} members={watching}/>}
+          {online.length>0&&<Section title={`● Online · ${online.length}`} members={online}/>}
+          {offline.length>0&&<Section title={`○ Away · ${offline.length}`} members={offline}/>}
+        </div>
+      </div>
+    </div>
+  );}
+
+// ─── ROOM SWITCHER ────────────────────────────────────────────
+function RoomSwitcher({current,onPick,onClose,onNavigate}){
+  return(<div style={{position:'absolute',inset:0,zIndex:90}}>
+    <div onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.55)',animation:'fadeIn .15s ease'}}/>
+    <div style={{position:'absolute',top:90,left:14,right:14,background:T.bg2,border:`1px solid ${T.border}`,borderRadius:16,overflow:'hidden',animation:'slideDown .2s ease',boxShadow:'0 12px 40px rgba(0,0,0,.6)'}}>
+      <div style={{padding:'10px 16px',borderBottom:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <span style={{fontSize:11,fontWeight:700,letterSpacing:'0.1em',textTransform:'uppercase',color:T.text3}}>Switch Huddle</span>
+        <button onClick={onClose} style={{background:'none',border:'none',color:T.text2,cursor:'pointer',fontSize:13}}>Close</button>
+      </div>
+      {MY_HUDDLES.map(h=>{const active=h.id===current?.id;return(
+        <div key={h.id} onClick={()=>{onPick(h);onClose();}} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',borderBottom:`1px solid ${T.border}`,cursor:'pointer',background:active?T.goldDim:'transparent'}}>
+          <div style={{width:36,height:36,borderRadius:'50%',background:T.bg3,border:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>{h.emoji}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:14,fontWeight:700,color:active?T.gold:T.text}}>{h.name}</div>
+            <div style={{fontSize:11,color:T.text3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{h.members} members · {h.preview}</div>
+          </div>
+          {h.unread>0&&<div style={{background:T.gold,color:'#000',borderRadius:20,minWidth:20,height:20,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,padding:'0 5px'}}>{h.unread}</div>}
+          {active&&<span style={{fontSize:11,color:T.gold,fontWeight:700}}>●</span>}
+        </div>
+      );})}
+      <div onClick={()=>{onClose();onNavigate('home');}} style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:8,cursor:'pointer',color:T.text2,fontSize:13,fontWeight:600}}>
+        ← Back to directory
+      </div>
+    </div>
+  </div>);
+}
+
+// ─── ONBOARDING ───────────────────────────────────────────────
+function OnboardingFlow({onDone}){
+  const [step,setStep]=React.useState(0);
+  const [sport,setSport]=React.useState(null);
+  const [picked,setPicked]=React.useState([]);
+  const next=()=>setStep(s=>s+1);
+  const toggleTeam=id=>setPicked(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
+  const sports=[{id:'nfl',label:'NFL',emoji:'🏈'},{id:'nba',label:'NBA',emoji:'🏀'},{id:'mlb',label:'MLB',emoji:'⚾'},{id:'ncaa',label:'NCAA',emoji:'🎓'}];
+
+  const steps=[
+    (<div key="s0" style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',padding:'0 28px',gap:24,animation:'onboardIn .5s ease'}}>
+      <SHLogo size={72}/>
+      <div style={{textAlign:'center'}}>
+        <h1 style={{fontSize:28,fontWeight:800,color:T.text,letterSpacing:'-0.5px',marginBottom:10,lineHeight:1.2}}>Where your friends<br/>watch the game.</h1>
+        <p style={{fontSize:15,color:T.text2,lineHeight:1.6}}>See who's huddled up. Jump in. Talk during the game with the people you actually want to talk to.</p>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:10,width:'100%'}}>
+        {[
+          {icon:'👥',title:'See who\'s live',desc:'Your friends, watching right now — tap to join'},
+          {icon:'💬',title:'Group chat for the game',desc:'Bubbles, mentions, threaded replies — built for live'},
+          {icon:'🤖',title:'Bot keeps the room posted',desc:'Scores, news, prediction markets — no tab switching'},
+        ].map(f=>(<div key={f.icon} style={{display:'flex',gap:12,alignItems:'flex-start',background:T.bg3,border:`1px solid ${T.border}`,borderRadius:12,padding:'12px 14px'}}>
+          <span style={{fontSize:22,flexShrink:0}}>{f.icon}</span>
+          <div><div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:2}}>{f.title}</div><div style={{fontSize:12,color:T.text3,lineHeight:1.4}}>{f.desc}</div></div>
+        </div>))}
+      </div>
+      <button onClick={next} style={{width:'100%',padding:'15px',borderRadius:14,background:T.gold,border:'none',color:'#000',fontSize:16,fontWeight:800,cursor:'pointer',letterSpacing:'-0.3px'}}>Let's go →</button>
+    </div>),
+    (<div key="s1" style={{display:'flex',flexDirection:'column',height:'100%',padding:'52px 24px 24px',gap:20,animation:'onboardIn .4s ease'}}>
+      <div>
+        <div style={{fontSize:12,color:T.text3,fontWeight:600,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:8}}>Step 1 of 3</div>
+        <h2 style={{fontSize:24,fontWeight:800,color:T.text,letterSpacing:'-0.5px',marginBottom:6}}>What do you follow?</h2>
+        <p style={{fontSize:14,color:T.text2}}>Pick your league.</p>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,flex:1}}>
+        {sports.map(s=>{const sel=sport===s.id;return(<button key={s.id} onClick={()=>setSport(s.id)} style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:8,background:sel?T.goldDim:T.bg3,border:`1.5px solid ${sel?T.goldBorder:T.border}`,borderRadius:16,padding:'20px 12px',cursor:'pointer'}}><span style={{fontSize:36}}>{s.emoji}</span><span style={{fontSize:16,fontWeight:700,color:sel?T.gold:T.text}}>{s.label}</span></button>);})}
+      </div>
+      <button onClick={next} disabled={!sport} style={{width:'100%',padding:'15px',borderRadius:14,background:sport?T.gold:T.bg3,border:`1px solid ${sport?T.gold:T.border}`,color:sport?'#000':T.text3,fontSize:16,fontWeight:800,cursor:sport?'pointer':'default'}}>Continue →</button>
+    </div>),
+    (<div key="s2" style={{display:'flex',flexDirection:'column',height:'100%',padding:'52px 20px 20px',gap:16,animation:'onboardIn .4s ease'}}>
+      <div>
+        <div style={{fontSize:12,color:T.text3,fontWeight:600,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:8}}>Step 2 of 3</div>
+        <h2 style={{fontSize:24,fontWeight:800,color:T.text,letterSpacing:'-0.5px',marginBottom:6}}>Pick your teams</h2>
+      </div>
+      <div style={{flex:1,overflowY:'auto'}}>
+        {(ALL_TEAMS[sport]||ALL_TEAMS.nfl).map(team=>{const sel=picked.includes(team.id);return(<div key={team.id} onClick={()=>toggleTeam(team.id)} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 4px',borderBottom:`1px solid ${T.border}`,cursor:'pointer'}}>
+          <div style={{width:42,height:42,borderRadius:10,background:team.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0,border:`1px solid ${T.border}`}}>{team.emoji}</div>
+          <span style={{flex:1,fontSize:15,fontWeight:600,color:T.text}}>{team.name}</span>
+          <div style={{width:26,height:26,borderRadius:'50%',background:sel?T.gold:T.bg3,border:`1.5px solid ${sel?T.gold:T.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+            {sel&&<svg width="12" height="9" viewBox="0 0 12 9"><path d="M1 4l3.5 3.5L11 1" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+          </div>
+        </div>);})}
+      </div>
+      <button onClick={next} disabled={picked.length===0} style={{width:'100%',padding:'15px',borderRadius:14,background:picked.length?T.gold:T.bg3,border:`1px solid ${picked.length?T.gold:T.border}`,color:picked.length?'#000':T.text3,fontSize:16,fontWeight:800,cursor:picked.length?'pointer':'default'}}>Follow {picked.length>0?`${picked.length} team${picked.length>1?'s':''}`:'a team'} →</button>
+    </div>),
+    (<div key="s3" style={{display:'flex',flexDirection:'column',height:'100%',padding:'52px 24px 24px',gap:20,animation:'onboardIn .4s ease'}}>
+      <div>
+        <div style={{fontSize:12,color:T.text3,fontWeight:600,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:8}}>Step 3 of 3</div>
+        <h2 style={{fontSize:24,fontWeight:800,color:T.text,letterSpacing:'-0.5px',marginBottom:6}}>Start a Huddle</h2>
+        <p style={{fontSize:14,color:T.text2}}>Private group chat for your crew.</p>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:10}}>
+        {[['🏆','The Boys Fantasy','Private · fantasy league'],['🎯','War Room','Private · game day crew'],['🍺','Bar Squad','Private · watch group']].map(([em,nm,ds])=>(
+          <div key={nm} style={{display:'flex',alignItems:'center',gap:12,background:T.bg3,border:`1px solid ${T.border}`,borderRadius:12,padding:'12px 14px',cursor:'pointer'}} onClick={()=>setStep(4)}>
+            <span style={{fontSize:24}}>{em}</span>
+            <div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:T.text}}>{nm}</div><div style={{fontSize:11,color:T.text3}}>{ds}</div></div>
+            <span style={{fontSize:13,color:T.gold,fontWeight:600}}>Use →</span>
+          </div>
+        ))}
+      </div>
+      <button onClick={()=>setStep(4)} style={{width:'100%',padding:'15px',borderRadius:14,background:T.gold,border:'none',color:'#000',fontSize:16,fontWeight:800,cursor:'pointer',marginTop:'auto'}}>Skip for now →</button>
+    </div>),
+    (<div key="s4" style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',padding:'0 28px',gap:24,animation:'onboardIn .5s ease',textAlign:'center'}}>
+      <div style={{width:80,height:80,borderRadius:'50%',background:T.goldDim,border:`2px solid ${T.goldBorder}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:36}}>🎉</div>
+      <div>
+        <h2 style={{fontSize:26,fontWeight:800,color:T.text,letterSpacing:'-0.5px',marginBottom:10}}>You're in!</h2>
+        <p style={{fontSize:15,color:T.text2,lineHeight:1.6}}>Three friends are already huddled up.</p>
+      </div>
+      <button onClick={onDone} style={{width:'100%',padding:'15px',borderRadius:14,background:T.gold,border:'none',color:'#000',fontSize:16,fontWeight:800,cursor:'pointer'}}>Go to Side Huddle →</button>
+    </div>),
+  ];
+
+  return(<div style={{height:'100%',background:T.bg,display:'flex',flexDirection:'column'}}>
+    {step<5&&step>0&&(<div style={{position:'absolute',top:20,left:'50%',transform:'translateX(-50%)',display:'flex',gap:6,zIndex:10}}>
+      {[1,2,3,4].map(i=><div key={i} style={{width:i<=step?24:6,height:6,borderRadius:3,background:i<=step?T.gold:T.bg3,transition:'all .3s'}}/>)}
+    </div>)}
+    <div style={{flex:1,display:'flex',flexDirection:'column'}}>{steps[step]||steps[0]}</div>
+  </div>);
+}
+
+// ─── HOME (Directory — people first) ──────────────────────────
+function HomeScreen({onNavigate}){
+  return(<div style={{height:'100%',display:'flex',flexDirection:'column',background:T.bg}}>
+    <div style={{padding:'54px 16px 12px',background:T.bg,flexShrink:0}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}><SHLogo size={30}/><span style={{fontSize:22,fontWeight:800,color:T.text,letterSpacing:'-0.5px'}}>Side Huddle</span></div>
+        <div style={{width:34,height:34,borderRadius:'50%',background:T.bg3,border:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>😎</div>
+      </div>
+    </div>
+
+    <div style={{flex:1,overflowY:'auto'}}>
+      {/* LIVE NOW (hero, people-first) */}
+      <div style={{padding:'8px 16px 4px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <div style={{width:7,height:7,borderRadius:'50%',background:T.red,animation:'pulse 1.5s infinite'}}/>
+          <span style={{fontSize:12,fontWeight:800,letterSpacing:'0.12em',textTransform:'uppercase',color:T.red}}>Live Now</span>
+        </div>
+        <span style={{fontSize:11,color:T.text3,fontWeight:600}}>{LIVE_NOW.reduce((s,r)=>s+r.count,0)} friends in {LIVE_NOW.length} rooms</span>
+      </div>
+      <div style={{padding:'4px 16px 16px',display:'flex',flexDirection:'column',gap:10}}>
+        {LIVE_NOW.map(room=>{
+          const huddleCtx={id:room.id,name:room.name,emoji:room.avatars[0],teamName:room.teamName,members:room.count+3};
+          return(<div key={room.id} onClick={()=>onNavigate('huddle',huddleCtx)} style={{
+            background:T.bg2,border:`1px solid ${T.border}`,borderRadius:16,padding:'14px 14px 12px',cursor:'pointer',position:'relative',overflow:'hidden',
+          }}>
+            <div style={{position:'absolute',top:0,left:0,bottom:0,width:3,background:room.accent}}/>
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+              <AvatarStack avatars={room.avatars} size={32} max={4} bgRing={T.bg2}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:700,color:T.text,lineHeight:1.2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                  <span>{room.leader.name} + {room.count-1}</span>
+                  <span style={{color:T.text3,fontWeight:500}}>→</span>
+                  <span style={{color:T.gold}}>{room.name}</span>
+                </div>
+                <div style={{fontSize:11,color:T.text3,marginTop:3,display:'flex',alignItems:'center',gap:6}}>
+                  <span style={{display:'inline-flex',alignItems:'center',gap:4}}>
+                    <div style={{width:5,height:5,borderRadius:'50%',background:T.green,animation:'pulse 1.5s infinite'}}/>
+                    <span>{room.count} live</span>
+                  </span>
+                  <span>·</span>
+                  <span>{room.activity}</span>
+                </div>
+              </div>
+            </div>
+            <button style={{width:'100%',padding:'10px',borderRadius:10,background:T.goldDim,border:`1px solid ${T.goldBorder}`,color:T.gold,fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+              <span>Join the huddle</span><span>→</span>
+            </button>
+          </div>);
+        })}
+      </div>
+
+      {/* TEAM FEEDS (secondary) */}
+      <div style={{padding:'4px 16px 4px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <span style={{fontSize:11,fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase',color:T.text3}}>Team Feeds</span>
+        <span style={{fontSize:11,color:T.text3,fontWeight:600}}>+ Follow</span>
+      </div>
+      <div style={{padding:'4px 16px 16px'}}>
+        {MY_TEAMS.map(team=>(<div key={team.id} onClick={()=>onNavigate('feed',team)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderBottom:`1px solid ${T.borderSoft}`,cursor:'pointer'}}>
+          <div style={{width:34,height:34,borderRadius:8,background:team.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0,border:`1px solid ${T.border}`}}>{team.emoji}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <span style={{fontSize:14,fontWeight:600,color:T.text}}>{team.name}</span>
+              {team.live&&<LivePill/>}
+            </div>
+            <span style={{fontSize:11,color:T.text3,display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{team.preview}</span>
+          </div>
+          {team.unread>0&&<div style={{background:T.bg3,color:T.text2,borderRadius:20,minWidth:22,height:20,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,padding:'0 6px',border:`1px solid ${T.border}`}}>{team.unread}</div>}
+          <span style={{fontSize:14,color:T.text3}}>›</span>
+        </div>))}
+      </div>
+
+      {/* YOUR HUDDLES */}
+      <div style={{padding:'4px 16px 4px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <span style={{fontSize:11,fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase',color:T.text3}}>Your Huddles</span>
+        <span style={{fontSize:11,color:T.gold,fontWeight:600}}>+ New</span>
+      </div>
+      <div style={{padding:'4px 16px 16px'}}>
+        {MY_HUDDLES.map(h=>(<div key={h.id} onClick={()=>onNavigate('huddle',h)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderBottom:`1px solid ${T.borderSoft}`,cursor:'pointer'}}>
+          <div style={{width:34,height:34,borderRadius:'50%',background:T.bg3,border:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>{h.emoji}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:14,fontWeight:600,color:T.text}}>{h.name}</div>
+            <div style={{fontSize:11,color:T.text3,display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{h.preview}</div>
+          </div>
+          {h.unread>0&&<div style={{background:T.gold,color:'#000',borderRadius:20,minWidth:22,height:20,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,padding:'0 6px'}}>{h.unread}</div>}
+          <span style={{fontSize:14,color:T.text3}}>›</span>
+        </div>))}
+      </div>
+      <div style={{height:80}}/>
+    </div>
+    <BottomNav active="home" onNavigate={onNavigate}/>
+  </div>);
+}
+
+// ─── FEED (passive consumption) ───────────────────────────────
+function FeedScreen({team,onBack,onNavigate,sponsor}){
+  const [msgs,setMsgs]=React.useState(buildPublicFeed);
+  const react=(id,e)=>setMsgs(prev=>prev.map(m=>{if(m.id!==id||!m.reactions)return m;const mine=(m.myReactions||[]).includes(e);return{...m,reactions:{...m.reactions,[e]:(m.reactions[e]||0)+(mine?-1:1)},myReactions:mine?(m.myReactions||[]).filter(x=>x!==e):[...(m.myReactions||[]),e]};}));
+
+  return(<div style={{height:'100%',display:'flex',flexDirection:'column',background:'#000'}}>
+    <div style={{padding:'52px 16px 0',background:'rgba(0,0,0,0.96)',backdropFilter:'blur(12px)',borderBottom:`1px solid ${T.borderSoft}`,flexShrink:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,paddingBottom:10}}>
+        <button onClick={onBack} style={{background:'none',border:'none',cursor:'pointer',padding:4,display:'flex'}}>
+          <svg width="10" height="16" viewBox="0 0 10 16" fill="none"><path d="M8 2L2 8l6 6" stroke={T.gold} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </button>
+        <div style={{width:36,height:36,borderRadius:9,background:team.color||T.bg3,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,border:`1px solid ${T.border}`,flexShrink:0}}>{team.emoji}</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:1}}>
+            <div style={{width:6,height:6,borderRadius:'50%',background:T.red,animation:'pulse 1.5s infinite'}}/>
+            <span style={{fontSize:10,fontWeight:800,letterSpacing:'0.14em',color:T.red}}>LIVE FEED</span>
+            <span style={{fontSize:10,color:T.text3,fontWeight:500}}>· broadcast</span>
+          </div>
+          <div style={{fontSize:16,fontWeight:700,color:T.text,lineHeight:1.2}}>{team.name}</div>
+        </div>
+      </div>
+      {team.live&&(<div><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'rgba(232,69,60,0.06)',borderRadius:10,padding:'8px 12px',border:'1px solid rgba(232,69,60,0.18)',marginBottom:10}}>
+        <span style={{fontSize:13,fontWeight:600,color:T.text}}>Bears</span>
+        <span style={{fontFamily:'DM Mono',fontSize:22,fontWeight:800,color:T.text}}>21</span>
+        <span style={{fontSize:10,color:T.text3,fontWeight:600}}>Q3 · 4:22</span>
+        <span style={{fontFamily:'DM Mono',fontSize:22,fontWeight:800,color:T.text3}}>14</span>
+        <span style={{fontSize:13,fontWeight:500,color:T.text3}}>Lions</span>
+      </div></div>)}
+      {sponsor&&<PresentedByBar sponsor={sponsor}/>}
+    </div>
+
+    <div style={{flex:1,overflowY:'auto'}}>
+      {msgs.map(m=>{
+        if(m.type==='sponsor'&&sponsor) return <SponsorFeedCard key={m.id} sponsor={sponsor} data={m.data}/>;
+        if(m.type==='sponsor') return null;
+        return <FeedCard key={m.id} msg={m} onReact={react} sponsor={sponsor}/>;
+      })}
+      <div style={{height:90}}/>
+    </div>
+
+    <div style={{padding:'10px 14px 12px',background:'rgba(0,0,0,0.95)',borderTop:`1px solid ${T.borderSoft}`,flexShrink:0,display:'flex',alignItems:'center',gap:10}}>
+      <span style={{fontSize:11,color:T.text3,flex:1,textAlign:'center'}}>Want to chat? Start a Huddle with friends.</span>
+      <button onClick={()=>onNavigate('huddle',MY_HUDDLES[0])} style={{padding:'8px 14px',borderRadius:18,background:T.goldDim,border:`1px solid ${T.goldBorder}`,color:T.gold,fontSize:12,fontWeight:700,cursor:'pointer',flexShrink:0}}>+ New Huddle</button>
+    </div>
+
+    <BottomNav active="home" onNavigate={onNavigate}/>
+  </div>);
+}
+
+// ─── HUDDLE (active group chat, top-down) ─────────────────────
+function HuddleScreen({huddle,onBack,onNavigate,onChangeRoom,sponsor}){
+  const [msgs,setMsgs]=React.useState(buildHuddleMsgs);
+  const [input,setInput]=React.useState('');
+  const [showMentions,setShowMentions]=React.useState(false);
+  const [mentionFilter,setMentionFilter]=React.useState('');
+  const [showWho,setShowWho]=React.useState(false);
+  const [showSwitcher,setShowSwitcher]=React.useState(false);
+  const watchers=HUDDLE_MEMBERS.filter(m=>m.status==='watching');
+  const onlineCount=HUDDLE_MEMBERS.filter(m=>m.status!=='offline').length;
+
+  React.useEffect(()=>{setMsgs(buildHuddleMsgs());setInput('');},[huddle?.id]);
+
+  const react=(id,e)=>setMsgs(prev=>prev.map(m=>{if(m.id!==id||!m.reactions)return m;const mine=(m.myReactions||[]).includes(e);return{...m,reactions:{...m.reactions,[e]:(m.reactions[e]||0)+(mine?-1:1)},myReactions:mine?(m.myReactions||[]).filter(x=>x!==e):[...(m.myReactions||[]),e]};}));
+
+  const handleInput=e=>{
+    const val=e.target.value; setInput(val);
+    const at=val.match(/@(\w*)$/);
+    if(at){setShowMentions(true);setMentionFilter(at[1].toLowerCase());}else setShowMentions(false);
+  };
+  const insertMention=m=>{setInput(prev=>prev.replace(/@\w*$/,`@${m.name} `));setShowMentions(false);};
+
+  const send=()=>{
+    if(!input.trim()) return;
+    // NEW MESSAGES APPEAR AT THE TOP
+    setMsgs(prev=>[{id:`m${Date.now()}`,type:'msg',uid:'me',name:'You',avatar:'😎',time:'now',isOwn:true,text:input.trim(),reactions:{},myReactions:[],replies:[]},...prev]);
+    setInput(''); setShowMentions(false);
+  };
+
+  const grouped=msgs.map((m,i)=>{
+    if(m.type==='system') return {...m,showAvatar:false};
+    const next=msgs[i+1];
+    const showAvatar=!next||next.uid!==m.uid||next.type==='system';
+    return {...m,showAvatar};
+  });
+  const filtered=HUDDLE_MEMBERS.filter(m=>m.name.toLowerCase().includes(mentionFilter));
+
+  return(<div style={{height:'100%',display:'flex',flexDirection:'column',background:T.bgHuddle,position:'relative',
+    backgroundImage:'radial-gradient(circle at 0% 0%, rgba(245,197,24,0.025), transparent 50%), radial-gradient(circle at 100% 100%, rgba(59,130,246,0.02), transparent 50%)'}}>
+    <div style={{padding:'52px 14px 10px',background:'rgba(20,20,24,0.96)',backdropFilter:'blur(12px)',borderBottom:`1px solid ${T.border}`,flexShrink:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <button onClick={onBack} style={{background:'none',border:'none',cursor:'pointer',padding:4,display:'flex'}}>
+          <svg width="10" height="16" viewBox="0 0 10 16" fill="none"><path d="M8 2L2 8l6 6" stroke={T.gold} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </button>
+        <button onClick={()=>setShowSwitcher(true)} style={{flex:1,display:'flex',alignItems:'center',gap:10,background:'none',border:'none',padding:'2px 0',cursor:'pointer',textAlign:'left',fontFamily:'DM Sans,sans-serif'}}>
+          <div style={{width:36,height:36,borderRadius:'50%',background:T.bg3,border:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>{huddle.emoji||'🏆'}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:1}}>
+              <span style={{fontSize:10,fontWeight:800,letterSpacing:'0.14em',color:T.gold}}>HUDDLE</span>
+              <AvatarStack avatars={watchers.map(w=>w.avatar)} size={14} max={3} bgRing={'#141418'}/>
+              <span style={{fontSize:10,color:T.text3,fontWeight:500}}>· {watchers.length} watching</span>
+            </div>
+            <div style={{fontSize:15,fontWeight:700,color:T.text,lineHeight:1.2,display:'flex',alignItems:'center',gap:6}}>
+              <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{huddle.name||'The Boys Fantasy'}</span>
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style={{flexShrink:0}}><path d="M1 1l4 4 4-4" stroke={T.text3} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+          </div>
+        </button>
+        <span style={{fontSize:18,color:T.text3,cursor:'pointer',padding:'0 4px'}}>···</span>
+      </div>
+    </div>
+
+    {/* Live presence bar */}
+    <div onClick={()=>setShowWho(true)} style={{padding:'10px 16px',background:'rgba(245,197,24,0.04)',borderBottom:`1px solid ${T.borderSoft}`,display:'flex',alignItems:'center',gap:10,cursor:'pointer',flexShrink:0}}>
+      <AvatarStack avatars={HUDDLE_MEMBERS.filter(m=>m.status!=='offline').map(m=>m.avatar)} size={26} max={5} bgRing={'#141418'}/>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:12,color:T.text,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
+          <div style={{width:6,height:6,borderRadius:'50%',background:T.green,animation:'pulse 1.5s infinite'}}/>
+          <span>{onlineCount} in the room</span>
+        </div>
+        <div style={{fontSize:11,color:T.text3,marginTop:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+          {watchers.map(w=>w.name).join(', ')} watching · Dan is typing…
+        </div>
+      </div>
+      <span style={{fontSize:11,color:T.gold,fontWeight:600,flexShrink:0}}>See all →</span>
+    </div>
+
+    <div style={{flex:1,overflowY:'auto',padding:'8px 0 4px'}}>
+      {grouped.map(m=><HuddleBubble key={m.id} msg={m} onReact={react} showAvatar={m.showAvatar} sponsor={sponsor}/>)}
+      <div style={{height:8}}/>
+    </div>
+
+    {showMentions&&filtered.length>0&&(<div style={{background:T.bg2,border:`1px solid ${T.border}`,borderRadius:12,margin:'0 12px',overflow:'hidden',flexShrink:0}}>
+      {filtered.map(m=>(<div key={m.uid} onClick={()=>insertMention(m)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',cursor:'pointer',borderBottom:`1px solid ${T.border}`}}>
+        <div style={{width:28,height:28,borderRadius:'50%',background:T.bg3,border:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>{m.avatar}</div>
+        <span style={{fontSize:14,fontWeight:600,color:T.text}}>{m.name}</span>
+        <StatusDot status={m.status}/>
+      </div>))}
+    </div>)}
+
+    <div style={{padding:'8px 12px 12px',background:'rgba(20,20,24,0.96)',borderTop:`1px solid ${T.border}`,flexShrink:0}}>
+      <div style={{display:'flex',gap:8,alignItems:'center'}}>
+        <button style={{width:32,height:32,borderRadius:'50%',background:T.bg3,border:`1px solid ${T.border}`,color:T.text2,fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>+</button>
+        <div style={{flex:1,background:T.bg3,border:`1px solid ${T.border}`,borderRadius:20,padding:'9px 14px',display:'flex',alignItems:'center',gap:8}}>
+          <input value={input} onChange={handleInput} onKeyDown={e=>e.key==='Enter'&&send()} placeholder="Message the huddle… or @mention" style={{flex:1,background:'none',border:'none',outline:'none',fontSize:15,color:T.text,fontFamily:'DM Sans,sans-serif',caretColor:T.gold}}/>
+        </div>
+        <button onClick={send} style={{width:36,height:36,borderRadius:'50%',background:input.trim()?T.gold:T.bg3,border:`1px solid ${input.trim()?T.gold:T.border}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0}}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 7h12M7 1l6 6-6 6" stroke={input.trim()?'#000':T.text3} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    {showWho&&<WhoSheet onClose={()=>setShowWho(false)}/>}
+    {showSwitcher&&<RoomSwitcher current={huddle} onPick={onChangeRoom} onClose={()=>setShowSwitcher(false)} onNavigate={onNavigate}/>}
+    <BottomNav active="home" onNavigate={onNavigate}/>
+  </div>);
+}
+
+function BottomNav({active,onNavigate}){
+  const items=[{id:'home',icon:'⊞',label:'Home'},{id:'teams',icon:'🏈',label:'Teams'},{id:'picks',icon:'🎯',label:'Picks'},{id:'me',icon:'👤',label:'Me'}];
+  return(<div style={{display:'flex',justifyContent:'space-around',alignItems:'center',padding:'8px 0 24px',background:'rgba(10,10,11,0.96)',backdropFilter:'blur(12px)',borderTop:`1px solid ${T.border}`,flexShrink:0}}>
+    {items.map(item=>{const a=active===item.id;return(<button key={item.id} onClick={()=>onNavigate(item.id)} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,background:'none',border:'none',cursor:'pointer',padding:'4px 16px'}}>
+      <span style={{fontSize:20,lineHeight:1}}>{item.icon}</span>
+      <span style={{fontSize:10,fontWeight:600,color:a?T.gold:T.text3}}>{item.label}</span>
+      {a&&<div style={{width:4,height:4,borderRadius:'50%',background:T.gold,marginTop:-2}}/>}
+    </button>);})}
+  </div>);
+}
+
+function App(){
+  const TWEAK_DEFAULTS=/*EDITMODE-BEGIN*/{
+    "startScreen": "home",
+    "sponsor": "hashmark"
+  }/*EDITMODE-END*/;
+  const [screen,setScreen]=React.useState(TWEAK_DEFAULTS.startScreen||'home');
+  const [sponsorId,setSponsorId]=React.useState(TWEAK_DEFAULTS.sponsor||'draftpass');
+  const sponsor=SPONSORS[sponsorId]||SPONSORS.draftpass;
+  const [ctx,setCtx]=React.useState(null);
+  const [tweaksVisible,setTweaksVisible]=React.useState(false);
+
+  React.useEffect(()=>{
+    const h=e=>{if(e.data?.type==='__activate_edit_mode')setTweaksVisible(true);if(e.data?.type==='__deactivate_edit_mode')setTweaksVisible(false);};
+    window.addEventListener('message',h);
+    window.parent.postMessage({type:'__edit_mode_available'},'*');
+    return()=>window.removeEventListener('message',h);
+  },[]);
+
+  const navigate=(dest,context=null)=>{
+    if(dest==='feed'||dest==='huddle'){setCtx(context);setScreen(dest);}
+    else{setScreen(dest);setCtx(null);}
+  };
+
+  const renderScreen=()=>{
+    switch(screen){
+      case 'onboard': return <OnboardingFlow onDone={()=>setScreen('home')}/>;
+      case 'home': return <HomeScreen onNavigate={navigate}/>;
+      case 'feed': return <FeedScreen team={ctx||MY_TEAMS[0]} onBack={()=>setScreen('home')} onNavigate={navigate} sponsor={sponsor}/>;
+      case 'huddle': return <HuddleScreen huddle={ctx||MY_HUDDLES[0]} onBack={()=>setScreen('home')} onNavigate={navigate} onChangeRoom={h=>{setCtx(h);}} sponsor={sponsor}/>;
+      default: return <HomeScreen onNavigate={navigate}/>;
+    }
+  };
+
+  return(<>
+    <div style={{width:'100vw',height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0A0A0B',position:'relative'}}>
+      <div style={{position:'absolute',top:18,left:'50%',transform:'translateX(-50%)',display:'flex',alignItems:'center',gap:8,whiteSpace:'nowrap'}}>
+        <SHLogo size={22}/>
+        <span style={{fontSize:11,fontWeight:600,color:'#404048',letterSpacing:'0.07em'}}>SIDE HUDDLE v5 · LIVE NOW · feed = passive · huddle = bubble chat (top-down)</span>
+      </div>
+      <div style={{width:390,height:844,borderRadius:52,overflow:'hidden',background:T.bg,boxShadow:'0 0 0 12px #141416,0 0 0 14px #1f1f22,0 40px 80px rgba(0,0,0,.6)',position:'relative',flexShrink:0}}>
+        <div style={{position:'absolute',top:12,left:'50%',transform:'translateX(-50%)',width:120,height:34,borderRadius:20,background:'#000',zIndex:100}}/>
+        <div style={{position:'absolute',top:0,left:0,right:0,height:54,zIndex:50,display:'flex',alignItems:'flex-end',justifyContent:'space-between',padding:'0 28px 6px',pointerEvents:'none'}}>
+          <span style={{fontFamily:'-apple-system',fontWeight:600,fontSize:15,color:T.text}}>9:41</span>
+          <div style={{display:'flex',gap:5,alignItems:'center'}}>
+            <svg width="17" height="12" viewBox="0 0 17 12"><rect x="0" y="8" width="3" height="4" rx=".5" fill={T.text}/><rect x="4.7" y="5.5" width="3" height="6.5" rx=".5" fill={T.text}/><rect x="9.4" y="3" width="3" height="9" rx=".5" fill={T.text}/><rect x="14" y="0" width="3" height="12" rx=".5" fill={T.text}/></svg>
+            <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 9.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" fill={T.text}/><path d="M4.5 7C5.8 5.7 7 5 8 5s2.2.7 3.5 2" stroke={T.text} strokeWidth="1.5" fill="none" strokeLinecap="round"/><path d="M1.5 4C3.3 2.2 5.5 1 8 1s4.7 1.2 6.5 3" stroke={T.text} strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>
+            <svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.5" stroke={T.text} strokeOpacity=".35" fill="none"/><rect x="2" y="2" width="16" height="8" rx="2" fill={T.text}/><path d="M23 4v4c.8-.3 1.5-1.2 1.5-2s-.7-1.7-1.5-2z" fill={T.text} fillOpacity=".4"/></svg>
+          </div>
+        </div>
+        <div style={{position:'absolute',inset:0}}>{renderScreen()}</div>
+        <div style={{position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',width:134,height:5,borderRadius:100,background:'rgba(255,255,255,0.2)',zIndex:200,pointerEvents:'none'}}/>
+      </div>
+    </div>
+    <div id="tweaks-panel" className={tweaksVisible?'visible':''}>
+      <div className="tweak-title">Tweaks</div>
+      <div className="tweak-row"><span className="tweak-label">Jump to</span>
+        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+          {[['onboard','Intro'],['home','Home'],['feed','Feed'],['huddle','Huddle']].map(([s,l])=>(
+            <button key={s} className={`tb ${screen===s?'active':''}`} onClick={()=>navigate(s,s==='feed'?MY_TEAMS[0]:s==='huddle'?MY_HUDDLES[0]:null)} style={{fontSize:11,padding:'3px 7px'}}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div className="tweak-row"><span className="tweak-label">Switch huddle</span>
+        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+          {MY_HUDDLES.map(h=>(<button key={h.id} className={`tb ${ctx?.id===h.id?'active':''}`} onClick={()=>navigate('huddle',h)} style={{fontSize:11,padding:'3px 7px'}}>{h.emoji}</button>))}
+        </div>
+      </div>
+      <div className="tweak-row"><span className="tweak-label">Sponsor</span>
+        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+          {Object.values(SPONSORS).map(s=>(<button key={s.id} className={`tb ${sponsorId===s.id?'active':''}`} onClick={()=>{setSponsorId(s.id);window.parent.postMessage({type:'__edit_mode_set_keys',edits:{sponsor:s.id}},'*');}} style={{fontSize:11,padding:'3px 7px'}}>{s.name}</button>))}
+        </div>
+      </div>
+    </div>
+  </>);}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+<div id="root"></div>
+</body>
+</html>
