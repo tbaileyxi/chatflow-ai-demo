@@ -105,6 +105,73 @@ async function fetchESPNScores(league: 'NFL' | 'NCAA' | 'NBA', teamName: string,
   }
 }
 
+const GAME_MARKET_TYPES = ['spread', 'total', 'winner', 'player_prop', 'other'];
+
+type BotMarket = {
+  question: string;
+  current_yes_price: number | null;
+  market_type: string | null;
+  event_start_time: string | null;
+};
+
+function buildKalshiContext(markets: BotMarket[]) {
+  if (!markets.length) {
+    return '\n🎯 GAME PROP DATA (Kalshi): No game props found for this team in the next 48 hours.\n';
+  }
+
+  const lines = markets.slice(0, 4).map((market, index) => {
+    const yesPrice = market.current_yes_price ?? 50;
+    const noPrice = 100 - yesPrice;
+    const marketType = market.market_type ?? 'game_prop';
+    return `${index + 1}. [${marketType}] ${market.question} — Yes ${yesPrice}¢ / No ${noPrice}¢`;
+  });
+
+  return `\n🎯 GAME PROP DATA (Kalshi - game props only, no futures):\n${lines.join('\n')}\n`;
+}
+
+function buildStructuredFallbackResponse(teamName: string, gameContext: string, kalshiContext: string) {
+  const hasLiveGame = gameContext.includes('LIVE GAME DATA');
+  const hasMarkets = !kalshiContext.includes('No game props found');
+
+  if (hasLiveGame && hasMarkets) {
+    return `${teamName} room check: score context is live and the game props are moving. Watch the next drive/possession before you boost anything.`;
+  }
+  if (hasLiveGame) {
+    return `${teamName} are live right now. I have the ESPN game context, but no matching game props are loaded for this window yet.`;
+  }
+  if (hasMarkets) {
+    return `${teamName} has game props on the board, but ESPN is not showing a live game right now. Good time to make a pregame call and let the room fade it.`;
+  }
+  return `${teamName} room is quiet on live data right now. I will bring score context and game props when ESPN/Kalshi have something active.`;
+}
+
+async function callOpenAI(apiKey: string, systemPrompt: string, userQuery: string) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: Deno.env.get('OPENAI_MODEL') || 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userQuery },
+      ],
+      temperature: 0.7,
+      max_tokens: 220,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -138,11 +205,8 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
-    
-    if (!XAI_API_KEY) {
-      throw new Error('XAI_API_KEY not configured');
-    }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -368,6 +432,21 @@ serve(async (req) => {
       gameContext = `\n⚠️ NO GAME TODAY: ESPN API returned no game for ${teamName} today (${exactDateForSearch}). This could mean:\n- No game scheduled today\n- Check their schedule for next game\n`;
     }
 
+    const nowIso = now.toISOString();
+    const cutoff48hIso = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
+    const { data: kalshiMarkets } = await supabase
+      .from('kalshi_markets')
+      .select('question, current_yes_price, market_type, event_start_time')
+      .eq('team_id', huddle.team_id)
+      .eq('is_resolved', false)
+      .in('market_type', GAME_MARKET_TYPES)
+      .gte('event_start_time', nowIso)
+      .lte('event_start_time', cutoff48hIso)
+      .order('event_start_time', { ascending: true })
+      .limit(4);
+
+    const kalshiContext = buildKalshiContext((kalshiMarkets ?? []) as BotMarket[]);
+
     // Build personality-specific tone instructions
     let personalityPrompt = '';
     switch (personality) {
@@ -396,6 +475,7 @@ Your job is to keep the room alive by:
 - Surfacing trending buzz and momentum
 - Provoking emotion, boosts, and fades
 - Acting like a sharp, trash-talky sports fan — not a chatbot
+- Reasoning from structured ESPN score/game data and Kalshi game props first
 
 TONE & STYLE:
 - Confident, opinionated, and punchy
@@ -411,6 +491,7 @@ CORE BEHAVIORS:
 - Trend detection: Use real-time search to detect what's buzzing on X, Reddit, and the web. Only surface buzz that fans would actually react to.
 - Boost + fade encouragement: Suggest boosts when takes are hot. Suggest fades when opinions split.
 - Respond to @mentions helpfully and FAST.
+- Prediction prompts: Use Kalshi game props only. Do not bring up season futures unless a human explicitly asks.
 
 RULES:
 - NEVER spam
@@ -419,80 +500,94 @@ RULES:
 - You are a conductor, not the main character
 - MAXIMUM 2 sentences per response
 
-🔍 LIVE SEARCH ENABLED - Use it for:
-- Game scores: Search ESPN, NFL.com for LIVE scores
-- News/buzz: Search X for trending ${teamName} takes
-- Rankings: Search for CFP/playoff standings
+🔍 DATA PRIORITY:
+- First use the ESPN API score/game context below
+- Then use the Kalshi game-prop context below
+- If live web/X search is available from the provider, use it only to add timely buzz
 
 ${gameContext}
+${kalshiContext}
 
-🎯 If ESPN data is provided above, use those EXACT scores.
+🎯 If ESPN data is provided above, use those EXACT scores. If Kalshi data is provided, use those exact prices and keep it playful, not financial advice.
 
 User question: ${finalQuery}`;
 
-    console.log(`🤖 Calling Grok API with Live Search enabled`);
+    let aiResponse: string | null = null;
+    let provider = 'fallback';
 
-    // Call Grok API with correct search_parameters for Live Search
-    const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${XAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'grok-3-latest',  // Upgraded model with better search capabilities
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: finalQuery }
-        ],
-        stream: false,
-        max_tokens: 300,  // Limit response to ~150-200 words for conciseness
-        search_parameters: {
-          mode: "auto",  // Let Grok decide when to search (smarter than "on")
-          sources: [
-            { type: "web" },   // Search the internet (ESPN, NFL.com, etc.)
-            { type: "x" }      // Search X/Twitter for real-time sports discussion
+    if (OPENAI_API_KEY) {
+      provider = 'openai';
+      console.log(`🤖 Calling OpenAI with ESPN/Kalshi structured context`);
+      aiResponse = await callOpenAI(OPENAI_API_KEY, systemPrompt, finalQuery);
+    } else if (XAI_API_KEY) {
+      provider = 'xai';
+      console.log(`🤖 Calling Grok API with Live Search enabled`);
+
+      // Call Grok API with correct search_parameters for Live Search
+      const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${XAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'grok-3-latest',  // Upgraded model with better search capabilities
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: finalQuery }
           ],
-          return_citations: false,  // Keep response clean without source links
-          max_search_results: finalQuery.toLowerCase().match(/cfp|playoff|bracket|matchup/) ? 15 : 10  // More results for CFP queries
+          stream: false,
+          max_tokens: 300,  // Limit response to ~150-200 words for conciseness
+          search_parameters: {
+            mode: "auto",  // Let Grok decide when to search (smarter than "on")
+            sources: [
+              { type: "web" },   // Search the internet (ESPN, NFL.com, etc.)
+              { type: "x" }      // Search X/Twitter for real-time sports discussion
+            ],
+            return_citations: false,  // Keep response clean without source links
+            max_search_results: finalQuery.toLowerCase().match(/cfp|playoff|bracket|matchup/) ? 15 : 10  // More results for CFP queries
+          }
+        }),
+      });
+
+      if (!grokResponse.ok) {
+        const errorText = await grokResponse.text();
+        console.error(`❌ Grok API error (${grokResponse.status}):`, errorText);
+        
+        // Handle specific error cases
+        if (grokResponse.status === 401) {
+          throw new Error('Invalid XAI_API_KEY');
+        } else if (grokResponse.status === 429) {
+          throw new Error('Rate limit exceeded for Grok - please wait before trying again');
+        } else {
+          throw new Error(`Grok API error: ${grokResponse.status} - ${errorText}`);
         }
-      }),
-    });
-
-    if (!grokResponse.ok) {
-      const errorText = await grokResponse.text();
-      console.error(`❌ Grok API error (${grokResponse.status}):`, errorText);
-      
-      // Handle specific error cases
-      if (grokResponse.status === 401) {
-        throw new Error('Invalid XAI_API_KEY');
-      } else if (grokResponse.status === 429) {
-        throw new Error('Rate limit exceeded for Grok - please wait before trying again');
-      } else {
-        throw new Error(`Grok API error: ${grokResponse.status} - ${errorText}`);
       }
-    }
 
-    const grokData = await grokResponse.json();
-    let aiResponse = grokData.choices?.[0]?.message?.content;
+      const grokData = await grokResponse.json();
+      aiResponse = grokData.choices?.[0]?.message?.content;
 
-    // Log response metadata
-    console.log(`✅ Grok response with Live Search received`);
-    if (grokData.usage) {
-      console.log(`📊 Tokens used:`, grokData.usage);
+      // Log response metadata
+      console.log(`✅ Grok response with Live Search received`);
+      if (grokData.usage) {
+        console.log(`📊 Tokens used:`, grokData.usage);
+      }
+    } else {
+      console.log(`🤖 No AI key configured; using structured ESPN/Kalshi fallback`);
+      aiResponse = buildStructuredFallbackResponse(teamName, gameContext, kalshiContext);
     }
 
     if (!aiResponse) {
-      throw new Error('No response from Grok API');
+      throw new Error(`No response from ${provider}`);
     }
 
-    // Detect if Grok didn't actually search (gave vague response)
+    // Detect if the model gave a vague response.
     const vagueResponse = aiResponse.toLowerCase().includes("i'll need to check") || 
                           aiResponse.toLowerCase().includes("let me look") ||
                           aiResponse.toLowerCase().includes("i couldn't find");
 
     if (vagueResponse && !espnGameData) {
-      console.warn('⚠️ Grok gave vague response - search may have failed');
+      console.warn(`⚠️ ${provider} gave vague response - data/search may have failed`);
       aiResponse += `\n\n💡 *Tip: Try asking something more specific like "What is ${teamName}'s CFP ranking?" or "When is ${teamName}'s next game?"*`;
     }
 
@@ -536,7 +631,7 @@ User question: ${finalQuery}`;
       .replace(/\s+/g, ' ') // Collapse multiple spaces
       .trim();
 
-    console.log(`✅ Grok response received (${aiResponse.length} chars)`);
+    console.log(`✅ ${provider} response received (${aiResponse.length} chars)`);
 
     // Get or create system user for posting
     const { data: systemUserData } = await supabase.rpc('get_or_create_system_user');

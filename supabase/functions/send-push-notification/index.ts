@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
       // Only notify for private huddles
       const { data: presenceHuddle } = await supabase
         .from('huddles')
-        .select('is_private')
+        .select('is_private, name, team_id')
         .eq('id', huddleId)
         .single();
 
@@ -223,6 +223,60 @@ Deno.serve(async (req) => {
 
       const userIds = members.map((m) => m.user_id);
 
+      let teamLabel = 'the game';
+      if (presenceHuddle.team_id) {
+        const { data: team } = await supabase
+          .from('teams')
+          .select('name, city')
+          .eq('id', presenceHuddle.team_id)
+          .maybeSingle();
+
+        if (team?.name) {
+          teamLabel = team.city ? `${team.city} ${team.name}` : team.name;
+        }
+      }
+
+      const huddleName = presenceHuddle.name || 'a room';
+      const notificationTitle = 'Friend watching now';
+      const notificationBody = `${displayName} is watching ${teamLabel} in "${huddleName}".`;
+
+      const { data: preferences } = await supabase
+        .from('notification_preferences')
+        .select('user_id, in_app_notifications')
+        .in('user_id', userIds);
+
+      const inAppAllowed = new Map(
+        (preferences ?? []).map((p) => [p.user_id, p.in_app_notifications !== false]),
+      );
+      const inAppNotifications = userIds
+        .filter((memberUserId) => inAppAllowed.get(memberUserId) !== false)
+        .map((memberUserId) => ({
+          user_id: memberUserId,
+          type: 'presence_active',
+          title: notificationTitle,
+          body: notificationBody,
+          huddle_id: huddleId,
+          team_id: presenceHuddle.team_id ?? null,
+          data: {
+            type: 'presence_active',
+            huddleId,
+            watcherId: userId,
+            watcherName: displayName,
+            huddleName,
+            teamLabel,
+          },
+        }));
+
+      if (inAppNotifications.length > 0) {
+        const { error: notificationError } = await supabase
+          .from('notifications')
+          .insert(inAppNotifications);
+
+        if (notificationError) {
+          console.error('presence in-app notification error:', notificationError);
+        }
+      }
+
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, expo_push_token')
@@ -230,6 +284,10 @@ Deno.serve(async (req) => {
         .not('expo_push_token', 'is', null);
 
       if (!profiles || profiles.length === 0) {
+        await supabase
+          .from('presence_notification_log')
+          .insert({ huddle_id: huddleId, user_id: userId });
+
         return new Response(JSON.stringify({ sent: 0 }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -239,9 +297,16 @@ Deno.serve(async (req) => {
         .filter((p) => p.expo_push_token)
         .map((p) => ({
           to: p.expo_push_token!,
-          title: 'Huddle Activity',
-          body: `${displayName} is in the huddle \u{1F3DF}\u{FE0F}`,
-          data: { type: 'presence_active', huddleId },
+          title: notificationTitle,
+          body: notificationBody,
+          data: {
+            type: 'presence_active',
+            huddleId,
+            watcherId: userId,
+            watcherName: displayName,
+            huddleName,
+            teamLabel,
+          },
           sound: 'default',
         }));
 

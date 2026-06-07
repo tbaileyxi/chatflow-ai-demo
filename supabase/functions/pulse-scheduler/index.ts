@@ -134,12 +134,39 @@ serve(async (req) => {
       liveStates?.forEach(ls => liveStateMap.set(ls.team_id, ls.state === 'live'));
     }
 
+    // 7a. Game mode starts 20 minutes before kickoff and stays live while the game is in progress.
+    const gameModeMap = new Map<string, 'pregame' | 'live' | 'normal'>();
+    if (allTeamIds.length > 0) {
+      const now = new Date();
+      const pregameWindowStart = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
+      const pregameWindowEnd = new Date(now.getTime() + 20 * 60 * 1000).toISOString();
+      const { data: activeGames } = await supabase
+        .from('games')
+        .select('home_team_id, away_team_id, status, start_time')
+        .or(`home_team_id.in.(${allTeamIds.join(',')}),away_team_id.in.(${allTeamIds.join(',')})`)
+        .in('status', ['scheduled', 'live', 'in_progress'])
+        .gte('start_time', pregameWindowStart)
+        .lte('start_time', pregameWindowEnd);
+
+      activeGames?.forEach((game: any) => {
+        const mode = game.status === 'live' || game.status === 'in_progress' ? 'live' : 'pregame';
+        for (const teamId of [game.home_team_id, game.away_team_id].filter(Boolean)) {
+          if (mode === 'live' || !gameModeMap.has(teamId)) gameModeMap.set(teamId, mode);
+        }
+      });
+
+      liveStateMap.forEach((isLive, teamId) => {
+        if (isLive) gameModeMap.set(teamId, 'live');
+      });
+    }
+
     // 8. Build payloads
     interface DropPayload {
       huddle_id: string;
       team_id?: string;
       team_name?: string;
       is_live: boolean;
+      game_mode?: 'pregame' | 'live' | 'normal';
       event_id?: string;
     }
 
@@ -147,7 +174,8 @@ serve(async (req) => {
       huddle_id: h.id,
       team_id: h.team_id || undefined,
       team_name: h.team_id ? (teamMap.get(h.team_id) || '') : undefined,
-      is_live: h.team_id ? (liveStateMap.get(h.team_id) || false) : false,
+      is_live: h.team_id ? ((liveStateMap.get(h.team_id) || false) || gameModeMap.get(h.team_id) === 'live') : false,
+      game_mode: h.team_id ? (gameModeMap.get(h.team_id) || 'normal') : 'normal',
       event_id: h.event_id || undefined,
     }));
 
@@ -170,7 +198,8 @@ serve(async (req) => {
               huddle_id: teamHuddle.id,
               team_id: tid,
               team_name: teamMap.get(tid) || '',
-              is_live: liveStateMap.get(tid) || false,
+              is_live: (liveStateMap.get(tid) || false) || gameModeMap.get(tid) === 'live',
+              game_mode: gameModeMap.get(tid) || 'normal',
               event_id: h.event_id,
             });
           }

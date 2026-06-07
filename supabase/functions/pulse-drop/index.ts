@@ -89,7 +89,7 @@ serve(async (req) => {
       );
     }
 
-    let { huddle_id, team_id, team_name, is_live, event_id, debug: requestDebug } = body;
+    let { huddle_id, team_id, team_name, is_live, event_id, game_mode = 'normal', debug: requestDebug } = body;
 
     if (!huddle_id) {
       console.error('[pulse-drop] Missing huddle_id in request');
@@ -100,6 +100,7 @@ serve(async (req) => {
     debug.huddle_id = huddle_id;
     debug.team_id = team_id;
     debug.is_live = is_live;
+    debug.game_mode = game_mode;
 
     // Resolve team name (prevents generic queries + cross-team content)
     let resolvedTeamName = typeof team_name === 'string' && team_name.trim() ? team_name.trim() : undefined;
@@ -117,11 +118,13 @@ serve(async (req) => {
     const { data: systemUser } = await supabase.rpc('get_or_create_system_user');
     if (!systemUser) throw new Error('Could not get system user');
 
-    // Throttle pulse frequency per huddle
-    // - live: frequent, to feel real-time
-    // - non-live: at least hourly to keep feeds fresh
-    const minIntervalMinutes = is_live ? 10 : 60;
+    // Throttle pulse frequency per huddle. Scoreboards sync separately; this is for news/insight only.
+    // - live/pregame: room can get smart context, but not score spam
+    // - normal: low-frequency daytime news drops
+    const minIntervalMinutes = game_mode === 'live' || is_live ? 20 : game_mode === 'pregame' ? 30 : 240;
+    const maxItemsThisDrop = game_mode === 'live' || is_live ? 2 : 1;
     debug.min_interval_minutes = minIntervalMinutes;
+    debug.max_items_this_drop = maxItemsThisDrop;
     const { data: lastPulse } = await supabase
       .from('huddle_messages')
       .select('created_at')
@@ -148,7 +151,7 @@ serve(async (req) => {
       }
     }
 
-    const searchQuery = resolvedTeamName ? `${resolvedTeamName} football` : 'sports game';
+    const searchQuery = resolvedTeamName ? `${resolvedTeamName} sports news` : 'sports news';
     debug.search_query = searchQuery;
 
     const samplePostIds: string[] = [];
@@ -173,11 +176,11 @@ serve(async (req) => {
             body: JSON.stringify({
               model: chosenModel,
               input: [
-                 { role: 'system', content: `You are a sports content aggregator. Use x_search to pull recent takes/memes/reactions.
+                 { role: 'system', content: `You are a sports content aggregator. Use x_search to pull recent news, takes, clips, memes, or reactions.
 
 CRITICAL: Only include items that are clearly about "${resolvedTeamName || searchQuery}". If it seems about a different team/player/topic, SKIP it.
 
-Return ONLY a JSON array (no markdown). Each item: {"text":"max 180 chars","media_url":null|"url"}. Return up to 8 items.` },
+Return ONLY a JSON array (no markdown). Each item: {"text":"max 180 chars","media_url":null|"url"}. Return up to ${maxItemsThisDrop} items.` },
                 { role: 'user', content: `Find the freshest buzz about: ${searchQuery}` }
               ],
               tools: [{ type: 'x_search' }],
@@ -189,20 +192,7 @@ Return ONLY a JSON array (no markdown). Each item: {"text":"max 180 chars","medi
             const errTxt = await xaiRes.text();
             console.error('[pulse-drop] xAI error:', xaiRes.status, errTxt.slice(0, 1000));
             debug.xai_error = { status: xaiRes.status, details: errTxt.slice(0, 1500) };
-            // Insert fallback if live
-            if (is_live) {
-              await supabase.from('huddle_messages').insert({
-                huddle_id,
-                user_id: systemUser,
-                is_bot_message: true,
-                content: `⚠️ Buzz temporarily unavailable (xAI error: ${xaiRes.status})`,
-                message_type: 'pulse',
-                is_pulse_moment: true,
-                pulse_source: 'grok',
-                embed_code: `buzz_error:${Date.now()}`
-              });
-              insertedBySource.grok++;
-            }
+            // Stay quiet on provider failure. No debug/error copy in user rooms.
           } else {
             const xData = await xaiRes.json();
             let rawContent: string | undefined;
@@ -228,7 +218,7 @@ Return ONLY a JSON array (no markdown). Each item: {"text":"max 180 chars","medi
                 const items = JSON.parse(jsonStr);
 
                 if (Array.isArray(items)) {
-                  for (const item of items.slice(0, 8)) {
+                  for (const item of items.slice(0, maxItemsThisDrop)) {
                     const text = truncate(String(item?.text || ''), 180);
                     if (!text) continue;
                     const embedCode = `x:${generateStableHash(text)}`;
@@ -265,7 +255,7 @@ Return ONLY a JSON array (no markdown). Each item: {"text":"max 180 chars","medi
     }
 
     // ========== Reddit Backup ==========
-    if (insertedBySource.x < 3) {
+    if (insertedBySource.x + insertedBySource.reddit + insertedBySource.grok < maxItemsThisDrop) {
       try {
         const redditQuery = encodeURIComponent(searchQuery);
         const redditRes = await fetch(`https://www.reddit.com/search.json?q=${redditQuery}&sort=new&t=day&limit=5`, {
@@ -274,7 +264,8 @@ Return ONLY a JSON array (no markdown). Each item: {"text":"max 180 chars","medi
         if (redditRes.ok) {
           const redditData = await redditRes.json();
           const posts = redditData.data?.children || [];
-          for (const post of posts.slice(0, 3)) {
+          for (const post of posts.slice(0, maxItemsThisDrop)) {
+            if (insertedBySource.x + insertedBySource.reddit + insertedBySource.grok >= maxItemsThisDrop) break;
             const title = truncate(String(post.data?.title || ''), 180);
             if (!title) continue;
             const embedCode = `reddit:${post.data.id}`;

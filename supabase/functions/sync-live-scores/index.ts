@@ -13,6 +13,7 @@ const ESPN_ENDPOINTS: Record<string, string> = {
   nba: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
   ncaab: 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard',
   nhl: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard',
+  mlb: 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard',
 };
 
 // Map ESPN sport keys to Odds API sport_key values used in the games table
@@ -22,6 +23,7 @@ const SPORT_KEY_MAP: Record<string, string> = {
   nba: 'basketball_nba',
   ncaab: 'basketball_ncaab',
   nhl: 'icehockey_nhl',
+  mlb: 'baseball_mlb',
 };
 
 interface ESPNGame {
@@ -108,6 +110,7 @@ function formatPeriod(period: number | undefined, sport: string): string | null 
   if (sport === 'nba' || sport === 'ncaab') return `Q${period}`;
   if (sport === 'nhl') return `P${period}`;
   if (sport === 'nfl' || sport === 'ncaaf') return `Q${period}`;
+  if (sport === 'mlb') return `${period}`;
   return `${period}`;
 }
 
