@@ -1,3 +1,10 @@
+# Legacy web app subfolder (now iOS-only)
+chatflow-ai-demo/
+
+# Claude/Codex worktrees
+.claude/worktrees/
+.codex/
+
 # Logs
 logs
 *.log
