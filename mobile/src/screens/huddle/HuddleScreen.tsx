@@ -2,14 +2,24 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
+  Image,
   FlatList,
+  ScrollView,
+  Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
+  Share,
   ActivityIndicator,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRoute, type RouteProp } from "@react-navigation/native";
+import {
+  useNavigation,
+  useRoute,
+  type RouteProp,
+} from "@react-navigation/native";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useHuddleDetails } from "@/hooks/useHuddleDetails";
@@ -22,9 +32,12 @@ import { ChatMessage } from "@/components/huddle/ChatMessage";
 import { MessageInput } from "@/components/huddle/MessageInput";
 import { PredictionCard } from "@/components/predictions/PredictionCard";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { DEV_ROOMS_STORAGE_KEY, getDevTeamById } from "@/config/devData";
+import { Bell, Lock, LogOut, MoreVertical, Pin, UserPlus } from "lucide-react-native";
 import { useTeamMarkets } from "@/hooks/useTeamMarkets";
 import {
   useLiveGameContext,
+  formatGameClock,
   getGameState,
 } from "@/hooks/useLiveGameContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -146,6 +159,11 @@ function buildListItems(
 export function HuddleScreen() {
   const route = useRoute<Route>();
   const { huddleId } = route.params;
+
+  if (huddleId.startsWith("dev-room-")) {
+    return <DevHuddleRoom huddleId={huddleId} />;
+  }
+
   const { user } = useAuth();
   const { data: profile } = useProfile();
   const { data: huddle, isLoading: huddleLoading } = useHuddleDetails(huddleId);
@@ -158,9 +176,10 @@ export function HuddleScreen() {
     loadingMore,
   } = useHuddleMessages(huddleId);
   const flatListRef = useRef<FlatList<ListItem>>(null);
-  const { presentUsers, entryBanner } = useHuddlePresence(huddleId);
+  const { presentUsers, typingUsers, entryBanner, sendTyping } =
+    useHuddlePresence(huddleId);
 
-  // Kalshi markets for this huddle's team
+  // Prediction markets for this huddle's team
   const teamId = huddle?.teamId;
   const { data: teamMarkets } = useTeamMarkets(teamId);
   const { data: game } = useLiveGameContext(teamId);
@@ -360,6 +379,27 @@ export function HuddleScreen() {
                 </View>
               ) : null
             }
+            ListEmptyComponent={
+              <View className="flex-1 justify-end px-4 py-6">
+                <View className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
+                  <Text className="text-lg font-black text-foreground">
+                    Room is open.
+                  </Text>
+                  <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+                    I’ll bring score context, game props, and useful room prompts when this team is active. Ask @coach for news, injuries, live score, or what prop the room should argue about.
+                  </Text>
+                  {teamMarkets && teamMarkets.length > 0 ? (
+                    <Text className="mt-3 text-sm font-bold text-primary">
+                      {teamMarkets.length} game prop{teamMarkets.length === 1 ? "" : "s"} loaded.
+                    </Text>
+                  ) : (
+                    <Text className="mt-3 text-sm font-bold text-muted-foreground">
+                      No game props loaded for this team window yet.
+                    </Text>
+                  )}
+                </View>
+              </View>
+            }
             contentContainerStyle={{ paddingVertical: 8 }}
             keyboardShouldPersistTaps="handled"
             onScrollToIndexFailed={(info) => {
@@ -375,14 +415,920 @@ export function HuddleScreen() {
         )}
 
         {user && huddle.isMember && (
+          <>
+            {typingUsers.length > 0 && (
+              <Text className="border-t border-border bg-background px-4 pt-2 text-xs italic text-muted-foreground">
+                {typingUsers.map((typingUser) => typingUser.displayName).join(", ")}
+                {typingUsers.length === 1 ? " is" : " are"} typing...
+              </Text>
+            )}
           <MessageInput
             onSend={handleSend}
             replyTo={replyTo}
             onCancelReply={() => setReplyTo(null)}
             onFocus={scrollToBottom}
+            onTypingChange={sendTyping}
           />
+          </>
         )}
       </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+type DevRoomMessage = {
+  id: string;
+  author: string;
+  content: string;
+  isOwn?: boolean;
+  isBot?: boolean;
+  isSystem?: boolean;
+  botType?: "news" | "prediction";
+  mediaUri?: string;
+  mediaType?: "image" | "audio";
+  replies?: { id: string; author: string; content: string; isOwn?: boolean }[];
+  time?: string;
+};
+
+type DevRoomPerson = {
+  id: string;
+  name: string;
+  status: "watching" | "online" | "away";
+};
+
+type DevStoredRoom = {
+  id: string;
+  name: string;
+  teamId?: string | null;
+  teamName?: string | null;
+  teamCity?: string | null;
+  teamLogoUrl?: string | null;
+  relationship?: "owner" | "joined";
+  accessMode?: "link" | "private";
+  memberCount?: number;
+  createdAt?: string;
+};
+
+const DEV_ROOM_MESSAGES_STORAGE_PREFIX = "side-huddle-dev-room-v5-messages";
+
+const DEV_TEAM_VISUALS: Record<
+  string,
+  { abbr: string; color: string; ink: string }
+> = {
+  "10000000-0000-4000-8000-000000000001": {
+    abbr: "CHI",
+    color: "#0B162A",
+    ink: "#C83803",
+  },
+  "10000000-0000-4000-8000-000000000002": {
+    abbr: "CHI",
+    color: "#1A1A1E",
+    ink: "#CE1141",
+  },
+  "10000000-0000-4000-8000-000000000009": {
+    abbr: "NYK",
+    color: "#0B2240",
+    ink: "#F58426",
+  },
+};
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return (parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : name.slice(0, 2)).toUpperCase();
+}
+
+function personColors(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i += 1) h = (h * 31 + name.charCodeAt(i)) % 360;
+  return {
+    bg: `hsl(${h}, 26%, 19%)`,
+    fg: `hsl(${h}, 48%, 74%)`,
+    line: `hsl(${h}, 24%, 30%)`,
+  };
+}
+
+function getDevTeamVisual(teamId?: string, fallbackName = "Team") {
+  const configured = teamId ? DEV_TEAM_VISUALS[teamId] : undefined;
+  if (configured) return configured;
+  return {
+    abbr: fallbackName
+      .split(/\s+/)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 3)
+      .toUpperCase() || "SH",
+    color: "#171A21",
+    ink: colors.primary,
+  };
+}
+
+function getBotName(teamLabel: string) {
+  const parts = teamLabel.split(/\s+/).filter(Boolean);
+  const name = parts[parts.length - 1] ?? "Team";
+  return name.toLowerCase() === "team" ? "Room Bot" : `${name} Bot`;
+}
+
+function DevAvatar({ name, size = 34 }: { name: string; size?: number }) {
+  const p = personColors(name);
+  return (
+    <View
+      className="items-center justify-center rounded-full"
+      style={{
+        width: size,
+        height: size,
+        backgroundColor: p.bg,
+        borderColor: p.line,
+        borderWidth: 1,
+      }}
+    >
+      <Text style={{ color: p.fg, fontSize: size * 0.35, fontWeight: "800" }}>
+        {initials(name)}
+      </Text>
+    </View>
+  );
+}
+
+function TeamTile({
+  visual,
+  size = 34,
+}: {
+  visual: { abbr: string; color: string; ink: string };
+  size?: number;
+}) {
+  return (
+    <View
+      className="items-center justify-center overflow-hidden"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: Math.max(8, size * 0.28),
+        backgroundColor: visual.color,
+        borderColor: "rgba(255,255,255,0.12)",
+        borderWidth: 1,
+      }}
+    >
+      <View
+        className="absolute bottom-0 left-0 top-0"
+        style={{ width: 3, backgroundColor: visual.ink }}
+      />
+      <Text className="font-black text-white" style={{ fontSize: size * 0.29 }}>
+        {visual.abbr}
+      </Text>
+    </View>
+  );
+}
+
+function AvatarStack({
+  names,
+  size = 22,
+}: {
+  names: string[];
+  size?: number;
+}) {
+  return (
+    <View className="flex-row items-center">
+      {names.slice(0, 4).map((name, index) => (
+        <View
+          key={`${name}-${index}`}
+          className="rounded-full"
+          style={{
+            marginLeft: index > 0 ? -size * 0.35 : 0,
+            borderWidth: 2,
+            borderColor: colors.card,
+          }}
+        >
+          <DevAvatar name={name} size={size} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function renderMentionText(text: string, className: string) {
+  return text.split(/(@\w+)/g).map((part, index) => (
+    <Text
+      key={`${part}-${index}`}
+      className={/^@\w+/.test(part) ? "font-black text-primary" : className}
+    >
+      {part}
+    </Text>
+  ));
+}
+
+function titleFromDevRoomId(huddleId: string) {
+  return huddleId
+    .replace(/^dev-room-/, "")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function DevRoomMessageRow({
+  item,
+  teamVisual,
+  onReply,
+  onImagePress,
+}: {
+  item: DevRoomMessage;
+  teamVisual: { abbr: string; color: string; ink: string };
+  onReply: (item: DevRoomMessage) => void;
+  onImagePress: (uri: string) => void;
+}) {
+  if (item.isSystem) {
+    return (
+      <View className="items-center px-4 py-3">
+        <Text className="text-xs font-semibold text-muted-foreground">
+          {item.content}
+        </Text>
+      </View>
+    );
+  }
+
+  if (item.isBot) {
+    return (
+      <View className="mb-4 px-1">
+        <View className="mb-2 flex-row items-center gap-2">
+          <TeamTile visual={teamVisual} size={23} />
+          <Text className="ml-auto text-xs text-muted-foreground">
+            {item.time ?? "now"}
+          </Text>
+        </View>
+
+        {item.botType === "prediction" ? (
+          <View className="rounded-xl border border-border bg-card">
+            <View className="flex-row items-center gap-2 border-b border-border px-4 py-2.5">
+              <Text className="rounded border border-info/40 bg-info/10 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-info">
+                Market
+              </Text>
+              <Text className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                Prediction Market
+              </Text>
+              <Text className="ml-auto text-xs font-black text-success">+4%</Text>
+            </View>
+            <View className="p-4">
+              <Text className="text-base font-black leading-6 text-foreground">
+                {item.content}
+              </Text>
+              <View className="mt-4 h-1.5 flex-row overflow-hidden rounded-full bg-destructive/45">
+                <View className="h-full bg-success" style={{ width: "54%" }} />
+              </View>
+              <View className="mt-3 flex-row gap-2">
+                <Pressable className="flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-success/50 bg-success/15 py-3 active:opacity-80">
+                  <Text className="font-black text-success">Yes</Text>
+                  <Text className="font-black text-success">54c</Text>
+                </Pressable>
+                <Pressable className="flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-border bg-muted py-3 active:opacity-80">
+                  <Text className="font-black text-foreground">No</Text>
+                  <Text className="font-black text-muted-foreground">46c</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View className="rounded-xl border border-border bg-muted p-4">
+            <Text className="text-base font-semibold leading-6 text-foreground">
+              {item.content}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <View className="mb-4 px-1">
+      <View className={item.isOwn ? "flex-row-reverse gap-2" : "flex-row gap-2"}>
+        {item.isOwn ? (
+          <View className="w-8" />
+        ) : (
+          <View className="pt-5">
+            <DevAvatar name={item.author} size={30} />
+          </View>
+        )}
+        <View className={item.isOwn ? "flex-1 items-end" : "flex-1 items-start"}>
+          {!item.isOwn ? (
+            <View className="mb-1 flex-row items-baseline gap-2 pl-1">
+              <Text className="text-xs font-black text-foreground">{item.author}</Text>
+              <Text className="text-[11px] text-muted-foreground">
+                {item.time ?? "now"}
+              </Text>
+            </View>
+          ) : null}
+
+          <View
+            className={
+              item.isOwn
+                ? "max-w-[82%] rounded-2xl bg-primary px-4 py-3"
+                : "max-w-[82%] rounded-2xl border border-border bg-muted px-4 py-3"
+            }
+            style={{
+              borderTopRightRadius: item.isOwn ? 5 : 16,
+              borderTopLeftRadius: item.isOwn ? 16 : 5,
+            }}
+          >
+            <Text
+              className={
+                item.isOwn
+                  ? "text-base font-semibold leading-6 text-primary-foreground"
+                  : "text-base leading-6 text-foreground"
+              }
+            >
+              {renderMentionText(
+                item.content,
+                item.isOwn ? "text-primary-foreground" : "text-foreground",
+              )}
+            </Text>
+            {item.mediaUri && item.mediaType === "image" ? (
+              <Pressable onPress={() => onImagePress(item.mediaUri!)} className="mt-3">
+                <Image
+                  source={{ uri: item.mediaUri }}
+                  className="h-48 w-64 rounded-xl"
+                  resizeMode="cover"
+                />
+              </Pressable>
+            ) : null}
+            {item.mediaUri && item.mediaType === "audio" ? (
+              <Text
+                className={
+                  item.isOwn
+                    ? "mt-2 text-sm font-semibold text-primary-foreground"
+                    : "mt-2 text-sm font-semibold text-muted-foreground"
+                }
+              >
+                Voice message attached
+              </Text>
+            ) : null}
+          </View>
+
+          {item.replies?.length ? (
+            <View
+              className={
+                item.isOwn
+                  ? "mr-3 mt-2 gap-2 border-r-2 border-border pr-3"
+                  : "ml-3 mt-2 gap-2 border-l-2 border-border pl-3"
+              }
+            >
+              {item.replies.map((reply) => (
+                <View
+                  key={reply.id}
+                  className={
+                    item.isOwn
+                      ? "flex-row-reverse items-start gap-2"
+                      : "flex-row items-start gap-2"
+                  }
+                >
+                  <DevAvatar name={reply.author} size={21} />
+                  <Text
+                    className={
+                      item.isOwn
+                        ? "max-w-[220px] text-right text-xs leading-5 text-muted-foreground"
+                        : "max-w-[220px] text-xs leading-5 text-muted-foreground"
+                    }
+                  >
+                    <Text className="font-black text-foreground">{reply.author} </Text>
+                    {reply.content}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          <Pressable onPress={() => onReply(item)} hitSlop={8}>
+            <Text className="mt-1.5 text-[11px] font-semibold text-muted-foreground">
+              Reply
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function DevHuddleRoom({ huddleId }: { huddleId: string }) {
+  const navigation = useNavigation();
+  const [roomTitle, setRoomTitle] = useState(
+    titleFromDevRoomId(huddleId) || "Game Room",
+  );
+  const [showPeople, setShowPeople] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [roomRelationship, setRoomRelationship] = useState<"owner" | "joined">(
+    huddleId.includes("my-room") ? "owner" : "joined",
+  );
+  const [roomAccessMode, setRoomAccessMode] = useState<"link" | "private">("link");
+  const [expandedImageUri, setExpandedImageUri] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<{
+    id: string;
+    displayName: string;
+    content: string;
+  } | null>(null);
+  const [roomTeamId, setRoomTeamId] = useState<string | undefined>(undefined);
+  const [availableRooms, setAvailableRooms] = useState<DevStoredRoom[]>([]);
+  const flatListRef = useRef<FlatList<DevRoomMessage>>(null);
+  const roomTeam = roomTeamId ? getDevTeamById(roomTeamId) : undefined;
+  const { data: game } = useLiveGameContext(roomTeam?.id);
+  const gameState = getGameState(game ?? null);
+  const teamLabel = roomTeam
+    ? `${roomTeam.city} ${roomTeam.name}`
+    : roomTitle;
+  const present = useMemo<DevRoomPerson[]>(
+    () => [{ id: "you", name: "You", status: "watching" }],
+    [],
+  );
+  const teamVisual = getDevTeamVisual(roomTeamId, teamLabel);
+  const botName = roomTeam ? getBotName(teamLabel) : "Room Bot";
+  const isOwnerRoom = roomRelationship === "owner";
+  const [pinnedMessage, setPinnedMessage] = useState(
+    isOwnerRoom ? "Room is open. Check in while you watch." : "",
+  );
+  const buildSeedMessages = useCallback(
+    (): DevRoomMessage[] => [
+      {
+        id: "bot-1",
+        author: botName,
+        content:
+          `This room is open. I'll bring score context, news, prediction market prompts, and game-thread questions when live data is available.`,
+        isBot: true,
+        botType: "news",
+        time: "now",
+      },
+      {
+        id: "bot-2",
+        author: botName,
+        content: `${teamLabel} next result`,
+        isBot: true,
+        botType: "prediction",
+        time: "now",
+      },
+    ],
+    [botName, teamLabel],
+  );
+  const [messages, setMessages] = useState<DevRoomMessage[]>(() => buildSeedMessages());
+
+  useEffect(() => {
+    const loadDevRoom = async () => {
+      const storedRooms = await AsyncStorage.getItem(DEV_ROOMS_STORAGE_KEY);
+      const rooms = storedRooms ? (JSON.parse(storedRooms) as DevStoredRoom[]) : [];
+      const room = rooms.find((item: any) => item.id === huddleId);
+      setAvailableRooms(rooms.filter((item) => item.id !== huddleId));
+      if (room?.name) {
+        setRoomTitle(room.name);
+        setRoomRelationship(room.relationship === "joined" ? "joined" : "owner");
+        setRoomAccessMode(room.accessMode === "private" ? "private" : "link");
+        setRoomTeamId(room.teamId ?? undefined);
+      } else {
+        setRoomTitle(titleFromDevRoomId(huddleId) || "Game Room");
+        setRoomRelationship("owner");
+        setRoomAccessMode("link");
+        setRoomTeamId(undefined);
+      }
+      setShowMenu(false);
+      setShowPeople(false);
+      setReplyTo(null);
+      const nextRelationship = room?.relationship === "joined" ? "joined" : "owner";
+      setPinnedMessage(
+        nextRelationship === "owner" ? "Room is open. Check in while you watch." : "",
+      );
+
+      const storedMessages = await AsyncStorage.getItem(
+        `${DEV_ROOM_MESSAGES_STORAGE_PREFIX}-${huddleId}`,
+      );
+      const savedMessages = storedMessages
+        ? (JSON.parse(storedMessages) as DevRoomMessage[])
+        : [];
+      setMessages([...buildSeedMessages(), ...savedMessages]);
+    };
+
+    loadDevRoom();
+  }, [buildSeedMessages, huddleId]);
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    });
+  }, [messages.length]);
+
+  const handleSend = async (
+    content: string,
+    replyToId?: string,
+    media?: { uri: string; type: "image" | "audio" },
+  ) => {
+    const nextMessage = {
+      id: `own-${Date.now()}`,
+      author: "You",
+      content,
+      isOwn: true,
+      mediaUri: media?.uri,
+      mediaType: media?.type,
+      time: "now",
+    } satisfies DevRoomMessage;
+
+    if (replyToId) {
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === replyToId
+            ? {
+                ...message,
+                replies: [
+                  ...(message.replies ?? []),
+                  {
+                    id: `reply-${Date.now()}`,
+                    author: "You",
+                    content,
+                    isOwn: true,
+                  },
+                ],
+              }
+            : message,
+        ),
+      );
+    } else {
+      setMessages((prev) => [...prev, nextMessage]);
+    }
+    setReplyTo(null);
+    Keyboard.dismiss();
+
+    const storageKey = `${DEV_ROOM_MESSAGES_STORAGE_PREFIX}-${huddleId}`;
+    const storedMessages = await AsyncStorage.getItem(storageKey);
+    const existing = storedMessages
+      ? (JSON.parse(storedMessages) as DevRoomMessage[])
+      : [];
+    if (!replyToId) {
+      await AsyncStorage.setItem(
+        storageKey,
+        JSON.stringify([...existing, nextMessage]),
+      );
+    }
+    return { error: null };
+  };
+
+  const handleReply = (message: DevRoomMessage) => {
+    if (message.isBot || message.isSystem) return;
+    setReplyTo({
+      id: message.id,
+      displayName: message.author,
+      content: message.content,
+    });
+  };
+
+  const handleShareRoom = () => {
+    Share.share({
+      message: `Jump into ${roomTitle} on Side Huddle.`,
+    });
+  };
+
+  const opponentLabel =
+    game?.homeTeamName || game?.awayTeamName
+      ? `${game.awayTeamCity ?? ""} ${game.awayTeamName ?? "Away"} at ${game.homeTeamCity ?? ""} ${game.homeTeamName ?? "Home"}`
+      : "No live game found";
+  const scoreLabel = game
+    ? `${game.awayScore ?? "-"}-${game.homeScore ?? "-"}`
+    : "No score";
+  const gameLabel =
+    gameState === "live"
+      ? "Live"
+      : gameState === "pregame"
+        ? "Next"
+        : gameState === "postgame"
+          ? "Final"
+          : "Game";
+  return (
+    <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <View
+          className="border-b border-border px-3 pb-2 pt-2"
+          style={{ backgroundColor: colors.card }}
+        >
+          <View
+            className="absolute left-0 right-0 top-0 h-0.5"
+            style={{ backgroundColor: teamVisual.ink }}
+          />
+          <View className="flex-row items-center gap-2.5">
+            <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+              <Text className="px-1 text-3xl text-primary">‹</Text>
+            </Pressable>
+            <TeamTile visual={teamVisual} size={36} />
+            <Pressable className="flex-1" onPress={() => setShowPeople(true)}>
+              <View className="flex-row items-center gap-2">
+                <Text className="flex-1 text-lg font-black text-foreground" numberOfLines={1}>
+                  {roomTitle}
+                </Text>
+              </View>
+              <View className="mt-1 flex-row items-center gap-2">
+                <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                  {present.length} member{present.length === 1 ? "" : "s"}
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable
+              className="h-9 w-9 items-center justify-center rounded-full active:bg-muted"
+              onPress={() => setShowMenu(true)}
+              hitSlop={8}
+            >
+              <MoreVertical color={colors.mutedForeground} size={20} />
+            </Pressable>
+          </View>
+
+          {game && gameState !== "none" ? (
+            <View className="mt-3 rounded-xl border border-border bg-muted px-3 py-3">
+              <View className="mb-2 flex-row items-center gap-2">
+                {gameState === "live" ? (
+                  <View className="h-2 w-2 rounded-full bg-destructive" />
+                ) : null}
+                <Text
+                  className={
+                    gameState === "live"
+                      ? "text-xs font-black uppercase tracking-widest text-destructive"
+                      : "text-xs font-black uppercase tracking-widest text-primary"
+                  }
+                >
+                  {gameLabel}
+                </Text>
+                <Text className="text-xs text-muted-foreground">
+                  {game ? formatGameClock(game) : ""}
+                </Text>
+              </View>
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1">
+                  <Text className="text-xs font-bold text-foreground" numberOfLines={1}>
+                    {game?.awayTeamName ?? "Away"}
+                  </Text>
+                  <Text className="mt-1 text-2xl font-black text-foreground">
+                    {game?.awayScore ?? "-"}
+                  </Text>
+                </View>
+                <View className="rounded-full border border-border px-3 py-1">
+                  <Text
+                    className={
+                      gameState === "live"
+                        ? "text-xs font-black text-destructive"
+                        : "text-xs font-black text-muted-foreground"
+                    }
+                  >
+                    {game ? formatGameClock(game) : gameLabel}
+                  </Text>
+                </View>
+                <View className="flex-1 items-end">
+                  <Text className="text-xs font-bold text-muted-foreground" numberOfLines={1}>
+                    {game?.homeTeamName ?? "Home"}
+                  </Text>
+                  <Text className="mt-1 text-2xl font-black text-muted-foreground">
+                    {game?.homeScore ?? "-"}
+                  </Text>
+                </View>
+              </View>
+              <Text className="mt-2 text-xs text-muted-foreground" numberOfLines={1}>
+                {opponentLabel}
+              </Text>
+            </View>
+          ) : null}
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ alignItems: "center", gap: 8, paddingTop: 10 }}
+          >
+            <Text className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              Jump
+            </Text>
+            {availableRooms.length === 0 ? (
+              <Text className="text-xs font-bold text-muted-foreground">
+                No other rooms yet
+              </Text>
+            ) : null}
+            {availableRooms.map((room) => {
+              const active = room.id === huddleId;
+              const roomVisual = getDevTeamVisual(room.teamId ?? undefined, room.name);
+              return (
+                <Pressable
+                  key={room.id}
+                  className={
+                    active
+                      ? "flex-row items-center gap-2 rounded-full border border-primary/40 bg-primary/15 py-1.5 pl-1.5 pr-3"
+                      : "flex-row items-center gap-2 rounded-full border border-border bg-muted py-1.5 pl-1.5 pr-3"
+                  }
+                  onPress={() => {
+                    if (!active) {
+                      (navigation as any).navigate("Huddle", {
+                        huddleId: room.id,
+                      });
+                    }
+                  }}
+                >
+                  <TeamTile visual={roomVisual} size={22} />
+                  <Text
+                    className={
+                      active
+                        ? "text-xs font-black text-primary"
+                        : "text-xs font-bold text-muted-foreground"
+                    }
+                  >
+                    {room.name}
+                  </Text>
+                  {!active ? <View className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {pinnedMessage ? (
+          <View className="flex-row items-center gap-2 border-b border-border bg-primary/10 px-4 py-2">
+            <Pin color={colors.primary} size={13} />
+            <Text className="text-[10px] font-black uppercase tracking-widest text-primary">
+              Pinned
+            </Text>
+            <Text className="flex-1 text-xs font-semibold text-foreground" numberOfLines={1}>
+              {pinnedMessage}
+            </Text>
+          </View>
+        ) : null}
+
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ flexGrow: 1, justifyContent: "flex-end", padding: 12, paddingBottom: 16 }}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          onScrollBeginDrag={Keyboard.dismiss}
+          renderItem={({ item }) => (
+            <DevRoomMessageRow
+              item={item}
+              teamVisual={teamVisual}
+              onReply={handleReply}
+              onImagePress={setExpandedImageUri}
+            />
+          )}
+          ListFooterComponent={null}
+        />
+
+        <MessageInput
+          onSend={handleSend}
+          replyTo={replyTo}
+          onCancelReply={() => setReplyTo(null)}
+          onFocus={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        />
+      </KeyboardAvoidingView>
+
+      <Modal
+        visible={showMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <Pressable className="flex-1 bg-black/20" onPress={() => setShowMenu(false)}>
+          <View className="items-end px-3 pt-24">
+            <Pressable className="w-60 overflow-hidden rounded-2xl border border-border bg-card">
+              {isOwnerRoom ? (
+                <Pressable
+                  className="flex-row items-center gap-3 border-b border-border px-4 py-3"
+                  onPress={() => {
+                    setPinnedMessage((value) =>
+                      value ? "" : `${teamLabel} room is open. Check in while you watch.`,
+                    );
+                    setShowMenu(false);
+                  }}
+                >
+                  <Pin color={colors.primary} size={18} />
+                  <Text className="font-bold text-primary">
+                    {pinnedMessage ? "Unpin message" : "Pin a message"}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {isOwnerRoom ? (
+                <Pressable
+                  className="flex-row items-center gap-3 border-b border-border px-4 py-3"
+                  onPress={() => setShowMenu(false)}
+                >
+                  <Lock color={colors.primary} size={18} />
+                  <View className="flex-1">
+                    <Text className="font-bold text-foreground">
+                      {roomAccessMode === "private" ? "Approval room" : "Invite room"}
+                    </Text>
+                    <Text className="mt-0.5 text-xs text-muted-foreground">
+                      Approval membership is an Official Huddle unlock.
+                    </Text>
+                  </View>
+                </Pressable>
+              ) : null}
+              <Pressable
+                className="flex-row items-center gap-3 border-b border-border px-4 py-3"
+                onPress={() => {
+                  setShowMenu(false);
+                  handleShareRoom();
+                }}
+              >
+                <UserPlus color={colors.mutedForeground} size={18} />
+                <Text className="font-bold text-foreground">Invite people</Text>
+              </Pressable>
+              <Pressable
+                className="flex-row items-center gap-3 border-b border-border px-4 py-3"
+                onPress={() => setShowMenu(false)}
+              >
+                <Bell color={colors.mutedForeground} size={18} />
+                <Text className="font-bold text-foreground">Notifications</Text>
+              </Pressable>
+              <Pressable
+                className="flex-row items-center gap-3 px-4 py-3"
+                onPress={() => setShowMenu(false)}
+              >
+                <LogOut color={colors.destructive} size={18} />
+                <Text className="font-bold text-destructive">
+                  {isOwnerRoom ? "Close room" : "Leave room"}
+                </Text>
+              </Pressable>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={!!expandedImageUri}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setExpandedImageUri(null)}
+      >
+        <Pressable
+          className="flex-1 items-center justify-center bg-black/90 px-4"
+          onPress={() => setExpandedImageUri(null)}
+        >
+          {expandedImageUri ? (
+            <Image
+              source={{ uri: expandedImageUri }}
+              className="h-[72%] w-full rounded-2xl"
+              resizeMode="contain"
+            />
+          ) : null}
+          <Text className="mt-4 text-sm font-bold text-white">Tap anywhere to close</Text>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={showPeople}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPeople(false)}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/60"
+          onPress={() => setShowPeople(false)}
+        >
+          <Pressable className="rounded-t-3xl border border-border bg-card px-5 pb-8 pt-4">
+            <View className="mx-auto mb-4 h-1 w-12 rounded-full bg-muted-foreground/40" />
+            <View className="flex-row items-start justify-between">
+              <View>
+                <Text className="text-xl font-black text-foreground">
+                  Who’s in the room
+                </Text>
+                <Text className="mt-1 text-sm text-muted-foreground">
+                  {present.length} online · watching together
+                </Text>
+              </View>
+              <Pressable onPress={() => setShowPeople(false)} hitSlop={8}>
+                <Text className="text-2xl text-muted-foreground">×</Text>
+              </Pressable>
+            </View>
+
+            <View className="mt-5 gap-3">
+              {present.map((friend) => (
+                <View key={friend.id} className="flex-row items-center gap-3">
+                  <DevAvatar name={friend.name} size={44} />
+                  <View className="flex-1">
+                    <Text className="font-bold text-foreground">{friend.name}</Text>
+                    <Text className="text-sm text-muted-foreground">
+                      {friend.status === "watching"
+                        ? "Watching game"
+                        : friend.status === "online"
+                          ? "Online"
+                          : "Away"}
+                    </Text>
+                  </View>
+                  <View
+                    className={
+                      friend.status === "watching"
+                        ? "h-2.5 w-2.5 rounded-full bg-destructive"
+                        : "h-2.5 w-2.5 rounded-full bg-success"
+                    }
+                  />
+                </View>
+              ))}
+            </View>
+            <Pressable
+              className="mt-6 rounded-full bg-primary px-4 py-3 active:opacity-80"
+              onPress={handleShareRoom}
+            >
+              <Text className="text-center text-sm font-bold text-primary-foreground">
+                Invite more friends
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }

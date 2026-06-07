@@ -12,6 +12,7 @@ import { HuddleSettingsScreen } from "@/screens/huddle-settings/HuddleSettingsSc
 import { HuddleCoachSettingsScreen } from "@/screens/huddle-settings/HuddleCoachSettingsScreen";
 import { AdminScreen } from "@/screens/admin/AdminScreen";
 import { TeamFeedScreen } from "@/screens/team-feed/TeamFeedScreen";
+import { EventLobbyScreen } from "@/screens/event-lobby/EventLobbyScreen";
 import { HuddleSearchScreen } from "@/screens/huddle-search/HuddleSearchScreen";
 import { JoinHuddleScreen } from "@/screens/join-huddle/JoinHuddleScreen";
 import { CreateSideHuddleScreen } from "@/screens/create-side-huddle/CreateSideHuddleScreen";
@@ -25,8 +26,9 @@ export function RootNavigator() {
   const { user, loading } = useAuth();
   const { data: profile, isLoading: profileLoading } = useProfile();
   useNotifications(); // Register push token and handle notification taps
+  const isDevTestUser = user?.app_metadata?.provider === "dev_test";
 
-  if (loading || (user && profileLoading)) {
+  if (loading || (user && !isDevTestUser && profileLoading)) {
     return (
       <View className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator size="large" color={colors.primary} />
@@ -34,7 +36,11 @@ export function RootNavigator() {
     );
   }
 
-  const needsOnboarding = user && !profile?.onboardingCompleted;
+  const needsOnboarding =
+    user &&
+    (isDevTestUser
+      ? user.user_metadata?.onboarding_completed !== true
+      : !profile?.onboardingCompleted);
 
   return (
     <Stack.Navigator
@@ -61,6 +67,11 @@ export function RootNavigator() {
           <Stack.Screen
             name="Huddle"
             component={HuddleScreen}
+            options={{ animation: "slide_from_right" }}
+          />
+          <Stack.Screen
+            name="EventLobby"
+            component={EventLobbyScreen}
             options={{ animation: "slide_from_right" }}
           />
           <Stack.Screen

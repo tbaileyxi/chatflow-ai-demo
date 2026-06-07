@@ -7,6 +7,7 @@ import {
   ScrollView,
   Alert,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +15,11 @@ import { ChevronLeft, Check } from "lucide-react-native";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  DEV_FOLLOWS_STORAGE_KEY,
+  DEV_TEAMS,
+  normalizeLeague,
+} from "@/config/devData";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { colors } from "@/theme/colors";
@@ -27,6 +33,7 @@ type Team = {
 };
 
 const LEAGUES = ["NFL", "NBA", "NHL", "NCAAF", "MLB"] as const;
+const TEAM_QUERY_LEAGUES = ["NFL", "NBA", "NHL", "NCAAF", "NCAA", "MLB"];
 
 function useAllTeams() {
   return useQuery({
@@ -36,15 +43,15 @@ function useAllTeams() {
         .from("teams")
         .select("id, name, city, logo_url, league")
         .eq("status", "active")
-        .in("league", [...LEAGUES])
+        .in("league", TEAM_QUERY_LEAGUES)
         .order("name");
-      if (error || !data) return [];
+      if (error || !data || data.length === 0) return DEV_TEAMS;
       return data.map((t) => ({
         id: t.id,
         name: t.name,
         city: t.city,
         logoUrl: t.logo_url,
-        league: t.league ?? "",
+        league: normalizeLeague(t.league),
       }));
     },
   });
@@ -57,6 +64,10 @@ function useFollowedTeamIds() {
     enabled: !!user,
     queryFn: async (): Promise<string[]> => {
       if (!user) return [];
+      if (user.app_metadata?.provider === "dev_test") {
+        const stored = await AsyncStorage.getItem(DEV_FOLLOWS_STORAGE_KEY);
+        return stored ? (JSON.parse(stored) as string[]) : [];
+      }
       const { data, error } = await supabase
         .from("user_follows")
         .select("team_id")
@@ -112,6 +123,18 @@ export function ManageTeamsScreen() {
 
     setSaving(true);
     try {
+      if (user.app_metadata?.provider === "dev_test") {
+        await AsyncStorage.setItem(
+          DEV_FOLLOWS_STORAGE_KEY,
+          JSON.stringify([...selectedTeams]),
+        );
+        queryClient.invalidateQueries({ queryKey: ["user-follows"] });
+        queryClient.invalidateQueries({ queryKey: ["super-huddle-feed"] });
+        queryClient.invalidateQueries({ queryKey: ["game-night-communities"] });
+        navigation.goBack();
+        return;
+      }
+
       const currentFollows = new Set(followedIds ?? []);
       const toAdd = [...selectedTeams].filter((id) => !currentFollows.has(id));
       const toRemove = [...currentFollows].filter((id) => !selectedTeams.has(id));
@@ -137,6 +160,7 @@ export function ManageTeamsScreen() {
 
       queryClient.invalidateQueries({ queryKey: ["user-follows"] });
       queryClient.invalidateQueries({ queryKey: ["super-huddle-feed"] });
+      queryClient.invalidateQueries({ queryKey: ["game-night-communities"] });
       navigation.goBack();
     } catch {
       Alert.alert("Error", "Failed to save changes.");

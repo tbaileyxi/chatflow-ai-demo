@@ -3,40 +3,42 @@
  * Use these for imperative styling (e.g. StatusBar, NavigationContainer theme).
  */
 export const colors = {
-  background: "#0A0A0A",
-  foreground: "#FAFAFA",
+  background: "#0A0A0B",
+  foreground: "#F0F0F2",
 
-  primary: "#FFD700",
-  primaryForeground: "#0A0A0A",
+  primary: "#F5C518",
+  primaryForeground: "#0A0A0B",
 
-  secondary: "#00D4FF",
-  secondaryForeground: "#0A0A0A",
+  secondary: "#111113",
+  secondaryForeground: "#F0F0F2",
 
-  accent: "#FF8C00",
-  accentForeground: "#0A0A0A",
+  accent: "#18181B",
+  accentForeground: "#F0F0F2",
 
-  destructive: "#EF4444",
+  destructive: "#E8453C",
   destructiveForeground: "#FFFFFF",
 
-  muted: "#262626",
-  mutedForeground: "#999999",
+  muted: "#18181B",
+  mutedForeground: "#A0A0A8",
 
-  card: "#0A0A0A",
-  cardForeground: "#FAFAFA",
+  card: "#111113",
+  cardForeground: "#F0F0F2",
 
-  popover: "#1F1F1F",
-  popoverForeground: "#FAFAFA",
+  popover: "#18181B",
+  popoverForeground: "#F0F0F2",
 
-  border: "#262626",
-  input: "#262626",
-  ring: "#FFD700",
+  border: "#2A2A2F",
+  input: "#222226",
+  ring: "#F5C518",
 
-  success: "#00CC00",
+  success: "#22C55E",
   successForeground: "#FFFFFF",
+  info: "#3B82F6",
+  textTertiary: "#505058",
 
   huddle: {
-    primary: "#FFD700",
-    secondary: "#00D4FF",
+    primary: "#F5C518",
+    secondary: "#3B82F6",
   },
 
   verified: {

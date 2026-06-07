@@ -1,11 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { DEV_ROOMS_STORAGE_KEY } from "@/config/devData";
 
 export type UserHuddle = {
   id: string;
   name: string;
   memberCount: number;
+  ownerId: string | null;
+  roomRole: "owner" | "joined";
   lastMessageAt: string | null;
   isVerified: boolean;
   isOfficialTeam: boolean;
@@ -27,6 +31,29 @@ export function useUserHuddles() {
     queryFn: async (): Promise<UserHuddle[]> => {
       if (!user) return [];
 
+      if (user.app_metadata?.provider === "dev_test") {
+        const stored = await AsyncStorage.getItem(DEV_ROOMS_STORAGE_KEY);
+        const rooms = stored ? JSON.parse(stored) : [];
+        return rooms.map((room: any) => ({
+          id: room.id,
+          name: room.name,
+          memberCount: room.memberCount ?? (room.relationship === "joined" ? 3 : 1),
+          ownerId: room.relationship === "owner" ? user.id : null,
+          roomRole: room.relationship === "joined" ? "joined" : "owner",
+          lastMessageAt: room.createdAt ?? null,
+          isVerified: false,
+          isOfficialTeam: false,
+          isPrivate: room.accessMode === "private",
+          teamName: room.teamName ?? null,
+          teamCity: room.teamCity ?? null,
+          teamLogoUrl: room.teamLogoUrl ?? null,
+          latestMessage:
+            "Room created. Invite friends here; game-day chat and bot cards live in this space.",
+          latestMessageIsBot: true,
+          hasUnread: false,
+        }));
+      }
+
       // Get user's huddle memberships
       const { data: memberships, error: memError } = await supabase
         .from("huddle_members")
@@ -36,7 +63,7 @@ export function useUserHuddles() {
           last_read_at,
           huddles (
             id, name, member_count, last_message_at,
-            is_verified, is_official_team_huddle, is_private,
+            owner_id, is_verified, is_official_team_huddle, is_private,
             teams!team_id (name, city, logo_url)
           )
         `,
@@ -86,10 +113,15 @@ export function useUserHuddles() {
             ? new Date(h.last_message_at)
             : null;
 
+          const roomRole: "owner" | "joined" =
+            h.owner_id === user.id ? "owner" : "joined";
+
           return {
             id: h.id,
             name: h.name,
             memberCount: h.member_count ?? 0,
+            ownerId: h.owner_id ?? null,
+            roomRole,
             lastMessageAt: h.last_message_at,
             isVerified: h.is_verified ?? false,
             isOfficialTeam: h.is_official_team_huddle ?? false,

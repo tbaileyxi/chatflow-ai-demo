@@ -11,8 +11,13 @@ export type PresenceUser = {
 export function useHuddlePresence(huddleId: string) {
   const { user } = useAuth();
   const [presentUsers, setPresentUsers] = useState<PresenceUser[]>([]);
+  const [typingUsers, setTypingUsers] = useState<PresenceUser[]>([]);
   const [entryBanner, setEntryBanner] = useState<string | null>(null);
   const bannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const displayNameRef = useRef("User");
+  const avatarUrlRef = useRef<string | null>(null);
   const trackedRef = useRef(false);
 
   const clearBanner = useCallback(() => {
@@ -25,6 +30,7 @@ export function useHuddlePresence(huddleId: string) {
     const channel = supabase.channel(`presence-${huddleId}`, {
       config: { presence: { key: user.id } },
     });
+    channelRef.current = channel;
 
     // Fetch current user's profile for presence metadata
     const setupPresence = async () => {
@@ -35,9 +41,51 @@ export function useHuddlePresence(huddleId: string) {
         .maybeSingle();
 
       const displayName =
-        profile?.display_name ?? profile?.username ?? "User";
+        profile?.display_name ??
+        profile?.username ??
+        (user.user_metadata?.display_name as string | undefined) ??
+        "User";
+      displayNameRef.current = displayName;
+      avatarUrlRef.current = profile?.avatar_url ?? null;
 
       channel
+        .on("broadcast", { event: "typing" }, ({ payload }) => {
+          const typing = payload as PresenceUser & { isTyping?: boolean };
+          if (!typing.userId || typing.userId === user.id) return;
+
+          if (typingTimeoutsRef.current[typing.userId]) {
+            clearTimeout(typingTimeoutsRef.current[typing.userId]);
+            delete typingTimeoutsRef.current[typing.userId];
+          }
+
+          if (!typing.isTyping) {
+            setTypingUsers((current) =>
+              current.filter((item) => item.userId !== typing.userId),
+            );
+            return;
+          }
+
+          setTypingUsers((current) => {
+            const nextUser = {
+              userId: typing.userId,
+              displayName: typing.displayName,
+              avatarUrl: typing.avatarUrl ?? null,
+            };
+            const exists = current.some((item) => item.userId === typing.userId);
+            return exists
+              ? current.map((item) =>
+                  item.userId === typing.userId ? nextUser : item,
+                )
+              : [...current, nextUser];
+          });
+
+          typingTimeoutsRef.current[typing.userId] = setTimeout(() => {
+            setTypingUsers((current) =>
+              current.filter((item) => item.userId !== typing.userId),
+            );
+            delete typingTimeoutsRef.current[typing.userId];
+          }, 3500);
+        })
         .on("presence", { event: "sync" }, () => {
           const state = channel.presenceState<{
             userId: string;
@@ -107,9 +155,32 @@ export function useHuddlePresence(huddleId: string) {
     return () => {
       trackedRef.current = false;
       if (bannerTimeoutRef.current) clearTimeout(bannerTimeoutRef.current);
+      Object.values(typingTimeoutsRef.current).forEach(clearTimeout);
+      typingTimeoutsRef.current = {};
+      setTypingUsers([]);
+      channelRef.current = null;
       supabase.removeChannel(channel);
     };
   }, [huddleId, user?.id, clearBanner]);
 
-  return { presentUsers, entryBanner, clearBanner };
+  const sendTyping = useCallback(
+    (isTyping: boolean) => {
+      if (!user || !channelRef.current) return;
+      channelRef.current
+        .send({
+          type: "broadcast",
+          event: "typing",
+          payload: {
+            userId: user.id,
+            displayName: displayNameRef.current,
+            avatarUrl: avatarUrlRef.current,
+            isTyping,
+          },
+        })
+        .catch(() => {});
+    },
+    [user?.id],
+  );
+
+  return { presentUsers, typingUsers, entryBanner, clearBanner, sendTyping };
 }

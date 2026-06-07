@@ -8,12 +8,17 @@ import {
   Pressable,
   Linking,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation, type RouteProp } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Heart, MapPin, Twitter, ExternalLink, Zap } from "lucide-react-native";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  DEV_FOLLOWS_STORAGE_KEY,
+  getDevTeamById,
+} from "@/config/devData";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -59,6 +64,20 @@ function useTeamFeed(teamId: string) {
   const teamQuery = useQuery({
     queryKey: ["team-info", teamId],
     queryFn: async (): Promise<TeamInfo | null> => {
+      if (user?.app_metadata?.provider === "dev_test") {
+        const team = getDevTeamById(teamId);
+        if (!team) return null;
+        return {
+          id: team.id,
+          name: team.name,
+          city: team.city,
+          league: team.league,
+          logoUrl: team.logoUrl,
+          description:
+            "Bot-curated team feed. During live games this becomes the context layer for your crew rooms.",
+        };
+      }
+
       const { data } = await supabase
         .from("teams")
         .select("id, name, city, league, logo_url, description")
@@ -79,6 +98,26 @@ function useTeamFeed(teamId: string) {
   const postsQuery = useQuery({
     queryKey: ["team-posts", teamId],
     queryFn: async (): Promise<Post[]> => {
+      if (user?.app_metadata?.provider === "dev_test") {
+        const team = getDevTeamById(teamId);
+        if (!team) return [];
+        return [
+          {
+            id: `dev-post-${teamId}-1`,
+            content: `${team.city} ${team.name} feed is ready. In season, the bot pulls game updates, highlights, and context into this stream.`,
+            mediaUrl: null,
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: `dev-post-${teamId}-2`,
+            content:
+              "Prediction prompt placeholder: this is where the faux gaming / market card belongs before and during games.",
+            mediaUrl: null,
+            createdAt: new Date(Date.now() - 3 * 60 * 1000).toISOString(),
+          },
+        ];
+      }
+
       const { data } = await supabase
         .from("posts")
         .select("id, content, media_url, created_at")
@@ -101,6 +140,12 @@ function useTeamFeed(teamId: string) {
     enabled: !!user,
     queryFn: async () => {
       if (!user) return false;
+      if (user.app_metadata?.provider === "dev_test") {
+        const stored = await AsyncStorage.getItem(DEV_FOLLOWS_STORAGE_KEY);
+        const teamIds = stored ? (JSON.parse(stored) as string[]) : [];
+        return teamIds.includes(teamId);
+      }
+
       const { data } = await supabase
         .from("user_follows")
         .select("id")
@@ -114,6 +159,25 @@ function useTeamFeed(teamId: string) {
   const trendingQuery = useQuery({
     queryKey: ["team-trending", teamId],
     queryFn: async (): Promise<TrendingPost[]> => {
+      if (user?.app_metadata?.provider === "dev_test") {
+        const team = getDevTeamById(teamId);
+        if (!team) return [];
+        return [
+          {
+            id: `dev-trending-${teamId}`,
+            postId: `dev-x-${teamId}`,
+            embedUrl: "",
+            content: `@${team.city.replace(/\s/g, "")}${team.name}: Offseason watchlist, roster buzz, and highlights will surface here as bot cards.`,
+            authorUsername: "sidehuddlebot",
+            likes: 128,
+            retweets: 18,
+            qualityScore: 90,
+            hasMedia: false,
+            createdAt: new Date(Date.now() - 90 * 1000).toISOString(),
+          },
+        ];
+      }
+
       const { data } = await supabase
         .from("team_trending")
         .select(
@@ -168,6 +232,21 @@ export function TeamFeedScreen() {
 
   const toggleFollow = async () => {
     if (!user) return;
+    if (user.app_metadata?.provider === "dev_test") {
+      const stored = await AsyncStorage.getItem(DEV_FOLLOWS_STORAGE_KEY);
+      const current = stored ? (JSON.parse(stored) as string[]) : [];
+      const next = isFollowing
+        ? current.filter((id) => id !== teamId)
+        : [...new Set([...current, teamId])];
+      await AsyncStorage.setItem(DEV_FOLLOWS_STORAGE_KEY, JSON.stringify(next));
+      queryClient.invalidateQueries({
+        queryKey: ["team-follow", teamId, user.id],
+      });
+      queryClient.invalidateQueries({ queryKey: ["super-huddle-feed"] });
+      queryClient.invalidateQueries({ queryKey: ["game-night-communities"] });
+      return;
+    }
+
     if (isFollowing) {
       await supabase
         .from("user_follows")

@@ -25,9 +25,11 @@ function mapMarket(m: any): TeamMarket {
   };
 }
 
+const GAME_MARKET_TYPES = ["spread", "total", "winner", "player_prop", "other"];
+
 /**
  * Fetch active Kalshi markets for a specific team.
- * Prefers game-day markets (next 48h), falls back to any active market (futures).
+ * Game-window only: no futures/championship fallback.
  */
 export function useTeamMarkets(teamId: string | undefined) {
   return useQuery({
@@ -37,28 +39,10 @@ export function useTeamMarkets(teamId: string | undefined) {
     queryFn: async (): Promise<TeamMarket[]> => {
       if (!teamId) return [];
 
-      // First try game-day markets (next 7 days), then fall back to any active market
+      // Game props only: keep the window tight so futures do not leak in.
       const now = new Date();
-      const cutoff7d = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const cutoff48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
-      const { data: gameDayData } = await supabase
-        .from("kalshi_markets")
-        .select(
-          "id, question, current_yes_price, market_type, event_start_time, is_resolved, resolution, kalshi_ticker",
-        )
-        .eq("team_id", teamId)
-        .eq("is_resolved", false)
-        .gte("event_start_time", now.toISOString())
-        .lte("event_start_time", cutoff7d.toISOString())
-        .order("event_start_time", { ascending: true })
-        .limit(10);
-
-      // If we have game-day markets, use those
-      if (gameDayData && gameDayData.length > 0) {
-        return gameDayData.map(mapMarket);
-      }
-
-      // Fall back to any unresolved market for this team (futures, championship, etc.)
       const { data, error } = await supabase
         .from("kalshi_markets")
         .select(
@@ -66,8 +50,11 @@ export function useTeamMarkets(teamId: string | undefined) {
         )
         .eq("team_id", teamId)
         .eq("is_resolved", false)
+        .in("market_type", GAME_MARKET_TYPES)
+        .gte("event_start_time", now.toISOString())
+        .lte("event_start_time", cutoff48h.toISOString())
         .order("event_start_time", { ascending: true })
-        .limit(5);
+        .limit(10);
 
       if (error || !data) return [];
       return data.map(mapMarket);

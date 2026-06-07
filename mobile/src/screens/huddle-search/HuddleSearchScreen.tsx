@@ -3,12 +3,11 @@ import { View, Text, Image, FlatList, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, Search, Users, ShieldCheck } from "lucide-react-native";
+import { Search, Users, ShieldCheck } from "lucide-react-native";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { colors } from "@/theme/colors";
 
@@ -98,7 +97,7 @@ export function HuddleSearchScreen() {
   const renderHuddle = ({ item }: { item: SearchHuddle }) => (
     <Pressable
       className="flex-row items-center gap-3 rounded-lg border border-border bg-card p-3 active:opacity-80"
-      onPress={() => navigation.navigate("Huddle", { huddleId: item.id })}
+      onPress={() => navigation.navigate("HuddleSettings", { huddleId: item.id })}
     >
       <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted">
         {item.teamLogoUrl ? (
@@ -129,6 +128,11 @@ export function HuddleSearchScreen() {
             by {item.ownerName}
           </Text>
         )}
+        {item.bio ? (
+          <Text className="text-xs text-muted-foreground" numberOfLines={2}>
+            {item.bio}
+          </Text>
+        ) : null}
         <View className="flex-row items-center gap-1">
           <Users color={colors.mutedForeground} size={12} />
           <Text className="text-xs text-muted-foreground">
@@ -138,9 +142,19 @@ export function HuddleSearchScreen() {
       </View>
 
       {item.isMember ? (
-        <Badge variant="secondary">Joined</Badge>
+        <Button
+          variant="outline"
+          size="xs"
+          onPress={() => navigation.navigate("Huddle", { huddleId: item.id })}
+        >
+          Enter
+        </Button>
       ) : (
-        <Button variant="outline" size="xs">
+        <Button
+          variant="outline"
+          size="xs"
+          onPress={() => navigation.navigate("JoinHuddle", { huddleId: item.id })}
+        >
           Join
         </Button>
       )}
@@ -149,18 +163,21 @@ export function HuddleSearchScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-      <View className="flex-row items-center gap-3 px-4 py-3">
-        <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-          <ChevronLeft color={colors.foreground} size={24} />
-        </Pressable>
-        <Text className="flex-1 text-lg font-bold text-foreground">
-          Find Side Huddles
+      <View className="px-4 pb-3 pt-2">
+        <View className="flex-row items-center gap-2">
+          <Search color={colors.primary} size={20} />
+          <Text className="text-3xl font-black text-foreground">
+            Search
+          </Text>
+        </View>
+        <Text className="mt-1 text-sm text-muted-foreground">
+          Find verified Official Huddles listed by team.
         </Text>
       </View>
 
       <View className="px-4 pb-3">
         <Input
-          placeholder="Search Side Huddles..."
+          placeholder="Search official huddles..."
           value={search}
           onChangeText={setSearch}
         />
@@ -180,7 +197,7 @@ export function HuddleSearchScreen() {
           contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingBottom: 32 }}
           ListEmptyComponent={
             <Text className="py-8 text-center text-muted-foreground">
-              No Side Huddles found
+              No official huddles found
             </Text>
           }
         />

@@ -8,16 +8,29 @@ import {
   ScrollView,
   Share,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import {
+  useNavigation,
+  useRoute,
+  type RouteProp,
+} from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Check, Lock, Search } from "lucide-react-native";
+import { ChevronLeft, Check, Lock, Search, Radio } from "lucide-react-native";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  DEV_ROOMS_STORAGE_KEY,
+  DEV_TEAMS,
+  normalizeLeague,
+} from "@/config/devData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { colors } from "@/theme/colors";
+import type { RootStackParamList } from "@/navigation/types";
+
+type Route = RouteProp<RootStackParamList, "CreateSideHuddle">;
 
 type Team = {
   id: string;
@@ -30,21 +43,27 @@ type Team = {
 const LEAGUES = ["NFL", "NBA", "NHL", "NCAAF", "MLB"] as const;
 
 function useTeamsList() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: ["teams-list"],
+    queryKey: ["teams-list", user?.app_metadata?.provider],
     queryFn: async (): Promise<Team[]> => {
+      if (user?.app_metadata?.provider === "dev_test") {
+        return DEV_TEAMS;
+      }
+
       const { data, error } = await supabase
         .from("teams")
         .select("id, name, city, logo_url, league")
         .eq("status", "active")
         .order("name");
-      if (error || !data) return [];
+      if (error || !data || data.length === 0) return DEV_TEAMS;
       return data.map((t) => ({
         id: t.id,
         name: t.name,
         city: t.city,
         logoUrl: t.logo_url,
-        league: t.league ?? "",
+        league: normalizeLeague(t.league),
       }));
     },
   });
@@ -97,11 +116,14 @@ async function backfillTeamContent(newHuddleId: string, teamId: string) {
 
 export function CreateSideHuddleScreen() {
   const navigation = useNavigation();
+  const route = useRoute<Route>();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { data: teams } = useTeamsList();
   const [name, setName] = useState("");
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(
+    route.params?.teamId ?? null,
+  );
   const [filterLeague, setFilterLeague] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -124,13 +146,43 @@ export function CreateSideHuddleScreen() {
 
     setCreating(true);
     try {
+      if (user.app_metadata?.provider === "dev_test") {
+        const selectedTeam = teams?.find((t) => t.id === selectedTeamId);
+        const roomId = `dev-room-${Date.now()}`;
+        const stored = await AsyncStorage.getItem(DEV_ROOMS_STORAGE_KEY);
+        const existingRooms = stored ? JSON.parse(stored) : [];
+        await AsyncStorage.setItem(
+          DEV_ROOMS_STORAGE_KEY,
+          JSON.stringify([
+            {
+              id: roomId,
+              name: name.trim(),
+              teamId: selectedTeamId,
+              teamName: selectedTeam?.name ?? null,
+              teamCity: selectedTeam?.city ?? null,
+              teamLogoUrl: selectedTeam?.logoUrl ?? null,
+              relationship: "owner",
+              accessMode: "link",
+              memberCount: 1,
+              createdAt: new Date().toISOString(),
+            },
+            ...existingRooms,
+          ]),
+        );
+
+        queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
+        queryClient.invalidateQueries({ queryKey: ["game-night-communities"] });
+        navigation.navigate("MainTabs" as any);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("huddles")
         .insert({
           name: name.trim(),
           owner_id: user.id,
           team_id: selectedTeamId,
-          is_private: true,
+          is_private: false,
           is_official_team_huddle: false,
           is_verified: false,
           member_count: 1,
@@ -139,7 +191,7 @@ export function CreateSideHuddleScreen() {
         .single();
 
       if (error) {
-        Alert.alert("Error", "Failed to create Side Huddle.");
+        Alert.alert("Error", "Failed to create crew room.");
         return;
       }
 
@@ -153,18 +205,19 @@ export function CreateSideHuddleScreen() {
       await backfillTeamContent(data.id, selectedTeamId);
 
       queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
+      queryClient.invalidateQueries({ queryKey: ["game-night-communities"] });
 
       // Offer to share invite link
       const inviteLink = `sidehuddle://join-huddle/${data.id}`;
       Alert.alert(
-        "Side Huddle Created!",
+        "Crew Room Created!",
         "Invite your friends to join.",
         [
           {
-            text: "Share Invite Link",
+            text: "Share Invite",
             onPress: () => {
               Share.share({
-                message: `Join my Side Huddle "${name.trim()}" on Side Huddle Sports! ${inviteLink}`,
+                message: `Join my crew room "${name.trim()}" on Side Huddle Sports! ${inviteLink}`,
                 url: inviteLink,
               }).finally(() => {
                 navigation.reset({
@@ -208,19 +261,39 @@ export function CreateSideHuddleScreen() {
           <ChevronLeft color={colors.foreground} size={24} />
         </Pressable>
         <Text className="flex-1 text-lg font-bold text-foreground">
-          Create Side Huddle
+          Start Crew Room
         </Text>
       </View>
 
       <View className="flex-1">
         <View className="px-4">
+          {selectedTeam && (
+            <View className="mb-4 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
+              <View className="flex-row items-center gap-2">
+                <Radio color={colors.primary} size={16} />
+                <Text className="text-sm font-bold text-foreground">
+                  {selectedTeam.city} {selectedTeam.name}
+                </Text>
+              </View>
+              <Text className="mt-1 text-xs leading-5 text-muted-foreground">
+                This room will stay attached to this team, so the team bot can
+                bring game context, highlights, and prediction prompts when
+                they play.
+              </Text>
+            </View>
+          )}
+
           {/* Name input */}
           <Text className="text-sm font-medium text-foreground">
-            Side Huddle Name
+            Crew Room Name
           </Text>
           <View className="mt-2">
             <Input
-              placeholder="e.g. Game Day Crew"
+              placeholder={
+                selectedTeam
+                  ? `e.g. ${selectedTeam.name} Game Crew`
+                  : "e.g. Game Day Crew"
+              }
               value={name}
               onChangeText={setName}
               autoFocus
@@ -231,7 +304,7 @@ export function CreateSideHuddleScreen() {
             <View className="flex-row items-center gap-1.5">
               <Lock color={colors.mutedForeground} size={12} />
               <Text className="text-xs text-muted-foreground">
-                Side Huddles are private and invite-only
+                Hidden room. Anyone with your link can enter.
               </Text>
             </View>
             <Text className="text-xs text-muted-foreground">
@@ -241,10 +314,10 @@ export function CreateSideHuddleScreen() {
 
           {/* Team picker */}
           <Text className="mt-5 text-sm font-medium text-foreground">
-            Pick a team
+            Attach to a team
           </Text>
           <Text className="mt-1 text-xs text-muted-foreground">
-            Your Side Huddle will get content from this team.
+            Your crew room will wake up when this team has a game.
             {selectedTeam
               ? ` Selected: ${selectedTeam.city} ${selectedTeam.name}`
               : ""}
@@ -378,7 +451,7 @@ export function CreateSideHuddleScreen() {
           onPress={handleCreate}
           disabled={creating || !name.trim() || !selectedTeamId}
         >
-          {creating ? "Creating..." : "Create Side Huddle"}
+          {creating ? "Creating..." : "Create Crew Room"}
         </Button>
       </View>
     </SafeAreaView>

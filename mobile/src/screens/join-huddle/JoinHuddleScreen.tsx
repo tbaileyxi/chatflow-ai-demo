@@ -39,6 +39,28 @@ export function JoinHuddleScreen() {
   const handleJoin = async () => {
     if (!user) return;
 
+    if (huddle.isPrivate) {
+      const { error } = await supabase
+        .from("huddle_join_requests")
+        .upsert({
+          huddle_id: huddleId,
+          user_id: user.id,
+          status: "pending",
+          message: null,
+        });
+
+      if (error) {
+        Alert.alert("Error", "Could not request access. Please try again.");
+        return;
+      }
+
+      Alert.alert(
+        "Request sent",
+        "The huddle admins will see your request and can approve you.",
+      );
+      return;
+    }
+
     const { error } = await supabase
       .from("huddle_members")
       .insert({ huddle_id: huddleId, user_id: user.id });
@@ -119,6 +141,15 @@ export function JoinHuddleScreen() {
                   }
                 >
                   Go to Side Huddle
+                </Button>
+              </View>
+            ) : huddle.isPrivate ? (
+              <View className="w-full gap-2">
+                <Text className="text-center text-sm text-muted-foreground">
+                  This Official Huddle uses approval membership.
+                </Text>
+                <Button size="lg" className="w-full" onPress={handleJoin}>
+                  Request Access
                 </Button>
               </View>
             ) : (

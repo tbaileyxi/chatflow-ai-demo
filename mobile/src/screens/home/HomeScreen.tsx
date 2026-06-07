@@ -1,532 +1,205 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useCallback, useState } from "react";
 import {
-  View,
-  Text,
-  ScrollView,
-  RefreshControl,
   Pressable,
-  Image,
-  FlatList,
+  RefreshControl,
+  ScrollView,
   Share,
+  Text,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Users, Settings, Share2, Zap } from "lucide-react-native";
-import { TweetEmbed, parseTweetId } from "@/components/embeds/TweetEmbed";
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/hooks/useAuth";
-import { useUserHuddles, type UserHuddle } from "@/hooks/useUserHuddles";
 import {
-  useSuperHuddleFeed,
-  type SuperHuddlePost,
-} from "@/hooks/useSuperHuddleFeed";
-import {
-  usePostReactions,
-  useTogglePostReaction,
-  type PostReactionSummary,
-} from "@/hooks/usePostReactions";
+  Lock,
+  Plus,
+  Radio,
+  Users,
+  UserPlus,
+} from "lucide-react-native";
 import { HuddleCard } from "@/components/home/HuddleCard";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/useAuth";
+import { useInAppNotifications } from "@/hooks/useInAppNotifications";
+import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { colors } from "@/theme/colors";
 
-type Tab = "super" | "side";
-
-type ChatListItem =
-  | { type: "post"; data: SuperHuddlePost }
-  | { type: "separator"; label: string; key: string };
-
-function formatDaySeparator(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const diffDays = Math.round((today.getTime() - msgDay.getTime()) / 86400000);
-
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  return date.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return (parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : name.slice(0, 2)).toUpperCase();
 }
 
-function formatTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
-function buildChatItems(posts: SuperHuddlePost[]): ChatListItem[] {
-  const items: ChatListItem[] = [];
-  let lastDay = "";
-
-  for (const post of posts) {
-    const d = new Date(post.createdAt);
-    const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-    if (dayKey !== lastDay) {
-      items.push({
-        type: "separator",
-        label: formatDaySeparator(post.createdAt),
-        key: `sep-${dayKey}`,
-      });
-      lastDay = dayKey;
-    }
-    items.push({ type: "post", data: post });
+function personColors(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i += 1) {
+    h = (h * 31 + name.charCodeAt(i)) % 360;
   }
+  return {
+    bg: `hsl(${h}, 26%, 19%)`,
+    fg: `hsl(${h}, 48%, 74%)`,
+    line: `hsl(${h}, 24%, 30%)`,
+  };
+}
 
-  return items;
+function MonogramAvatar({ name, size = 36 }: { name: string; size?: number }) {
+  const palette = personColors(name);
+  return (
+    <View
+      className="items-center justify-center rounded-full"
+      style={{
+        width: size,
+        height: size,
+        backgroundColor: palette.bg,
+        borderColor: palette.line,
+        borderWidth: 1,
+      }}
+    >
+      <Text style={{ color: palette.fg, fontSize: size * 0.34, fontWeight: "800" }}>
+        {initials(name)}
+      </Text>
+    </View>
+  );
+}
+
+function FriendsNowSection() {
+  const inviteFriends = useCallback(() => {
+    Share.share({
+      message:
+        "Join me on Side Huddle. We can jump into game rooms when friends are watching.",
+    });
+  }, []);
+
+  return (
+    <View className="px-4">
+      <View className="mb-3 flex-row items-center justify-between">
+        <View className="flex-row items-center gap-2">
+          <View className="h-2 w-2 rounded-full bg-muted-foreground" />
+          <Text className="text-sm font-black uppercase tracking-widest text-foreground">
+            Friends Now
+          </Text>
+        </View>
+        <Pressable className="flex-row items-center gap-1" onPress={inviteFriends}>
+          <UserPlus color={colors.primary} size={14} />
+          <Text className="text-xs font-black text-primary">Invite</Text>
+        </Pressable>
+      </View>
+      <View className="rounded-2xl border border-border bg-card p-4">
+        <Text className="text-base font-black text-foreground">
+          No friends watching yet
+        </Text>
+        <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+          When a friend checks into a room, it appears here so you can jump in
+          without searching.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function YourRoomsSection() {
+  const navigation = useNavigation<any>();
+  const { data: huddles, isLoading } = useUserHuddles();
+  const rooms = (huddles ?? []).filter((huddle) => !huddle.isOfficialTeam);
+
+  return (
+    <View className="px-4">
+      <View className="mb-3 flex-row items-center justify-between">
+        <View className="flex-row items-center gap-2">
+          <Users color={colors.primary} size={17} />
+          <Text className="text-sm font-black uppercase tracking-widest text-foreground">
+            Your Rooms
+          </Text>
+        </View>
+        <Pressable onPress={() => navigation.navigate("CreateSideHuddle")}>
+          <Text className="text-sm font-black text-primary">+ New</Text>
+        </Pressable>
+      </View>
+
+      {isLoading ? (
+        <View className="gap-3">
+          <Skeleton className="h-20 rounded-2xl" />
+          <Skeleton className="h-20 rounded-2xl" />
+        </View>
+      ) : rooms.length > 0 ? (
+        <View className="gap-3">
+          {rooms.map((room) => (
+            <HuddleCard
+              key={room.id}
+              huddle={room}
+              onPress={() =>
+                navigation.navigate("Huddle", {
+                  huddleId: room.id,
+                })
+              }
+            />
+          ))}
+        </View>
+      ) : (
+        <View className="rounded-2xl border border-border bg-card p-4">
+          <View className="flex-row items-center gap-2">
+            <Lock color={colors.primary} size={17} />
+            <Text className="text-base font-black text-foreground">
+              No rooms yet
+            </Text>
+          </View>
+          <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+            Create a room anchored to a team. It will stay hidden unless you
+            share the link or a friend sees you inside.
+          </Text>
+        </View>
+      )}
+    </View>
+  );
 }
 
 export function HomeScreen() {
-  const { user } = useAuth();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<Tab>("super");
+  const { user } = useAuth();
+  const { unreadCount } = useInAppNotifications(8);
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await queryClient.invalidateQueries({ queryKey: ["super-huddle-feed"] });
     await queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
+    await queryClient.invalidateQueries({ queryKey: ["super-huddle-feed"] });
+    await queryClient.invalidateQueries({ queryKey: ["in-app-notifications"] });
     setRefreshing(false);
   }, [queryClient]);
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-      {/* Header */}
-      <View className="px-4 pb-2 pt-2">
-        <Text className="text-2xl font-bold text-foreground">
-          Side Huddle Sports
-        </Text>
-        <Text className="text-sm text-muted-foreground">
-          Your team. Your huddle.
-        </Text>
-      </View>
-
-      {/* Tab bar */}
-      <View className="flex-row border-b border-border">
-        <Pressable
-          className="flex-1 items-center pb-2.5 pt-2"
-          onPress={() => setActiveTab("super")}
-        >
-          <Text
-            className={cn(
-              "text-sm font-semibold",
-              activeTab === "super"
-                ? "text-primary"
-                : "text-muted-foreground",
-            )}
-          >
-            Super Huddle
-          </Text>
-          {activeTab === "super" && (
-            <View className="absolute bottom-0 h-0.5 w-full bg-primary" />
-          )}
-        </Pressable>
-
-        <Pressable
-          className="flex-1 items-center pb-2.5 pt-2"
-          onPress={() => setActiveTab("side")}
-        >
-          <Text
-            className={cn(
-              "text-sm font-semibold",
-              activeTab === "side"
-                ? "text-primary"
-                : "text-muted-foreground",
-            )}
-          >
-            Side Huddles
-          </Text>
-          {activeTab === "side" && (
-            <View className="absolute bottom-0 h-0.5 w-full bg-primary" />
-          )}
-        </Pressable>
-      </View>
-
-      {/* Tab content */}
-      {activeTab === "super" ? (
-        <SuperHuddleTab refreshing={refreshing} onRefresh={onRefresh} />
-      ) : (
-        <SideHuddlesTab refreshing={refreshing} onRefresh={onRefresh} />
-      )}
-
-      {/* Floating + button on Side Huddles tab */}
-      {activeTab === "side" && (
-        <Pressable
-          className="absolute bottom-6 right-6 h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg active:opacity-80"
-          onPress={() => navigation.navigate("CreateSideHuddle" as any)}
-        >
-          <Plus color={colors.primaryForeground} size={28} />
-        </Pressable>
-      )}
-    </SafeAreaView>
-  );
-}
-
-const SUPER_HUDDLE_REACTIONS = ["W", "L", "🔥"] as const;
-
-function SuperHuddleTab({
-  refreshing,
-  onRefresh,
-}: {
-  refreshing: boolean;
-  onRefresh: () => void;
-}) {
-  const navigation = useNavigation();
-  const { data: posts, isLoading } = useSuperHuddleFeed();
-  const postIds = useMemo(() => posts?.map((p) => p.id) ?? [], [posts]);
-  const { data: reactionsMap } = usePostReactions(postIds);
-  const toggleReaction = useTogglePostReaction();
-
-  const chatItems = useMemo(
-    () => (posts ? buildChatItems(posts) : []),
-    [posts],
-  );
-
-  // Unique teams from feed for team icon strip
-  const uniqueTeams = useMemo(() => {
-    if (!posts) return [];
-    const seen = new Set<string>();
-    const teams: { id: string; name: string; logoUrl: string | null }[] = [];
-    for (const p of posts) {
-      if (!seen.has(p.teamId)) {
-        seen.add(p.teamId);
-        teams.push({
-          id: p.teamId,
-          name: p.teamName,
-          logoUrl: p.teamLogoUrl,
-        });
-      }
-    }
-    return teams;
-  }, [posts]);
-
-  if (isLoading) {
-    return (
-      <View className="gap-3 px-4 pt-4">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
-      </View>
-    );
-  }
-
-  if (!posts || posts.length === 0) {
-    return (
-      <ScrollView
-        contentContainerClassName="flex-1 items-center justify-center px-8"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-          />
-        }
-      >
-        <Users color={colors.mutedForeground} size={48} />
-        <Text className="mt-4 text-center text-lg font-semibold text-foreground">
-          Build your Super Huddle
-        </Text>
-        <Text className="mt-2 text-center text-sm text-muted-foreground">
-          Follow teams to see their posts here. Your Super Huddle is a unified
-          feed from all the teams you follow.
-        </Text>
-        <Pressable
-          className="mt-4 rounded-full bg-primary px-6 py-2.5"
-          onPress={() => navigation.navigate("ManageTeams" as any)}
-        >
-          <Text className="text-sm font-semibold text-primary-foreground">
-            Pick Teams
-          </Text>
-        </Pressable>
-      </ScrollView>
-    );
-  }
-
-  return (
-    <View className="flex-1">
-      {/* Team icon strip + Manage Teams */}
-      <View className="flex-row items-center px-4 py-2">
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 2 }}
-          className="flex-1"
-          style={{ flexGrow: 0 }}
-        >
-          {uniqueTeams.map((t, i) => (
-            <View
-              key={t.id}
-              className="h-7 w-7 items-center justify-center overflow-hidden rounded-full border-2 border-background bg-muted"
-              style={i > 0 ? { marginLeft: -4 } : undefined}
-            >
-              {t.logoUrl ? (
-                <Image
-                  source={{ uri: t.logoUrl }}
-                  className="h-full w-full"
-                  resizeMode="cover"
-                />
-              ) : (
-                <Text className="text-xs font-bold text-muted-foreground">
-                  {t.name.charAt(0)}
-                </Text>
-              )}
-            </View>
-          ))}
-        </ScrollView>
-        <Pressable
-          className="flex-row items-center gap-1.5 active:opacity-60 ml-2"
-          onPress={() => navigation.navigate("ManageTeams" as any)}
-        >
-          <Settings color={colors.mutedForeground} size={18} />
-          <Text className="text-sm font-medium text-muted-foreground">
-            Manage Teams
-          </Text>
-        </Pressable>
-      </View>
-
-      <FlatList
-        data={chatItems}
-        keyExtractor={(item) =>
-          item.type === "separator" ? item.key : item.data.id
-        }
-        renderItem={({ item }) => {
-          if (item.type === "separator") {
-            return (
-              <View className="my-4 flex-row items-center gap-3 px-6">
-                <View className="h-px flex-1 bg-border" />
-                <Text className="text-sm font-medium text-muted-foreground">
-                  {item.label}
-                </Text>
-                <View className="h-px flex-1 bg-border" />
-              </View>
-            );
-          }
-
-          return (
-            <SuperHuddleChatBubble
-              post={item.data}
-              reactions={reactionsMap?.get(item.data.id)}
-              onReact={(type) => toggleReaction(item.data.id, type)}
-            />
-          );
-        }}
-        contentContainerStyle={{ paddingBottom: 32 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-          />
-        }
-      />
-    </View>
-  );
-}
-
-function SuperHuddleChatBubble({
-  post,
-  reactions,
-  onReact,
-}: {
-  post: SuperHuddlePost;
-  reactions?: PostReactionSummary[];
-  onReact?: (type: string) => void;
-}) {
-  const lastTapRef = useRef<number>(0);
-  const [showPicker, setShowPicker] = useState(false);
-
-  const handleDoubleTap = () => {
-    const now = Date.now();
-    if (now - lastTapRef.current < 300) {
-      onReact?.("W");
-    }
-    lastTapRef.current = now;
-  };
-
-  const handlePickReaction = (type: string) => {
-    onReact?.(type);
-    setShowPicker(false);
-  };
-
-  const handleShare = () => {
-    Share.share({
-      message: `${post.teamCity} ${post.teamName}: "${post.content}" — on Side Huddle Sports`,
-      ...(post.mediaUrl ? { url: post.mediaUrl } : {}),
-    });
-    setShowPicker(false);
-  };
-
-  return (
-    <>
-      <Pressable
-        onPress={handleDoubleTap}
-        onLongPress={() => setShowPicker(true)}
-      >
-        <View className="gap-1 px-4 py-2">
-          <View className="flex-row gap-2.5">
-            {/* Team avatar */}
-            <View className="h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-muted">
-              {post.teamLogoUrl ? (
-                <Image
-                  source={{ uri: post.teamLogoUrl }}
-                  className="h-full w-full"
-                  resizeMode="cover"
-                />
-              ) : (
-                <Text className="text-sm font-bold text-muted-foreground">
-                  {post.teamName.charAt(0)}
-                </Text>
-              )}
-            </View>
-
-            {/* Content */}
-            <View className="max-w-[85%] gap-1">
-              <View className="flex-row items-center gap-2">
-                <Text className="text-sm font-semibold text-secondary">
-                  {post.teamCity} {post.teamName}
-                </Text>
-                <Text className="text-sm text-muted-foreground">
-                  {formatTime(post.createdAt)}
-                </Text>
-              </View>
-
-              {/* Trending X embed */}
-              {post.source === "trending" && post.embedUrl ? (() => {
-                const tid = parseTweetId(post.embedUrl);
-                if (tid) {
-                  return (
-                    <View className="gap-1">
-                      <View className="flex-row items-center gap-1.5">
-                        <Zap color="#EAB308" size={11} fill="#EAB308" />
-                        <Text className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#EAB308" }}>Trending</Text>
-                        {post.authorUsername && (
-                          <Text className="text-[10px] text-muted-foreground">@{post.authorUsername}</Text>
-                        )}
-                      </View>
-                      <TweetEmbed tweetId={tid} />
-                    </View>
-                  );
-                }
-                return (
-                  <View className="rounded-2xl bg-secondary/10 px-4 py-2.5">
-                    <Text className="text-base text-foreground">{post.content}</Text>
-                  </View>
-                );
-              })() : (
-                <>
-                  <View className="rounded-2xl bg-secondary/10 px-4 py-2.5">
-                    <Text className="text-base text-foreground">
-                      {post.content}
-                    </Text>
-                  </View>
-
-                  {post.mediaUrl && (
-                    <Image
-                      source={{ uri: post.mediaUrl }}
-                      className="mt-1 w-full rounded-lg"
-                      style={{ height: 200 }}
-                      resizeMode="cover"
-                    />
-                  )}
-                </>
-              )}
-
-              {/* Reaction pills */}
-              {reactions && reactions.length > 0 && (
-                <View className="mt-0.5 flex-row gap-1">
-                  {reactions.map((r) => (
-                    <Pressable
-                      key={r.reactionType}
-                      className={cn(
-                        "flex-row items-center gap-1 rounded-full border px-2 py-0.5",
-                        r.hasReacted
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-muted",
-                      )}
-                      onPress={() => onReact?.(r.reactionType)}
-                    >
-                      <Text className="text-sm text-foreground">{r.reactionType}</Text>
-                      <Text className="text-sm text-muted-foreground">
-                        {r.count}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-            </View>
+      <View className="flex-row items-center justify-between px-4 pb-4 pt-2">
+        <View>
+          <View className="flex-row items-center gap-2">
+            <Radio color={colors.primary} size={18} />
+            <Text className="text-3xl font-black text-foreground">
+              Side Huddle
+            </Text>
           </View>
-
-          {/* Long-press picker — W / L / 🔥 + share, no reply */}
-          {showPicker && (
-            <View
-              className="absolute left-14 top-0 z-50 flex-row items-center gap-1.5 rounded-full border border-border bg-card px-3 py-2 shadow-lg"
-              style={{ elevation: 8 }}
-            >
-              {SUPER_HUDDLE_REACTIONS.map((type) => (
-                <Pressable
-                  key={type}
-                  onPress={() => handlePickReaction(type)}
-                  className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
-                >
-                  <Text className="text-lg font-bold text-foreground">{type}</Text>
-                </Pressable>
-              ))}
-              <View className="mx-0.5 h-6 w-px bg-border" />
-              <Pressable
-                onPress={handleShare}
-                className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
-              >
-                <Share2 color={colors.mutedForeground} size={20} />
-              </Pressable>
-            </View>
-          )}
+          <Text className="mt-1 text-sm text-muted-foreground">
+            Friend rooms only. No public room directory.
+          </Text>
         </View>
-      </Pressable>
 
-      {/* Dismiss picker overlay */}
-      {showPicker && (
         <Pressable
-          className="absolute inset-0 z-40"
-          onPress={() => setShowPicker(false)}
-        />
-      )}
-    </>
-  );
-}
-
-function SideHuddlesTab({
-  refreshing,
-  onRefresh,
-}: {
-  refreshing: boolean;
-  onRefresh: () => void;
-}) {
-  const navigation = useNavigation();
-  const { data: allHuddles, isLoading } = useUserHuddles();
-
-  // Filter to only non-official huddles (Side Huddles = private friend groups)
-  const sideHuddles = allHuddles?.filter((h) => !h.isOfficialTeam) ?? [];
-
-  if (isLoading) {
-    return (
-      <View className="gap-3 px-4 pt-4">
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
+          className="active:opacity-80"
+          onPress={() => navigation.navigate("Profile")}
+        >
+          <MonogramAvatar name={user?.user_metadata?.display_name ?? "You"} size={42} />
+          {unreadCount > 0 ? (
+            <View className="absolute -right-1 -top-1 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5">
+              <Text className="text-[10px] font-black text-destructive-foreground">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </Text>
+            </View>
+          ) : null}
+        </Pressable>
       </View>
-    );
-  }
 
-  if (sideHuddles.length === 0) {
-    return (
       <ScrollView
-        contentContainerClassName="flex-1 items-center justify-center px-8"
+        className="flex-1"
+        contentContainerStyle={{ gap: 24, paddingBottom: 36 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -535,37 +208,16 @@ function SideHuddlesTab({
           />
         }
       >
-        <Users color={colors.mutedForeground} size={48} />
-        <Text className="mt-4 text-center text-lg font-semibold text-foreground">
-          No Side Huddles yet
-        </Text>
-        <Text className="mt-2 text-center text-sm text-muted-foreground">
-          Create a Side Huddle to chat with friends about your favorite teams.
-          Tap the + button to get started.
-        </Text>
+        <FriendsNowSection />
+        <YourRoomsSection />
       </ScrollView>
-    );
-  }
 
-  const navigateToHuddle = (huddle: UserHuddle) => {
-    navigation.navigate("Huddle", { huddleId: huddle.id });
-  };
-
-  return (
-    <FlatList
-      data={sideHuddles}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <HuddleCard huddle={item} onPress={() => navigateToHuddle(item)} />
-      )}
-      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 80, gap: 12 }}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={colors.primary}
-        />
-      }
-    />
+      <Pressable
+        className="absolute bottom-6 right-6 h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg active:opacity-80"
+        onPress={() => navigation.navigate("CreateSideHuddle")}
+      >
+        <Plus color={colors.primaryForeground} size={28} />
+      </Pressable>
+    </SafeAreaView>
   );
 }

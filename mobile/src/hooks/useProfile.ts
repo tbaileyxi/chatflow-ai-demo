@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -21,6 +22,34 @@ export function useProfile() {
     enabled: !!user,
     queryFn: async (): Promise<UserProfile | null> => {
       if (!user) return null;
+
+      if (user.app_metadata?.provider === "dev_test") {
+        const stored = await AsyncStorage.getItem(`side-huddle-dev-profile-${user.id}`);
+        const localProfile = stored
+          ? (JSON.parse(stored) as Partial<UserProfile>)
+          : {};
+        return {
+          userId: user.id,
+          displayName:
+            localProfile.displayName ??
+            (user.user_metadata?.display_name as string | undefined) ??
+            null,
+          username:
+            localProfile.username ??
+            (user.user_metadata?.username as string | undefined) ??
+            null,
+          phoneNumber:
+            localProfile.phoneNumber ??
+            user.phone ??
+            (user.user_metadata?.phone as string | undefined) ??
+            null,
+          bio: localProfile.bio ?? null,
+          avatarUrl: localProfile.avatarUrl ?? null,
+          onboardingCompleted:
+            localProfile.onboardingCompleted ??
+            Boolean(user.user_metadata?.onboarding_completed),
+        };
+      }
 
       const { data, error } = await supabase
         .from("profiles")
@@ -46,13 +75,38 @@ export function useProfile() {
 
   const updateProfile = async (
     updates: Partial<{
-      display_name: string;
-      username: string;
-      bio: string;
+      display_name: string | null;
+      username: string | null;
+      bio: string | null;
       avatar_url: string;
     }>,
   ) => {
     if (!user) return { error: new Error("Not authenticated") };
+
+    if (user.app_metadata?.provider === "dev_test") {
+      const key = `side-huddle-dev-profile-${user.id}`;
+      const existing = await AsyncStorage.getItem(key);
+      const current = existing
+        ? (JSON.parse(existing) as Partial<UserProfile>)
+        : {};
+      const next: Partial<UserProfile> = {
+        ...current,
+        displayName:
+          updates.display_name !== undefined
+            ? updates.display_name
+            : current.displayName,
+        username:
+          updates.username !== undefined ? updates.username : current.username,
+        bio: updates.bio !== undefined ? updates.bio : current.bio,
+        avatarUrl:
+          updates.avatar_url !== undefined
+            ? updates.avatar_url
+            : current.avatarUrl,
+      };
+      await AsyncStorage.setItem(key, JSON.stringify(next));
+      queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+      return { error: null };
+    }
 
     const { error } = await supabase
       .from("profiles")

@@ -7,8 +7,9 @@ import {
   Alert,
   Image,
   Animated,
+  Keyboard,
 } from "react-native";
-import { Send, X, Camera, ImageIcon, Mic, Square, Play, Pause } from "lucide-react-native";
+import { Send, X, Camera, ImageIcon, Mic, Square } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Audio } from "expo-av";
 import { colors } from "@/theme/colors";
@@ -28,6 +29,7 @@ type Props = {
   replyTo?: { id: string; displayName: string; content: string } | null;
   onCancelReply?: () => void;
   onFocus?: () => void;
+  onTypingChange?: (isTyping: boolean) => void;
 };
 
 export function MessageInput({
@@ -36,6 +38,7 @@ export function MessageInput({
   replyTo,
   onCancelReply,
   onFocus,
+  onTypingChange,
 }: Props) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -76,6 +79,7 @@ export function MessageInput({
 
     setSending(true);
     setText("");
+    onTypingChange?.(false);
     const attachedMedia = media;
     setMedia(null);
     const { error } = await onSend(
@@ -85,10 +89,12 @@ export function MessageInput({
     );
     if (error) {
       setText(trimmed);
+      onTypingChange?.(trimmed.length > 0);
       setMedia(attachedMedia);
       Alert.alert("Error", "Failed to send message.");
     }
     onCancelReply?.();
+    Keyboard.dismiss();
     setSending(false);
   };
 
@@ -226,12 +232,12 @@ export function MessageInput({
 
       {/* Media preview */}
       {media && (
-        <View className="border-b border-border px-4 py-2">
-          <View className="flex-row items-center gap-2">
+        <View className="border-b border-border bg-card px-4 py-3">
+          <View className="flex-row items-center gap-3">
             {media.type === "image" ? (
               <Image
                 source={{ uri: media.uri }}
-                className="h-16 w-16 rounded-lg"
+                className="h-16 w-16 rounded-xl"
                 resizeMode="cover"
               />
             ) : (
@@ -240,8 +246,31 @@ export function MessageInput({
                 <Text className="text-sm text-foreground">Voice message</Text>
               </View>
             )}
-            <Pressable onPress={() => setMedia(null)} hitSlop={8}>
+            <View className="flex-1">
+              <Text className="text-sm font-bold text-foreground">
+                {media.type === "image" ? "Photo ready" : "Voice message ready"}
+              </Text>
+              <Text className="mt-0.5 text-xs text-muted-foreground">
+                Tap Send to post it to the room.
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => setMedia(null)}
+              className="h-9 w-9 items-center justify-center rounded-full bg-muted"
+              hitSlop={8}
+            >
               <X color={colors.mutedForeground} size={16} />
+            </Pressable>
+            <Pressable
+              onPress={handleSend}
+              disabled={sending || disabled}
+              className="h-9 w-20 flex-row items-center justify-center gap-1 rounded-full bg-primary active:opacity-80"
+              style={{ opacity: sending || disabled ? 0.5 : 1 }}
+            >
+              <Send color={colors.primaryForeground} size={14} />
+              <Text className="text-xs font-bold text-primary-foreground">
+                Send
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -307,13 +336,17 @@ export function MessageInput({
             placeholder="Message..."
             placeholderTextColor={colors.mutedForeground}
             value={text}
-            onChangeText={setText}
+            onChangeText={(value) => {
+              setText(value);
+              onTypingChange?.(value.trim().length > 0);
+            }}
             multiline
             editable={!disabled}
             returnKeyType="send"
             blurOnSubmit={false}
             onSubmitEditing={handleSend}
             onFocus={onFocus}
+            onBlur={() => onTypingChange?.(false)}
           />
 
           {/* Send button */}

@@ -16,18 +16,18 @@ export function PortfolioCard({ portfolio }: Props) {
       <CardContent className="gap-4 pt-4">
         <View className="flex-row items-center gap-2">
           <Coins color={colors.primary} size={20} />
-          <Text className="text-lg font-bold text-foreground">Portfolio</Text>
+          <Text className="text-lg font-bold text-foreground">Side Coins</Text>
         </View>
 
         <View className="flex-row flex-wrap">
           <StatBox
-            label="Chips"
-            value={`${portfolio.totalChips.toLocaleString()}¢`}
+            label="Balance"
+            value={`${portfolio.totalChips.toLocaleString()} coins`}
             color={colors.foreground}
           />
           <StatBox
             label="P/L"
-            value={`${isPositive ? "+" : ""}${portfolio.profitLoss.toLocaleString()}¢`}
+            value={`${isPositive ? "+" : ""}${portfolio.profitLoss.toLocaleString()} coins`}
             color={isPositive ? colors.success : colors.destructive}
             icon={
               isPositive ? (
@@ -43,7 +43,7 @@ export function PortfolioCard({ portfolio }: Props) {
             color={colors.foreground}
           />
           <StatBox
-            label="Total Bets"
+            label="Picks"
             value={`${portfolio.totalBets}`}
             color={colors.foreground}
           />

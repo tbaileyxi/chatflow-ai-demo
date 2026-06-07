@@ -1,3 +1,4 @@
+import { Children } from "react";
 import { Pressable, Text, type PressableProps } from "react-native";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +51,11 @@ export function Button({
   children,
   ...props
 }: ButtonProps) {
+  const childArray = Children.toArray(children);
+  const textOnlyChildren = childArray.every(
+    (child) => typeof child === "string" || typeof child === "number",
+  );
+
   return (
     <Pressable
       className={cn(
@@ -62,7 +68,7 @@ export function Button({
       disabled={disabled}
       {...props}
     >
-      {typeof children === "string" ? (
+      {textOnlyChildren ? (
         <Text
           className={cn(
             "font-semibold",

@@ -1,4 +1,4 @@
-import { View, ScrollView, type ViewProps } from "react-native";
+import { Platform, View, ScrollView, type ViewProps } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,7 @@ export function ScreenWrapper({
       {scroll ? (
         <ScrollView
           contentContainerClassName="flex-grow"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           keyboardShouldPersistTaps="handled"
         >
           <View className={cn("flex-1 px-4", className)} {...props}>

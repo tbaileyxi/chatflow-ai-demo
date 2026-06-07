@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { View, Text, Alert } from "react-native";
+import {
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -8,6 +17,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { colors } from "@/theme/colors";
+import {
+  formatPhoneForAuth,
+  getTestLogin,
+  TEST_LOGINS,
+} from "@/config/testLogins";
 import type { AuthStackParamList } from "@/navigation/types";
 
 type Nav = NativeStackNavigationProp<AuthStackParamList, "PhoneEntry">;
@@ -19,29 +33,76 @@ const COUNTRY_CODES = [
   { code: "+91", label: "IN +91" },
 ] as const;
 
-function formatPhoneForSupabase(countryCode: string, phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  return `${countryCode}${digits}`;
-}
-
 export function PhoneEntryScreen() {
   const navigation = useNavigation<Nav>();
   const [countryCode, setCountryCode] = useState("+1");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [authMethod, setAuthMethod] = useState<"email" | "sms">("email");
   const [loading, setLoading] = useState(false);
   const [showCodes, setShowCodes] = useState(false);
 
+  const continueWithTestLogin = (login: (typeof TEST_LOGINS)[number]) => {
+    Keyboard.dismiss();
+    navigation.navigate("OTPVerification", {
+      phone: login.phone,
+      method: "sms",
+      isTestLogin: true,
+    });
+  };
+
   const handleSendCode = async () => {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (authMethod === "email" && !trimmedEmail.includes("@")) {
+      Alert.alert("Invalid Email", "Enter a valid email address.");
+      return;
+    }
+
     const digits = phone.replace(/\D/g, "");
-    if (digits.length < 10) {
+    if (authMethod === "sms" && digits.length < 10) {
       Alert.alert("Invalid Number", "Please enter a valid phone number.");
       return;
     }
 
     setLoading(true);
     try {
-      const fullPhone = formatPhoneForSupabase(countryCode, phone);
+      const fullPhone = formatPhoneForAuth(countryCode, phone);
+      const testLogin = getTestLogin(fullPhone);
       console.log("Sending OTP to:", fullPhone);
+
+      if (authMethod === "sms" && testLogin) {
+        navigation.navigate("OTPVerification", {
+          phone: testLogin.phone,
+          method: "sms",
+          isTestLogin: true,
+        });
+        return;
+      }
+
+      if (authMethod === "email") {
+        const { error } = await supabase.auth.signInWithOtp({
+          email: trimmedEmail,
+          options: {
+            shouldCreateUser: true,
+            data: {
+              phone_number: digits.length >= 10 ? fullPhone : null,
+            },
+          },
+        });
+
+        if (error) {
+          console.log("Email OTP send error:", error.message);
+          Alert.alert("Error", error.message);
+          return;
+        }
+
+        navigation.navigate("OTPVerification", {
+          email: trimmedEmail,
+          phone: digits.length >= 10 ? fullPhone : undefined,
+          method: "email",
+        });
+        return;
+      }
 
       const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone });
 
@@ -54,6 +115,7 @@ export function PhoneEntryScreen() {
       console.log("OTP sent successfully, navigating to verification");
       navigation.navigate("OTPVerification", {
         phone: fullPhone,
+        method: "sms",
       });
     } catch {
       Alert.alert("Error", "Something went wrong. Please try again.");
@@ -64,75 +126,169 @@ export function PhoneEntryScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <View className="px-4 pt-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onPress={() => navigation.goBack()}
-        >
-          <ChevronLeft color={colors.foreground} size={24} />
-        </Button>
-      </View>
-
-      <View className="flex-1 px-8 pt-8">
-        <Text className="text-2xl font-bold text-foreground">
-          Enter your phone number
-        </Text>
-        <Text className="mt-2 text-base text-muted-foreground">
-          We'll send you a verification code
-        </Text>
-
-        <View className="mt-8 gap-4">
-          {/* Country code selector */}
-          <View className="flex-row gap-3">
-            <View className="relative">
-              <Button
-                variant="outline"
-                className="w-24"
-                onPress={() => setShowCodes(!showCodes)}
-              >
-                {COUNTRY_CODES.find((c) => c.code === countryCode)?.label ??
-                  countryCode}
-              </Button>
-              {showCodes && (
-                <View className="absolute left-0 top-12 z-10 w-32 rounded-md border border-border bg-popover p-1">
-                  {COUNTRY_CODES.map((c) => (
-                    <Button
-                      key={c.code}
-                      variant="ghost"
-                      className="justify-start"
-                      onPress={() => {
-                        setCountryCode(c.code);
-                        setShowCodes(false);
-                      }}
-                    >
-                      {c.label}
-                    </Button>
-                  ))}
-                </View>
-              )}
-            </View>
-
-            <View className="flex-1">
-              <Input
-                placeholder="(555) 123-4567"
-                keyboardType="phone-pad"
-                value={phone}
-                onChangeText={setPhone}
-                autoFocus
-              />
-            </View>
-          </View>
-
-          <Button
-            size="lg"
-            onPress={handleSendCode}
-            disabled={loading || phone.replace(/\D/g, "").length < 10}
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <Pressable className="flex-1" onPress={Keyboard.dismiss}>
+          <ScrollView
+            className="flex-1"
+            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: 32 }}
           >
-            {loading ? "Sending..." : "Send Code"}
-          </Button>
-        </View>
-      </View>
+            <View className="px-4 pt-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onPress={() => navigation.goBack()}
+              >
+                <ChevronLeft color={colors.foreground} size={24} />
+              </Button>
+            </View>
+
+            <View className="px-8 pt-8">
+              <Text className="text-3xl font-black text-foreground">
+                Sign in
+              </Text>
+              <Text className="mt-2 text-base leading-6 text-muted-foreground">
+                Use an email code to sign in. Phone can stay on your profile
+                until SMS is ready.
+              </Text>
+
+              <View className="mt-6 flex-row rounded-xl border border-border bg-muted p-1">
+                <Button
+                  variant={authMethod === "email" ? "default" : "ghost"}
+                  className="flex-1"
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setAuthMethod("email");
+                  }}
+                >
+                  Email Code
+                </Button>
+                <Button
+                  variant={authMethod === "sms" ? "default" : "ghost"}
+                  className="flex-1"
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setAuthMethod("sms");
+                  }}
+                >
+                  SMS Code
+                </Button>
+              </View>
+
+              <View className="mt-6 gap-4">
+                {authMethod === "email" && (
+                  <Input
+                    placeholder="you@example.com"
+                    keyboardType="email-address"
+                    textContentType="emailAddress"
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoFocus={false}
+                    returnKeyType="send"
+                    blurOnSubmit
+                    onSubmitEditing={handleSendCode}
+                  />
+                )}
+
+                {authMethod === "sms" ? (
+                  <View className="gap-4">
+                    <View className="rounded-2xl border border-border bg-card p-3">
+                      <Text className="text-sm font-black uppercase tracking-widest text-primary">
+                        Quick accounts
+                      </Text>
+                      <Text className="mt-1 text-sm leading-5 text-muted-foreground">
+                        Use these until real SMS is approved. Code is 123456.
+                      </Text>
+                      <View className="mt-3 gap-2">
+                        {TEST_LOGINS.map((login) => (
+                          <Button
+                            key={login.phone}
+                            variant="outline"
+                            size="lg"
+                            onPress={() => continueWithTestLogin(login)}
+                          >
+                            Continue as {login.displayName}
+                          </Button>
+                        ))}
+                      </View>
+                    </View>
+
+                    <View className="flex-row gap-3">
+                      <View className="relative">
+                        <Button
+                          variant="outline"
+                          className="w-24"
+                          onPress={() => {
+                            Keyboard.dismiss();
+                            setShowCodes(!showCodes);
+                          }}
+                        >
+                          {COUNTRY_CODES.find((c) => c.code === countryCode)?.label ??
+                            countryCode}
+                        </Button>
+                        {showCodes && (
+                          <View className="absolute left-0 top-12 z-10 w-32 rounded-md border border-border bg-popover p-1">
+                            {COUNTRY_CODES.map((c) => (
+                              <Button
+                                key={c.code}
+                                variant="ghost"
+                                className="justify-start"
+                                onPress={() => {
+                                  setCountryCode(c.code);
+                                  setShowCodes(false);
+                                }}
+                              >
+                                {c.label}
+                              </Button>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+
+                      <View className="flex-1">
+                        <Input
+                          placeholder="(555) 123-4567"
+                          keyboardType="phone-pad"
+                          textContentType="telephoneNumber"
+                          value={phone}
+                          onChangeText={setPhone}
+                          autoFocus={false}
+                          returnKeyType="done"
+                        />
+                      </View>
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          </ScrollView>
+
+          <View className="border-t border-border bg-background px-8 pb-6 pt-3">
+            <Button
+              size="lg"
+              onPress={handleSendCode}
+              disabled={
+                loading ||
+                (authMethod === "email"
+                  ? !email.trim().includes("@")
+                  : phone.replace(/\D/g, "").length < 10)
+              }
+            >
+              {loading
+                ? "Sending..."
+                : authMethod === "email"
+                  ? "Send Email Code"
+                  : "Send SMS Code"}
+            </Button>
+          </View>
+        </Pressable>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

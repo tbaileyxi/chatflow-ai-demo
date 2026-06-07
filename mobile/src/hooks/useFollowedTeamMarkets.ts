@@ -22,6 +22,8 @@ export type TeamMarket = {
   kalshi_ticker: string;
 };
 
+const GAME_MARKET_TYPES = ["spread", "total", "winner", "player_prop", "other"];
+
 export function useFollowedTeamMarkets() {
   const { user } = useAuth();
 
@@ -69,6 +71,7 @@ export function useFollowedTeamMarkets() {
         )
         .in("team_id", teamIds)
         .eq("is_resolved", false)
+        .in("market_type", GAME_MARKET_TYPES)
         .gte("event_start_time", now.toISOString())
         .lte("event_start_time", cutoff48h.toISOString())
         .order("event_start_time", { ascending: true });

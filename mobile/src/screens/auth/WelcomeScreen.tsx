@@ -13,17 +13,18 @@ export function WelcomeScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <View className="flex-1 items-center justify-center px-8">
-        {/* Logo area */}
-        <View className="mb-4 h-20 w-20 items-center justify-center rounded-2xl bg-primary">
-          <Text className="text-3xl font-bold text-primary-foreground">SH</Text>
+        <View className="mb-5 h-24 w-24 items-center justify-center rounded-full border border-primary/40 bg-primary">
+          <Text className="text-3xl font-black text-primary-foreground">
+            SH
+          </Text>
         </View>
 
-        <Text className="text-3xl font-bold text-foreground">
+        <Text className="text-center text-3xl font-black uppercase tracking-wider text-primary">
           Side Huddle Sports
         </Text>
 
         <Text className="mt-3 text-center text-lg text-muted-foreground">
-          Your team. Your huddle.
+          Your teams. Your crews. Game night.
         </Text>
       </View>
 

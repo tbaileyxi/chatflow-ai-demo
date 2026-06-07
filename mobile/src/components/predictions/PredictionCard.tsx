@@ -285,7 +285,7 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
                 <Text className="text-xs text-muted-foreground">
                   Community: {communityYesPct}% YES ({stats.total} bets)
                 </Text>
-                <Text className="text-xs text-muted-foreground">Kalshi: {yesCost}%</Text>
+                <Text className="text-xs text-muted-foreground">Market: {yesCost}%</Text>
               </View>
               {Math.abs(divergence) >= 3 && (
                 <View className="flex-row items-center gap-1">

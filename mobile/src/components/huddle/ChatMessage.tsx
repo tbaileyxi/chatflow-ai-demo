@@ -147,8 +147,8 @@ export function ChatMessage({
           : "Buzz"
       : message.isBotMessage
         ? "@coach"
-        : message.displayName ?? message.username ?? "User";
-  const initial = displayName.charAt(0).toUpperCase();
+      : message.displayName ?? message.username ?? "User";
+  const initial = message.isBotMessage ? "SH" : displayName.charAt(0).toUpperCase();
 
   const handleDoubleTap = () => {
     const now = Date.now();
@@ -218,19 +218,16 @@ export function ChatMessage({
 
             {/* Bubble */}
             <View className={cn("max-w-[75%] gap-1", isOwnMessage && "items-end")}>
-              <View className="flex-row items-center gap-2">
-                <Text
-                  className={cn(
-                    "text-sm font-semibold",
-                    message.isBotMessage ? "text-secondary" : "text-muted-foreground",
-                  )}
-                >
-                  {displayName}
-                </Text>
-                <Text className="text-sm text-muted-foreground">
-                  {formatTime(message.createdAt)}
-                </Text>
-              </View>
+              {!message.isBotMessage ? (
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-sm font-semibold text-muted-foreground">
+                    {displayName}
+                  </Text>
+                  <Text className="text-sm text-muted-foreground">
+                    {formatTime(message.createdAt)}
+                  </Text>
+                </View>
+              ) : null}
 
               {/* Quoted reply context */}
               {replyTo && (
@@ -254,7 +251,7 @@ export function ChatMessage({
                   className={cn(
                     "rounded-2xl px-4 py-2.5",
                     message.isBotMessage
-                      ? "bg-secondary/20"
+                      ? "border border-primary/30 bg-primary/10"
                       : isOwnMessage
                         ? "bg-primary/20"
                         : "bg-muted",
@@ -281,7 +278,7 @@ export function ChatMessage({
                   <Image
                     source={{ uri: message.mediaUrl }}
                     className="mt-1 w-full rounded-lg"
-                    style={{ height: 256, aspectRatio: undefined }}
+                    style={{ height: 256 }}
                     resizeMode="cover"
                   />
                 </Pressable>

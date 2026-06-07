@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback } from "react";
 import { View, Text, ScrollView, RefreshControl, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Coins, Target, Clock, Trophy, TrendingUp } from "lucide-react-native";
+import { Coins, Target, Clock, Trophy, TrendingUp, Sparkles } from "lucide-react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { usePortfolio } from "@/hooks/usePortfolio";
@@ -61,15 +61,26 @@ export function LedgerScreen() {
           />
         }
       >
-        {/* Header */}
         <View className="px-4 pb-4 pt-2">
-          <Text className="text-2xl font-bold text-foreground">Ledger</Text>
+          <Text className="text-2xl font-black text-foreground">Picks</Text>
           <Text className="text-sm text-muted-foreground">
-            Your predictions portfolio
+            Side Coins, game props, and bragging rights.
           </Text>
         </View>
 
         <View className="gap-6 px-4">
+          <View className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
+            <View className="flex-row items-center gap-2">
+              <Sparkles color={colors.primary} size={18} />
+              <Text className="text-base font-black text-foreground">
+                Play with coins, not cash
+              </Text>
+            </View>
+            <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+              Prediction markets power the real line. Side Huddle turns it into casual room picks.
+            </Text>
+          </View>
+
           {/* Portfolio */}
           {isLoading ? (
             <Skeleton className="h-40 w-full" />
@@ -89,7 +100,7 @@ export function LedgerScreen() {
               <View className="flex-row items-center gap-2">
                 <TrendingUp color={colors.primary} size={18} />
                 <Text className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                  Live Markets
+                  Game Props
                 </Text>
               </View>
               {teamMarkets.map((group) => (

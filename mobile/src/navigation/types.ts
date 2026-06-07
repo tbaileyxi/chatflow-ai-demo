@@ -3,6 +3,8 @@ import type { NavigatorScreenParams } from "@react-navigation/native";
 // Bottom tab screens
 export type TabParamList = {
   Home: undefined;
+  Teams: undefined;
+  Search: undefined;
   Ledger: undefined;
   Profile: undefined;
 };
@@ -11,7 +13,12 @@ export type TabParamList = {
 export type AuthStackParamList = {
   Welcome: undefined;
   PhoneEntry: undefined;
-  OTPVerification: { phone: string };
+  OTPVerification: {
+    phone?: string;
+    email?: string;
+    method?: "email" | "sms";
+    isTestLogin?: boolean;
+  };
 };
 
 // Root stack (auth-gated)
@@ -20,11 +27,12 @@ export type RootStackParamList = {
   Onboarding: undefined;
   MainTabs: NavigatorScreenParams<TabParamList>;
   Huddle: { huddleId: string };
+  EventLobby: { eventId: string };
   HuddleSettings: { huddleId: string };
   HuddleCoachSettings: { huddleId: string };
   JoinHuddle: { huddleId: string };
   HuddleSearch: undefined;
-  CreateSideHuddle: undefined;
+  CreateSideHuddle: { teamId?: string } | undefined;
   ManageTeams: undefined;
   TeamFeed: { teamId: string };
   Admin: undefined;

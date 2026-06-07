@@ -1,7 +1,9 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Home, Receipt, User } from "lucide-react-native";
+import { Home, Newspaper, Search, Target, User } from "lucide-react-native";
 import { colors } from "@/theme/colors";
 import { HomeScreen } from "@/screens/home/HomeScreen";
+import { TeamsScreen } from "@/screens/teams/TeamsScreen";
+import { HuddleSearchScreen } from "@/screens/huddle-search/HuddleSearchScreen";
 import { LedgerScreen } from "@/screens/ledger/LedgerScreen";
 import { ProfileScreen } from "@/screens/profile/ProfileScreen";
 import type { TabParamList } from "./types";
@@ -14,9 +16,10 @@ export function TabNavigator() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.background,
+          backgroundColor: colors.card,
           borderTopColor: colors.border,
           borderTopWidth: 1,
+          paddingTop: 6,
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
@@ -30,11 +33,30 @@ export function TabNavigator() {
         }}
       />
       <Tab.Screen
+        name="Teams"
+        component={TeamsScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Newspaper color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Search"
+        component={HuddleSearchScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Search color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="Ledger"
         component={LedgerScreen}
         options={{
+          title: "Picks",
           tabBarIcon: ({ color, size }) => (
-            <Receipt color={color} size={size} />
+            <Target color={color} size={size} />
           ),
         }}
       />
@@ -42,6 +64,7 @@ export function TabNavigator() {
         name="Profile"
         component={ProfileScreen}
         options={{
+          title: "Me",
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
         }}
       />

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { getDevTeamById, type DevTeam } from "@/config/devData";
 import { supabase } from "@/integrations/supabase/client";
 
 export type GameContext = {
@@ -96,10 +97,11 @@ export function useLiveGameContext(teamId: string | undefined) {
 
       if (liveGame) return await resolveGame(liveGame);
 
-      // Look for upcoming game (next 48 hours)
+      // Look for upcoming game. Keep this wide so offseason/next scheduled
+      // games can still appear in room headers.
       const now = new Date().toISOString();
-      const twoDaysOut = new Date(
-        Date.now() + 48 * 60 * 60 * 1000,
+      const oneYearOut = new Date(
+        Date.now() + 365 * 24 * 60 * 60 * 1000,
       ).toISOString();
 
       const { data: upcomingGame } = await supabase
@@ -108,7 +110,7 @@ export function useLiveGameContext(teamId: string | undefined) {
         .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
         .eq("status", "scheduled")
         .gte("start_time", now)
-        .lte("start_time", twoDaysOut)
+        .lte("start_time", oneYearOut)
         .order("start_time", { ascending: true })
         .limit(1)
         .maybeSingle();
@@ -181,9 +183,158 @@ export function useLiveGameContext(teamId: string | undefined) {
         };
       }
 
-      return null;
+      return await resolveExternalGameForTeamId(teamId);
     },
   });
+}
+
+type TeamLookup = {
+  id: string;
+  name: string;
+  city: string;
+  league: string | null;
+};
+
+const ESPN_SCOREBOARD_BY_LEAGUE: Record<string, string> = {
+  NFL: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard",
+  NBA: "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
+  MLB: "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard",
+  NHL: "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard",
+  NCAAF:
+    "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard",
+  NCAA:
+    "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard",
+};
+
+async function resolveTeamLookup(teamId: string): Promise<TeamLookup | null> {
+  const devTeam = getDevTeamById(teamId);
+  if (devTeam) {
+    return {
+      id: devTeam.id,
+      name: devTeam.name,
+      city: devTeam.city,
+      league: devTeam.league,
+    };
+  }
+
+  const { data } = await supabase
+    .from("teams")
+    .select("id, name, city, league")
+    .eq("id", teamId)
+    .maybeSingle();
+
+  return data ?? null;
+}
+
+function normalizeTeamText(value: string | null | undefined) {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function teamMatchesEspnCompetitor(team: TeamLookup, competitor: any) {
+  const targetFull = normalizeTeamText(`${team.city} ${team.name}`);
+  const targetName = normalizeTeamText(team.name);
+  const values = [
+    competitor?.team?.displayName,
+    competitor?.team?.shortDisplayName,
+    competitor?.team?.name,
+    competitor?.team?.abbreviation,
+  ].map(normalizeTeamText);
+
+  return values.some((value) => {
+    if (!value) return false;
+    return (
+      value === targetFull ||
+      value === targetName ||
+      value.includes(targetName)
+    );
+  });
+}
+
+function mapEspnStatus(status: any) {
+  const state = String(status?.type?.state ?? "").toLowerCase();
+  const name = String(status?.type?.name ?? "").toLowerCase();
+  if (state === "in" || name.includes("progress")) return "in_progress";
+  if (state === "post" || name.includes("final")) return "final";
+  return "scheduled";
+}
+
+function mapEspnCompetitor(competitor: any, teamId: string | null) {
+  return {
+    id: teamId,
+    name: competitor?.team?.name ?? null,
+    city: competitor?.team?.location ?? null,
+    score:
+      competitor?.score === undefined || competitor?.score === ""
+        ? null
+        : Number(competitor.score),
+  };
+}
+
+export async function resolveExternalGameForTeam(
+  team: TeamLookup | DevTeam | null,
+): Promise<GameContext | null> {
+  if (!team?.league) return null;
+  const endpoint = ESPN_SCOREBOARD_BY_LEAGUE[team.league.toUpperCase()];
+  if (!endpoint) return null;
+
+  try {
+    const response = await fetch(endpoint);
+    if (!response.ok) return null;
+    const payload = await response.json();
+    const events = Array.isArray(payload?.events) ? payload.events : [];
+
+    for (const event of events) {
+      const competition = event?.competitions?.[0];
+      const competitors = competition?.competitors ?? [];
+      const match = competitors.find((c: any) =>
+        teamMatchesEspnCompetitor(team, c),
+      );
+      if (!match) continue;
+
+      const homeRaw = competitors.find((c: any) => c.homeAway === "home");
+      const awayRaw = competitors.find((c: any) => c.homeAway === "away");
+      const home = mapEspnCompetitor(
+        homeRaw,
+        teamMatchesEspnCompetitor(team, homeRaw) ? team.id : null,
+      );
+      const away = mapEspnCompetitor(
+        awayRaw,
+        teamMatchesEspnCompetitor(team, awayRaw) ? team.id : null,
+      );
+
+      return {
+        id: `espn-${event.id}`,
+        homeTeamId: home.id,
+        awayTeamId: away.id,
+        homeScore: home.score,
+        awayScore: away.score,
+        clock: competition?.status?.displayClock ?? null,
+        period: competition?.status?.period
+          ? `P${competition.status.period}`
+          : null,
+        status: mapEspnStatus(competition?.status),
+        startTime: event.date,
+        sportKey: team.league,
+        homeTeamName: home.name,
+        awayTeamName: away.name,
+        homeTeamCity: home.city,
+        awayTeamCity: away.city,
+      };
+    }
+  } catch (error) {
+    console.warn("Failed to resolve ESPN game context:", error);
+  }
+
+  return null;
+}
+
+export async function resolveExternalGameForTeamId(
+  teamId: string,
+): Promise<GameContext | null> {
+  return resolveExternalGameForTeam(await resolveTeamLookup(teamId));
 }
 
 async function resolveGame(game: any): Promise<GameContext> {

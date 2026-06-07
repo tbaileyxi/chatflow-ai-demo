@@ -1,7 +1,6 @@
 import { Pressable, View, Text, Image } from "react-native";
-import { Lock, Users } from "lucide-react-native";
+import { Crown, Users } from "lucide-react-native";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { colors } from "@/theme/colors";
 import type { UserHuddle } from "@/hooks/useUserHuddles";
 
@@ -37,26 +36,25 @@ export function HuddleCard({ huddle, onPress }: Props) {
       </View>
 
       {/* Content */}
-      <View className="flex-1 gap-0.5">
-        <View className="flex-row items-center gap-1.5">
-          <Lock color={colors.mutedForeground} size={14} />
+      <View className="flex-1 gap-1">
+        <View className="flex-row items-center gap-2">
           <Text className="flex-1 text-base font-semibold text-foreground" numberOfLines={1}>
             {huddle.name}
           </Text>
-          {huddle.hasUnread && <Badge variant="default">New</Badge>}
+          {huddle.roomRole === "owner" ? (
+            <View className="flex-row items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5">
+              <Crown color={colors.primary} size={10} />
+              <Text className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Owner
+              </Text>
+            </View>
+          ) : null}
         </View>
-
-        {huddle.latestMessage && (
-          <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-            {huddle.latestMessageIsBot ? "🤖 " : ""}
-            {huddle.latestMessage}
-          </Text>
-        )}
 
         <View className="flex-row items-center gap-1">
           <Users color={colors.mutedForeground} size={11} />
           <Text className="text-xs text-muted-foreground">
-            {huddle.memberCount}
+            {huddle.memberCount} people
           </Text>
         </View>
       </View>

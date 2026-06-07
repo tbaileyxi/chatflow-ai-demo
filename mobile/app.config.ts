@@ -18,6 +18,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.sidehuddle.sports",
+    buildNumber: "2",
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
+    },
   },
   android: {
     adaptiveIcon: {
@@ -33,5 +37,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     adminPhoneNumber: process.env.ADMIN_PHONE_NUMBER ?? "",
     bypassPhoneNumber: process.env.BYPASS_PHONE_NUMBER ?? "5555555555",
+    eas: {
+      projectId: "9cbdc342-9160-4707-aaa0-c231ede47f17",
+    },
   },
 });

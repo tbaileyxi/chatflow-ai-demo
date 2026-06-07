@@ -5,48 +5,48 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Resolved from HSL CSS vars in the web dark theme
-        border: "#262626",
-        input: "#262626",
-        ring: "#FFD700",
-        background: "#0A0A0A",
-        foreground: "#FAFAFA",
+        border: "#2A2A2F",
+        input: "#222226",
+        ring: "#F5C518",
+        background: "#0A0A0B",
+        foreground: "#F0F0F2",
 
         primary: {
-          DEFAULT: "#FFD700", // hsl(51, 100%, 50%) — neon gold
-          foreground: "#0A0A0A",
+          DEFAULT: "#F5C518",
+          foreground: "#0A0A0B",
         },
         secondary: {
-          DEFAULT: "#00D4FF", // hsl(191, 100%, 50%) — teal
-          foreground: "#0A0A0A",
+          DEFAULT: "#111113",
+          foreground: "#F0F0F2",
         },
         destructive: {
-          DEFAULT: "#EF4444", // hsl(0, 84%, 60%)
+          DEFAULT: "#E8453C",
           foreground: "#FFFFFF",
         },
         muted: {
-          DEFAULT: "#262626", // hsl(0, 0%, 15%)
-          foreground: "#999999", // hsl(0, 0%, 60%)
+          DEFAULT: "#18181B",
+          foreground: "#A0A0A8",
         },
         accent: {
-          DEFAULT: "#FF8C00", // hsl(30, 100%, 50%) — orange
-          foreground: "#0A0A0A",
+          DEFAULT: "#18181B",
+          foreground: "#F0F0F2",
         },
         popover: {
-          DEFAULT: "#1F1F1F", // hsl(0, 0%, 12%)
-          foreground: "#FAFAFA",
+          DEFAULT: "#18181B",
+          foreground: "#F0F0F2",
         },
         card: {
-          DEFAULT: "#0A0A0A", // hsl(0, 0%, 4%)
-          foreground: "#FAFAFA",
+          DEFAULT: "#111113",
+          foreground: "#F0F0F2",
         },
         success: {
-          DEFAULT: "#00CC00", // hsl(120, 100%, 40%)
+          DEFAULT: "#22C55E",
           foreground: "#FFFFFF",
         },
+        info: "#3B82F6",
         huddle: {
-          primary: "#FFD700",
-          secondary: "#00D4FF",
+          primary: "#F5C518",
+          secondary: "#3B82F6",
         },
         verified: {
           primary: "#22C55E", // hsl(142, 76%, 36%)

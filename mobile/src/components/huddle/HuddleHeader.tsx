@@ -1,25 +1,19 @@
 import { useEffect, useRef } from "react";
-import { View, Text, Image, Pressable, Share, Animated } from "react-native";
+import { View, Text, Image, Pressable, Animated } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
   ChevronLeft,
   Users,
-  Lock,
-  Settings,
-  UserPlus,
-  BookOpen,
+  MoreVertical,
+  ShieldCheck,
 } from "lucide-react-native";
-import { cn } from "@/lib/utils";
 import { colors } from "@/theme/colors";
-import { useAuth } from "@/hooks/useAuth";
 import {
   useLiveGameContext,
   getGameState,
-  formatGameClock,
   type GameContext,
   type GameState,
 } from "@/hooks/useLiveGameContext";
-import { useTeamMarkets } from "@/hooks/useTeamMarkets";
 import type { HuddleDetails } from "@/hooks/useHuddleDetails";
 
 type Props = {
@@ -85,11 +79,9 @@ function formatNextGameDate(dateStr: string): string {
 function GameBar({
   game,
   gameState,
-  topOdds,
 }: {
   game: GameContext;
   gameState: GameState;
-  topOdds: string | null;
 }) {
   if (gameState === "live") {
     return (
@@ -153,7 +145,7 @@ function GameBar({
 
   // Pregame
   return (
-    <View className="bg-primary/5 px-4 py-2.5">
+      <View className="bg-primary/5 px-4 py-2.5">
       <View className="flex-row items-center gap-2 mb-1">
         <Text className="text-xs font-bold uppercase tracking-wider text-primary">
           PREGAME
@@ -171,32 +163,19 @@ function GameBar({
           {game.homeTeamName ?? "Home"}
         </Text>
       </View>
-      {topOdds && (
-        <Text className="mt-1 text-center text-xs text-muted-foreground">
-          {topOdds}
-        </Text>
-      )}
     </View>
   );
 }
 
 export function HuddleHeader({ huddle }: Props) {
   const navigation = useNavigation();
-  const { user } = useAuth();
   const { data: game } = useLiveGameContext(huddle.teamId);
-  const { data: markets } = useTeamMarkets(huddle.teamId);
 
   const displayName = huddle.isOfficialTeam
     ? huddle.teamName ?? huddle.name
     : huddle.name;
 
   const gameState = getGameState(game ?? null);
-
-  // Top Kalshi odds for pregame display
-  const topOdds =
-    markets && markets.length > 0
-      ? `${markets[0].question} — YES ${markets[0].current_yes_price}¢`
-      : null;
 
   return (
     <View className="border-b border-border bg-background">
@@ -212,7 +191,7 @@ export function HuddleHeader({ huddle }: Props) {
         </Pressable>
 
         {/* Team logo */}
-        <View className="h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-muted">
+        <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-muted">
           {huddle.teamLogoUrl ? (
             <Image
               source={{ uri: huddle.teamLogoUrl }}
@@ -227,69 +206,42 @@ export function HuddleHeader({ huddle }: Props) {
         </View>
 
         {/* Name + info */}
-        <View className="flex-1 gap-0.5">
-          <Text className="text-base font-semibold text-foreground" numberOfLines={1}>
-            {displayName}
-          </Text>
+        <Pressable
+          className="flex-1 gap-0.5"
+          onPress={() =>
+            navigation.navigate("HuddleSettings", { huddleId: huddle.id })
+          }
+        >
           <View className="flex-row items-center gap-2">
-            <Lock color={colors.mutedForeground} size={12} />
-            <View className="flex-row items-center gap-1">
-              <Users color={colors.mutedForeground} size={12} />
-              <Text className="text-xs text-muted-foreground">
-                {huddle.memberCount}
-              </Text>
-            </View>
+            <Text className="flex-1 text-lg font-black text-foreground" numberOfLines={1}>
+              {displayName}
+            </Text>
+            {huddle.isVerified ? (
+              <ShieldCheck color={colors.primary} size={15} />
+            ) : null}
           </View>
-        </View>
+          <View className="flex-row items-center gap-1">
+            <Users color={colors.mutedForeground} size={12} />
+            <Text className="text-xs text-muted-foreground">
+              {huddle.memberCount} member{huddle.memberCount === 1 ? "" : "s"}
+            </Text>
+          </View>
+        </Pressable>
 
-        {/* Ledger + Invite + Settings */}
-        {user && huddle.isMember && (
-          <View className="flex-row items-center gap-3">
-            <Pressable
-              onPress={() => navigation.navigate("Ledger" as any)}
-              className="active:opacity-60"
-              hitSlop={8}
-            >
-              <BookOpen color={colors.primary} size={20} />
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                const inviteLink = `sidehuddle://join-huddle/${huddle.id}`;
-                Share.share({
-                  message: `Join my Side Huddle "${huddle.name}" on Side Huddle Sports! ${inviteLink}`,
-                  url: inviteLink,
-                });
-              }}
-              className="active:opacity-60"
-              hitSlop={8}
-            >
-              <UserPlus color={colors.primary} size={20} />
-            </Pressable>
-            <Pressable
-              onPress={() =>
-                navigation.navigate("HuddleSettings", { huddleId: huddle.id })
-              }
-              className="active:opacity-60"
-              hitSlop={8}
-            >
-              <Settings color={colors.mutedForeground} size={20} />
-            </Pressable>
-          </View>
-        )}
+        <Pressable
+          onPress={() =>
+            navigation.navigate("HuddleSettings", { huddleId: huddle.id })
+          }
+          className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
+          hitSlop={8}
+        >
+          <MoreVertical color={colors.mutedForeground} size={22} />
+        </Pressable>
       </View>
 
       {/* Game day bar */}
       {game && gameState !== "none" && (
-        <GameBar game={game} gameState={gameState} topOdds={topOdds} />
-      )}
-
-      {/* No game — show next scheduled */}
-      {!game && huddle.teamId && (
-        <View className="bg-muted/30 px-4 py-2">
-          <Text className="text-center text-xs text-muted-foreground">
-            No game scheduled — check back on game day
-          </Text>
-        </View>
+        <GameBar game={game} gameState={gameState} />
       )}
     </View>
   );

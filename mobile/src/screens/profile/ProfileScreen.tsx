@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react";
-import { View, Text, Image, Alert, Pressable } from "react-native";
+import { View, Text, Image, Alert, Pressable, Keyboard } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-import { LogOut, Camera, Shield } from "lucide-react-native";
+import { Bell, Camera, Crown, LogOut, Shield } from "lucide-react-native";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { useAuth } from "@/hooks/useAuth";
+import { useInAppNotifications } from "@/hooks/useInAppNotifications";
 import { useProfile } from "@/hooks/useProfile";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,15 +19,51 @@ import { ScreenWrapper } from "@/components/ui/screen-wrapper";
 import { Badge } from "@/components/ui/badge";
 import { colors } from "@/theme/colors";
 
+const BASE64_CHARS =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+function base64ToUint8Array(base64: string) {
+  const clean = base64.replace(/=+$/, "");
+  const bytes: number[] = [];
+  let buffer = 0;
+  let bits = 0;
+
+  for (const char of clean) {
+    const value = BASE64_CHARS.indexOf(char);
+    if (value < 0) continue;
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >> bits) & 0xff);
+    }
+  }
+
+  return new Uint8Array(bytes);
+}
+
 export function ProfileScreen() {
   const navigation = useNavigation();
-  const { user, userRole, hasAdminAccess, signOut } = useAuth();
+  const {
+    user,
+    userRole,
+    hasAdminAccess,
+    signOut,
+  } = useAuth();
   const { data: profile, isLoading, updateProfile } = useProfile();
+  const {
+    notifications,
+    unreadCount,
+    markRead,
+    markAllRead,
+    isLoading: notificationsLoading,
+  } = useInAppNotifications(8);
 
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -42,12 +82,19 @@ export function ProfileScreen() {
   }
 
   const handleSave = async () => {
+    Keyboard.dismiss();
     setSaving(true);
-    const { error } = await updateProfile({
-      display_name: displayName.trim(),
-      username: username.trim(),
-      bio: bio.trim(),
-    });
+    const trimmedUsername = username.trim();
+    const updates: Parameters<typeof updateProfile>[0] = {
+      display_name: displayName.trim() || null,
+      bio: bio.trim() || null,
+    };
+
+    if (trimmedUsername) {
+      updates.username = trimmedUsername;
+    }
+
+    const { error } = await updateProfile(updates);
 
     if (error) {
       Alert.alert(
@@ -73,9 +120,103 @@ export function ProfileScreen() {
     ]);
   };
 
+  const handlePickAvatar = async () => {
+    if (!user) return;
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permission.status !== "granted") {
+      Alert.alert("Permission needed", "Allow photo access to upload a profile photo.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    setUploadingAvatar(true);
+    try {
+      const asset = result.assets[0];
+
+      if (user.app_metadata?.provider === "dev_test") {
+        const { error } = await updateProfile({ avatar_url: asset.uri });
+        if (error) throw error;
+        return;
+      }
+
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: "base64",
+      });
+      const ext = asset.uri.split(".").pop()?.toLowerCase()?.split("?")[0] ?? "jpg";
+      const contentType = ext === "png" ? "image/png" : "image/jpeg";
+      const path = `${user.id}/avatar-${Date.now()}.${ext === "png" ? "png" : "jpg"}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, base64ToUint8Array(base64), {
+          contentType,
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+      const { error } = await updateProfile({ avatar_url: data.publicUrl });
+      if (error) throw error;
+    } catch (error: any) {
+      Alert.alert(
+        "Avatar upload failed",
+        error?.message?.includes("Bucket not found")
+          ? "Supabase needs an avatars storage bucket before uploads can work."
+          : error?.message ?? "Could not upload the profile photo.",
+      );
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const initial = (displayName || username || user?.phone || "U")
     .charAt(0)
     .toUpperCase();
+
+  const handleOpenNotification = async (notificationId: string) => {
+    const notification = notifications.find((n) => n.id === notificationId);
+    if (!notification) return;
+
+    if (!notification.readAt) {
+      await markRead(notification.id);
+    }
+
+    const data = notification.data;
+    const dataHuddleId =
+      data && typeof data === "object" && !Array.isArray(data)
+        ? (data as { huddleId?: string }).huddleId
+        : null;
+    const huddleId = notification.huddleId ?? dataHuddleId ?? null;
+
+    if (huddleId) {
+      navigation.navigate("Huddle" as any, { huddleId });
+      return;
+    }
+
+    if (notification.type.includes("kalshi") || notification.type.includes("pick")) {
+      navigation.navigate("Ledger" as any);
+    }
+  };
+
+  const formatNotificationTime = (createdAt: string | null) => {
+    if (!createdAt) return "";
+    const diffMs = Date.now() - new Date(createdAt).getTime();
+    const diffMinutes = Math.max(1, Math.floor(diffMs / 60000));
+    if (diffMinutes < 60) return `${diffMinutes}m`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours}h`;
+    return `${Math.floor(diffHours / 24)}d`;
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
@@ -92,22 +233,119 @@ export function ProfileScreen() {
 
         {/* Avatar */}
         <View className="items-center gap-2 py-4">
-          <View className="h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-muted">
+          <Pressable
+            className="h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-muted active:opacity-80"
+            onPress={handlePickAvatar}
+            disabled={uploadingAvatar}
+          >
             {profile?.avatarUrl ? (
               <Image
                 source={{ uri: profile.avatarUrl }}
                 className="h-full w-full"
+                resizeMode="cover"
               />
             ) : (
               <Text className="text-3xl font-bold text-muted-foreground">
                 {initial}
               </Text>
             )}
-          </View>
+            <View className="absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-primary">
+              <Camera color={colors.primaryForeground} size={16} />
+            </View>
+          </Pressable>
+          <Text className="text-xs font-semibold text-primary">
+            {uploadingAvatar ? "Uploading..." : "Tap photo to upload"}
+          </Text>
           <Text className="text-sm text-muted-foreground">
             {user?.phone ?? user?.email ?? ""}
           </Text>
         </View>
+
+        <Card className="border-primary/25 bg-primary/5">
+          <CardContent className="gap-3 pt-4">
+            <View className="flex-row items-center gap-2">
+              <Crown color={colors.primary} size={18} />
+              <Text className="text-base font-bold text-foreground">
+                Official Huddles
+              </Text>
+              <Badge variant="outline" className="ml-auto">
+                $29/mo
+              </Badge>
+            </View>
+            <Text className="text-sm leading-5 text-muted-foreground">
+              Verified badge, team-page listing, multiple admins, approval
+              membership, and an about page with links.
+            </Text>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="gap-3 pt-4">
+            <View className="flex-row items-center gap-2">
+              <Bell color={colors.primary} size={18} />
+              <Text className="text-base font-bold text-foreground">
+                Notifications Center
+              </Text>
+              {unreadCount > 0 && (
+                <Badge variant="secondary" className="ml-auto">
+                  {`${unreadCount} unread`}
+                </Badge>
+              )}
+            </View>
+            {unreadCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="self-start px-0"
+                onPress={() => markAllRead()}
+              >
+                Mark all read
+              </Button>
+            )}
+            {notificationsLoading ? (
+              <Text className="text-sm text-muted-foreground">
+                Loading alerts...
+              </Text>
+            ) : notifications.length === 0 ? (
+              <Text className="text-sm leading-5 text-muted-foreground">
+                Friend check-ins, game alerts, bot drops, invites, and pick results will collect here.
+              </Text>
+            ) : (
+              <View className="gap-2">
+                {notifications.map((notification) => (
+                  <Pressable
+                    key={notification.id}
+                    className={`rounded-xl border p-3 active:opacity-80 ${
+                      notification.readAt
+                        ? "border-border bg-muted/20"
+                        : "border-primary/35 bg-primary/10"
+                    }`}
+                    onPress={() => handleOpenNotification(notification.id)}
+                  >
+                    <View className="flex-row items-start gap-2">
+                      {!notification.readAt && (
+                        <View className="mt-2 h-2 w-2 rounded-full bg-primary" />
+                      )}
+                      <View className="flex-1">
+                        <View className="flex-row items-start justify-between gap-2">
+                          <Text className="flex-1 text-sm font-bold text-foreground">
+                            {notification.title}
+                          </Text>
+                          <Text className="text-xs font-semibold text-muted-foreground">
+                            {formatNotificationTime(notification.createdAt)}
+                          </Text>
+                        </View>
+                        <Text className="mt-1 text-sm leading-5 text-muted-foreground">
+                          {notification.body}
+                        </Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Profile Fields */}
         <Card>
@@ -120,6 +358,7 @@ export function ProfileScreen() {
               value={displayName}
               onChangeText={setDisplayName}
               placeholder="Your name"
+              returnKeyType="next"
             />
             <Input
               label="Username"
@@ -127,6 +366,7 @@ export function ProfileScreen() {
               onChangeText={(t) => setUsername(t.toLowerCase().replace(/\s/g, ""))}
               placeholder="username"
               autoCapitalize="none"
+              returnKeyType="next"
             />
             <Textarea
               label="Bio"
@@ -134,6 +374,8 @@ export function ProfileScreen() {
               onChangeText={(t) => setBio(t.slice(0, 280))}
               placeholder="Tell us about yourself..."
               maxLength={280}
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
             />
             <View className="flex-row items-center justify-between">
               <Text className="text-xs text-muted-foreground">

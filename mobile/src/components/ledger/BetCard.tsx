@@ -53,7 +53,7 @@ export function BetCard({ bet }: Props) {
           {bet.position.toUpperCase()}
         </Badge>
         <Text className="text-xs text-muted-foreground">
-          {bet.chipsRisked}¢ risked
+          {bet.chipsRisked} coins risked
         </Text>
 
         {/* Status */}
@@ -77,7 +77,7 @@ export function BetCard({ bet }: Props) {
           <View className="ml-auto flex-row items-center gap-1">
             <Check color={colors.success} size={14} />
             <Text className="text-xs font-semibold text-success">
-              +{bet.chipsWon ?? 0}¢
+              +{bet.chipsWon ?? 0} coins
             </Text>
           </View>
         )}
@@ -86,7 +86,7 @@ export function BetCard({ bet }: Props) {
           <View className="ml-auto flex-row items-center gap-1">
             <X color={colors.destructive} size={14} />
             <Text className="text-xs font-semibold text-destructive">
-              -{bet.chipsRisked}¢
+              -{bet.chipsRisked} coins
             </Text>
           </View>
         )}
