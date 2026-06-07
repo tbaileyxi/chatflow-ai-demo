@@ -1,0 +1,253 @@
+// bot-news-poller — fires every 30 minutes via pg_cron.
+//
+// Flow:
+//   1. For each team with at least one active feed, fetch every feed.
+//   2. Parse RSS, skip entries we've already seen.
+//   3. If the team has a live game (or one inside the quiet window), STAY SILENT.
+//   4. Score new entries through the 4 gates. Bypass LLM judge when cheap signals decide.
+//   5. Respect NEWS_DAILY_CAP_PER_TEAM. Breaking flag may exceed cap by 1.
+//   6. Voice + publish surviving entries.
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isNewsQuietWindow, parseRss, scoreEntries } from "../_shared/bot/news.ts";
+import { generateMessage, defaultPersona } from "../_shared/bot/voice.ts";
+import { newsCapRemaining, publish } from "../_shared/bot/publisher.ts";
+import { getProvider } from "../_shared/bot/providers.ts";
+import type { League } from "../_shared/bot/types.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const NEWS_SCORE_THRESHOLD = Number(Deno.env.get("NEWS_SCORE_THRESHOLD") || 55);
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return new Response(JSON.stringify({ error: "missing supabase env" }), { status: 500 });
+  }
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  const TEST_MODE = (Deno.env.get("TEST_MODE") || "false").toLowerCase() === "true";
+  const TEST_TEAM = (Deno.env.get("TEST_TEAM") || "").toLowerCase();
+  const provider = getProvider();
+
+  const summary = {
+    started_at: new Date().toISOString(),
+    teams_considered: 0,
+    teams_quieted: 0,
+    entries_fetched: 0,
+    entries_new: 0,
+    entries_survived: 0,
+    posts: 0,
+    errors: [] as string[],
+  };
+
+  try {
+    // Pull teams that have at least one active feed.
+    const { data: feeds } = await supabase
+      .from("team_feeds")
+      .select("team_id, feed_url, source_label, teams!inner(id, name, city, league, highlightly_display_name)")
+      .eq("is_active", true);
+    if (!feeds || feeds.length === 0) {
+      return new Response(JSON.stringify({ ...summary, message: "no feeds" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Group by team id.
+    interface TeamBundle {
+      teamId: string;
+      teamName: string;
+      league: string;
+      tokens: string[];
+      feeds: { url: string; label: string }[];
+    }
+    const byTeam = new Map<string, TeamBundle>();
+    for (const row of feeds as any[]) {
+      const t = row.teams;
+      const display = t.highlightly_display_name || `${t.city ?? ""} ${t.name}`.trim();
+      const tokens = [t.name, display, t.city].filter(Boolean);
+      const bundle = byTeam.get(t.id) || {
+        teamId: t.id,
+        teamName: display,
+        league: t.league,
+        tokens,
+        feeds: [],
+      };
+      bundle.feeds.push({ url: row.feed_url, label: row.source_label || "" });
+      byTeam.set(t.id, bundle);
+    }
+
+    for (const bundle of byTeam.values()) {
+      if (TEST_MODE && TEST_TEAM && !bundle.teamName.toLowerCase().includes(TEST_TEAM)) continue;
+      summary.teams_considered += 1;
+
+      // Quiet window check: ask provider for upcoming/live games for this team's league.
+      const quiet = await isQuietForTeam(provider, bundle);
+      if (quiet) {
+        summary.teams_quieted += 1;
+        continue;
+      }
+
+      // Daily cap check up front — cheap.
+      const remaining = await newsCapRemaining(supabase, bundle.teamId);
+      if (remaining <= 0) continue;
+
+      // Fetch every feed.
+      const allEntries: ReturnType<typeof parseRss> = [];
+      for (const f of bundle.feeds) {
+        try {
+          const res = await fetch(f.url, { headers: { "User-Agent": "SideHuddleBot/1.0" } });
+          if (!res.ok) continue;
+          const xml = await res.text();
+          allEntries.push(...parseRss(xml, f.label || hostname(f.url)));
+        } catch (err) {
+          summary.errors.push(`feed ${f.url}: ${(err as Error).message}`);
+        }
+      }
+      summary.entries_fetched += allEntries.length;
+
+      // Filter out already-seen entries.
+      if (allEntries.length === 0) continue;
+      const ids = allEntries.map((e) => e.entryId);
+      const { data: seen } = await supabase
+        .from("seen_news")
+        .select("entry_id")
+        .eq("team_id", bundle.teamId)
+        .in("entry_id", ids);
+      const seenIds = new Set((seen ?? []).map((r: any) => r.entry_id));
+      const fresh = allEntries.filter((e) => !seenIds.has(e.entryId));
+      summary.entries_new += fresh.length;
+      if (fresh.length === 0) continue;
+
+      const scored = await scoreEntries(supabase, bundle.teamId, fresh, {
+        team: bundle.teamName,
+        tokens: bundle.tokens,
+        threshold: NEWS_SCORE_THRESHOLD,
+      });
+
+      // Record EVERY fresh entry in seen_news (whether or not it survived) so we
+      // don't reconsider them next poll.  Mark emitted=false unless we publish.
+      await supabase.from("seen_news").upsert(
+        fresh.map((e) => {
+          const match = scored.find((s) => s.entryId === e.entryId);
+          return {
+            team_id: bundle.teamId,
+            entry_id: e.entryId,
+            title: e.title,
+            link: e.link,
+            source: e.source,
+            published_at: e.publishedAt,
+            category: match?.category ?? "DROP",
+            llm_score: match?.llmScore ?? null,
+            cluster_size: match?.clusterSize ?? 1,
+            emitted: false,
+          };
+        }),
+        { onConflict: "team_id,entry_id", ignoreDuplicates: true },
+      );
+
+      if (scored.length === 0) continue;
+      summary.entries_survived += scored.length;
+
+      // Emit up to `remaining` survivors, breaking allowed +1.
+      let budget = remaining;
+      for (const s of scored) {
+        if (budget <= 0 && !s.breaking) break;
+        if (budget <= 0 && s.breaking) budget = 1; // breaking can take one over the cap
+
+        try {
+          const persona = defaultPersona(bundle.teamName);
+          const voice = await generateMessage({
+            mode: "news",
+            team: bundle.teamName,
+            persona,
+            facts: {
+              headline: s.title,
+              source: s.source,
+              category: s.category,
+              link: s.link,
+              breaking: s.breaking,
+            },
+          });
+
+          // Mark this entry emitted FIRST to avoid double-publish.
+          const { data: marked, error: markErr } = await supabase
+            .from("seen_news")
+            .update({ emitted: true, emitted_at: new Date().toISOString() })
+            .eq("team_id", bundle.teamId)
+            .eq("entry_id", s.entryId)
+            .eq("emitted", false)
+            .select("id")
+            .single();
+          if (markErr || !marked) continue;
+
+          const result = await publish({
+            client: supabase,
+            teamId: bundle.teamId,
+            teamName: bundle.teamName,
+            mode: "news",
+            sourceRef: marked.id,
+            message: voice.message,
+            facts: {
+              headline: s.title,
+              source: s.source,
+              category: s.category,
+              link: s.link,
+              breaking: s.breaking,
+            },
+            newsLink: s.link,
+          });
+          summary.posts += result.huddleIdsPosted.length;
+          budget -= 1;
+        } catch (err) {
+          summary.errors.push(`emit ${s.entryId}: ${(err as Error).message}`);
+        }
+      }
+    }
+  } catch (err) {
+    summary.errors.push(`fatal: ${(err as Error).message}`);
+  }
+
+  return new Response(JSON.stringify(summary), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+});
+
+function hostname(url: string): string {
+  try { return new URL(url).hostname; } catch { return "feed"; }
+}
+
+async function isQuietForTeam(
+  provider: ReturnType<typeof getProvider>,
+  bundle: { teamName: string; league: string; tokens: string[] },
+): Promise<boolean> {
+  if (!bundle.league) return false;
+  let games;
+  try {
+    games = await provider.liveGames(bundle.league as League);
+  } catch {
+    return false;
+  }
+  const matchedGame = games.find((g) => {
+    const home = g.home.fullName.toLowerCase();
+    const away = g.away.fullName.toLowerCase();
+    const homeShort = g.home.name.toLowerCase();
+    const awayShort = g.away.name.toLowerCase();
+    return bundle.tokens.some((tok) => {
+      const t = tok.toLowerCase();
+      return home.includes(t) || away.includes(t) || homeShort.includes(t) || awayShort.includes(t);
+    });
+  });
+  if (!matchedGame) return false;
+  return isNewsQuietWindow({
+    nextGameStartIso: matchedGame.startTime,
+    nextGameStatus: matchedGame.status,
+  });
+}
