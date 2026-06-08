@@ -267,40 +267,47 @@ export function ManageTeamsScreen() {
             return (
               <Pressable
                 key={team.id}
-                className={cn(
-                  "w-[22%] items-center gap-1.5 rounded-xl border p-2 active:opacity-80",
-                  selected
-                    ? "border-primary bg-primary/10"
-                    : "border-border bg-card",
-                )}
                 onPress={() => toggleTeam(team.id)}
+                hitSlop={6}
+                style={({ pressed }) => ({
+                  opacity: pressed ? 0.7 : 1,
+                  width: "22%",
+                  alignItems: "center",
+                  padding: 8,
+                  borderRadius: 12,
+                  borderWidth: selected ? 2 : 1,
+                  borderColor: selected ? colors.primary : colors.border,
+                  backgroundColor: selected ? colors.primary + "22" : colors.card,
+                })}
               >
-                <View className="relative">
-                  <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted">
-                    {team.logoUrl ? (
-                      <Image
-                        source={{ uri: team.logoUrl }}
-                        className="h-full w-full"
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <Text className="text-xs font-bold text-muted-foreground">
-                        {team.name.slice(0, 2)}
-                      </Text>
+                <View pointerEvents="none" className="items-center gap-1.5">
+                  <View className="relative">
+                    <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted">
+                      {team.logoUrl ? (
+                        <Image
+                          source={{ uri: team.logoUrl }}
+                          className="h-full w-full"
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <Text className="text-xs font-bold text-muted-foreground">
+                          {team.name.slice(0, 2)}
+                        </Text>
+                      )}
+                    </View>
+                    {selected && (
+                      <View className="absolute -right-1 -top-1 h-5 w-5 items-center justify-center rounded-full bg-primary">
+                        <Check color={colors.primaryForeground} size={12} />
+                      </View>
                     )}
                   </View>
-                  {selected && (
-                    <View className="absolute -right-1 -top-1 h-5 w-5 items-center justify-center rounded-full bg-primary">
-                      <Check color={colors.primaryForeground} size={12} />
-                    </View>
-                  )}
+                  <Text
+                    className="text-center text-xs text-foreground"
+                    numberOfLines={1}
+                  >
+                    {team.name}
+                  </Text>
                 </View>
-                <Text
-                  className="text-center text-xs text-foreground"
-                  numberOfLines={1}
-                >
-                  {team.name}
-                </Text>
               </Pressable>
             );
           })}

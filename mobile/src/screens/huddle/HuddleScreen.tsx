@@ -12,6 +12,7 @@ import {
   Pressable,
   Share,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -33,7 +34,7 @@ import { MessageInput } from "@/components/huddle/MessageInput";
 import { PredictionCard } from "@/components/predictions/PredictionCard";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { DEV_ROOMS_STORAGE_KEY, getDevTeamById } from "@/config/devData";
-import { Bell, Lock, LogOut, MoreVertical, Pin, UserPlus } from "lucide-react-native";
+import { LogOut, MoreVertical, Pin, UserPlus, User } from "lucide-react-native";
 import { useTeamMarkets } from "@/hooks/useTeamMarkets";
 import {
   useLiveGameContext,
@@ -938,6 +939,62 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
     });
   };
 
+  const handlePin = () => {
+    if (pinnedMessage) {
+      setPinnedMessage("");
+      return;
+    }
+    // iOS supports Alert.prompt; Android falls back to a fixed default.
+    if (Platform.OS === "ios" && (Alert as any).prompt) {
+      (Alert as any).prompt(
+        "Pin a message",
+        "Pin a short note to the top of this room.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Pin",
+            onPress: (value?: string) => {
+              const text = (value ?? "").trim();
+              if (text) setPinnedMessage(text);
+            },
+          },
+        ],
+        "plain-text",
+      );
+    } else {
+      setPinnedMessage("Room is open. Check in while you watch.");
+    }
+  };
+
+  const handleCloseRoom = () => {
+    Alert.alert(
+      isOwnerRoom ? "Close room?" : "Leave room?",
+      isOwnerRoom
+        ? "This will remove the room from your device. People you invited will lose access."
+        : "You can rejoin later from your invite link.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: isOwnerRoom ? "Close" : "Leave",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const stored = await AsyncStorage.getItem(DEV_ROOMS_STORAGE_KEY);
+              if (stored) {
+                const rooms = JSON.parse(stored) as DevStoredRoom[];
+                const next = rooms.filter((r) => r.id !== huddleId);
+                await AsyncStorage.setItem(DEV_ROOMS_STORAGE_KEY, JSON.stringify(next));
+              }
+              await AsyncStorage.removeItem(`${DEV_ROOM_MESSAGES_STORAGE_PREFIX}-${huddleId}`);
+            } finally {
+              navigation.goBack();
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const opponentLabel =
     game?.homeTeamName || game?.awayTeamName
       ? `${game.awayTeamCity ?? ""} ${game.awayTeamName ?? "Away"} at ${game.homeTeamCity ?? ""} ${game.homeTeamName ?? "Home"}`
@@ -1037,7 +1094,7 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
             ) : null}
             {availableRooms.map((room) => {
               const active = room.id === huddleId;
-              const roomVisual = getDevTeamVisual(room.teamId ?? undefined, room.name);
+              const avatarCount = Math.min(3, Math.max(1, room.memberCount ?? 1));
               return (
                 <Pressable
                   key={room.id}
@@ -1054,7 +1111,18 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
                     }
                   }}
                 >
-                  <TeamTile visual={roomVisual} size={22} />
+                  {/* Up to 3 overlapping avatar placeholders */}
+                  <View className="flex-row" style={{ paddingRight: (avatarCount - 1) * 6 }}>
+                    {Array.from({ length: avatarCount }).map((_, i) => (
+                      <View
+                        key={i}
+                        className="h-5 w-5 items-center justify-center rounded-full border border-card bg-muted-foreground/40"
+                        style={{ marginLeft: i === 0 ? 0 : -6 }}
+                      >
+                        <User color={colors.background} size={10} />
+                      </View>
+                    ))}
+                  </View>
                   <Text
                     className={
                       active
@@ -1124,32 +1192,14 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
                 <Pressable
                   className="flex-row items-center gap-3 border-b border-border px-4 py-3"
                   onPress={() => {
-                    setPinnedMessage((value) =>
-                      value ? "" : `${teamLabel} room is open. Check in while you watch.`,
-                    );
                     setShowMenu(false);
+                    handlePin();
                   }}
                 >
                   <Pin color={colors.primary} size={18} />
                   <Text className="font-bold text-primary">
                     {pinnedMessage ? "Unpin message" : "Pin a message"}
                   </Text>
-                </Pressable>
-              ) : null}
-              {isOwnerRoom ? (
-                <Pressable
-                  className="flex-row items-center gap-3 border-b border-border px-4 py-3"
-                  onPress={() => setShowMenu(false)}
-                >
-                  <Lock color={colors.primary} size={18} />
-                  <View className="flex-1">
-                    <Text className="font-bold text-foreground">
-                      {roomAccessMode === "private" ? "Approval room" : "Invite room"}
-                    </Text>
-                    <Text className="mt-0.5 text-xs text-muted-foreground">
-                      Approval membership is an Official Huddle unlock.
-                    </Text>
-                  </View>
                 </Pressable>
               ) : null}
               <Pressable
@@ -1163,15 +1213,11 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
                 <Text className="font-bold text-foreground">Invite people</Text>
               </Pressable>
               <Pressable
-                className="flex-row items-center gap-3 border-b border-border px-4 py-3"
-                onPress={() => setShowMenu(false)}
-              >
-                <Bell color={colors.mutedForeground} size={18} />
-                <Text className="font-bold text-foreground">Notifications</Text>
-              </Pressable>
-              <Pressable
                 className="flex-row items-center gap-3 px-4 py-3"
-                onPress={() => setShowMenu(false)}
+                onPress={() => {
+                  setShowMenu(false);
+                  handleCloseRoom();
+                }}
               >
                 <LogOut color={colors.destructive} size={18} />
                 <Text className="font-bold text-destructive">
