@@ -380,24 +380,10 @@ export function HuddleScreen() {
               ) : null
             }
             ListEmptyComponent={
-              <View className="flex-1 justify-end px-4 py-6">
-                <View className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
-                  <Text className="text-lg font-black text-foreground">
-                    Room is open.
-                  </Text>
-                  <Text className="mt-2 text-sm leading-5 text-muted-foreground">
-                    I’ll bring score context, game props, and useful room prompts when this team is active. Ask @coach for news, injuries, live score, or what prop the room should argue about.
-                  </Text>
-                  {teamMarkets && teamMarkets.length > 0 ? (
-                    <Text className="mt-3 text-sm font-bold text-primary">
-                      {teamMarkets.length} game prop{teamMarkets.length === 1 ? "" : "s"} loaded.
-                    </Text>
-                  ) : (
-                    <Text className="mt-3 text-sm font-bold text-muted-foreground">
-                      No game props loaded for this team window yet.
-                    </Text>
-                  )}
-                </View>
+              <View className="flex-1 items-center justify-center px-4 py-12">
+                <Text className="text-sm text-muted-foreground">
+                  Say something to start the room.
+                </Text>
               </View>
             }
             contentContainerStyle={{ paddingVertical: 8 }}
@@ -838,31 +824,9 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
   const teamVisual = getDevTeamVisual(roomTeamId, teamLabel);
   const botName = roomTeam ? getBotName(teamLabel) : "Room Bot";
   const isOwnerRoom = roomRelationship === "owner";
-  const [pinnedMessage, setPinnedMessage] = useState(
-    isOwnerRoom ? "Room is open. Check in while you watch." : "",
-  );
-  const buildSeedMessages = useCallback(
-    (): DevRoomMessage[] => [
-      {
-        id: "bot-1",
-        author: botName,
-        content:
-          `This room is open. I'll bring score context, news, prediction market prompts, and game-thread questions when live data is available.`,
-        isBot: true,
-        botType: "news",
-        time: "now",
-      },
-      {
-        id: "bot-2",
-        author: botName,
-        content: `${teamLabel} next result`,
-        isBot: true,
-        botType: "prediction",
-        time: "now",
-      },
-    ],
-    [botName, teamLabel],
-  );
+  const [pinnedMessage, setPinnedMessage] = useState("");
+  // Rooms start empty. The real bot fills in content; no fake seed messages.
+  const buildSeedMessages = useCallback((): DevRoomMessage[] => [], []);
   const [messages, setMessages] = useState<DevRoomMessage[]>(() => buildSeedMessages());
 
   useEffect(() => {
@@ -885,10 +849,7 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
       setShowMenu(false);
       setShowPeople(false);
       setReplyTo(null);
-      const nextRelationship = room?.relationship === "joined" ? "joined" : "owner";
-      setPinnedMessage(
-        nextRelationship === "owner" ? "Room is open. Check in while you watch." : "",
-      );
+      setPinnedMessage("");
 
       const storedMessages = await AsyncStorage.getItem(
         `${DEV_ROOM_MESSAGES_STORAGE_PREFIX}-${huddleId}`,
@@ -896,7 +857,7 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
       const savedMessages = storedMessages
         ? (JSON.parse(storedMessages) as DevRoomMessage[])
         : [];
-      setMessages([...buildSeedMessages(), ...savedMessages]);
+      setMessages(savedMessages);
     };
 
     loadDevRoom();
@@ -1019,7 +980,7 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
               </View>
               <View className="mt-1 flex-row items-center gap-2">
                 <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-                  {present.length} member{present.length === 1 ? "" : "s"}
+                  Members · {present.length} in room
                 </Text>
               </View>
             </Pressable>
@@ -1033,55 +994,30 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
           </View>
 
           {game && gameState !== "none" ? (
-            <View className="mt-3 rounded-xl border border-border bg-muted px-3 py-3">
-              <View className="mb-2 flex-row items-center gap-2">
+            <View className="mt-2 rounded-lg border border-border bg-muted px-3 py-1.5">
+              <View className="flex-row items-center gap-1.5">
                 {gameState === "live" ? (
-                  <View className="h-2 w-2 rounded-full bg-destructive" />
+                  <View className="h-1.5 w-1.5 rounded-full bg-destructive" />
                 ) : null}
                 <Text
                   className={
                     gameState === "live"
-                      ? "text-xs font-black uppercase tracking-widest text-destructive"
-                      : "text-xs font-black uppercase tracking-widest text-primary"
+                      ? "text-[10px] font-black uppercase tracking-wider text-destructive"
+                      : "text-[10px] font-black uppercase tracking-wider text-primary"
                   }
                 >
                   {gameLabel}
                 </Text>
-                <Text className="text-xs text-muted-foreground">
+                <Text className="text-[10px] text-muted-foreground" numberOfLines={1}>
                   {game ? formatGameClock(game) : ""}
                 </Text>
               </View>
-              <View className="flex-row items-center justify-between">
-                <View className="flex-1">
-                  <Text className="text-xs font-bold text-foreground" numberOfLines={1}>
-                    {game?.awayTeamName ?? "Away"}
-                  </Text>
-                  <Text className="mt-1 text-2xl font-black text-foreground">
-                    {game?.awayScore ?? "-"}
-                  </Text>
-                </View>
-                <View className="rounded-full border border-border px-3 py-1">
-                  <Text
-                    className={
-                      gameState === "live"
-                        ? "text-xs font-black text-destructive"
-                        : "text-xs font-black text-muted-foreground"
-                    }
-                  >
-                    {game ? formatGameClock(game) : gameLabel}
-                  </Text>
-                </View>
-                <View className="flex-1 items-end">
-                  <Text className="text-xs font-bold text-muted-foreground" numberOfLines={1}>
-                    {game?.homeTeamName ?? "Home"}
-                  </Text>
-                  <Text className="mt-1 text-2xl font-black text-muted-foreground">
-                    {game?.homeScore ?? "-"}
-                  </Text>
-                </View>
-              </View>
-              <Text className="mt-2 text-xs text-muted-foreground" numberOfLines={1}>
-                {opponentLabel}
+              <Text className="mt-0.5 text-sm font-bold text-foreground" numberOfLines={1}>
+                <Text>{game?.awayTeamName ?? "Away"} </Text>
+                <Text className="font-black">{game?.awayScore ?? "-"}</Text>
+                <Text className="text-muted-foreground"> · </Text>
+                <Text>{game?.homeTeamName ?? "Home"} </Text>
+                <Text className="font-black">{game?.homeScore ?? "-"}</Text>
               </Text>
             </View>
           ) : null}
