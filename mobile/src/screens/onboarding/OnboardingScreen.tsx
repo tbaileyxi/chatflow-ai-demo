@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Alert, Image, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
@@ -69,9 +69,11 @@ export function OnboardingScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <View className="flex-1 justify-between px-6 pb-8 pt-8">
         <View>
-          <View className="h-14 w-14 items-center justify-center rounded-2xl bg-primary">
-            <Text className="text-xl font-black text-primary-foreground">SH</Text>
-          </View>
+          <Image
+            source={require("../../../assets/sh-logo-master.png")}
+            style={{ width: 56, height: 56, borderRadius: 14 }}
+            resizeMode="cover"
+          />
 
           <View className="mt-14 min-h-[360px] justify-center">
             <View className="h-16 w-16 items-center justify-center rounded-2xl bg-primary/15">

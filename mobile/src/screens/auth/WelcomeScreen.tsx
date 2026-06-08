@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View, Text, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -13,11 +13,11 @@ export function WelcomeScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <View className="flex-1 items-center justify-center px-8">
-        <View className="mb-5 h-24 w-24 items-center justify-center rounded-full border border-primary/40 bg-primary">
-          <Text className="text-3xl font-black text-primary-foreground">
-            SH
-          </Text>
-        </View>
+        <Image
+          source={require("../../../assets/sh-logo-master.png")}
+          style={{ width: 112, height: 112, marginBottom: 20, borderRadius: 56 }}
+          resizeMode="cover"
+        />
 
         <Text className="text-center text-3xl font-black uppercase tracking-wider text-primary">
           Side Huddle Sports

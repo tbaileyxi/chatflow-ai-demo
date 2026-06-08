@@ -89,6 +89,11 @@ export interface InGameFacts {
   runText?: string;                   // e.g. "12-0 run"
   leadChangeNote?: string;            // e.g. "Knicks first lead of the half"
   excitementScore: number;
+  // Optional surgical enrichment from Highlightly. Voice may reference these
+  // fields verbatim or skip them. Strings only — pre-formatted in code so the
+  // model never computes percentages or makes up numbers.
+  teamShootingLine?: string;          // e.g. "15/38 3PT (39%)"
+  rivalShootingLine?: string;
 }
 
 export interface NewsFacts {

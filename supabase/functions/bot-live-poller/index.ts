@@ -16,6 +16,7 @@ import { getProvider } from "../_shared/bot/providers.ts";
 import { gateEvents } from "../_shared/bot/brain.ts";
 import { generateMessage, defaultPersona } from "../_shared/bot/voice.ts";
 import { publish } from "../_shared/bot/publisher.ts";
+import { findNbaMatchForTeam, fetchGameStats, pickSide, shootingLine } from "../_shared/bot/highlightly.ts";
 import type { Game, League } from "../_shared/bot/types.ts";
 
 const corsHeaders = {
@@ -99,13 +100,40 @@ serve(async (req) => {
           if (TEST_MODE && TEST_TEAM && !dbTeam.name.toLowerCase().includes(TEST_TEAM)) continue;
 
           try {
+            // Surgical Highlightly enrichment (basketball only for now).
+            // Cheap: 1 match lookup + 1 stats call per poll cycle per team, both
+            // in-process cached. Skips silently when key/data missing.
+            const enrichedFacts = { ...g.facts };
+            if (league === "NBA" && Deno.env.get("HIGHLIGHTLY_API_KEY")) {
+              try {
+                const hgMatch = await findNbaMatchForTeam(dbTeam.name);
+                if (hgMatch) {
+                  const stats = await fetchGameStats(hgMatch.id);
+                  if (stats) {
+                    const teamSide = pickSide(stats, dbTeam.name);
+                    const rivalSide = pickSide(stats, g.rival.fullName || g.rival.name);
+                    if (teamSide) {
+                      const line = shootingLine(teamSide);
+                      if (line) enrichedFacts.teamShootingLine = line;
+                    }
+                    if (rivalSide) {
+                      const line = shootingLine(rivalSide);
+                      if (line) enrichedFacts.rivalShootingLine = line;
+                    }
+                  }
+                }
+              } catch (err) {
+                console.warn("[live-poller] enrichment skipped", err);
+              }
+            }
+
             const persona = defaultPersona(dbTeam.name);
             const voice = await generateMessage({
               mode: "in_game",
               team: dbTeam.name,
               rival: g.rival.fullName || g.rival.name,
               persona,
-              facts: g.facts,
+              facts: enrichedFacts,
             });
 
             // Record the play BEFORE publish to prevent double-emit if publish fails partway.
