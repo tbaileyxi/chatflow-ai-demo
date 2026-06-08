@@ -122,9 +122,40 @@ serve(async (req) => {
         .eq("team_id", bundle.teamId)
         .in("entry_id", ids);
       const seenIds = new Set((seen ?? []).map((r: any) => r.entry_id));
-      const fresh = allEntries.filter((e) => !seenIds.has(e.entryId));
-      summary.entries_new += fresh.length;
-      if (fresh.length === 0) continue;
+      const freshAll = allEntries.filter((e) => !seenIds.has(e.entryId));
+      summary.entries_new += freshAll.length;
+      if (freshAll.length === 0) continue;
+
+      // Cap per-run scoring work. Daily cap is small (5), so even on a large
+      // backlog we only need to consider the freshest slice. Anything older
+      // we still record in seen_news below so we skip it next run.
+      const SCORE_BATCH = Number(Deno.env.get("NEWS_SCORE_BATCH") || 25);
+      const sorted = [...freshAll].sort((a, b) => {
+        const ta = a.publishedAt ? Date.parse(a.publishedAt) : 0;
+        const tb = b.publishedAt ? Date.parse(b.publishedAt) : 0;
+        return tb - ta;
+      });
+      const fresh = sorted.slice(0, SCORE_BATCH);
+      const deferred = sorted.slice(SCORE_BATCH);
+
+      // Record deferred entries up front as "seen" so we don't rescore them.
+      if (deferred.length > 0) {
+        await supabase.from("seen_news").upsert(
+          deferred.map((e) => ({
+            team_id: bundle.teamId,
+            entry_id: e.entryId,
+            title: e.title,
+            link: e.link,
+            source: e.source,
+            published_at: e.publishedAt,
+            category: "DROP",                       // not scored this run
+            llm_score: null,
+            cluster_size: 1,
+            emitted: false,
+          })),
+          { onConflict: "team_id,entry_id", ignoreDuplicates: true },
+        );
+      }
 
       const scored = await scoreEntries(supabase, bundle.teamId, fresh, {
         team: bundle.teamName,
