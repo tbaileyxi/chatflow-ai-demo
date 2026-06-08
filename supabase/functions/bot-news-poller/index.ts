@@ -84,20 +84,29 @@ serve(async (req) => {
       byTeam.set(t.id, bundle);
     }
 
-    for (const bundle of byTeam.values()) {
-      if (TEST_MODE && TEST_TEAM && !bundle.teamName.toLowerCase().includes(TEST_TEAM)) continue;
+    // Process N teams per invocation in PARALLEL.  Serial was hitting the
+    // 150s timeout; even with TEAMS_PER_RUN=12 each team took ~50s.
+    // Parallel across 6 teams = ~50s total. Order is randomized so no
+    // team gets starved.
+    const TEAMS_PER_RUN = Number(Deno.env.get("NEWS_TEAMS_PER_RUN") || 6);
+    const allBundles = Array.from(byTeam.values());
+    const candidates = TEST_MODE && TEST_TEAM
+      ? allBundles.filter((b) => b.teamName.toLowerCase().includes(TEST_TEAM))
+      : shuffle(allBundles).slice(0, TEAMS_PER_RUN);
+
+    await Promise.all(candidates.map(async (bundle) => {
       summary.teams_considered += 1;
 
       // Quiet window check: ask provider for upcoming/live games for this team's league.
       const quiet = await isQuietForTeam(provider, bundle);
       if (quiet) {
         summary.teams_quieted += 1;
-        continue;
+        return;
       }
 
       // Daily cap check up front — cheap.
       const remaining = await newsCapRemaining(supabase, bundle.teamId);
-      if (remaining <= 0) continue;
+      if (remaining <= 0) return;
 
       // Fetch every feed.
       const allEntries: ReturnType<typeof parseRss> = [];
@@ -114,7 +123,7 @@ serve(async (req) => {
       summary.entries_fetched += allEntries.length;
 
       // Filter out already-seen entries.
-      if (allEntries.length === 0) continue;
+      if (allEntries.length === 0) return;
       const ids = allEntries.map((e) => e.entryId);
       const { data: seen } = await supabase
         .from("seen_news")
@@ -124,7 +133,7 @@ serve(async (req) => {
       const seenIds = new Set((seen ?? []).map((r: any) => r.entry_id));
       const freshAll = allEntries.filter((e) => !seenIds.has(e.entryId));
       summary.entries_new += freshAll.length;
-      if (freshAll.length === 0) continue;
+      if (freshAll.length === 0) return;
 
       // Cap per-run scoring work. Daily cap is small (5), so even on a large
       // backlog we only need to consider the freshest slice. Anything older
@@ -184,7 +193,7 @@ serve(async (req) => {
         { onConflict: "team_id,entry_id", ignoreDuplicates: true },
       );
 
-      if (scored.length === 0) continue;
+      if (scored.length === 0) return;
       summary.entries_survived += scored.length;
 
       // Emit up to `remaining` survivors, breaking allowed +1.
@@ -241,7 +250,7 @@ serve(async (req) => {
           summary.errors.push(`emit ${s.entryId}: ${(err as Error).message}`);
         }
       }
-    }
+    }));
   } catch (err) {
     summary.errors.push(`fatal: ${(err as Error).message}`);
   }
@@ -250,6 +259,15 @@ serve(async (req) => {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 function hostname(url: string): string {
   try { return new URL(url).hostname; } catch { return "feed"; }

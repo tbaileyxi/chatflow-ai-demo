@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   Pressable,
+  TouchableOpacity,
   Image,
   ScrollView,
   Alert,
@@ -89,9 +90,15 @@ export function ManageTeamsScreen() {
   const [filterLeague, setFilterLeague] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Initialize selections from current follows
+  // Initialize selections from current follows EXACTLY ONCE so the user's
+  // taps aren't clobbered by a re-fetch.  Prior bug: useEffect re-ran on
+  // every new query reference and reset selectedTeams to followedIds,
+  // making it look like taps did nothing.
+  const initializedRef = useRef(false);
   useEffect(() => {
+    if (initializedRef.current) return;
     if (followedIds) {
+      initializedRef.current = true;
       setSelectedTeams(new Set(followedIds));
     }
   }, [followedIds]);
@@ -265,50 +272,47 @@ export function ManageTeamsScreen() {
           {filtered?.map((team) => {
             const selected = selectedTeams.has(team.id);
             return (
-              <Pressable
+              <TouchableOpacity
                 key={team.id}
+                activeOpacity={0.7}
                 onPress={() => toggleTeam(team.id)}
-                hitSlop={6}
-                style={({ pressed }) => ({
-                  opacity: pressed ? 0.7 : 1,
+                style={{
                   width: "22%",
                   alignItems: "center",
                   padding: 8,
                   borderRadius: 12,
                   borderWidth: selected ? 2 : 1,
                   borderColor: selected ? colors.primary : colors.border,
-                  backgroundColor: selected ? colors.primary + "22" : colors.card,
-                })}
+                  backgroundColor: selected ? colors.primary + "33" : colors.card,
+                }}
               >
-                <View pointerEvents="none" className="items-center gap-1.5">
-                  <View className="relative">
-                    <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted">
-                      {team.logoUrl ? (
-                        <Image
-                          source={{ uri: team.logoUrl }}
-                          className="h-full w-full"
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <Text className="text-xs font-bold text-muted-foreground">
-                          {team.name.slice(0, 2)}
-                        </Text>
-                      )}
-                    </View>
-                    {selected && (
-                      <View className="absolute -right-1 -top-1 h-5 w-5 items-center justify-center rounded-full bg-primary">
-                        <Check color={colors.primaryForeground} size={12} />
-                      </View>
+                <View className="relative">
+                  <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted">
+                    {team.logoUrl ? (
+                      <Image
+                        source={{ uri: team.logoUrl }}
+                        className="h-full w-full"
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Text className="text-xs font-bold text-muted-foreground">
+                        {team.name.slice(0, 2)}
+                      </Text>
                     )}
                   </View>
-                  <Text
-                    className="text-center text-xs text-foreground"
-                    numberOfLines={1}
-                  >
-                    {team.name}
-                  </Text>
+                  {selected && (
+                    <View className="absolute -right-1 -top-1 h-5 w-5 items-center justify-center rounded-full bg-primary">
+                      <Check color={colors.primaryForeground} size={12} />
+                    </View>
+                  )}
                 </View>
-              </Pressable>
+                <Text
+                  className="mt-1.5 text-center text-xs text-foreground"
+                  numberOfLines={1}
+                >
+                  {team.name}
+                </Text>
+              </TouchableOpacity>
             );
           })}
         </ScrollView>

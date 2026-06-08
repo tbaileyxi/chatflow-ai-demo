@@ -835,16 +835,15 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
       const storedRooms = await AsyncStorage.getItem(DEV_ROOMS_STORAGE_KEY);
       const rooms = storedRooms ? (JSON.parse(storedRooms) as DevStoredRoom[]) : [];
       const room = rooms.find((item: any) => item.id === huddleId);
-      // Only suggest jumping to OTHER rooms attached to the same team as this one.
-      // Prevents pills from showing irrelevant teams across all rooms.
+      // Prefer same-team rooms; fall back to all other rooms if the user has
+      // no other rooms attached to the current room's team. Empty pills =
+      // bad UX (esp. for users testing single rooms).
       const currentTeamId = room?.teamId ?? null;
-      setAvailableRooms(
-        rooms.filter(
-          (item) =>
-            item.id !== huddleId &&
-            (currentTeamId ? item.teamId === currentTeamId : true),
-        ),
-      );
+      const others = rooms.filter((item) => item.id !== huddleId);
+      const sameTeam = currentTeamId
+        ? others.filter((item) => item.teamId === currentTeamId)
+        : [];
+      setAvailableRooms(sameTeam.length > 0 ? sameTeam : others);
       if (room?.name) {
         setRoomTitle(room.name);
         setRoomRelationship(room.relationship === "joined" ? "joined" : "owner");
