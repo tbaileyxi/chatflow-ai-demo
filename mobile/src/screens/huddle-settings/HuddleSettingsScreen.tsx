@@ -20,6 +20,7 @@ import {
 } from "lucide-react-native";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { useHuddleDetails } from "@/hooks/useHuddleDetails";
 import { useHuddleMembers } from "@/hooks/useHuddleMembers";
 import { Button } from "@/components/ui/button";
@@ -53,10 +54,13 @@ export function HuddleSettingsScreen() {
   const [admins, setAdmins] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
 
+  const { data: profile } = useProfile();
   const isOwner = user?.id === huddle?.ownerId;
   const isRoomAdmin =
     isOwner || admins.some((admin) => admin.user_id === user?.id);
-  const isOfficial = !!huddle?.isVerified;
+  const isOfficial = !!huddle?.isOfficial;
+  const isAppAdmin = !!profile?.isAppAdmin;
+  const canFlipOfficial = isAppAdmin && isOwner;
 
   useEffect(() => {
     if (huddle?.bio) setBio(huddle.bio);
@@ -149,6 +153,36 @@ export function HuddleSettingsScreen() {
       return;
     }
     Alert.alert("Saved", "Official Huddle details updated.");
+  };
+
+  const flipOfficialStatus = async (next: "active" | "inactive") => {
+    if (!canFlipOfficial) return;
+    const verb = next === "active" ? "Make Official" : "Revert to regular";
+    Alert.alert(
+      verb,
+      next === "active"
+        ? "Flip this huddle to Official? Unlocks website, multiple admins, approval mode, and listing in search."
+        : "Revert this huddle to a regular room? Locks the Official-only features.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: next === "active" ? "Make Official" : "Revert",
+          onPress: async () => {
+            const { error } = await (supabase.rpc as any)(
+              "flip_huddle_official_status",
+              { p_huddle_id: huddleId, p_status: next },
+            );
+            if (error) {
+              Alert.alert("Could not change status", error.message);
+              return;
+            }
+            queryClient.invalidateQueries({ queryKey: ["huddle-details", huddleId] });
+            queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
+            queryClient.invalidateQueries({ queryKey: ["huddle-search"] });
+          },
+        },
+      ],
+    );
   };
 
   const togglePrivate = async () => {
@@ -385,6 +419,57 @@ export function HuddleSettingsScreen() {
           </CardContent>
         </Card>
 
+        {/* Official Huddle upgrade — owner only.
+            Today only app admins can flip. Real paywall lands separately. */}
+        {isOwner && !isOfficial && (
+          <Card>
+            <CardContent className="gap-2 pt-4">
+              <View className="flex-row items-center gap-2">
+                <ShieldCheck color={colors.primary} size={18} />
+                <Text className="text-base font-black text-foreground">
+                  Make this an Official Huddle
+                </Text>
+              </View>
+              <Text className="text-sm leading-5 text-muted-foreground">
+                Unlocks website link, multiple admins, approval-only membership,
+                and a listing on the team page. $29/mo.
+              </Text>
+              {canFlipOfficial ? (
+                <Button onPress={() => flipOfficialStatus("active")}>
+                  Make Official (admin override)
+                </Button>
+              ) : (
+                <Button disabled>
+                  Subscribe to unlock — coming soon
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Official status badge + revert option for app admin */}
+        {isOwner && isOfficial && canFlipOfficial && (
+          <Card>
+            <CardContent className="gap-2 pt-4">
+              <View className="flex-row items-center gap-2">
+                <ShieldCheck color={colors.primary} size={18} />
+                <Text className="text-sm font-bold text-foreground">
+                  Official status: {huddle.officialStatus}
+                </Text>
+              </View>
+              {!huddle.isOfficialTeam && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onPress={() => flipOfficialStatus("inactive")}
+                >
+                  Revert to regular (admin)
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {isRoomAdmin && (
           <Card>
             <CardHeader>
@@ -614,11 +699,11 @@ export function HuddleSettingsScreen() {
                 url: inviteLink,
               });
             } catch (err) {
+              const msg =
+                (err as any)?.message ??
+                (typeof err === "string" ? err : "Unknown error");
               console.warn("[invite] create code failed", err);
-              Alert.alert(
-                "Couldn't create invite link",
-                "Try again in a moment.",
-              );
+              Alert.alert("Couldn't create invite link", msg);
             }
           }}
         >

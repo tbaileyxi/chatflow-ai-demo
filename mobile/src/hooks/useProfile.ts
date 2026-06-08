@@ -11,6 +11,7 @@ export type UserProfile = {
   bio: string | null;
   avatarUrl: string | null;
   onboardingCompleted: boolean;
+  isAppAdmin: boolean;
 };
 
 export function useProfile() {
@@ -48,16 +49,19 @@ export function useProfile() {
           onboardingCompleted:
             localProfile.onboardingCompleted ??
             Boolean(user.user_metadata?.onboarding_completed),
+          isAppAdmin: false,
         };
       }
 
-      const { data, error } = await supabase
+      // is_app_admin added in 20260608000005 — types lag. Cast through any.
+      const { data: rawData, error } = await (supabase as any)
         .from("profiles")
         .select(
-          "user_id, display_name, username, phone_number, bio, avatar_url, onboarding_completed",
+          "user_id, display_name, username, phone_number, bio, avatar_url, onboarding_completed, is_app_admin",
         )
         .eq("user_id", user.id)
         .maybeSingle();
+      const data: any = rawData;
 
       if (error || !data) return null;
 
@@ -69,6 +73,7 @@ export function useProfile() {
         bio: data.bio,
         avatarUrl: data.avatar_url,
         onboardingCompleted: data.onboarding_completed ?? false,
+        isAppAdmin: data.is_app_admin ?? false,
       };
     },
   });

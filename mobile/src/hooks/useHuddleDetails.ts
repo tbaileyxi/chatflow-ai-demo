@@ -8,8 +8,11 @@ export type HuddleDetails = {
   bio: string | null;
   memberCount: number;
   isPrivate: boolean;
-  isOfficialTeam: boolean;
-  isVerified: boolean;
+  isOfficialTeam: boolean;          // system-created auto team huddle
+  isVerified: boolean;              // blue-check
+  officialStatus: "inactive" | "active" | "past_due" | "cancelled";
+  isOfficial: boolean;              // computed: official_status='active' OR is_official_team_huddle
+  websiteUrl: string | null;
   ownerId: string;
   teamId: string;
   teamName: string | null;
@@ -24,17 +27,21 @@ export function useHuddleDetails(huddleId: string) {
   return useQuery({
     queryKey: ["huddle-details", huddleId],
     queryFn: async (): Promise<HuddleDetails | null> => {
-      const { data, error } = await supabase
+      // Selecting columns added by recent migrations (official_status, website_url)
+      // — generated types lag. Cast the response after the call.
+      const { data: rawData, error } = await (supabase as any)
         .from("huddles")
         .select(
           `
           id, name, bio, member_count, is_private,
-          is_official_team_huddle, is_verified, owner_id, team_id,
+          is_official_team_huddle, is_verified, official_status, website_url,
+          owner_id, team_id,
           teams!team_id (name, city, logo_url)
         `,
         )
         .eq("id", huddleId)
         .single();
+      const data: any = rawData;
 
       if (error || !data) return null;
 
@@ -50,14 +57,20 @@ export function useHuddleDetails(huddleId: string) {
       }
 
       const team = (data as any).teams;
+      const officialStatus = ((data as any).official_status ??
+        "inactive") as HuddleDetails["officialStatus"];
+      const isOfficialTeam = (data as any).is_official_team_huddle ?? false;
       return {
         id: data.id,
         name: data.name,
         bio: data.bio,
         memberCount: data.member_count ?? 0,
         isPrivate: data.is_private ?? false,
-        isOfficialTeam: data.is_official_team_huddle ?? false,
+        isOfficialTeam,
         isVerified: data.is_verified ?? false,
+        officialStatus,
+        isOfficial: officialStatus === "active" || isOfficialTeam,
+        websiteUrl: (data as any).website_url ?? null,
         ownerId: data.owner_id,
         teamId: data.team_id,
         teamName: team?.name ?? null,

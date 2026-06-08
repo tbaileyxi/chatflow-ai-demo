@@ -207,19 +207,36 @@ export function CreateSideHuddleScreen() {
       queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
       queryClient.invalidateQueries({ queryKey: ["game-night-communities"] });
 
-      // Offer to share invite link
-      const inviteLink = `sidehuddle://join-huddle/${data.id}`;
+      // Offer to share invite link via the real RPC-minted code.
       Alert.alert(
         "Crew Room Created!",
-        "Invite your friends to join.",
+        "Pull friends in?",
         [
           {
             text: "Share Invite",
-            onPress: () => {
-              Share.share({
-                message: `Join my crew room "${name.trim()}" on Side Huddle Sports! ${inviteLink}`,
-                url: inviteLink,
-              }).finally(() => {
+            onPress: async () => {
+              try {
+                const { data: inviteRow, error: inviteErr } = await (
+                  supabase.rpc as any
+                )("create_room_invite_code", { p_huddle_id: data.id });
+                if (inviteErr) throw inviteErr;
+                const row = Array.isArray(inviteRow)
+                  ? inviteRow[0]
+                  : inviteRow;
+                const code: string | undefined = row?.invite_code;
+                const inviteLink = code
+                  ? `sidehuddle://i/${code}`
+                  : `sidehuddle://huddle/${data.id}`;
+                await Share.share({
+                  message: `Jump in: ${name.trim()} on Side Huddle. ${inviteLink}`,
+                  url: inviteLink,
+                });
+              } catch (err) {
+                const msg =
+                  (err as any)?.message ??
+                  (typeof err === "string" ? err : "Unknown error");
+                Alert.alert("Couldn't generate invite link", msg);
+              } finally {
                 navigation.reset({
                   index: 1,
                   routes: [
@@ -227,7 +244,7 @@ export function CreateSideHuddleScreen() {
                     { name: "Huddle" as any, params: { huddleId: data.id } },
                   ],
                 });
-              });
+              }
             },
           },
           {

@@ -131,6 +131,15 @@ export function useSuperHuddleFeed() {
         Date.now() - 24 * 60 * 60 * 1000,
       ).toISOString();
 
+      // Bot v2 emits into huddle_messages on the official team huddles, not
+      // into `posts`. We pull recent bot messages from those rooms so the
+      // Teams feed reflects what the bot is actually saying.
+      const officialHuddlesPromise = supabase
+        .from("huddles")
+        .select("id, team_id, teams!team_id (name, city, logo_url)")
+        .in("team_id", teamIds)
+        .eq("is_official_team_huddle", true);
+
       const [postsResult, trendingResult, marketsResult] = await Promise.all([
         // 1. Regular posts
         supabase
@@ -245,8 +254,49 @@ export function useSuperHuddleFeed() {
         };
       });
 
+      // Pull bot v2 messages from each team's official huddle.
+      const { data: officialHuddles } = await officialHuddlesPromise;
+      const officialHuddleIds = (officialHuddles ?? []).map((h) => h.id);
+      const huddleTeamMap = new Map<string, any>();
+      for (const h of officialHuddles ?? []) {
+        huddleTeamMap.set(h.id, h);
+      }
+
+      let botPosts: SuperHuddlePost[] = [];
+      if (officialHuddleIds.length > 0) {
+        const { data: botMessages } = await supabase
+          .from("huddle_messages")
+          .select(
+            "id, huddle_id, content, message_type, created_at, is_bot_message",
+          )
+          .in("huddle_id", officialHuddleIds)
+          .eq("is_bot_message", true)
+          .gte("created_at", twentyFourHoursAgo)
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        botPosts = (botMessages ?? []).map((m) => {
+          const huddle = huddleTeamMap.get(m.huddle_id) as any;
+          const team = huddle?.teams;
+          return {
+            id: `bot-${m.id}`,
+            content: m.content ?? "",
+            mediaUrl: null,
+            teamName: team?.name ?? "",
+            teamCity: team?.city ?? "",
+            teamLogoUrl: team?.logo_url ?? null,
+            teamId: huddle?.team_id ?? "",
+            createdAt: m.created_at,
+            embedUrl: null,
+            authorUsername: "bot",
+            source: "post" as const,
+            cardType: m.message_type === "news" ? ("x" as const) : ("bot" as const),
+          };
+        });
+      }
+
       // Merge and sort by date, newest first
-      return [...posts, ...trending, ...markets].sort(
+      return [...posts, ...trending, ...markets, ...botPosts].sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
