@@ -1,8 +1,16 @@
+import { useEffect, useRef } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNotifications } from "@/hooks/useNotifications";
+import {
+  useInviteHandler,
+  takePendingInvite,
+  consumeInvite,
+} from "@/hooks/useInviteHandler";
 import { colors } from "@/theme/colors";
 import { TabNavigator } from "./TabNavigator";
 import { AuthNavigator } from "./AuthNavigator";
@@ -25,8 +33,28 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export function RootNavigator() {
   const { user, loading } = useAuth();
   const { data: profile, isLoading: profileLoading } = useProfile();
-  useNotifications(); // Register push token and handle notification taps
+  useNotifications();         // push tokens + notification taps
+  useInviteHandler();         // parses sidehuddle://i/{code} URLs, defers if unauthed
   const isDevTestUser = user?.app_metadata?.provider === "dev_test";
+
+  // After the user is fully authed AND past onboarding, drain any pending invite
+  // (stored when an unauthenticated user tapped a deep link).
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const consumedRef = useRef(false);
+  useEffect(() => {
+    if (!user) return;
+    if (loading || profileLoading) return;
+    const onboarded = isDevTestUser
+      ? user.user_metadata?.onboarding_completed === true
+      : profile?.onboardingCompleted === true;
+    if (!onboarded || consumedRef.current) return;
+    consumedRef.current = true;
+    (async () => {
+      const code = await takePendingInvite();
+      if (code) await consumeInvite(code, navigation);
+    })();
+  }, [user, loading, profileLoading, profile, isDevTestUser, navigation]);
 
   if (loading || (user && !isDevTestUser && profileLoading)) {
     return (

@@ -589,21 +589,43 @@ export function HuddleSettingsScreen() {
           </CardContent>
         </Card>
 
-        {/* Invite Link */}
+        {/* Invite / Pull-in link.
+            Label changes based on huddle privacy:
+              - open    → "Pull friends in" (one-tap join, no approval)
+              - private → "Invite people"   (acceptance grants access)
+        */}
         <Button
           variant="outline"
-          onPress={() => {
-            const inviteLink = `sidehuddle://join-huddle/${huddleId}`;
-            Share.share({
-              message: `Join my Side Huddle "${huddle.name}" on Side Huddle Sports! ${inviteLink}`,
-              url: inviteLink,
-            });
+          onPress={async () => {
+            try {
+              // RPC added in 20260608000001 — types not regenerated yet.
+              const { data, error } = await (supabase.rpc as any)(
+                "create_room_invite_code",
+                { p_huddle_id: huddleId },
+              );
+              if (error) throw error;
+              const row = Array.isArray(data) ? data[0] : data;
+              const code: string | undefined = row?.invite_code;
+              if (!code) throw new Error("no code returned");
+              const inviteLink = `sidehuddle://i/${code}`;
+              const verb = huddle.isPrivate ? "Invite" : "Jump in";
+              await Share.share({
+                message: `${verb}: ${huddle.name} on Side Huddle. ${inviteLink}`,
+                url: inviteLink,
+              });
+            } catch (err) {
+              console.warn("[invite] create code failed", err);
+              Alert.alert(
+                "Couldn't create invite link",
+                "Try again in a moment.",
+              );
+            }
           }}
         >
           <View className="flex-row items-center gap-2">
             <Share2 color={colors.primary} size={16} />
             <Text className="text-sm font-medium text-primary">
-              Invite Friends
+              {huddle.isPrivate ? "Invite people" : "Pull friends in"}
             </Text>
           </View>
         </Button>
