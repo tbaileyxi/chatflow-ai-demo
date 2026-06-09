@@ -17,6 +17,12 @@ import { supabase } from "@/integrations/supabase/client";
 // is available (will start with `appl_...`).
 const REVENUECAT_IOS_KEY = "test_sypoGZMOgpTBVecrxIjvRMSWmJg";
 
+// Apple's TestFlight + App Store builds force-quit the app when a test_
+// RevenueCat key is detected (RC's built-in safety). Skip configure entirely
+// for test_ keys so the rest of the app stays usable while we wait on the
+// production appl_ key.
+const SDK_ENABLED = !REVENUECAT_IOS_KEY.startsWith("test_");
+
 // Entitlement that gates Official Huddle features.  Must match what you
 // configure in RevenueCat dashboard.
 export const OFFICIAL_HUDDLE_ENTITLEMENT = "official_huddle_access";
@@ -28,6 +34,11 @@ let configured = false;
 
 export async function ensureConfigured(userId?: string) {
   if (Platform.OS !== "ios") return;
+  if (!SDK_ENABLED) {
+    // Test key in a production-distributed build would force-quit via RC's
+    // safety. Stay silent until we swap to the production key.
+    return;
+  }
   if (!configured) {
     Purchases.setLogLevel(LOG_LEVEL.WARN);
     Purchases.configure({
@@ -60,6 +71,7 @@ export async function logOut() {
 // ---- Offering / package helpers ----
 
 export async function fetchOfficialHuddlePackage(): Promise<PurchasesPackage | null> {
+  if (!SDK_ENABLED) return null;
   await ensureConfigured();
   try {
     const offerings = await Purchases.getOfferings();
