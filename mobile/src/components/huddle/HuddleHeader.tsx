@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
-import { View, Text, Image, Pressable, Animated } from "react-native";
+import { View, Text, Image, Pressable, Animated, Linking } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
   ChevronLeft,
   Users,
   MoreVertical,
   ShieldCheck,
+  ExternalLink,
 } from "lucide-react-native";
 import { colors } from "@/theme/colors";
 import {
@@ -14,6 +15,8 @@ import {
   type GameContext,
   type GameState,
 } from "@/hooks/useLiveGameContext";
+import { useTeamSponsor, logSponsorTap } from "@/hooks/useTeamSponsor";
+import { useAuth } from "@/hooks/useAuth";
 import type { HuddleDetails } from "@/hooks/useHuddleDetails";
 
 type Props = {
@@ -169,13 +172,25 @@ function GameBar({
 
 export function HuddleHeader({ huddle }: Props) {
   const navigation = useNavigation();
+  const { user } = useAuth();
   const { data: game } = useLiveGameContext(huddle.teamId);
+  const { data: sponsor } = useTeamSponsor(huddle.teamId);
 
   const displayName = huddle.isOfficialTeam
     ? huddle.teamName ?? huddle.name
     : huddle.name;
 
   const gameState = getGameState(game ?? null);
+
+  const handleSponsorTap = () => {
+    if (!sponsor) return;
+    logSponsorTap({
+      sponsorId: sponsor.id,
+      huddleId: huddle.id,
+      userId: user?.id ?? null,
+    });
+    Linking.openURL(sponsor.linkUrl).catch(() => {});
+  };
 
   return (
     <View className="border-b border-border bg-background">
@@ -238,6 +253,24 @@ export function HuddleHeader({ huddle }: Props) {
           <MoreVertical color={colors.mutedForeground} size={22} />
         </Pressable>
       </View>
+
+      {/* Sponsor whisper line — Tier 1 ("Presented by X").
+          Always visible on huddles attached to a team. Renders a placeholder
+          when no active sponsor is set so the slot is discoverable. */}
+      {huddle.teamId ? (
+        <Pressable
+          onPress={sponsor ? handleSponsorTap : undefined}
+          className="flex-row items-center justify-center gap-1.5 border-t border-border bg-muted/40 px-4 py-1"
+          hitSlop={4}
+        >
+          <Text className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            {sponsor ? `Presented by ${sponsor.brandName}` : "Your Brand Here"}
+          </Text>
+          {sponsor ? (
+            <ExternalLink color={colors.mutedForeground} size={10} />
+          ) : null}
+        </Pressable>
+      ) : null}
 
       {/* Game day bar */}
       {game && gameState !== "none" && (
