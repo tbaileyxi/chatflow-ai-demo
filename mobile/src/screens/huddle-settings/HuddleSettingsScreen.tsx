@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useHuddleDetails } from "@/hooks/useHuddleDetails";
 import { useHuddleMembers } from "@/hooks/useHuddleMembers";
+import { OfficialUpgradePaywall } from "@/components/paywall/OfficialUpgradePaywall";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,6 +54,7 @@ export function HuddleSettingsScreen() {
   const [joinRequests, setJoinRequests] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const { data: profile } = useProfile();
   const isOwner = user?.id === huddle?.ownerId;
@@ -439,8 +441,8 @@ export function HuddleSettingsScreen() {
                   Make Official (admin override)
                 </Button>
               ) : (
-                <Button disabled>
-                  Subscribe to unlock — coming soon
+                <Button onPress={() => setShowPaywall(true)}>
+                  Make Official — $29/mo
                 </Button>
               )}
             </CardContent>
@@ -751,6 +753,17 @@ export function HuddleSettingsScreen() {
           )}
         </View>
       </ScreenWrapper>
+
+      <OfficialUpgradePaywall
+        visible={showPaywall}
+        huddleId={huddleId}
+        huddleName={huddle.name}
+        onClose={() => setShowPaywall(false)}
+        onActivated={() => {
+          queryClient.invalidateQueries({ queryKey: ["huddle-details", huddleId] });
+          queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
+        }}
+      />
     </SafeAreaView>
   );
 }

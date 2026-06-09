@@ -11,6 +11,7 @@ import {
   takePendingInvite,
   consumeInvite,
 } from "@/hooks/useInviteHandler";
+import { ensureConfigured as configureRevenueCat } from "@/lib/revenuecat";
 import { colors } from "@/theme/colors";
 import { TabNavigator } from "./TabNavigator";
 import { AuthNavigator } from "./AuthNavigator";
@@ -35,6 +36,11 @@ export function RootNavigator() {
   const { data: profile, isLoading: profileLoading } = useProfile();
   useNotifications();         // push tokens + notification taps
   useInviteHandler();         // parses sidehuddle://i/{code} URLs, defers if unauthed
+
+  // Re-identify RevenueCat once the auth user is known so receipts attribute correctly.
+  useEffect(() => {
+    if (user?.id) configureRevenueCat(user.id).catch(() => {});
+  }, [user?.id]);
   const isDevTestUser = user?.app_metadata?.provider === "dev_test";
 
   // After the user is fully authed AND past onboarding, drain any pending invite

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   NavigationContainer,
   DefaultTheme,
@@ -8,6 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
 import { AuthProvider } from "@/hooks/useAuth";
+import { ensureConfigured as configureRevenueCat } from "@/lib/revenuecat";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
 
@@ -59,6 +60,14 @@ const linking: LinkingOptions<RootStackParamList> = {
 };
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
+  // Configure RevenueCat once at startup.  Anonymous identity initially;
+  // useAuth-side hook re-identifies once the user is known.
+  useEffect(() => {
+    configureRevenueCat().catch((err) =>
+      console.warn("[providers] RevenueCat init failed", err),
+    );
+  }, []);
+
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
