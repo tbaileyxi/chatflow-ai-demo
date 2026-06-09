@@ -126,7 +126,7 @@ export function OfficialUpgradePaywall({
                 "Custom website link",
                 "Add multiple admins",
                 "Private / approval-only membership",
-                "Listed on the team page",
+                "Get discovered in Search",
               ].map((line) => (
                 <View key={line} className="flex-row items-center gap-2">
                   <Text className="text-base text-primary">✓</Text>

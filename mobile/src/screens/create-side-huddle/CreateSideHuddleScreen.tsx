@@ -313,7 +313,6 @@ export function CreateSideHuddleScreen() {
               }
               value={name}
               onChangeText={setName}
-              autoFocus
               maxLength={50}
             />
           </View>

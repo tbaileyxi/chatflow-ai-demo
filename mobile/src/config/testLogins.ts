@@ -10,35 +10,10 @@ export type TestLogin = {
   username: string;
 };
 
-export const TEST_LOGINS: TestLogin[] = [
-  {
-    userId: "00000000-0000-4000-8000-000000000101",
-    phone: "+15555550101",
-    displayPhone: "(555) 555-0101",
-    email: "tester-101@sidehuddle.test",
-    password: "SideHuddleTest!101",
-    displayName: "Ty Bailey",
-    username: "tybailey",
-  },
-  {
-    userId: "00000000-0000-4000-8000-000000000102",
-    phone: "+15555550102",
-    displayPhone: "(555) 555-0102",
-    email: "tester-102@sidehuddle.test",
-    password: "SideHuddleTest!102",
-    displayName: "Account Two",
-    username: "accounttwo",
-  },
-  {
-    userId: "00000000-0000-4000-8000-000000000103",
-    phone: "+15555550103",
-    displayPhone: "(555) 555-0103",
-    email: "tester-103@sidehuddle.test",
-    password: "SideHuddleTest!103",
-    displayName: "Account Three",
-    username: "accountthree",
-  },
-];
+// Dev-test phone shortcuts retired. All sign-ins now go through Supabase
+// email OTP. Keeping the array empty preserves any imports without breaking
+// the build; getTestLogin() always returns undefined.
+export const TEST_LOGINS: TestLogin[] = [];
 
 export function formatPhoneForAuth(countryCode: string, phone: string): string {
   const digits = phone.replace(/\D/g, "");

@@ -31,16 +31,17 @@ function cardMeta(post: SuperHuddlePost) {
     };
   }
   if (post.cardType === "x") {
+    // News card: lead with the team name, not "@bot" or "@coach".
     return {
       label: "News",
-      title: post.authorUsername ? `@${post.authorUsername}` : "News",
+      title: post.teamName ? `${post.teamName} News` : "News",
       icon: Zap,
       color: "#EAB308",
     };
   }
   return {
     label: "Score",
-    title: `${post.teamName || "Team"} Bot`,
+    title: post.teamName || "Bot",
     icon: Radio,
     color: colors.primary,
   };
@@ -132,7 +133,7 @@ function BotFeedCard({ post }: { post: SuperHuddlePost }) {
       </View>
 
       <Text className="mt-3 text-base leading-6 text-foreground">
-        {post.content}
+        {post.content.replace(/https?:\/\/[^\s)]+/g, "").trim()}
       </Text>
 
       {tweetId ? (

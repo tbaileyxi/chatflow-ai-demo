@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from "react";
-import { View, Text, Image, Pressable, Share, Modal, Dimensions } from "react-native";
+import { View, Text, Image, Pressable, Share, Modal, Dimensions, Linking } from "react-native";
 import { MessageSquareReply, Share2, X, Play, Pause, Mic } from "lucide-react-native";
 import { Audio } from "expo-av";
 import { cn } from "@/lib/utils";
@@ -100,6 +100,17 @@ type Props = {
   replyTo?: { displayName: string; content: string } | null;
   isReply?: boolean;
 };
+
+// Strip raw URLs from bot message content so legacy posts (server fix now puts
+// link in embed_code, but older messages have full URL inline) don't render
+// as 10 lines of garbage. Keeps the message clean; embed_code becomes the
+// 'Read source' chip below.
+function cleanBotContent(text: string): string {
+  return text
+    .replace(/https?:\/\/[^\s)]+/g, "")
+    .replace(/\s+\n\s*$/g, "")
+    .trim();
+}
 
 function formatTime(dateStr: string): string {
   const date = new Date(dateStr);
@@ -257,7 +268,24 @@ export function ChatMessage({
                         : "bg-muted",
                   )}
                 >
-                  <Text className="text-base text-foreground">{message.content}</Text>
+                  <Text className="text-base text-foreground">
+                    {message.isBotMessage
+                      ? cleanBotContent(message.content)
+                      : message.content}
+                  </Text>
+                  {/* News-style 'Read source' chip when an embed URL exists.
+                      Keeps the raw URL off the bubble while preserving access. */}
+                  {message.isBotMessage && message.embedCode &&
+                   /^https?:\/\//.test(message.embedCode) ? (
+                    <Pressable
+                      onPress={() => Linking.openURL(message.embedCode!).catch(() => {})}
+                      className="mt-2 flex-row items-center gap-1.5 self-start rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1"
+                    >
+                      <Text className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                        Read source
+                      </Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               )}
 

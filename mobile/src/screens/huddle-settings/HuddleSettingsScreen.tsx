@@ -24,6 +24,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useHuddleDetails } from "@/hooks/useHuddleDetails";
 import { useHuddleMembers } from "@/hooks/useHuddleMembers";
 import { OfficialUpgradePaywall } from "@/components/paywall/OfficialUpgradePaywall";
+import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,6 +56,7 @@ export function HuddleSettingsScreen() {
   const [admins, setAdmins] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showPullIn, setShowPullIn] = useState(false);
 
   const { data: profile } = useProfile();
   const isOwner = user?.id === huddle?.ownerId;
@@ -434,7 +436,7 @@ export function HuddleSettingsScreen() {
               </View>
               <Text className="text-sm leading-5 text-muted-foreground">
                 Unlocks website link, multiple admins, approval-only membership,
-                and a listing on the team page. $29/mo.
+                and discoverability in Search. $29/mo.
               </Text>
               {canFlipOfficial ? (
                 <Button onPress={() => flipOfficialStatus("active")}>
@@ -489,13 +491,16 @@ export function HuddleSettingsScreen() {
                 placeholder="Tell people who runs this huddle and what it is for..."
                 maxLength={280}
               />
-              <Input
-                label="Website"
-                value={websiteUrl}
-                onChangeText={setWebsiteUrl}
-                placeholder="https://..."
-                autoCapitalize="none"
-              />
+              {/* Website URL is an Official-only perk */}
+              {isOfficial ? (
+                <Input
+                  label="Website"
+                  value={websiteUrl}
+                  onChangeText={setWebsiteUrl}
+                  placeholder="https://..."
+                  autoCapitalize="none"
+                />
+              ) : null}
               <View className="flex-row items-center justify-between">
                 <Text className="text-xs text-muted-foreground">
                   {bio.length}/280
@@ -676,16 +681,21 @@ export function HuddleSettingsScreen() {
           </CardContent>
         </Card>
 
-        {/* Invite / Pull-in link.
-            Label changes based on huddle privacy:
-              - open    → "Pull friends in" (one-tap join, no approval)
-              - private → "Invite people"   (acceptance grants access)
-        */}
+        {/* Pull friends in — opens in-app picker for people already on Side Huddle. */}
+        <Button variant="outline" onPress={() => setShowPullIn(true)}>
+          <View className="flex-row items-center gap-2">
+            <Share2 color={colors.primary} size={16} />
+            <Text className="text-sm font-medium text-primary">
+              {huddle.isPrivate ? "Invite people on Side Huddle" : "Pull friends in"}
+            </Text>
+          </View>
+        </Button>
+
+        {/* External share — for people NOT on the app yet. */}
         <Button
           variant="outline"
           onPress={async () => {
             try {
-              // RPC added in 20260608000001 — types not regenerated yet.
               const { data, error } = await (supabase.rpc as any)(
                 "create_room_invite_code",
                 { p_huddle_id: huddleId },
@@ -695,24 +705,22 @@ export function HuddleSettingsScreen() {
               const code: string | undefined = row?.invite_code;
               if (!code) throw new Error("no code returned");
               const inviteLink = `sidehuddle://i/${code}`;
-              const verb = huddle.isPrivate ? "Invite" : "Jump in";
               await Share.share({
-                message: `${verb}: ${huddle.name} on Side Huddle. ${inviteLink}`,
+                message: `Jump into ${huddle.name} on Side Huddle. ${inviteLink}`,
                 url: inviteLink,
               });
             } catch (err) {
               const msg =
                 (err as any)?.message ??
                 (typeof err === "string" ? err : "Unknown error");
-              console.warn("[invite] create code failed", err);
               Alert.alert("Couldn't create invite link", msg);
             }
           }}
         >
           <View className="flex-row items-center gap-2">
-            <Share2 color={colors.primary} size={16} />
-            <Text className="text-sm font-medium text-primary">
-              {huddle.isPrivate ? "Invite people" : "Pull friends in"}
+            <Share2 color={colors.mutedForeground} size={16} />
+            <Text className="text-sm font-medium text-muted-foreground">
+              Share link (text / iMessage / anywhere)
             </Text>
           </View>
         </Button>
@@ -763,6 +771,13 @@ export function HuddleSettingsScreen() {
           queryClient.invalidateQueries({ queryKey: ["huddle-details", huddleId] });
           queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
         }}
+      />
+
+      <PullInFriendsModal
+        visible={showPullIn}
+        huddleId={huddleId}
+        huddleName={huddle.name}
+        onClose={() => setShowPullIn(false)}
       />
     </SafeAreaView>
   );

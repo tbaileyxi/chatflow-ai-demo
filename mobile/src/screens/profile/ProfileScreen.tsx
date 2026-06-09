@@ -142,10 +142,13 @@ export function ProfileScreen() {
     try {
       const asset = result.assets[0];
 
-      if (user.app_metadata?.provider === "dev_test") {
-        const { error } = await updateProfile({ avatar_url: asset.uri });
-        if (error) throw error;
-        return;
+      // Use the auth session's CURRENT user id (not the React context user) so
+      // it matches what RLS sees in auth.uid().  Avoids "new row violates RLS"
+      // when the React user object is stale.
+      const { data: authData } = await supabase.auth.getUser();
+      const authUid = authData?.user?.id;
+      if (!authUid) {
+        throw new Error("Not signed in. Sign out and back in to upload.");
       }
 
       const base64 = await FileSystem.readAsStringAsync(asset.uri, {
@@ -153,7 +156,7 @@ export function ProfileScreen() {
       });
       const ext = asset.uri.split(".").pop()?.toLowerCase()?.split("?")[0] ?? "jpg";
       const contentType = ext === "png" ? "image/png" : "image/jpeg";
-      const path = `${user.id}/avatar-${Date.now()}.${ext === "png" ? "png" : "jpg"}`;
+      const path = `${authUid}/avatar-${Date.now()}.${ext === "png" ? "png" : "jpg"}`;
 
       const { error: uploadError } = await supabase.storage
         .from("avatars")
