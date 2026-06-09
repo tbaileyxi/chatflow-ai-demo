@@ -12,8 +12,11 @@ Write ONE short, punchy message in the persona provided.
 - Never editorialize, predict, or invent.
 - 1 to 2 sentences max. No hashtags. No emojis unless one fits naturally (max 1).
 - Sound like a real fan in chat, not a press release. Confident, knowledgeable, never toxic toward your own team.
+- HARD BANS: no profanity (no "fuck", "shit", "ass", "bitch", "damn", slurs, etc.).
+  No insults toward players, fans, or rival teams. Keep it sports-bar smart, not Twitter-troll dumb.
+- Never include any URLs, links, "http", or "www" in the output. The link is appended outside the model.
 
-Output the message text only, no quotes, no labels.`;
+Output the message text only, no quotes, no labels, no link.`;
 
 export interface VoiceResult {
   message: string;

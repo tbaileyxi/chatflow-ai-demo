@@ -50,15 +50,18 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
 
   // 3. Build the final message body. News mode appends the link OUTSIDE the model
   //    so the model can never miscopy it (mouth-not-eyes).
-  const body = input.newsLink && mode === "news"
-    ? `${input.message}\n${input.newsLink}`
-    : input.message;
+  // Body is JUST the message — no raw URL appended. The link goes in
+  // a structured embed_url field for the chat UI to render as a preview
+  // card (B11). Until then, the link is invisible to users but logged.
+  const body = input.message;
+  const embedUrl = input.newsLink && mode === "news" ? input.newsLink : null;
 
   // 4. Fan-out insert into huddle_messages.
   const rows = huddles.map((h) => ({
     huddle_id: h.id,
     user_id: systemUserId,
     content: body,
+    embed_code: embedUrl,
     is_bot_message: true,
     message_type: mode === "in_game" ? "live_play" : "news",
   }));

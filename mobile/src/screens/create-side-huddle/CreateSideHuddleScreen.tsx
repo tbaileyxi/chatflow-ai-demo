@@ -321,7 +321,7 @@ export function CreateSideHuddleScreen() {
             <View className="flex-row items-center gap-1.5">
               <Lock color={colors.mutedForeground} size={12} />
               <Text className="text-xs text-muted-foreground">
-                Hidden room. Anyone with your link can enter.
+                Invite-only. Share the link to bring people in.
               </Text>
             </View>
             <Text className="text-xs text-muted-foreground">

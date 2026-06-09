@@ -143,8 +143,8 @@ function YourRoomsSection() {
             </Text>
           </View>
           <Text className="mt-2 text-sm leading-5 text-muted-foreground">
-            Create a room anchored to a team. It will stay hidden unless you
-            share the link or a friend sees you inside.
+            Create a room anchored to a team. Invite-only — only people with
+            your link can join.
           </Text>
         </View>
       )}
