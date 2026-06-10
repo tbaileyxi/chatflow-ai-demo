@@ -7,23 +7,31 @@ const corsHeaders = {
 
 const KALSHI_BASE = 'https://api.elections.kalshi.com/trade-api/v2';
 
-// Series tickers for sports markets on Kalshi
+// Series tickers for sports markets on Kalshi.
+// Include both season/championship series AND per-game series so the feed
+// shows day-of and in-game cards (not just Feb 2027 futures).
 const SPORT_SERIES: Record<string, string[]> = {
-  NBA: ['KXNBA'],
-  NFL: ['KXNFL'],
-  NHL: ['KXNHL'],
-  NCAA: ['KXNCAAB', 'KXNCAAF'],
-  MLB: ['KXMLB'],
+  NBA: ['KXNBA', 'KXNBAGAME'],
+  NFL: ['KXNFL', 'KXNFLGAME'],
+  NHL: ['KXNHL', 'KXNHLGAME'],
+  NCAA: ['KXNCAAB', 'KXNCAAF', 'KXNCAABGAME', 'KXNCAAFGAME'],
+  MLB: ['KXMLB', 'KXMLBGAME'],
 };
 
 // Map series ticker -> our DB league value
 const TICKER_TO_LEAGUE: Record<string, string> = {
   KXNBA: 'NBA',
+  KXNBAGAME: 'NBA',
   KXNFL: 'NFL',
+  KXNFLGAME: 'NFL',
   KXNHL: 'NHL',
+  KXNHLGAME: 'NHL',
   KXNCAAB: 'NCAA',
+  KXNCAABGAME: 'NCAA',
   KXNCAAF: 'NCAA',
+  KXNCAAFGAME: 'NCAA',
   KXMLB: 'MLB',
+  KXMLBGAME: 'MLB',
 };
 
 interface TeamRecord {
@@ -255,9 +263,11 @@ Deno.serve(async (req) => {
     let totalSkipped = 0;
     const matchLog: Array<{ ticker: string; title: string; league: string; matchType: string; matchedTeam: string | null }> = [];
 
-    // Only sync markets closing within the next 48 hours
+    // Sync markets closing within the next 7 days so the Teams feed can show
+    // upcoming game markets (was 48h which was too aggressive — most games
+    // are scheduled 2-7 days out).
     const now = new Date();
-    const cutoff48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    const cutoff48h = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     // Fetch open markets for each sport
     for (const [_league, seriesTickers] of Object.entries(SPORT_SERIES)) {
