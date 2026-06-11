@@ -324,12 +324,101 @@ serve(async (req) => {
       }
     }
 
-    console.log(`✅ ESPN sync done: ${liveEventsUpdated} live_events, ${gamesEnriched} games enriched`);
+    // ──────────────────────────────────────────────────────
+    // Part 4: INSERT games we don't have yet.
+    // The games table was originally seeded by a now-dead Odds API ingestion.
+    // Parts 1–3 only UPDATE existing rows, so once that ingestion stopped the
+    // table went permanently stale and no current games (or scores) existed
+    // for any league. This pass creates rows for today's ESPN games that
+    // involve a team in our DB, keyed on odds_game_id = "espn-{sport}-{id}"
+    // so reruns are idempotent. Parts 2–3 then keep them updated.
+    // ──────────────────────────────────────────────────────
+    const SPORT_TO_LEAGUE: Record<string, string> = {
+      nfl: 'NFL', ncaaf: 'NCAAF', nba: 'NBA', ncaab: 'NCAAB', nhl: 'NHL', mlb: 'MLB',
+    };
+
+    const { data: allTeams } = await supabase
+      .from('teams')
+      .select('id, name, city, league');
+    // Exact-match index only (full "City Name" and bare "Name") with league
+    // verification — fuzzy matching across leagues misfires (Rangers, Giants…).
+    const teamIndex = new Map<string, { id: string; league: string }>();
+    for (const t of allTeams ?? []) {
+      const league = (t.league ?? '').toUpperCase();
+      const full = `${t.city ?? ''} ${t.name}`.trim().toLowerCase();
+      if (!teamIndex.has(full)) teamIndex.set(full, { id: t.id, league });
+      const short = String(t.name).toLowerCase();
+      if (!teamIndex.has(short)) teamIndex.set(short, { id: t.id, league });
+    }
+    const resolveTeamId = (league: string, displayName?: string, shortName?: string): string | null => {
+      for (const key of [displayName?.toLowerCase(), shortName?.toLowerCase()]) {
+        if (!key) continue;
+        const hit = teamIndex.get(key);
+        if (hit && hit.league === league) return hit.id;
+      }
+      return null;
+    };
+
+    let gamesInserted = 0;
+    for (const [sport, espnGames] of allEspnGames.entries()) {
+      const sportKey = SPORT_KEY_MAP[sport];
+      const league = SPORT_TO_LEAGUE[sport];
+      if (!sportKey || !league) continue;
+
+      for (const eg of espnGames) {
+        const comps = eg.competitions?.[0]?.competitors || [];
+        const home = comps.find((c) => c.homeAway === 'home');
+        const away = comps.find((c) => c.homeAway === 'away');
+        if (!home || !away) continue;
+
+        const homeTeamId = resolveTeamId(league, home.team.displayName, home.team.shortDisplayName);
+        const awayTeamId = resolveTeamId(league, away.team.displayName, away.team.shortDisplayName);
+        // Only track games at least one of our teams plays in.
+        if (!homeTeamId && !awayTeamId) continue;
+
+        const oddsGameId = `espn-${sport}-${eg.id}`;
+        const { data: existing } = await supabase
+          .from('games')
+          .select('id')
+          .eq('odds_game_id', oddsGameId)
+          .maybeSingle();
+        if (existing) continue;
+
+        const status = eg.status.type.completed
+          ? 'final'
+          : eg.status.type.state === 'in'
+            ? 'in_progress'
+            : 'scheduled';
+
+        const { error: insertErr } = await supabase.from('games').insert({
+          odds_game_id: oddsGameId,
+          sport_key: sportKey,
+          home_team_id: homeTeamId,
+          away_team_id: awayTeamId,
+          home_score: parseInt(home.score) || 0,
+          away_score: parseInt(away.score) || 0,
+          clock: eg.status.displayClock || null,
+          period: formatPeriod(eg.status.period, sport),
+          status,
+          start_time: eg.date,
+          last_synced_at: new Date().toISOString(),
+        });
+        if (!insertErr) {
+          gamesInserted++;
+          console.log(`🆕 Game inserted: ${away.team.displayName} @ ${home.team.displayName} [${status}]`);
+        } else {
+          console.error(`Error inserting game ${oddsGameId}:`, insertErr);
+        }
+      }
+    }
+
+    console.log(`✅ ESPN sync done: ${liveEventsUpdated} live_events, ${gamesEnriched} games enriched, ${gamesInserted} games inserted`);
 
     return new Response(JSON.stringify({
       success: true,
       live_events_updated: liveEventsUpdated,
       games_enriched: gamesEnriched,
+      games_inserted: gamesInserted,
       sports_fetched: sportsToFetch.length,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

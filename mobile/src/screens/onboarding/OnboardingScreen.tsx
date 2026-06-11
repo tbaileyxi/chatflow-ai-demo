@@ -11,7 +11,7 @@ import { colors } from "@/theme/colors";
 export function OnboardingScreen() {
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState(0);
-  const { user, completeDevOnboarding } = useAuth();
+  const { user } = useAuth();
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
   const slides = [
@@ -39,18 +39,14 @@ export function OnboardingScreen() {
 
     setSaving(true);
     try {
-      if (user.app_metadata?.provider === "dev_test") {
-        await completeDevOnboarding();
-      } else {
-        const { error } = await supabase
-          .from("profiles")
-          .update({ onboarding_completed: true })
-          .eq("user_id", user.id);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ onboarding_completed: true })
+        .eq("user_id", user.id);
 
-        if (error) {
-          Alert.alert("Error", "Could not finish setup. Please try again.");
-          return;
-        }
+      if (error) {
+        Alert.alert("Error", "Could not finish setup. Please try again.");
+        return;
       }
 
       await queryClient.invalidateQueries({ queryKey: ["profile"] });

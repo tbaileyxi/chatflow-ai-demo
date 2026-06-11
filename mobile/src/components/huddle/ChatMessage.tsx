@@ -99,6 +99,9 @@ type Props = {
   onReply?: () => void;
   replyTo?: { displayName: string; content: string } | null;
   isReply?: boolean;
+  // When true the message follows another from the same sender within ~5 min.
+  // Avatar + name row + tight spacing.
+  isGroupedWithPrev?: boolean;
 };
 
 // Strip raw URLs from bot message content so legacy posts (server fix now puts
@@ -136,6 +139,7 @@ export function ChatMessage({
   onReply,
   replyTo,
   isReply,
+  isGroupedWithPrev,
 }: Props) {
   const lastTapRef = useRef<number>(0);
   const [showPicker, setShowPicker] = useState(false);
@@ -196,7 +200,10 @@ export function ChatMessage({
       <Pressable onPress={handleDoubleTap} onLongPress={handleLongPress}>
         <View
           className={cn(
-            "gap-1 py-2",
+            // Tighter vertical padding when this is a follow-up message from
+            // the same sender (consecutive grouping). Full padding on the
+            // first message of a chain.
+            isGroupedWithPrev ? "pb-0.5 pt-0" : "gap-1 py-2",
             isOwnMessage ? "items-end" : "items-start",
             isReply ? "pl-14 pr-4" : "px-4",
           )}
@@ -208,28 +215,33 @@ export function ChatMessage({
               isOwnMessage && "flex-row-reverse",
             )}
           >
-            {/* Avatar */}
-            <View
-              className={cn(
-                "h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-muted",
-                message.isBotMessage && "border-2 border-primary",
-              )}
-            >
-              {message.avatarUrl ? (
-                <Image
-                  source={{ uri: message.avatarUrl }}
-                  className="h-full w-full"
-                />
-              ) : (
-                <Text className="text-sm font-bold text-muted-foreground">
-                  {initial}
-                </Text>
-              )}
-            </View>
+            {/* Avatar — hidden on consecutive same-sender messages so chains
+                look like a single voice without the repeated circle. */}
+            {isGroupedWithPrev ? (
+              <View className="h-0 w-9" />
+            ) : (
+              <View
+                className={cn(
+                  "h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-muted",
+                  message.isBotMessage && "border-2 border-primary",
+                )}
+              >
+                {message.avatarUrl ? (
+                  <Image
+                    source={{ uri: message.avatarUrl }}
+                    className="h-full w-full"
+                  />
+                ) : (
+                  <Text className="text-sm font-bold text-muted-foreground">
+                    {initial}
+                  </Text>
+                )}
+              </View>
+            )}
 
             {/* Bubble */}
             <View className={cn("max-w-[75%] gap-1", isOwnMessage && "items-end")}>
-              {!message.isBotMessage ? (
+              {!message.isBotMessage && !isGroupedWithPrev ? (
                 <View className="flex-row items-center gap-2">
                   <Text className="text-sm font-semibold text-muted-foreground">
                     {displayName}

@@ -19,6 +19,7 @@ import {
   useSuperHuddleFeed,
   type SuperHuddlePost,
 } from "@/hooks/useSuperHuddleFeed";
+import { useFollowedTeams } from "@/hooks/useFollowedTeams";
 import { colors } from "@/theme/colors";
 
 function cardMeta(post: SuperHuddlePost) {
@@ -39,9 +40,12 @@ function cardMeta(post: SuperHuddlePost) {
       color: "#EAB308",
     };
   }
+  // Generic bot card fallback — used to say "SCORE" which misled when the
+  // content was a buzz/news item. Use "Update" instead, which works for
+  // either a score recap or a contextual note.
   return {
-    label: "Score",
-    title: post.teamName || "Bot",
+    label: "Update",
+    title: post.teamName || "Update",
     icon: Radio,
     color: colors.primary,
   };
@@ -157,12 +161,24 @@ export function TeamsScreen() {
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
   const { data: posts, isLoading } = useSuperHuddleFeed();
+  const { data: followedTeams } = useFollowedTeams();
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Pills come from the user's actual follows, so teams stay visible even on
+  // days with no feed posts. Feed-derived teams fill in anything extra
+  // (e.g. legacy posts from teams the user since unfollowed).
   const teams = useMemo(() => {
     const seen = new Set<string>();
-    return (posts ?? []).flatMap((post) => {
+    const fromFollows = (followedTeams ?? []).map((t) => {
+      seen.add(t.id);
+      return {
+        id: t.id,
+        name: `${t.city} ${t.name}`.trim(),
+        logoUrl: t.logoUrl,
+      };
+    });
+    const fromPosts = (posts ?? []).flatMap((post) => {
       if (seen.has(post.teamId)) return [];
       seen.add(post.teamId);
       return [
@@ -173,7 +189,8 @@ export function TeamsScreen() {
         },
       ];
     });
-  }, [posts]);
+    return [...fromFollows, ...fromPosts];
+  }, [followedTeams, posts]);
 
   const filteredPosts = useMemo(
     () =>
@@ -248,19 +265,20 @@ export function TeamsScreen() {
             <View className="flex-row items-center gap-2">
               <Activity color={colors.primary} size={18} />
               <Text className="text-lg font-black text-foreground">
-                No team updates yet
+                {teams.length > 0 ? "Quiet day" : "No team updates yet"}
               </Text>
             </View>
             <Text className="mt-2 text-sm leading-5 text-muted-foreground">
-              Follow teams to see scores, news, and prediction markets here
-              without opening a room.
+              {teams.length > 0
+                ? "Your teams are followed — no new scores, news, or markets in the last 24 hours. Updates land here automatically."
+                : "Follow teams to see scores, news, and prediction markets here without opening a room."}
             </Text>
             <Button
               className="mt-4 self-start"
               variant="outline"
               onPress={() => navigation.navigate("ManageTeams")}
             >
-              Follow Teams
+              {teams.length > 0 ? "Manage Teams" : "Follow Teams"}
             </Button>
           </View>
         )}

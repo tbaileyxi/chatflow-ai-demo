@@ -36,6 +36,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { DEV_ROOMS_STORAGE_KEY, getDevTeamById } from "@/config/devData";
 import { LogOut, MoreVertical, Pin, UserPlus, User } from "lucide-react-native";
 import { useTeamMarkets } from "@/hooks/useTeamMarkets";
+import { useUserHuddles } from "@/hooks/useUserHuddles";
 import {
   useLiveGameContext,
   formatGameClock,
@@ -186,6 +187,20 @@ export function HuddleScreen() {
   const { data: game } = useLiveGameContext(teamId);
   const gameState = getGameState(game ?? null);
 
+  // JUMP pills — the user's other rooms, same-team rooms first. This is the
+  // core room-jumping loop; it previously existed only in the dev sandbox.
+  const navigation = useNavigation();
+  const { data: myHuddles } = useUserHuddles();
+  const jumpRooms = useMemo(() => {
+    if (!myHuddles) return [];
+    const others = myHuddles.filter((h) => h.id !== huddleId);
+    const sameTeam = teamId
+      ? others.filter((h) => h.teamName && huddle?.teamName === h.teamName)
+      : [];
+    const rest = others.filter((h) => !sameTeam.includes(h));
+    return [...sameTeam, ...rest].slice(0, 8);
+  }, [myHuddles, huddleId, teamId, huddle?.teamName]);
+
   // Reply state
   const [replyTo, setReplyTo] = useState<{
     id: string;
@@ -218,9 +233,20 @@ export function HuddleScreen() {
     [messages, hasMore],
   );
 
-  // Update last_read_at on mount and when new messages arrive
+  // Update last_read_at on mount and when new messages arrive, throttled to
+  // one write per 15s per room — during live games the bot can land a message
+  // every few seconds and each viewer was issuing an UPDATE per message.
+  const lastReadWriteRef = useRef<{ huddleId: string; ts: number }>({
+    huddleId: "",
+    ts: 0,
+  });
   useEffect(() => {
     if (!user || !huddleId) return;
+    const now = Date.now();
+    const prev = lastReadWriteRef.current;
+    // Switching rooms always writes immediately; same room throttles.
+    if (prev.huddleId === huddleId && now - prev.ts < 15_000) return;
+    lastReadWriteRef.current = { huddleId, ts: now };
     supabase
       .from("huddle_members")
       .update({ last_read_at: new Date().toISOString() })
@@ -288,6 +314,53 @@ export function HuddleScreen() {
         keyboardVerticalOffset={0}
       >
         <HuddleHeader huddle={huddle} />
+
+        {/* JUMP pills — hop between your rooms without backing out to Home. */}
+        {jumpRooms.length > 0 && (
+          <View className="border-b border-border bg-background">
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                alignItems: "center",
+                gap: 8,
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+              }}
+            >
+              <Text className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Jump
+              </Text>
+              {jumpRooms.map((room) => (
+                <Pressable
+                  key={room.id}
+                  className="flex-row items-center gap-2 rounded-full border border-border bg-muted py-1.5 pl-2 pr-3 active:opacity-80"
+                  onPress={() =>
+                    (navigation as any).navigate("Huddle", { huddleId: room.id })
+                  }
+                >
+                  {room.teamLogoUrl ? (
+                    <Image
+                      source={{ uri: room.teamLogoUrl }}
+                      className="h-5 w-5 rounded-full"
+                      resizeMode="cover"
+                    />
+                  ) : null}
+                  <Text
+                    className="text-xs font-bold text-muted-foreground"
+                    numberOfLines={1}
+                  >
+                    {room.name}
+                  </Text>
+                  {room.hasUnread ? (
+                    <View className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  ) : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         <PresenceBar users={presentUsers} entryBanner={entryBanner} />
 
         {messagesLoading ? (
@@ -301,7 +374,7 @@ export function HuddleScreen() {
                 ? item.key
                 : item.data.id
             }
-            renderItem={({ item }) => {
+            renderItem={({ item, index }) => {
               if (item.type === "separator") {
                 return (
                   <View className="my-4 flex-row items-center gap-3 px-6">
@@ -336,6 +409,23 @@ export function HuddleScreen() {
               const parentMsg = msg.replyToId ? messageMap.get(msg.replyToId) : undefined;
               const isReply = !!parentMsg;
 
+              // Consecutive grouping: hide the name + avatar row when the
+              // previous list item is a message from the same sender within
+              // the last 5 minutes. Reduces "name + time" clutter on
+              // back-to-back chatter.
+              const prev = index > 0 ? listItems[index - 1] : null;
+              const prevMsg =
+                prev && (prev as any).type === "message"
+                  ? (prev as any).data
+                  : null;
+              const isGroupedWithPrev =
+                !!prevMsg &&
+                prevMsg.userId === msg.userId &&
+                new Date(msg.createdAt).getTime() -
+                  new Date(prevMsg.createdAt).getTime() <
+                  5 * 60 * 1000 &&
+                !msg.isBotMessage;
+
               return (
                 <ChatMessage
                   message={msg}
@@ -348,6 +438,7 @@ export function HuddleScreen() {
                   }
                   onReply={() => handleReply(msg)}
                   isReply={isReply}
+                  isGroupedWithPrev={isGroupedWithPrev}
                   replyTo={
                     parentMsg
                       ? {
@@ -387,7 +478,13 @@ export function HuddleScreen() {
                 </Text>
               </View>
             }
-            contentContainerStyle={{ paddingVertical: 8 }}
+            // Anchor content to bottom (iMessage-style) so short threads
+            // don't have a giant blank between header and the latest message.
+            contentContainerStyle={{
+              paddingVertical: 8,
+              flexGrow: 1,
+              justifyContent: "flex-end",
+            }}
             keyboardShouldPersistTaps="handled"
             onScrollToIndexFailed={(info) => {
               setTimeout(() => {

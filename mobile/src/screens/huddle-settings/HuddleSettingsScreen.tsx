@@ -704,7 +704,10 @@ export function HuddleSettingsScreen() {
               const row = Array.isArray(data) ? data[0] : data;
               const code: string | undefined = row?.invite_code;
               if (!code) throw new Error("no code returned");
-              const inviteLink = `sidehuddle://i/${code}`;
+              // https link, not the custom scheme — custom-scheme URLs are
+              // dead text for anyone without the app installed. The web
+              // /i/:code page deep-links installed users back into the app.
+              const inviteLink = `https://www.sidehuddlesports.com/i/${code}`;
               await Share.share({
                 message: `Jump into ${huddle.name} on Side Huddle. ${inviteLink}`,
                 url: inviteLink,

@@ -170,8 +170,10 @@ export function PullInFriendsModal({
     >
       <Pressable className="flex-1 bg-black/60" onPress={onClose}>
         <View className="flex-1 justify-end">
-          <Pressable
-            onPress={(e) => e.stopPropagation()}
+          {/* Inner sheet is a View (not Pressable) so taps on rows reach
+              their own Pressables instead of being captured here. */}
+          <View
+            onStartShouldSetResponder={() => true}
             className="max-h-[80%] rounded-t-3xl border-t border-border bg-background px-5 pb-10 pt-4"
           >
             {/* Handle + header */}
@@ -294,7 +296,7 @@ export function PullInFriendsModal({
                   : `Pull in ${selected.size > 0 ? selected.size : ""}`}
               </Text>
             </Pressable>
-          </Pressable>
+          </View>
         </View>
       </Pressable>
     </Modal>

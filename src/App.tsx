@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { HelmetProvider } from "react-helmet-async";
 import LandingPage from "./pages/LandingPage";
 import HuddleInvitePage from "./pages/HuddleInvitePage";
+import InviteCodePage from "./pages/InviteCodePage";
 import AdminEventsPage from "./pages/AdminEventsPage";
 import PickSharePage from "./pages/PickSharePage";
 import Sponsor from "./pages/Sponsor";
@@ -19,6 +20,7 @@ const AppContent = () => (
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/h/:huddleId" element={<HuddleInvitePage />} />
+      <Route path="/i/:code" element={<InviteCodePage />} />
       <Route path="/admin/events" element={<AdminEventsPage />} />
       <Route path="/picks/:betId" element={<PickSharePage />} />
       <Route path="/sponsors" element={<Sponsor />} />

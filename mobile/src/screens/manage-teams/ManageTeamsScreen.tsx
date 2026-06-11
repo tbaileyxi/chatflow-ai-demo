@@ -146,22 +146,25 @@ export function ManageTeamsScreen() {
       const toAdd = [...selectedTeams].filter((id) => !currentFollows.has(id));
       const toRemove = [...currentFollows].filter((id) => !selectedTeams.has(id));
 
-      // Insert new follows
+      // Insert new follows. These writes used to be fire-and-forget — an RLS
+      // rejection "saved" silently and the user's follows just vanished.
       if (toAdd.length > 0) {
-        await supabase.from("user_follows").upsert(
+        const { error: addError } = await supabase.from("user_follows").upsert(
           toAdd.map((teamId) => ({ user_id: user.id, team_id: teamId })),
           { onConflict: "user_id,team_id" },
         );
+        if (addError) throw addError;
       }
 
       // Remove unfollowed teams
       if (toRemove.length > 0) {
         for (const teamId of toRemove) {
-          await supabase
+          const { error: removeError } = await supabase
             .from("user_follows")
             .delete()
             .eq("user_id", user.id)
             .eq("team_id", teamId);
+          if (removeError) throw removeError;
         }
       }
 
@@ -169,8 +172,9 @@ export function ManageTeamsScreen() {
       queryClient.invalidateQueries({ queryKey: ["super-huddle-feed"] });
       queryClient.invalidateQueries({ queryKey: ["game-night-communities"] });
       navigation.goBack();
-    } catch {
-      Alert.alert("Error", "Failed to save changes.");
+    } catch (err) {
+      const msg = (err as any)?.message ?? "Failed to save changes.";
+      Alert.alert("Couldn't save teams", msg);
     } finally {
       setSaving(false);
     }

@@ -78,27 +78,31 @@ export function useUserHuddles() {
 
       if (huddleIds.length === 0) return [];
 
-      // Get latest message per huddle
-      const { data: messages } = await supabase
-        .from("huddle_messages")
-        .select("huddle_id, content, created_at, is_bot_message")
-        .in("huddle_id", huddleIds)
-        .order("created_at", { ascending: false });
-
+      // Latest message per huddle — one limit(1) query each, in parallel.
+      // A single unbounded .in() query here used to download the entire
+      // message history of every huddle and degraded home-screen load as
+      // tables grew.
       const latestByHuddle = new Map<
         string,
         { content: string; isBot: boolean }
       >();
-      if (messages) {
-        for (const msg of messages) {
-          if (!latestByHuddle.has(msg.huddle_id)) {
-            latestByHuddle.set(msg.huddle_id, {
+      await Promise.all(
+        huddleIds.map(async (hid) => {
+          const { data: msg } = await supabase
+            .from("huddle_messages")
+            .select("content, is_bot_message")
+            .eq("huddle_id", hid)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (msg) {
+            latestByHuddle.set(hid, {
               content: msg.content,
               isBot: msg.is_bot_message ?? false,
             });
           }
-        }
-      }
+        }),
+      );
 
       return memberships
         .filter((m) => m.huddles)

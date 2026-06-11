@@ -17,11 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { colors } from "@/theme/colors";
-import {
-  formatPhoneForAuth,
-  getTestLogin,
-  TEST_LOGINS,
-} from "@/config/testLogins";
+import { formatPhoneForAuth } from "@/config/testLogins";
 import type { AuthStackParamList } from "@/navigation/types";
 
 type Nav = NativeStackNavigationProp<AuthStackParamList, "PhoneEntry">;
@@ -42,15 +38,6 @@ export function PhoneEntryScreen() {
   const [loading, setLoading] = useState(false);
   const [showCodes, setShowCodes] = useState(false);
 
-  const continueWithTestLogin = (login: (typeof TEST_LOGINS)[number]) => {
-    Keyboard.dismiss();
-    navigation.navigate("OTPVerification", {
-      phone: login.phone,
-      method: "sms",
-      isTestLogin: true,
-    });
-  };
-
   const handleSendCode = async () => {
     const trimmedEmail = email.trim().toLowerCase();
     if (authMethod === "email" && !trimmedEmail.includes("@")) {
@@ -67,17 +54,7 @@ export function PhoneEntryScreen() {
     setLoading(true);
     try {
       const fullPhone = formatPhoneForAuth(countryCode, phone);
-      const testLogin = getTestLogin(fullPhone);
       console.log("Sending OTP to:", fullPhone);
-
-      if (authMethod === "sms" && testLogin) {
-        navigation.navigate("OTPVerification", {
-          phone: testLogin.phone,
-          method: "sms",
-          isTestLogin: true,
-        });
-        return;
-      }
 
       if (authMethod === "email") {
         const { error } = await supabase.auth.signInWithOtp({
@@ -198,27 +175,6 @@ export function PhoneEntryScreen() {
 
                 {authMethod === "sms" ? (
                   <View className="gap-4">
-                    <View className="rounded-2xl border border-border bg-card p-3">
-                      <Text className="text-sm font-black uppercase tracking-widest text-primary">
-                        Quick accounts
-                      </Text>
-                      <Text className="mt-1 text-sm leading-5 text-muted-foreground">
-                        Use these until real SMS is approved. Code is 123456.
-                      </Text>
-                      <View className="mt-3 gap-2">
-                        {TEST_LOGINS.map((login) => (
-                          <Button
-                            key={login.phone}
-                            variant="outline"
-                            size="lg"
-                            onPress={() => continueWithTestLogin(login)}
-                          >
-                            Continue as {login.displayName}
-                          </Button>
-                        ))}
-                      </View>
-                    </View>
-
                     <View className="flex-row gap-3">
                       <View className="relative">
                         <Button

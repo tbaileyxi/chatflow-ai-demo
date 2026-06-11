@@ -31,6 +31,14 @@ export async function generateMessage(payload: VoicePayload): Promise<VoiceResul
   if (provider === "xai") {
     return callXai(userBlock);
   }
+  if (provider === "anthropic") {
+    // Mode-aware model split: cheap/fast for news one-liners, a smarter
+    // model for in-game digestion (scores, runs, momentum — the "smart bot").
+    const model = payload.mode === "in_game"
+      ? Deno.env.get("LLM_MODEL_INGAME") || "claude-sonnet-4-6"
+      : Deno.env.get("LLM_MODEL") || "claude-haiku-4-5";
+    return callAnthropic(userBlock, model);
+  }
   return callOpenAi(userBlock);
 }
 
@@ -108,6 +116,76 @@ async function callXai(userPrompt: string): Promise<VoiceResult> {
   return { message, provider: "xai", model };
 }
 
+// ---- Anthropic (Claude) ------------------------------------------
+
+async function callAnthropic(userPrompt: string, model?: string): Promise<VoiceResult> {
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+  model = model || Deno.env.get("LLM_MODEL") || "claude-haiku-4-5";
+
+  const doFetch = () =>
+    fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 256,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    });
+
+  let res = await doFetch();
+  if (res.status === 429) {
+    // Org RPM limit — back off once and retry rather than dropping the post.
+    const retryAfter = Number(res.headers.get("retry-after")) || 20;
+    await new Promise((r) => setTimeout(r, Math.min(retryAfter, 30) * 1000));
+    res = await doFetch();
+  }
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Anthropic ${res.status}: ${txt.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  const message = (data?.content ?? [])
+    .filter((b: { type: string }) => b.type === "text")
+    .map((b: { text: string }) => b.text)
+    .join("")
+    .trim();
+  return { message, provider: "anthropic", model };
+}
+
+async function judgeViaAnthropic(sys: string, usr: string): Promise<string | null> {
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) return null;
+  const model = Deno.env.get("JUDGE_MODEL") || "claude-haiku-4-5";
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 60,
+      system: sys,
+      messages: [{ role: "user", content: usr }],
+    }),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return (data?.content ?? [])
+    .filter((b: { type: string }) => b.type === "text")
+    .map((b: { text: string }) => b.text)
+    .join("")
+    .trim();
+}
+
 // ---------------------------------------------------------------
 // Cheap LLM news judge. Tiny call, JSON only. Bypassed when the cheap
 // signals already decide (HIGH category or cluster size >= 3).
@@ -121,30 +199,36 @@ export interface JudgeResult {
 
 export async function judgeHeadline(team: string, title: string, source: string): Promise<JudgeResult | null> {
   const provider = (Deno.env.get("LLM_PROVIDER") || "openai").toLowerCase();
-  const apiKey = provider === "xai" ? Deno.env.get("XAI_API_KEY") : Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) return null;
-  const model = Deno.env.get("JUDGE_MODEL") || "gpt-4o-mini";
 
   const sys = `You score sports news headlines for one team's hardcore fan. Reply with JSON only: {"score":0-100,"category":"trade|injury|signing|coaching|recruit|result|opinion|other","breaking":true|false}. Never include any other text.`;
   const usr = `Team: ${team}\nHeadline: ${title}\nSource: ${source}`;
 
   try {
-    const endpoint = provider === "xai"
-      ? "https://api.x.ai/v1/chat/completions"
-      : "https://api.openai.com/v1/chat/completions";
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "system", content: sys }, { role: "user", content: usr }],
-        temperature: 0,
-        max_tokens: 60,
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const raw = (data?.choices?.[0]?.message?.content ?? "").trim();
+    let raw: string | null;
+    if (provider === "anthropic") {
+      raw = await judgeViaAnthropic(sys, usr);
+    } else {
+      const apiKey = provider === "xai" ? Deno.env.get("XAI_API_KEY") : Deno.env.get("OPENAI_API_KEY");
+      if (!apiKey) return null;
+      const model = Deno.env.get("JUDGE_MODEL") || "gpt-4o-mini";
+      const endpoint = provider === "xai"
+        ? "https://api.x.ai/v1/chat/completions"
+        : "https://api.openai.com/v1/chat/completions";
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "system", content: sys }, { role: "user", content: usr }],
+          temperature: 0,
+          max_tokens: 60,
+        }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      raw = (data?.choices?.[0]?.message?.content ?? "").trim();
+    }
+    if (!raw) return null;
     const clean = raw.replace(/```json\n?|```/g, "").trim();
     const parsed = JSON.parse(clean);
     return {

@@ -280,8 +280,12 @@ export async function resolveExternalGameForTeam(
   const endpoint = ESPN_SCOREBOARD_BY_LEAGUE[team.league.toUpperCase()];
   if (!endpoint) return null;
 
+  // Hard timeout — this runs on a 60s poll loop during games; a hung ESPN
+  // request must never stack behind the next tick.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
   try {
-    const response = await fetch(endpoint);
+    const response = await fetch(endpoint, { signal: controller.signal });
     if (!response.ok) return null;
     const payload = await response.json();
     const events = Array.isArray(payload?.events) ? payload.events : [];
@@ -326,6 +330,8 @@ export async function resolveExternalGameForTeam(
     }
   } catch (error) {
     console.warn("Failed to resolve ESPN game context:", error);
+  } finally {
+    clearTimeout(timeout);
   }
 
   return null;

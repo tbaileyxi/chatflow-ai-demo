@@ -184,10 +184,16 @@ export function useHuddleMessages(huddleId: string) {
           const profileMap = await fetchProfiles([msg.user_id]);
           const newMessage = mapRow(msg, profileMap);
 
-          // Prepend to cache (newest first)
+          // Prepend to cache (newest first). Guard against duplicates —
+          // channel rejoins can replay an INSERT, and a concurrent refetch
+          // may have already landed the row.
           queryClient.setQueryData<HuddleMessage[]>(
             ["huddle-messages", huddleId],
-            (old) => (old ? [newMessage, ...old] : [newMessage]),
+            (old) => {
+              if (!old) return [newMessage];
+              if (old.some((m) => m.id === newMessage.id)) return old;
+              return [newMessage, ...old];
+            },
           );
 
           setRealtimeMessage(newMessage);

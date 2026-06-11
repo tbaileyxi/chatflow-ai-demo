@@ -27,29 +27,17 @@ export function useHuddlePresence(huddleId: string) {
   useEffect(() => {
     if (!huddleId || !user) return;
 
+    // Cancellation flag: if the user jumps rooms before async work resolves,
+    // late continuations must not touch the (already removed) channel.
+    let cancelled = false;
+
     const channel = supabase.channel(`presence-${huddleId}`, {
       config: { presence: { key: user.id } },
     });
     channelRef.current = channel;
 
-    // Fetch current user's profile for presence metadata
-    const setupPresence = async () => {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("display_name, username, avatar_url")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      const displayName =
-        profile?.display_name ??
-        profile?.username ??
-        (user.user_metadata?.display_name as string | undefined) ??
-        "User";
-      displayNameRef.current = displayName;
-      avatarUrlRef.current = profile?.avatar_url ?? null;
-
-      channel
-        .on("broadcast", { event: "typing" }, ({ payload }) => {
+    channel
+      .on("broadcast", { event: "typing" }, ({ payload }) => {
           const typing = payload as PresenceUser & { isTyping?: boolean };
           if (!typing.userId || typing.userId === user.id) return;
 
@@ -123,36 +111,52 @@ export function useHuddlePresence(huddleId: string) {
           }
         })
         .subscribe(async (status) => {
-          if (status === "SUBSCRIBED") {
-            await channel.track({
-              userId: user.id,
-              displayName,
-              avatarUrl: profile?.avatar_url ?? null,
-            });
+          if (status !== "SUBSCRIBED" || cancelled) return;
 
-            // Notify other members that this user entered (throttled server-side)
-            supabase.functions
-              .invoke("send-push-notification", {
-                body: {
-                  type: "presence_active",
-                  huddleId,
-                  userId: user.id,
-                  displayName,
-                },
-              })
-              .catch(() => {});
+          // Fetch profile metadata AFTER subscribing — the channel lifecycle
+          // never waits on this network call, so room-jumping can't strand
+          // a half-initialized channel.
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("display_name, username, avatar_url")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (cancelled) return;
 
-            // Delay setting trackedRef so we don't show banners for initial presence state
-            setTimeout(() => {
-              trackedRef.current = true;
-            }, 1000);
-          }
+          const displayName =
+            profile?.display_name ??
+            profile?.username ??
+            (user.user_metadata?.display_name as string | undefined) ??
+            "User";
+          displayNameRef.current = displayName;
+          avatarUrlRef.current = profile?.avatar_url ?? null;
+
+          await channel.track({
+            userId: user.id,
+            displayName,
+            avatarUrl: profile?.avatar_url ?? null,
+          });
+
+          // Notify other members that this user entered (throttled server-side)
+          supabase.functions
+            .invoke("send-push-notification", {
+              body: {
+                type: "presence_active",
+                huddleId,
+                userId: user.id,
+                displayName,
+              },
+            })
+            .catch(() => {});
+
+          // Delay setting trackedRef so we don't show banners for initial presence state
+          setTimeout(() => {
+            if (!cancelled) trackedRef.current = true;
+          }, 1000);
         });
-    };
-
-    setupPresence();
 
     return () => {
+      cancelled = true;
       trackedRef.current = false;
       if (bannerTimeoutRef.current) clearTimeout(bannerTimeoutRef.current);
       Object.values(typingTimeoutsRef.current).forEach(clearTimeout);

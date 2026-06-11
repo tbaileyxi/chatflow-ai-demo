@@ -1,0 +1,13 @@
+# Web app needs only src/, public/, index.html, configs.
+chatflow-ai-demo/
+mobile/
+design_handoff_side_huddle_ios/
+design_handoff_side_huddle_rebrand/
+supabase/
+sponsor-outreach/
+cloudflare-worker/
+*.md
+.claude/
+.codex/
+.lovable/
+bun.lockb

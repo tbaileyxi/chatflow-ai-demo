@@ -1,0 +1,38 @@
+# EAS upload archive excludes. When present, EAS uses THIS (not .gitignore)
+# to decide what to upload. Keep the archive tiny — node_modules and native
+# deps are restored/generated on the build server.
+
+# dependencies (re-installed on EAS build servers)
+node_modules/
+
+# Expo / build output
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# generated native folders (managed workflow)
+/ios
+/android
+
+# nested legacy web app — never part of the mobile build
+/../chatflow-ai-demo
+
+# misc
+.git/
+.DS_Store
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.tsbuildinfo
+.metro-health-check*
+
+# secrets / certs (provided by EAS credentials, never upload)
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+.env*.local

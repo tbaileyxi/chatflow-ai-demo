@@ -65,7 +65,7 @@ function FriendsNowSection() {
   const inviteFriends = useCallback(() => {
     Share.share({
       message:
-        "Join me on Side Huddle. We can jump into game rooms when friends are watching.",
+        "Join me on Side Huddle. We can jump into game rooms when friends are watching. https://www.sidehuddlesports.com",
     });
   }, []);
 

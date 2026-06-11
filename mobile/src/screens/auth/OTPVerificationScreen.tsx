@@ -18,8 +18,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { colors } from "@/theme/colors";
 import { env } from "@/config/env";
-import { getTestLogin, TEST_LOGIN_CODE } from "@/config/testLogins";
-import { useAuth } from "@/hooks/useAuth";
 import type { AuthStackParamList } from "@/navigation/types";
 
 type Nav = NativeStackNavigationProp<AuthStackParamList, "OTPVerification">;
@@ -31,9 +29,7 @@ const RESEND_COOLDOWN = 60;
 export function OTPVerificationScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const { signInWithDevTestLogin } = useAuth();
-  const { phone, email, method = phone ? "sms" : "email", isTestLogin } = route.params;
-  const testLogin = isTestLogin && phone ? getTestLogin(phone) : undefined;
+  const { phone, email, method = phone ? "sms" : "email" } = route.params;
 
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -50,53 +46,15 @@ export function OTPVerificationScreen() {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  const completeDevLogin = async () => {
-    if (!testLogin) {
-      const message = "This is not one of the configured dev test numbers.";
-      setErrorMessage(message);
-      Alert.alert("Verification Failed", message);
-      return;
-    }
-
-    setLoading(true);
-    setErrorMessage("");
-    setStatusMessage(`Opening ${testLogin.displayName}...`);
-    try {
-      await signInWithDevTestLogin(testLogin);
-      setStatusMessage("Signed in. Loading app...");
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Could not open the dev test session.";
-      setErrorMessage(message);
-      Alert.alert("Error", message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleVerify = async () => {
     if (code.length !== CODE_LENGTH) return;
     Keyboard.dismiss();
 
     setLoading(true);
     setErrorMessage("");
-    setStatusMessage(isTestLogin ? "Opening account..." : "Checking code...");
+    setStatusMessage("Checking code...");
     console.log("Verifying OTP - method:", method, "phone:", phone, "email:", email);
     try {
-      if (isTestLogin) {
-        if (!testLogin || code !== TEST_LOGIN_CODE) {
-          setErrorMessage("Use code 123456 for this quick account.");
-          Alert.alert("Verification Failed", "Use code 123456 for this quick account.");
-          setCode("");
-          return;
-        }
-
-        await completeDevLogin();
-        return;
-      }
-
       const { data, error } =
         method === "email"
           ? await supabase.auth.verifyOtp({
@@ -139,11 +97,6 @@ export function OTPVerificationScreen() {
   const handleResend = async () => {
     setResendTimer(RESEND_COOLDOWN);
     try {
-      if (isTestLogin) {
-        Alert.alert("Code", `Use ${TEST_LOGIN_CODE} for this quick account.`);
-        return;
-      }
-
       const { error } =
         method === "email"
           ? await supabase.auth.signInWithOtp({
@@ -192,11 +145,6 @@ export function OTPVerificationScreen() {
               <Text className="mt-2 text-base text-muted-foreground">
                 Sent to {method === "email" ? email : phone}
               </Text>
-              {isTestLogin ? (
-                <Text className="mt-4 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
-                  Use code {TEST_LOGIN_CODE} for this quick account.
-                </Text>
-              ) : null}
               {statusMessage ? (
                 <Text className="mt-3 text-sm text-muted-foreground">
                   {statusMessage}
@@ -230,17 +178,6 @@ export function OTPVerificationScreen() {
                   placeholderTextColor={colors.mutedForeground}
                   className="h-16 rounded-2xl border border-input bg-background px-4 text-center text-3xl font-black tracking-[8px] text-foreground"
                 />
-
-                {isTestLogin && testLogin ? (
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onPress={completeDevLogin}
-                    disabled={loading}
-                  >
-                    Continue as {testLogin.displayName}
-                  </Button>
-                ) : null}
 
                 <View className="items-center">
                   {resendTimer > 0 ? (

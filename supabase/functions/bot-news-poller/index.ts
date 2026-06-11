@@ -46,6 +46,7 @@ serve(async (req) => {
     entries_survived: 0,
     posts: 0,
     errors: [] as string[],
+    debug: [] as Record<string, unknown>[],
   };
 
   try {
@@ -96,9 +97,12 @@ serve(async (req) => {
 
     await Promise.all(candidates.map(async (bundle) => {
       summary.teams_considered += 1;
+      const dbg: Record<string, unknown> = { team: bundle.teamName, feeds: bundle.feeds.length };
+      summary.debug.push(dbg);
 
       // Quiet window check: ask provider for upcoming/live games for this team's league.
       const quiet = await isQuietForTeam(provider, bundle);
+      dbg.quiet = quiet;
       if (quiet) {
         summary.teams_quieted += 1;
         return;
@@ -106,14 +110,28 @@ serve(async (req) => {
 
       // Daily cap check up front — cheap.
       const remaining = await newsCapRemaining(supabase, bundle.teamId);
+      dbg.capRemaining = remaining;
       if (remaining <= 0) return;
 
       // Fetch every feed.
       const allEntries: ReturnType<typeof parseRss> = [];
       for (const f of bundle.feeds) {
         try {
-          const res = await fetch(f.url, { headers: { "User-Agent": "SideHuddleBot/1.0" } });
-          if (!res.ok) continue;
+          const res = await fetch(f.url, {
+            headers: {
+              // Browser-like UA — Google News RSS rejects unknown bots from
+              // datacenter IPs.
+              "User-Agent":
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+              "Accept": "application/rss+xml, application/xml, text/xml, */*",
+            },
+          });
+          if (!res.ok) {
+            // Never skip silently — a feed quietly 4xx/5xxing is exactly the
+            // failure mode that left the news bot dark with empty summaries.
+            summary.errors.push(`feed ${f.url}: HTTP ${res.status}`);
+            continue;
+          }
           const xml = await res.text();
           allEntries.push(...parseRss(xml, f.label || hostname(f.url)));
         } catch (err) {
@@ -121,6 +139,7 @@ serve(async (req) => {
         }
       }
       summary.entries_fetched += allEntries.length;
+      dbg.fetched = allEntries.length;
 
       // Filter out already-seen entries.
       if (allEntries.length === 0) return;

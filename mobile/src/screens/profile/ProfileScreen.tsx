@@ -97,12 +97,14 @@ export function ProfileScreen() {
     const { error } = await updateProfile(updates);
 
     if (error) {
-      Alert.alert(
-        "Error",
+      // Surface the actual error so we can debug the silent save failures
+      // users have been hitting.
+      const msg =
         error.message?.includes("unique")
           ? "Username is already taken."
-          : "Failed to save profile.",
-      );
+          : (error as any).message || (error as any).code || "Failed to save profile.";
+      console.warn("[profile] save failed", error);
+      Alert.alert("Couldn't save profile", msg);
     } else {
       Alert.alert("Saved", "Profile updated.");
     }

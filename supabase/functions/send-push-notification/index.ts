@@ -470,6 +470,80 @@ Deno.serve(async (req) => {
       sent = messages.length;
     }
 
+    // ─── TYPE 6: Direct sends ───
+    // Two callers were posting payloads no branch handled (so they silently
+    // notified nobody):
+    //   PullInFriendsModal:  { user_ids: [...], title, body, url }
+    //   bot publisher v2:    { huddle_ids: [...], title, body, source: 'bot_v2' }
+    if (!type && (Array.isArray(body.user_ids) || Array.isArray(body.huddle_ids))) {
+      const { title, body: messageBody, url, source } = body;
+      const notifType = source === 'bot_v2' ? 'bot_drop' : 'room_invite';
+
+      let targetUserIds: string[] = [];
+      let huddleId: string | null = null;
+      if (Array.isArray(body.user_ids)) {
+        targetUserIds = body.user_ids as string[];
+      } else {
+        huddleId = (body.huddle_ids as string[])[0] ?? null;
+        const { data: members } = await supabase
+          .from('huddle_members')
+          .select('user_id')
+          .in('huddle_id', body.huddle_ids as string[]);
+        targetUserIds = [...new Set((members ?? []).map((m) => m.user_id))];
+      }
+
+      if (targetUserIds.length === 0 || !title) {
+        return new Response(JSON.stringify({ sent: 0 }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // In-app notifications (respect preferences) so the invite/drop is
+      // visible even when push permission is denied.
+      const { data: preferences } = await supabase
+        .from('notification_preferences')
+        .select('user_id, in_app_notifications')
+        .in('user_id', targetUserIds);
+      const inAppAllowed = new Map(
+        (preferences ?? []).map((p) => [p.user_id, p.in_app_notifications !== false]),
+      );
+      const inAppRows = targetUserIds
+        .filter((uid) => inAppAllowed.get(uid) !== false)
+        .map((uid) => ({
+          user_id: uid,
+          type: notifType,
+          title,
+          body: messageBody ?? '',
+          huddle_id: huddleId,
+          data: { type: notifType, url: url ?? null },
+        }));
+      if (inAppRows.length > 0) {
+        const { error: inAppErr } = await supabase
+          .from('notifications')
+          .insert(inAppRows);
+        if (inAppErr) console.error('direct in-app notification error:', inAppErr);
+      }
+
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, expo_push_token')
+        .in('user_id', targetUserIds)
+        .not('expo_push_token', 'is', null);
+
+      const messages: PushMessage[] = (profiles ?? [])
+        .filter((p) => p.expo_push_token)
+        .map((p) => ({
+          to: p.expo_push_token!,
+          title,
+          body: messageBody ?? '',
+          data: { type: notifType, url: url ?? null, huddleId },
+          sound: 'default',
+        }));
+
+      await sendExpoPush(messages);
+      sent = messages.length;
+    }
+
     return new Response(JSON.stringify({ sent }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

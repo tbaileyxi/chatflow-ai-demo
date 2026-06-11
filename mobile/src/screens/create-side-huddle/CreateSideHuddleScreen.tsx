@@ -224,9 +224,11 @@ export function CreateSideHuddleScreen() {
                   ? inviteRow[0]
                   : inviteRow;
                 const code: string | undefined = row?.invite_code;
+                // https link so invitees without the app get a real page,
+                // not dead custom-scheme text.
                 const inviteLink = code
-                  ? `sidehuddle://i/${code}`
-                  : `sidehuddle://huddle/${data.id}`;
+                  ? `https://www.sidehuddlesports.com/i/${code}`
+                  : `https://www.sidehuddlesports.com/h/${data.id}`;
                 await Share.share({
                   message: `Jump in: ${name.trim()} on Side Huddle. ${inviteLink}`,
                   url: inviteLink,
