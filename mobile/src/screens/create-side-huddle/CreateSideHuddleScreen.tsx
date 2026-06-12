@@ -209,8 +209,8 @@ export function CreateSideHuddleScreen() {
 
       // Offer to share invite link via the real RPC-minted code.
       Alert.alert(
-        "Crew Room Created!",
-        "Pull friends in?",
+        "Room created 🎉",
+        "Send your crew the invite link?",
         [
           {
             text: "Share Invite",
@@ -280,69 +280,52 @@ export function CreateSideHuddleScreen() {
           <ChevronLeft color={colors.foreground} size={24} />
         </Pressable>
         <Text className="flex-1 text-lg font-bold text-foreground">
-          Start Crew Room
+          Start a room
         </Text>
       </View>
 
       <View className="flex-1">
         <View className="px-4">
-          {selectedTeam && (
-            <View className="mb-4 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
-              <View className="flex-row items-center gap-2">
-                <Radio color={colors.primary} size={16} />
-                <Text className="text-sm font-bold text-foreground">
-                  {selectedTeam.city} {selectedTeam.name}
-                </Text>
-              </View>
-              <Text className="mt-1 text-xs leading-5 text-muted-foreground">
-                This room will stay attached to this team, so the team bot can
-                bring game context, highlights, and prediction prompts when
-                they play.
-              </Text>
-            </View>
-          )}
-
-          {/* Name input */}
-          <Text className="text-sm font-medium text-foreground">
-            Crew Room Name
+          {/* Step 1 — name. Big target, zero jargon. */}
+          <Text className="text-xs font-black uppercase tracking-widest text-primary">
+            1 · Name your room
           </Text>
           <View className="mt-2">
             <Input
               placeholder={
-                selectedTeam
-                  ? `e.g. ${selectedTeam.name} Game Crew`
-                  : "e.g. Game Day Crew"
+                selectedTeam ? `${selectedTeam.name} crew` : "Game day crew"
               }
               value={name}
               onChangeText={setName}
               maxLength={50}
+              autoFocus
+              className="h-14 text-lg font-bold"
             />
           </View>
-          <View className="mt-1 flex-row items-center justify-between">
-            <View className="flex-row items-center gap-1.5">
-              <Lock color={colors.mutedForeground} size={12} />
-              <Text className="text-xs text-muted-foreground">
-                Invite-only. Share the link to bring people in.
-              </Text>
-            </View>
+          <View className="mt-1.5 flex-row items-center gap-1.5">
+            <Lock color={colors.mutedForeground} size={12} />
             <Text className="text-xs text-muted-foreground">
-              {name.length}/50
+              Private — only people you invite can join.
             </Text>
           </View>
 
-          {/* Team picker */}
-          <Text className="mt-5 text-sm font-medium text-foreground">
-            Attach to a team
-          </Text>
-          <Text className="mt-1 text-xs text-muted-foreground">
-            Your crew room will wake up when this team has a game.
-            {selectedTeam
-              ? ` Selected: ${selectedTeam.city} ${selectedTeam.name}`
-              : ""}
-          </Text>
+          {/* Step 2 — team. One line, then visual picker. */}
+          <View className="mt-6 flex-row items-center gap-2">
+            <Text className="text-xs font-black uppercase tracking-widest text-primary">
+              2 · Pick your team
+            </Text>
+            {selectedTeam ? (
+              <View className="flex-row items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5">
+                <Radio color={colors.primary} size={11} />
+                <Text className="text-xs font-bold text-primary">
+                  {selectedTeam.name}
+                </Text>
+              </View>
+            ) : null}
+          </View>
 
           {/* Team search */}
-          <View className="mt-3 flex-row items-center gap-2 rounded-lg border border-input bg-muted px-3">
+          <View className="mt-2 flex-row items-center gap-2 rounded-lg border border-input bg-muted px-3">
             <Search color={colors.mutedForeground} size={16} />
             <Input
               placeholder="Search teams..."
@@ -423,7 +406,7 @@ export function CreateSideHuddleScreen() {
               <Pressable
                 key={team.id}
                 className={cn(
-                  "w-[22%] items-center gap-1 rounded-xl border p-2 active:opacity-80",
+                  "w-[30%] items-center gap-1.5 rounded-xl border p-3 active:opacity-80",
                   selected
                     ? "border-primary bg-primary/10"
                     : "border-border bg-card",
@@ -431,7 +414,7 @@ export function CreateSideHuddleScreen() {
                 onPress={() => setSelectedTeamId(selected ? null : team.id)}
               >
                 <View className="relative">
-                  <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-muted">
+                  <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted">
                     {team.logoUrl ? (
                       <Image
                         source={{ uri: team.logoUrl }}
@@ -469,7 +452,13 @@ export function CreateSideHuddleScreen() {
           onPress={handleCreate}
           disabled={creating || !name.trim() || !selectedTeamId}
         >
-          {creating ? "Creating..." : "Create Crew Room"}
+          {creating
+            ? "Creating..."
+            : !name.trim()
+              ? "Name your room to continue"
+              : !selectedTeamId
+                ? "Pick a team to continue"
+                : "Create room"}
         </Button>
       </View>
     </SafeAreaView>

@@ -82,11 +82,8 @@ export function MessageInput({
     onTypingChange?.(false);
     const attachedMedia = media;
     setMedia(null);
-    const { error } = await onSend(
-      trimmed || (attachedMedia?.type === "image" ? "📷 Photo" : "🎤 Voice message"),
-      replyTo?.id,
-      attachedMedia ?? undefined,
-    );
+    // Media-only sends carry empty content — the image/audio IS the message.
+    const { error } = await onSend(trimmed, replyTo?.id, attachedMedia ?? undefined);
     if (error) {
       setText(trimmed);
       onTypingChange?.(trimmed.length > 0);

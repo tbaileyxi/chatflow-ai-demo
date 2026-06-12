@@ -57,7 +57,18 @@ export function useTeamMarkets(teamId: string | undefined) {
         .limit(10);
 
       if (error || !data) return [];
-      return data.map(mapMarket);
+
+      // The sync ingests multiple Kalshi series per game (legacy + per-game
+      // tickers), which lands duplicate rows with identical questions. Keep
+      // one card per question+start time.
+      const seen = new Set<string>();
+      const deduped = data.filter((m: any) => {
+        const key = `${m.question}|${m.event_start_time}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      return deduped.map(mapMarket);
     },
   });
 }

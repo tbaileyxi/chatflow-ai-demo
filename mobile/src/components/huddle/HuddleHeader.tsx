@@ -79,6 +79,8 @@ function formatNextGameDate(dateStr: string): string {
   return `${dayStr} at ${time}`;
 }
 
+// One compact, centered strip for all game states — no full-row labels,
+// no left-aligned score. Time/status rides as small text under the line.
 function GameBar({
   game,
   gameState,
@@ -88,84 +90,50 @@ function GameBar({
 }) {
   if (gameState === "live") {
     return (
-      <View className="bg-destructive/10 px-4 py-2.5">
-        {/* LIVE label */}
-        <View className="flex-row items-center gap-2 mb-1">
+      <View className="items-center bg-destructive/10 px-4 py-1.5">
+        <View className="flex-row items-center gap-2">
           <PulsingDot />
-          <Text className="text-xs font-black uppercase tracking-widest text-destructive">
-            LIVE
-          </Text>
-          <Text className="text-xs text-muted-foreground">
-            {game.period ? `${game.period}` : ""}{game.clock ? ` — ${game.clock}` : ""}
+          <Text className="text-sm font-bold text-foreground">
+            {game.awayTeamName ?? "Away"}{" "}
+            <Text className="font-black">{game.awayScore ?? 0}</Text>
+            <Text className="text-muted-foreground">  —  </Text>
+            {game.homeTeamName ?? "Home"}{" "}
+            <Text className="font-black">{game.homeScore ?? 0}</Text>
           </Text>
         </View>
-        {/* Score */}
-        <View className="flex-row items-center justify-center gap-4">
-          <View className="flex-1 items-end">
-            <Text className="text-sm font-bold text-foreground">
-              {game.awayTeamCity} {game.awayTeamName}
-            </Text>
-          </View>
-          <Text className="text-xl font-black text-foreground">
-            {game.awayScore ?? 0} — {game.homeScore ?? 0}
-          </Text>
-          <View className="flex-1 items-start">
-            <Text className="text-sm font-bold text-foreground">
-              {game.homeTeamCity} {game.homeTeamName}
-            </Text>
-          </View>
-        </View>
+        <Text className="text-[11px] text-muted-foreground">
+          {[game.period, game.clock].filter(Boolean).join(" · ") || "Live"}
+        </Text>
       </View>
     );
   }
 
   if (gameState === "postgame") {
     return (
-      <View className="bg-muted/50 px-4 py-2.5">
-        <View className="flex-row items-center gap-2 mb-1">
-          <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            FINAL
-          </Text>
-        </View>
-        <View className="flex-row items-center justify-center gap-4">
-          <View className="flex-1 items-end">
-            <Text className="text-sm font-bold text-foreground">
-              {game.awayTeamCity} {game.awayTeamName}
-            </Text>
-          </View>
-          <Text className="text-xl font-black text-foreground">
-            {game.awayScore ?? 0} — {game.homeScore ?? 0}
-          </Text>
-          <View className="flex-1 items-start">
-            <Text className="text-sm font-bold text-foreground">
-              {game.homeTeamCity} {game.homeTeamName}
-            </Text>
-          </View>
-        </View>
+      <View className="items-center bg-muted/40 px-4 py-1.5">
+        <Text className="text-sm font-bold text-foreground">
+          {game.awayTeamName ?? "Away"}{" "}
+          <Text className="font-black">{game.awayScore ?? 0}</Text>
+          <Text className="text-muted-foreground">  —  </Text>
+          {game.homeTeamName ?? "Home"}{" "}
+          <Text className="font-black">{game.homeScore ?? 0}</Text>
+        </Text>
+        <Text className="text-[11px] text-muted-foreground">Final</Text>
       </View>
     );
   }
 
   // Pregame
   return (
-      <View className="bg-primary/5 px-4 py-2.5">
-      <View className="flex-row items-center gap-2 mb-1">
-        <Text className="text-xs font-bold uppercase tracking-wider text-primary">
-          PREGAME
-        </Text>
-        <Text className="text-xs text-muted-foreground">
-          {formatNextGameDate(game.startTime)}
-        </Text>
-      </View>
-      <View className="flex-row items-center justify-center gap-3">
-        <Text className="text-sm font-semibold text-foreground">
-          {game.awayTeamName ?? "Away"}
-        </Text>
-        <Text className="text-xs text-muted-foreground">@</Text>
-        <Text className="text-sm font-semibold text-foreground">
-          {game.homeTeamName ?? "Home"}
-        </Text>
-      </View>
+    <View className="items-center bg-primary/5 px-4 py-1.5">
+      <Text className="text-sm font-semibold text-foreground">
+        {game.awayTeamName ?? "Away"}
+        <Text className="text-muted-foreground">  @  </Text>
+        {game.homeTeamName ?? "Home"}
+      </Text>
+      <Text className="text-[11px] text-muted-foreground">
+        {formatNextGameDate(game.startTime)}
+      </Text>
     </View>
   );
 }
@@ -254,21 +222,18 @@ export function HuddleHeader({ huddle }: Props) {
         </Pressable>
       </View>
 
-      {/* Sponsor whisper line — Tier 1 ("Presented by X").
-          Always visible on huddles attached to a team. Renders a placeholder
-          when no active sponsor is set so the slot is discoverable. */}
-      {huddle.teamId ? (
+      {/* Sponsor whisper line — only when a real sponsor is attached.
+          No placeholder: empty slots stay invisible. */}
+      {sponsor ? (
         <Pressable
-          onPress={sponsor ? handleSponsorTap : undefined}
+          onPress={handleSponsorTap}
           className="flex-row items-center justify-center gap-1.5 border-t border-border bg-muted/40 px-4 py-1"
           hitSlop={4}
         >
           <Text className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            {sponsor ? `Presented by ${sponsor.brandName}` : "Your Brand Here"}
+            Presented by {sponsor.brandName}
           </Text>
-          {sponsor ? (
-            <ExternalLink color={colors.mutedForeground} size={10} />
-          ) : null}
+          <ExternalLink color={colors.mutedForeground} size={10} />
         </Pressable>
       ) : null}
 

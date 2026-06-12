@@ -269,7 +269,10 @@ export function ChatMessage({
                 <PulseBubble message={message} />
               ) : isPredictionCard ? (
                 <PredictionCardInMessage content={message.content} huddleId={huddleId} />
-              ) : (
+              ) : message.mediaUrl &&
+                (!message.content?.trim() ||
+                  message.content === "📷 Photo" ||
+                  message.content === "🎤 Voice message") ? null : (
                 <View
                   className={cn(
                     "rounded-2xl px-4 py-2.5",

@@ -1,6 +1,28 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import * as FileSystem from "expo-file-system/legacy";
 import { supabase } from "@/integrations/supabase/client";
+
+// Minimal base64 → bytes decoder. RN's fetch(uri).blob() produces Blobs that
+// supabase-js uploads as zero-byte objects, so media must go up as raw bytes.
+const B64_CHARS =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function base64ToBytes(b64: string): Uint8Array {
+  const clean = b64.replace(/[^A-Za-z0-9+/]/g, "");
+  const len = Math.floor((clean.length * 3) / 4);
+  const bytes = new Uint8Array(len);
+  let p = 0;
+  for (let i = 0; i + 3 < clean.length || (i < clean.length && p < len); i += 4) {
+    const e1 = B64_CHARS.indexOf(clean[i]);
+    const e2 = B64_CHARS.indexOf(clean[i + 1] ?? "A");
+    const e3 = B64_CHARS.indexOf(clean[i + 2] ?? "A");
+    const e4 = B64_CHARS.indexOf(clean[i + 3] ?? "A");
+    if (p < len) bytes[p++] = (e1 << 2) | (e2 >> 4);
+    if (p < len) bytes[p++] = ((e2 & 15) << 4) | (e3 >> 2);
+    if (p < len) bytes[p++] = ((e3 & 3) << 6) | e4;
+  }
+  return bytes;
+}
 
 export type HuddleMessage = {
   id: string;
@@ -222,12 +244,15 @@ export function useHuddleMessages(huddleId: string) {
         try {
           const ext = media.type === "audio" ? "m4a" : "jpg";
           const fileName = `${huddleId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-          const response = await fetch(media.uri);
-          const blob = await response.blob();
+          const base64 = await FileSystem.readAsStringAsync(media.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          const bytes = base64ToBytes(base64);
+          if (bytes.length === 0) throw new Error("Empty media file");
 
           const { error: uploadError } = await supabase.storage
             .from("huddle-media")
-            .upload(fileName, blob, {
+            .upload(fileName, bytes.buffer as ArrayBuffer, {
               contentType: media.type === "audio" ? "audio/m4a" : "image/jpeg",
               upsert: false,
             });

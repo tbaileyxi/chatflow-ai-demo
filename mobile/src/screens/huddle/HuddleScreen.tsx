@@ -28,6 +28,7 @@ import { useHuddleMessages, type HuddleMessage } from "@/hooks/useHuddleMessages
 import { useMessageReactions, useToggleReaction } from "@/hooks/useMessageReactions";
 import { useHuddlePresence } from "@/hooks/useHuddlePresence";
 import { HuddleHeader } from "@/components/huddle/HuddleHeader";
+import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
 import { PresenceBar } from "@/components/huddle/PresenceBar";
 import { ChatMessage } from "@/components/huddle/ChatMessage";
 import { MessageInput } from "@/components/huddle/MessageInput";
@@ -193,7 +194,11 @@ export function HuddleScreen() {
   const { data: myHuddles } = useUserHuddles();
   const jumpRooms = useMemo(() => {
     if (!myHuddles) return [];
-    const others = myHuddles.filter((h) => h.id !== huddleId);
+    // Jump is rooms-only: your private huddles with friends. Official team
+    // "Community" huddles are bot surfaces, not destinations — never show them.
+    const others = myHuddles.filter(
+      (h) => h.id !== huddleId && !h.isOfficialTeam,
+    );
     const sameTeam = teamId
       ? others.filter((h) => h.teamName && huddle?.teamName === h.teamName)
       : [];
@@ -207,6 +212,9 @@ export function HuddleScreen() {
     displayName: string;
     content: string;
   } | null>(null);
+
+  // Invite modal — the room's one invite surface (link + in-app friends).
+  const [showInvite, setShowInvite] = useState(false);
 
   // Reactions
   const messageIds = useMemo(
@@ -315,23 +323,33 @@ export function HuddleScreen() {
       >
         <HuddleHeader huddle={huddle} />
 
-        {/* JUMP pills — hop between your rooms without backing out to Home. */}
-        {jumpRooms.length > 0 && (
-          <View className="border-b border-border bg-background">
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                alignItems: "center",
-                gap: 8,
-                paddingHorizontal: 16,
-                paddingVertical: 8,
-              }}
+        {/* Action row — Invite CTA always first, then JUMP pills for your rooms. */}
+        <View className="border-b border-border bg-background">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              alignItems: "center",
+              gap: 8,
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+            }}
+          >
+            <Pressable
+              onPress={() => setShowInvite(true)}
+              className="flex-row items-center gap-1.5 rounded-full bg-primary py-1.5 pl-2.5 pr-3.5 active:opacity-80"
             >
+              <UserPlus color={colors.primaryForeground} size={14} />
+              <Text className="text-xs font-black text-primary-foreground">
+                Invite
+              </Text>
+            </Pressable>
+            {jumpRooms.length > 0 && (
               <Text className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 Jump
               </Text>
-              {jumpRooms.map((room) => (
+            )}
+            {jumpRooms.map((room) => (
                 <Pressable
                   key={room.id}
                   className="flex-row items-center gap-2 rounded-full border border-border bg-muted py-1.5 pl-2 pr-3 active:opacity-80"
@@ -357,9 +375,8 @@ export function HuddleScreen() {
                   ) : null}
                 </Pressable>
               ))}
-            </ScrollView>
-          </View>
-        )}
+          </ScrollView>
+        </View>
 
         <PresenceBar users={presentUsers} entryBanner={entryBanner} />
 
@@ -516,6 +533,13 @@ export function HuddleScreen() {
           </>
         )}
       </KeyboardAvoidingView>
+
+      <PullInFriendsModal
+        visible={showInvite}
+        huddleId={huddleId}
+        huddleName={huddle.name}
+        onClose={() => setShowInvite(false)}
+      />
     </SafeAreaView>
   );
 }

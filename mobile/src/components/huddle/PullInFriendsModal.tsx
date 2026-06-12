@@ -12,11 +12,12 @@ import {
   Image,
   Modal,
   Pressable,
+  Share,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { Check, Send, X } from "lucide-react-native";
+import { Check, Link2, Send, X } from "lucide-react-native";
 import { supabase } from "@/integrations/supabase/client";
 import { colors } from "@/theme/colors";
 
@@ -110,19 +111,40 @@ export function PullInFriendsModal({
       return next;
     });
 
+  // Mint one invite code for the room (shared by both link + in-app paths).
+  const mintInviteCode = async (): Promise<string> => {
+    const { data: rpcRows, error: rpcErr } = await (supabase.rpc as any)(
+      "create_room_invite_code",
+      { p_huddle_id: huddleId },
+    );
+    if (rpcErr) throw rpcErr;
+    const row = Array.isArray(rpcRows) ? rpcRows[0] : rpcRows;
+    const code: string | undefined = row?.invite_code;
+    if (!code) throw new Error("No invite code");
+    return code;
+  };
+
+  const handleShareLink = async () => {
+    try {
+      const code = await mintInviteCode();
+      const inviteLink = `https://www.sidehuddlesports.com/i/${code}`;
+      await Share.share({
+        message: `Jump into ${huddleName} on Side Huddle. ${inviteLink}`,
+        url: inviteLink,
+      });
+    } catch (err) {
+      Alert.alert(
+        "Couldn't create invite link",
+        (err as Error)?.message ?? "Try again in a moment.",
+      );
+    }
+  };
+
   const handleSend = async () => {
     if (selected.size === 0) return;
     setSending(true);
     try {
-      // Mint one invite code for the room.
-      const { data: rpcRows, error: rpcErr } = await (supabase.rpc as any)(
-        "create_room_invite_code",
-        { p_huddle_id: huddleId },
-      );
-      if (rpcErr) throw rpcErr;
-      const row = Array.isArray(rpcRows) ? rpcRows[0] : rpcRows;
-      const code: string | undefined = row?.invite_code;
-      if (!code) throw new Error("No invite code");
+      const code = await mintInviteCode();
       const url = `sidehuddle://i/${code}`;
 
       // Fire push notifications (one per selected user).
@@ -147,8 +169,8 @@ export function PullInFriendsModal({
       );
 
       Alert.alert(
-        "Pulled in",
-        `Sent ${selected.size} ${selected.size === 1 ? "person" : "people"} a notification.`,
+        "Invites sent ✓",
+        `${selected.size} ${selected.size === 1 ? "person" : "people"} just got a notification in the app.`,
       );
       onClose();
     } catch (err) {
@@ -186,11 +208,23 @@ export function PullInFriendsModal({
               </Pressable>
             </View>
 
-            <Text className="mb-1 text-xl font-black text-foreground">
-              Pull friends in
+            <Text className="mb-3 text-xl font-black text-foreground">
+              Invite to {huddleName}
             </Text>
-            <Text className="mb-3 text-sm text-muted-foreground">
-              People you co-huddle with — tap to pick.
+
+            {/* Share link — the universal path, works for anyone anywhere. */}
+            <Pressable
+              onPress={handleShareLink}
+              className="mb-4 flex-row items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 active:opacity-80"
+            >
+              <Link2 color={colors.primaryForeground} size={18} />
+              <Text className="text-base font-black text-primary-foreground">
+                Share invite link
+              </Text>
+            </Pressable>
+
+            <Text className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Or tap friends on Side Huddle
             </Text>
 
             <TextInput
@@ -211,7 +245,7 @@ export function PullInFriendsModal({
               <View className="items-center py-10">
                 <Text className="text-center text-sm text-muted-foreground">
                   {people.length === 0
-                    ? "No co-huddlers yet. Share an invite link to bring people on."
+                    ? "No friends on Side Huddle yet — use Share invite link above."
                     : "No matches."}
                 </Text>
               </View>
@@ -292,8 +326,10 @@ export function PullInFriendsModal({
                 }`}
               >
                 {sending
-                  ? "Pulling in…"
-                  : `Pull in ${selected.size > 0 ? selected.size : ""}`}
+                  ? "Sending…"
+                  : selected.size === 0
+                    ? "Send invites"
+                    : `Send ${selected.size} invite${selected.size === 1 ? "" : "s"}`}
               </Text>
             </Pressable>
           </View>

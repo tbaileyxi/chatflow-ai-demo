@@ -681,49 +681,12 @@ export function HuddleSettingsScreen() {
           </CardContent>
         </Card>
 
-        {/* Pull friends in — opens in-app picker for people already on Side Huddle. */}
+        {/* One invite surface — the modal handles share-link + in-app friends. */}
         <Button variant="outline" onPress={() => setShowPullIn(true)}>
           <View className="flex-row items-center gap-2">
             <Share2 color={colors.primary} size={16} />
             <Text className="text-sm font-medium text-primary">
-              {huddle.isPrivate ? "Invite people on Side Huddle" : "Pull friends in"}
-            </Text>
-          </View>
-        </Button>
-
-        {/* External share — for people NOT on the app yet. */}
-        <Button
-          variant="outline"
-          onPress={async () => {
-            try {
-              const { data, error } = await (supabase.rpc as any)(
-                "create_room_invite_code",
-                { p_huddle_id: huddleId },
-              );
-              if (error) throw error;
-              const row = Array.isArray(data) ? data[0] : data;
-              const code: string | undefined = row?.invite_code;
-              if (!code) throw new Error("no code returned");
-              // https link, not the custom scheme — custom-scheme URLs are
-              // dead text for anyone without the app installed. The web
-              // /i/:code page deep-links installed users back into the app.
-              const inviteLink = `https://www.sidehuddlesports.com/i/${code}`;
-              await Share.share({
-                message: `Jump into ${huddle.name} on Side Huddle. ${inviteLink}`,
-                url: inviteLink,
-              });
-            } catch (err) {
-              const msg =
-                (err as any)?.message ??
-                (typeof err === "string" ? err : "Unknown error");
-              Alert.alert("Couldn't create invite link", msg);
-            }
-          }}
-        >
-          <View className="flex-row items-center gap-2">
-            <Share2 color={colors.mutedForeground} size={16} />
-            <Text className="text-sm font-medium text-muted-foreground">
-              Share link (text / iMessage / anywhere)
+              Invite people
             </Text>
           </View>
         </Button>
@@ -748,7 +711,7 @@ export function HuddleSettingsScreen() {
                 <View className="flex-row items-center gap-2">
                   <LogOut color={colors.foreground} size={16} />
                   <Text className="text-sm font-medium text-foreground">
-                    Leave Side Huddle
+                    Leave this room
                   </Text>
                 </View>
               </Button>
@@ -756,7 +719,7 @@ export function HuddleSettingsScreen() {
                 <View className="flex-row items-center gap-2">
                   <Trash2 color={colors.destructiveForeground} size={16} />
                   <Text className="text-sm font-medium text-destructive-foreground">
-                    Delete Side Huddle
+                    Delete room
                   </Text>
                 </View>
               </Button>
