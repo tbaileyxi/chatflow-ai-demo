@@ -53,8 +53,38 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
   // Body is JUST the message — no raw URL appended. The link goes in
   // a structured embed_url field for the chat UI to render as a preview
   // card (B11). Until then, the link is invisible to users but logged.
-  const body = input.message;
+  let body = input.message;
   const embedUrl = input.newsLink && mode === "news" ? input.newsLink : null;
+
+  // Sponsor whisper: append "— presented by X" to the FIRST bot message of the
+  // calendar day for this team. One sponsor impression per team per day, on the
+  // highest-attention moment — never on every play.
+  try {
+    const sinceMidnight = new Date();
+    sinceMidnight.setUTCHours(0, 0, 0, 0);
+    const { count: todayCount } = await client
+      .from("bot_emit_log")
+      .select("id", { count: "exact", head: true })
+      .eq("team_id", teamId)
+      .gte("created_at", sinceMidnight.toISOString());
+    if ((todayCount ?? 0) === 0) {
+      const { data: sponsor } = await client
+        .from("team_sponsors")
+        .select("brand_name, is_active, end_date")
+        .eq("team_id", teamId)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      const live =
+        sponsor &&
+        (!sponsor.end_date || new Date(sponsor.end_date).getTime() > Date.now());
+      if (live && sponsor?.brand_name) {
+        body = `${body}\n\n— presented by ${sponsor.brand_name}`;
+      }
+    }
+  } catch (err) {
+    console.warn("[publisher] sponsor line skipped", err);
+  }
 
   // 4. Fan-out insert into huddle_messages.
   const rows = huddles.map((h) => ({
