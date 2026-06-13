@@ -239,6 +239,18 @@ serve(async (req) => {
             },
           });
 
+          // Guard: never publish a thin/empty headline or an output where the
+          // model broke character (asked a question, mentioned facts/headline,
+          // refused). Mark it seen so we don't retry, but skip the post.
+          const msg = (voice.message || "").trim();
+          const brokeCharacter =
+            !s.title?.trim() ||
+            msg.length < 8 ||
+            msg.includes("?") ||
+            /\b(headline|facts?|metadata|payload|context|information|provided|mind sharing|tell me more|not enough|i don['’]?t have|the story was|share what)\b/i.test(
+              msg,
+            );
+
           // Mark this entry emitted FIRST to avoid double-publish.
           const { data: marked, error: markErr } = await supabase
             .from("seen_news")
@@ -249,6 +261,10 @@ serve(async (req) => {
             .select("id")
             .single();
           if (markErr || !marked) continue;
+          if (brokeCharacter) {
+            summary.errors.push(`skipped off-voice: ${msg.slice(0, 60)}`);
+            continue;
+          }
 
           const result = await publish({
             client: supabase,

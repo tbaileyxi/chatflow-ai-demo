@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { View, Text, Image, Alert, Pressable, Keyboard } from "react-native";
+import { View, Text, Image, Alert, Pressable, Keyboard, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-import { Bell, Camera, Crown, LogOut, Shield } from "lucide-react-native";
+import { Bell, Camera, Crown, LogOut, Shield, Megaphone } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useAuth } from "@/hooks/useAuth";
@@ -414,6 +414,21 @@ export function ProfileScreen() {
                 </View>
               </Button>
             )}
+            <Button
+              variant="outline"
+              onPress={() =>
+                Linking.openURL("https://www.sidehuddlesports.com/sponsors").catch(
+                  () => {},
+                )
+              }
+            >
+              <View className="flex-row items-center gap-2">
+                <Megaphone color={colors.primary} size={16} />
+                <Text className="text-sm font-medium text-foreground">
+                  Sponsor a team
+                </Text>
+              </View>
+            </Button>
             <Button variant="destructive" onPress={handleSignOut}>
               <View className="flex-row items-center gap-2">
                 <LogOut color={colors.destructiveForeground} size={16} />

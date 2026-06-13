@@ -17,9 +17,11 @@ import {
   Users,
   UserPlus,
 } from "lucide-react-native";
+import { Image } from "react-native";
 import { HuddleCard } from "@/components/home/HuddleCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { useInAppNotifications } from "@/hooks/useInAppNotifications";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { colors } from "@/theme/colors";
@@ -156,8 +158,15 @@ export function HomeScreen() {
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { data: profile } = useProfile();
   const { unreadCount } = useInAppNotifications(8);
   const [refreshing, setRefreshing] = useState(false);
+
+  const myName =
+    profile?.displayName ??
+    profile?.username ??
+    (user?.user_metadata?.display_name as string | undefined) ??
+    "You";
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -186,7 +195,14 @@ export function HomeScreen() {
           className="active:opacity-80"
           onPress={() => navigation.navigate("Profile")}
         >
-          <MonogramAvatar name={user?.user_metadata?.display_name ?? "You"} size={42} />
+          {profile?.avatarUrl ? (
+            <Image
+              source={{ uri: profile.avatarUrl }}
+              style={{ width: 42, height: 42, borderRadius: 21 }}
+            />
+          ) : (
+            <MonogramAvatar name={myName} size={42} />
+          )}
           {unreadCount > 0 ? (
             <View className="absolute -right-1 -top-1 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5">
               <Text className="text-[10px] font-black text-destructive-foreground">
