@@ -233,6 +233,9 @@ serve(async (req) => {
               category: s.category,
               link: s.link,
               breaking: s.breaking,
+              // Anchors tense: old game recaps must read as past, not live.
+              published_at: s.publishedAt ?? undefined,
+              now: new Date().toISOString(),
             },
           });
 

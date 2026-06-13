@@ -64,6 +64,7 @@ function AudioBubble({ uri }: { uri: string }) {
     <Pressable
       onPress={togglePlayback}
       className="flex-row items-center gap-2.5 rounded-2xl bg-primary/15 px-4 py-2.5"
+      style={{ width: 230 }}
     >
       <View className="h-8 w-8 items-center justify-center rounded-full bg-primary">
         {playing ? (
@@ -318,10 +319,12 @@ export function ChatMessage({
                   }}
                   onLongPress={handleLongPress}
                 >
+                  {/* Fixed box — percentage widths collapse to 0 inside the
+                      intrinsic-width bubble container (blank image bug). */}
                   <Image
                     source={{ uri: message.mediaUrl }}
-                    className="mt-1 w-full rounded-lg"
-                    style={{ height: 256 }}
+                    className="mt-1 rounded-xl"
+                    style={{ width: 230, height: 230 }}
                     resizeMode="cover"
                   />
                 </Pressable>

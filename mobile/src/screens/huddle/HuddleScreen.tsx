@@ -32,11 +32,9 @@ import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
 import { PresenceBar } from "@/components/huddle/PresenceBar";
 import { ChatMessage } from "@/components/huddle/ChatMessage";
 import { MessageInput } from "@/components/huddle/MessageInput";
-import { PredictionCard } from "@/components/predictions/PredictionCard";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { DEV_ROOMS_STORAGE_KEY, getDevTeamById } from "@/config/devData";
 import { LogOut, MoreVertical, Pin, UserPlus, User } from "lucide-react-native";
-import { useTeamMarkets } from "@/hooks/useTeamMarkets";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import {
   useLiveGameContext,
@@ -184,9 +182,6 @@ export function HuddleScreen() {
 
   // Prediction markets for this huddle's team
   const teamId = huddle?.teamId;
-  const { data: teamMarkets } = useTeamMarkets(teamId);
-  const { data: game } = useLiveGameContext(teamId);
-  const gameState = getGameState(game ?? null);
 
   // JUMP pills — the user's other rooms, same-team rooms first. This is the
   // core room-jumping loop; it previously existed only in the dev sandbox.
@@ -321,9 +316,10 @@ export function HuddleScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={0}
       >
-        <HuddleHeader huddle={huddle} />
+        <HuddleHeader huddle={huddle} onInvite={() => setShowInvite(true)} />
 
-        {/* Action row — Invite CTA always first, then JUMP pills for your rooms. */}
+        {/* JUMP — your other rooms. Row hidden entirely when there are none. */}
+        {jumpRooms.length > 0 && (
         <View className="border-b border-border bg-background">
           <ScrollView
             horizontal
@@ -335,20 +331,9 @@ export function HuddleScreen() {
               paddingVertical: 8,
             }}
           >
-            <Pressable
-              onPress={() => setShowInvite(true)}
-              className="flex-row items-center gap-1.5 rounded-full bg-primary py-1.5 pl-2.5 pr-3.5 active:opacity-80"
-            >
-              <UserPlus color={colors.primaryForeground} size={14} />
-              <Text className="text-xs font-black text-primary-foreground">
-                Invite
-              </Text>
-            </Pressable>
-            {jumpRooms.length > 0 && (
-              <Text className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                Jump
-              </Text>
-            )}
+            <Text className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              Jump
+            </Text>
             {jumpRooms.map((room) => (
                 <Pressable
                   key={room.id}
@@ -377,6 +362,7 @@ export function HuddleScreen() {
               ))}
           </ScrollView>
         </View>
+        )}
 
         <PresenceBar users={presentUsers} entryBanner={entryBanner} />
 
@@ -468,26 +454,9 @@ export function HuddleScreen() {
                 />
               );
             }}
-            ListHeaderComponent={
-              teamMarkets && teamMarkets.length > 0 ? (
-                <View className="gap-2 px-4 py-3 border-b border-border bg-muted/20">
-                  <Text className="text-xs font-bold uppercase tracking-wider text-primary">
-                    {gameState === "live"
-                      ? "Live Predictions"
-                      : gameState === "postgame"
-                        ? "Game Predictions"
-                        : "Predictions"}
-                  </Text>
-                  {teamMarkets.slice(0, 3).map((market) => (
-                    <PredictionCard
-                      key={market.id}
-                      market={market}
-                      huddleId={huddleId}
-                    />
-                  ))}
-                </View>
-              ) : null
-            }
+            // Prediction cards are NOT pinned chrome — the bot drops them
+            // inline in chat around game time, and the perpetual home for
+            // your team's markets is the Picks tab.
             ListEmptyComponent={
               <View className="flex-1 items-center justify-center px-4 py-12">
                 <Text className="text-sm text-muted-foreground">

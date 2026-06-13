@@ -7,6 +7,7 @@ import {
   MoreVertical,
   ShieldCheck,
   ExternalLink,
+  UserPlus,
 } from "lucide-react-native";
 import { colors } from "@/theme/colors";
 import {
@@ -21,6 +22,7 @@ import type { HuddleDetails } from "@/hooks/useHuddleDetails";
 
 type Props = {
   huddle: HuddleDetails;
+  onInvite?: () => void;
 };
 
 function PulsingDot() {
@@ -138,7 +140,7 @@ function GameBar({
   );
 }
 
-export function HuddleHeader({ huddle }: Props) {
+export function HuddleHeader({ huddle, onInvite }: Props) {
   const navigation = useNavigation();
   const { user } = useAuth();
   const { data: game } = useLiveGameContext(huddle.teamId);
@@ -210,6 +212,17 @@ export function HuddleHeader({ huddle }: Props) {
             </Text>
           </View>
         </Pressable>
+
+        {/* Invite — primary action, always one tap from the header. */}
+        {onInvite ? (
+          <Pressable
+            onPress={onInvite}
+            className="h-10 w-10 items-center justify-center rounded-full bg-primary active:opacity-80"
+            hitSlop={8}
+          >
+            <UserPlus color={colors.primaryForeground} size={18} />
+          </Pressable>
+        ) : null}
 
         <Pressable
           onPress={() =>

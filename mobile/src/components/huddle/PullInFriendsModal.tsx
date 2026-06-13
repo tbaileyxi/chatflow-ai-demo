@@ -12,6 +12,7 @@ import {
   Image,
   Modal,
   Pressable,
+  ScrollView,
   Share,
   Text,
   TextInput,
@@ -250,7 +251,9 @@ export function PullInFriendsModal({
                 </Text>
               </View>
             ) : (
-              <View className="gap-1">
+              // Bounded list — the Send CTA below must NEVER leave the screen.
+              <ScrollView style={{ maxHeight: 300 }} keyboardShouldPersistTaps="handled">
+                <View className="gap-1">
                 {filtered.map((p) => {
                   const isSel = selected.has(p.user_id);
                   const name =
@@ -297,7 +300,8 @@ export function PullInFriendsModal({
                     </Pressable>
                   );
                 })}
-              </View>
+                </View>
+              </ScrollView>
             )}
 
             {/* CTA */}

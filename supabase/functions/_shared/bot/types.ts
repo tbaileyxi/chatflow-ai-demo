@@ -102,6 +102,8 @@ export interface NewsFacts {
   category: string;                   // HIGH / MED / LOW
   link: string;
   breaking: boolean;
+  published_at?: string;              // tense anchor — when the story ran
+  now?: string;                       // tense anchor — current time
 }
 
 export type BotMode = "in_game" | "news";

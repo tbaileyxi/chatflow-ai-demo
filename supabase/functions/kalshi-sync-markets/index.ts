@@ -205,6 +205,23 @@ function matchTeam(
   return { team: null, matchType: 'no_match' };
 }
 
+// Per-game event tickers encode the start: KXMLBGAME-26JUN121840MIAPIT
+// → 2026 Jun 12, 18:40 ET. Crude DST handling (Mar–Oct = EDT).
+const TICKER_MONTHS: Record<string, number> = {
+  JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5,
+  JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11,
+};
+function parseTickerStart(eventTicker: string): string | null {
+  const match = /-(\d{2})([A-Z]{3})(\d{2})(\d{2})(\d{2})/.exec(eventTicker || '');
+  if (!match) return null;
+  const mon = TICKER_MONTHS[match[2]];
+  if (mon === undefined) return null;
+  const etOffset = mon >= 2 && mon <= 9 ? 4 : 5;
+  return new Date(
+    Date.UTC(2000 + +match[1], mon, +match[3], +match[4] + etOffset, +match[5]),
+  ).toISOString();
+}
+
 async function fetchKalshiMarkets(seriesTicker: string) {
   try {
     const url = `${KALSHI_BASE}/markets?series_ticker=${seriesTicker}&status=open&limit=200`;
@@ -283,7 +300,18 @@ Deno.serve(async (req) => {
             continue;
           }
           const title = m.title || m.subtitle || '';
-          const { team, matchType } = matchTeam(title, league, leagueMaps);
+          // Per-game series ("…GAME") list one market PER SIDE: the event
+          // title names both teams, and yes_sub_title carries the side
+          // (e.g. "Detroit"). Match the team and word the question from the
+          // SIDE — matching on the event title picks an arbitrary team and
+          // produced identical "X vs Y Winner?" cards for both markets.
+          const isGameSeries = seriesTicker.endsWith('GAME');
+          const side: string = (m.yes_sub_title || '').trim();
+          const { team, matchType } = matchTeam(
+            isGameSeries && side ? side : title,
+            league,
+            leagueMaps,
+          );
 
           matchLog.push({
             ticker: m.ticker,
@@ -301,17 +329,45 @@ Deno.serve(async (req) => {
           else if (titleLower.includes('win') || titleLower.includes('winner') || titleLower.includes('moneyline')) marketType = 'winner';
           else if (titleLower.includes('points') || titleLower.includes('rebounds') || titleLower.includes('assists')) marketType = 'player_prop';
 
-          const yesPrice = Math.round((m.yes_ask || m.last_price || 0.5) * 100);
+          // Prices arrive as "*_dollars" STRINGS ("0.5400") in the current
+          // API; older integer-cent fields are kept as fallback. last trade
+          // first, then the orderbook.
+          const dollarStr = [
+            m.last_price_dollars,
+            m.yes_ask_dollars,
+            m.yes_bid_dollars,
+          ].find((v: unknown) => typeof v === 'string' && parseFloat(v) > 0) as
+            | string
+            | undefined;
+          const cents = dollarStr
+            ? Math.round(parseFloat(dollarStr) * 100)
+            : ([m.last_price, m.yes_ask, m.yes_bid].find(
+                (v: unknown) => typeof v === 'number' && v > 0,
+              ) as number | undefined);
+          const yesPrice = Math.max(1, Math.min(99, Math.round(cents ?? 50)));
+
+          // Kalshi-faithful wording: per-side game markets read
+          // "Will <team> win?" — futures keep their full market title.
+          const question = isGameSeries && side
+            ? `Will ${side} win?`
+            : m.title || m.subtitle || m.ticker;
 
           const { error } = await supabase
             .from('kalshi_markets')
             .upsert({
               kalshi_ticker: m.ticker,
               team_id: team?.id || null,
-              question: m.title || m.subtitle || m.ticker,
-              current_yes_price: Math.max(1, Math.min(99, yesPrice)),
+              question,
+              current_yes_price: yesPrice,
               market_type: marketType,
-              event_start_time: m.close_time || m.expiration_time,
+              // Actual game start parsed from the ticker (close_time is a
+              // trading-halt buffer up to 3 days AFTER the game and was
+              // making finished games look upcoming).
+              event_start_time:
+                parseTickerStart(m.event_ticker || m.ticker) ||
+                m.expected_expiration_time ||
+                m.close_time ||
+                m.expiration_time,
               kalshi_event_ticker: m.event_ticker || '',
               metadata: {
                 volume: m.volume,
@@ -335,6 +391,17 @@ Deno.serve(async (req) => {
     if (unmatched.length > 0) {
       console.log('Unmatched markets:', unmatched.slice(0, 10).map(u => `${u.league}: "${u.title}"`));
     }
+
+    // Purge legacy per-game rows from before the per-side rewrite — they
+    // carry event-title questions ("X vs Y Winner?") and trading-halt times
+    // days after the game, so they show finished games as upcoming.
+    const { error: purgeErr } = await supabase
+      .from('kalshi_markets')
+      .delete()
+      .eq('is_resolved', false)
+      .like('kalshi_ticker', '%GAME%')
+      .not('question', 'like', 'Will %');
+    if (purgeErr) console.error('legacy purge error:', purgeErr.message);
 
     // Check for resolved markets in our DB
     const { data: unresolvedMarkets } = await supabase

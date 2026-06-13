@@ -191,6 +191,11 @@ export function HuddleSettingsScreen() {
 
   const togglePrivate = async () => {
     if (!isRoomAdmin) return;
+    // Private mode is an Official Huddle feature — gate behind the upgrade.
+    if (!isOfficial && !huddle.isPrivate) {
+      setShowPaywall(true);
+      return;
+    }
     const next = !huddle.isPrivate;
     await supabase
       .from("huddles")

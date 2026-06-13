@@ -52,40 +52,43 @@ Deno.serve(async (req) => {
     let posted = 0;
 
     for (const [teamId, teamMarkets] of byTeam.entries()) {
-      // Find official huddle for this team
-      const { data: huddle } = await supabase
+      // Cards drop INLINE in every room attached to the team — crew rooms
+      // included, not just the official community. The chat is the surface;
+      // there is no pinned predictions section in the app anymore.
+      const { data: huddles } = await supabase
         .from('huddles')
         .select('id')
-        .eq('team_id', teamId)
-        .eq('is_official_team_huddle', true)
-        .maybeSingle();
+        .eq('team_id', teamId);
 
-      if (!huddle) continue;
+      if (!huddles || huddles.length === 0) continue;
 
-      // Take top 5-8 markets (sorted by volume if available)
+      // One compact card: top 2 markets by volume (usually the team's
+      // own "Will X win?" plus one more).
       const topMarkets = teamMarkets
         .sort((a, b) => ((b.metadata as any)?.volume || 0) - ((a.metadata as any)?.volume || 0))
-        .slice(0, 8);
+        .slice(0, 2);
 
       const marketIds = topMarkets.map(m => m.id);
+      const content = JSON.stringify({ market_ids: marketIds });
 
-      // Post prediction card message
       const { error: msgError } = await supabase
         .from('huddle_messages')
-        .insert({
-          huddle_id: huddle.id,
-          user_id: systemUserId,
-          content: JSON.stringify({ market_ids: marketIds }),
-          message_type: 'prediction_card',
-          is_bot_message: true,
-        });
+        .insert(
+          huddles.map((h) => ({
+            huddle_id: h.id,
+            user_id: systemUserId,
+            content,
+            message_type: 'prediction_card',
+            is_bot_message: true,
+          })),
+        );
 
       if (!msgError) {
-        // Mark markets as posted and link to huddle
+        // Mark markets as posted so the next cron tick doesn't re-drop them.
         for (const m of topMarkets) {
           await supabase
             .from('kalshi_markets')
-            .update({ posted_at: now.toISOString(), huddle_id: huddle.id })
+            .update({ posted_at: now.toISOString(), huddle_id: huddles[0].id })
             .eq('id', m.id);
         }
         posted += topMarkets.length;
