@@ -73,8 +73,10 @@ function getRefetchInterval(data: GameContext | null | undefined): number | fals
     if (msUntilStart < 2 * 60 * 60 * 1000) return 2 * 60 * 1000; // <2h: every 2min
     return 5 * 60 * 1000; // >2h: every 5min
   }
-  // postgame — stop polling after a while
-  return false;
+  // postgame — keep checking every 15 min so the header rolls over to
+  // TODAY's game instead of freezing on last night's final. (Previously this
+  // returned false and the header stopped updating until an app restart.)
+  return 15 * 60 * 1000;
 }
 
 export function useLiveGameContext(teamId: string | undefined) {
