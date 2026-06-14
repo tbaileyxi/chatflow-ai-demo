@@ -60,10 +60,11 @@ export function useFollowedTeamMarkets() {
         (huddles ?? []).map((h) => [h.team_id, h.id]),
       );
 
-      // Perpetual picks home: show every upcoming unresolved market for your
-      // teams over the next 7 days (was 48h, which left Picks empty most days).
+      // Date-specific: only markets for games inside the next 48h. Kalshi
+      // doesn't list most per-game markets earlier than that anyway, and a
+      // card for a game 4 days out is noise.
       const now = new Date();
-      const cutoff7d = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const cutoff48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
       const { data: markets } = await supabase
         .from("kalshi_markets")
@@ -74,7 +75,7 @@ export function useFollowedTeamMarkets() {
         .eq("is_resolved", false)
         .in("market_type", GAME_MARKET_TYPES)
         .gte("event_start_time", now.toISOString())
-        .lte("event_start_time", cutoff7d.toISOString())
+        .lte("event_start_time", cutoff48h.toISOString())
         .order("event_start_time", { ascending: true });
 
       if (!markets || !teams) return [];

@@ -135,7 +135,34 @@ export class EspnProvider implements SportsDataProvider {
       flatPlays.push(...data.drives.current.plays);
     }
 
-    return flatPlays.map((p) => normalizeEspnPlay(p, game)).filter((e): e is PlayEvent => e !== null);
+    const events = flatPlays
+      .map((p) => normalizeEspnPlay(p, game))
+      .filter((e): e is PlayEvent => e !== null);
+
+    // MLB/NHL: ESPN omits `scoreValue`, so normalizeEspnPlay can't tell which
+    // plays scored. Derive runs/goals from the cumulative score CHANGING
+    // between consecutive chronological plays. Without this every baseball
+    // play has pointsScored=undefined and the brain emits nothing.
+    let prevHome = 0;
+    let prevAway = 0;
+    for (const e of events) {
+      if (!e.scoreAfter) continue;
+      const dHome = e.scoreAfter.home - prevHome;
+      const dAway = e.scoreAfter.away - prevAway;
+      if (!e.pointsScored && (dHome > 0 || dAway > 0)) {
+        if (dHome > 0) {
+          e.pointsScored = dHome;
+          e.scoringTeamProviderId = game.home.providerId;
+        } else {
+          e.pointsScored = dAway;
+          e.scoringTeamProviderId = game.away.providerId;
+        }
+      }
+      prevHome = e.scoreAfter.home;
+      prevAway = e.scoreAfter.away;
+    }
+
+    return events;
   }
 }
 
