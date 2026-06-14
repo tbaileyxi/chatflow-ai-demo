@@ -59,8 +59,18 @@ function buildUserPrompt(payload: VoicePayload): string {
     return base + `\n\nWrite a single-line take on this headline IN YOUR OWN WORDS. Do not copy the headline verbatim.
 DO NOT invent or assume ANY detail not literally in the headline — no venue, no stadium ("the Garden", "at home", "at MSG"), no city, no opponent, no score, no date, no player role. If the headline doesn't say it, you don't know it. React only to what the headline literally states. Do not include the link — it is appended after.`;
   }
-  return base + `\n\nWrite ONE sharp, analytical line about this exact moment using ONLY the listed facts.
-If teamLeader / rivalLeader stat lines are present, work the most relevant real number in naturally (e.g. "Brunson's up to 31 and 7 dimes as the Knicks pull within 3"). Lead with the stat or situation, not hype — knowledgeable analyst, not cheerleader. No "we need a miracle", no "let's go", no rallying cries. Do not invent venue, location, or any number not in the facts.`;
+  return base + `\n\nYou are a stats nerd, not a play-by-play announcer. The play already happened seconds ago — DO NOT narrate it as news ("X hits a three", "Y drains the free throw"). That reads stale and repetitive.
+
+INSTEAD: lead with the most INTERESTING DATA the moment reveals. Good angles, pick ONE:
+- a shooting/efficiency trend (teamShootingLine / rivalShootingLine), e.g. "Knicks heating up — 4-of-5 from three in the 3rd"
+- a player's updated stat line (teamLeader / rivalLeader), e.g. "Harper's quietly got 21 and 5 dimes"
+- the run / win-probability swing / margin context
+
+Hard rules:
+- Open with the stat or trend, NOT the player + verb of the play.
+- Do NOT just restate a running point total you'd obviously have said already (no "Brunson up to 30" three times). If the only fact is a total you've likely mentioned, find a different angle (efficiency, rival, margin) or be brief.
+- One sentence preferred, two max. Analyst, not cheerleader. No "we need a miracle", "let's go", rallying cries.
+- Never invent a venue, location, or any number not in the facts.`;
 }
 
 // ---- OpenAI ------------------------------------------------------

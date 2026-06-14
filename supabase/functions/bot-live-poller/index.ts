@@ -193,7 +193,10 @@ serve(async (req) => {
     // YouTube highlight clip into every room for that team. Throttled to
     // ~every 10 min (the poller fires every minute) to protect YouTube
     // quota, and guarded per-room so we never double-post.
-    if (new Date().getUTCMinutes() % 10 === 0) {
+    // Sendoff recap runs every poll (no YouTube cost, guarded once per room).
+    await postFinals(supabase, summary);
+    // Highlights + pregame are throttled to protect YouTube quota / dedupe.
+    if (new Date().getUTCMinutes() % 5 === 0) {
       await postHighlights(supabase, summary);
       await postPregames(supabase, summary);
     }
@@ -259,6 +262,75 @@ async function postPregames(
           is_bot_message: true, message_type: "pregame",
         });
         if (!error) summary.pregames = (summary.pregames ?? 0) + 1;
+      }
+    }
+  }
+}
+
+// Post-game sendoff: when a followed team's game goes final, drop ONE recap
+// (final score + each side's leader) into each room. Guarded once per room.
+async function postFinals(
+  supabase: ReturnType<typeof createClient>,
+  summary: { errors: string[]; finals?: number },
+): Promise<void> {
+  summary.finals = 0;
+  const now = Date.now();
+  const threeHoursAgo = new Date(now - 3 * 60 * 60 * 1000).toISOString();
+  const { data: finals } = await supabase
+    .from("games")
+    .select(
+      "id, odds_game_id, status, start_time, sport_key, home_score, away_score, " +
+        "home:teams!games_home_team_id_fkey(id, name, city), " +
+        "away:teams!games_away_team_id_fkey(id, name, city)",
+    )
+    .eq("status", "final")
+    .gte("start_time", threeHoursAgo);
+  if (!finals || finals.length === 0) return;
+
+  const { data: sysUser } = await supabase.rpc("get_or_create_system_user");
+  if (!sysUser) return;
+  const sixHoursAgo = new Date(now - 6 * 60 * 60 * 1000).toISOString();
+
+  for (const g of finals as any[]) {
+    const home = g.home, away = g.away;
+    if (!home?.name || !away?.name) continue;
+    const hs = g.home_score ?? 0, as = g.away_score ?? 0;
+    // Pull final leaders for a stat-rich sendoff.
+    let leaderLine = "";
+    try {
+      // sport_key like "basketball_nba" -> league handled by provider via id;
+      // we only need leaders keyed by team name.
+      const leagueGuess =
+        g.sport_key?.includes("basketball") ? "NBA" :
+        g.sport_key?.includes("baseball") ? "MLB" :
+        g.sport_key?.includes("hockey") ? "NHL" :
+        g.sport_key?.includes("ncaaf") ? "NCAAF" : "NFL";
+      // ESPN event id lives in odds_game_id ("espn-nba-401859967").
+      const espnId = String(g.odds_game_id ?? "").replace(/^espn-[a-z]+-/, "");
+      const lead = espnId
+        ? await fetchEspnLeaders(espnId, leagueGuess as any)
+        : new Map<string, string>();
+      const hl = lead.get(`${home.city} ${home.name}`.toLowerCase()) ?? lead.get(home.name.toLowerCase());
+      const al = lead.get(`${away.city} ${away.name}`.toLowerCase()) ?? lead.get(away.name.toLowerCase());
+      if (hl || al) leaderLine = ` ${[al, hl].filter(Boolean).join(" · ")}.`;
+    } catch { /* leaders optional */ }
+
+    for (const team of [home, away]) {
+      const { data: huddles } = await supabase
+        .from("huddles").select("id").eq("team_id", team.id);
+      const won = team.id === home.id ? hs > as : as > hs;
+      const body = `🏁 Final: ${away.name} ${as}, ${home.name} ${hs}.${leaderLine} ${won ? "Big one in the books." : "On to the next."}`;
+      for (const h of huddles ?? []) {
+        const { data: recent } = await supabase
+          .from("huddle_messages").select("id")
+          .eq("huddle_id", h.id).eq("message_type", "postgame")
+          .gte("created_at", sixHoursAgo).limit(1).maybeSingle();
+        if (recent) continue;
+        const { error } = await supabase.from("huddle_messages").insert({
+          huddle_id: h.id, user_id: sysUser, content: body,
+          is_bot_message: true, message_type: "postgame",
+        });
+        if (!error) summary.finals = (summary.finals ?? 0) + 1;
       }
     }
   }

@@ -287,10 +287,8 @@ export function ChatMessage({
               {/* YouTube highlight — poster + inline player (tap to play) */}
               {youTubeId ? (
                 <View
-                  className={cn(
-                    "rounded-2xl px-3 py-2.5",
-                    "border border-primary/30 bg-primary/10",
-                  )}
+                  className="rounded-2xl bg-card px-3 py-2.5"
+                  style={{ borderLeftWidth: 3, borderLeftColor: colors.primary }}
                 >
                   <Text className="mb-1 text-base text-foreground">
                     {cleanBotContent(message.content)}
@@ -308,14 +306,26 @@ export function ChatMessage({
                 <View
                   className={cn(
                     "rounded-2xl px-4 py-2.5",
-                    message.isBotMessage
-                      ? "border border-primary/30 bg-primary/10"
-                      : isOwnMessage
-                        ? "bg-primary/20"
+                    isOwnMessage
+                      ? "bg-primary"
+                      : message.isBotMessage
+                        ? "bg-card"
                         : "bg-muted",
                   )}
+                  style={
+                    message.isBotMessage && !isOwnMessage
+                      ? { borderLeftWidth: 3, borderLeftColor: colors.primary }
+                      : undefined
+                  }
                 >
-                  <Text className="text-base text-foreground">
+                  <Text
+                    className="text-base"
+                    style={{
+                      color: isOwnMessage
+                        ? colors.primaryForeground
+                        : colors.foreground,
+                    }}
+                  >
                     {message.isBotMessage
                       ? cleanBotContent(message.content)
                       : message.content}
