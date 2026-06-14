@@ -329,21 +329,22 @@ Deno.serve(async (req) => {
           else if (titleLower.includes('win') || titleLower.includes('winner') || titleLower.includes('moneyline')) marketType = 'winner';
           else if (titleLower.includes('points') || titleLower.includes('rebounds') || titleLower.includes('assists')) marketType = 'player_prop';
 
-          // Prices arrive as "*_dollars" STRINGS ("0.5400") in the current
-          // API; older integer-cent fields are kept as fallback. last trade
-          // first, then the orderbook.
-          const dollarStr = [
-            m.last_price_dollars,
-            m.yes_ask_dollars,
-            m.yes_bid_dollars,
-          ].find((v: unknown) => typeof v === 'string' && parseFloat(v) > 0) as
-            | string
-            | undefined;
-          const cents = dollarStr
-            ? Math.round(parseFloat(dollarStr) * 100)
-            : ([m.last_price, m.yes_ask, m.yes_bid].find(
-                (v: unknown) => typeof v === 'number' && v > 0,
-              ) as number | undefined);
+          // Fair price = midpoint of the YES ask/bid (what a market maker
+          // would quote). last_price is exactly 0.50 for untraded games,
+          // which made every upcoming market look like a fake 50/50 coin
+          // flip. The ask/bid midpoint reflects real implied odds and is
+          // almost never a flat 50.
+          const num = (s: unknown, n: unknown): number | undefined => {
+            if (typeof s === 'string' && parseFloat(s) > 0) return parseFloat(s) * 100;
+            if (typeof n === 'number' && n > 0) return n;
+            return undefined;
+          };
+          const ask = num(m.yes_ask_dollars, m.yes_ask);
+          const bid = num(m.yes_bid_dollars, m.yes_bid);
+          const last = num(m.last_price_dollars, m.last_price);
+          let cents: number | undefined;
+          if (ask !== undefined && bid !== undefined) cents = (ask + bid) / 2;
+          else cents = ask ?? bid ?? last;
           const yesPrice = Math.max(1, Math.min(99, Math.round(cents ?? 50)));
 
           // Kalshi-faithful wording: per-side game markets read

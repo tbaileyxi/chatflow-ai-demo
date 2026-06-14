@@ -100,6 +100,9 @@ type Props = {
   onReply?: () => void;
   replyTo?: { displayName: string; content: string } | null;
   isReply?: boolean;
+  // When true, the parent message is the one directly above — so the quoted
+  // context is redundant and we hide it (just show avatar + message).
+  hideReplyQuote?: boolean;
   // When true the message follows another from the same sender within ~5 min.
   // Avatar + name row + tight spacing.
   isGroupedWithPrev?: boolean;
@@ -140,6 +143,7 @@ export function ChatMessage({
   onReply,
   replyTo,
   isReply,
+  hideReplyQuote,
   isGroupedWithPrev,
 }: Props) {
   const lastTapRef = useRef<number>(0);
@@ -184,11 +188,19 @@ export function ChatMessage({
   };
 
   const handleShare = () => {
-    Share.share({
-      message: `${displayName}: "${message.content}"${huddleName ? ` — in ${huddleName} on Side Huddle Sports` : ""}`,
-      ...(message.mediaUrl ? { url: message.mediaUrl } : {}),
-    });
+    // Close the picker FIRST, then present the share sheet on the next tick —
+    // iOS silently no-ops Share.share() if a modal is still dismissing.
     setShowPicker(false);
+    const body = (message.content || "").trim();
+    const text = body
+      ? `${displayName}: "${body}"`
+      : `${displayName} shared a moment`;
+    setTimeout(() => {
+      Share.share({
+        message: `${text}${huddleName ? ` — in ${huddleName} on Side Huddle Sports` : ""}`,
+        ...(message.mediaUrl ? { url: message.mediaUrl } : {}),
+      }).catch(() => {});
+    }, 350);
   };
 
   const handleReply = () => {
@@ -253,8 +265,9 @@ export function ChatMessage({
                 </View>
               ) : null}
 
-              {/* Quoted reply context */}
-              {replyTo && (
+              {/* Quoted reply context — hidden when the parent is the message
+                  directly above (redundant). */}
+              {replyTo && !hideReplyQuote && (
                 <View className="rounded-xl border-l-2 border-primary/50 bg-muted/50 px-3 py-1.5 mb-1">
                   <Text className="text-xs font-semibold text-primary" numberOfLines={1}>
                     {replyTo.displayName}

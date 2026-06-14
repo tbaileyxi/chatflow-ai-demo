@@ -324,14 +324,15 @@ export function CreateSideHuddleScreen() {
             ) : null}
           </View>
 
-          {/* Team search */}
-          <View className="mt-2 flex-row items-center gap-2 rounded-lg border border-input bg-muted px-3">
+          {/* Team search — explicit height so the input isn't clipped. */}
+          <View className="mt-2 h-12 flex-row items-center gap-2 rounded-lg border border-input bg-muted px-3">
             <Search color={colors.mutedForeground} size={16} />
             <Input
               placeholder="Search teams..."
               value={searchQuery}
               onChangeText={setSearchQuery}
-              className="flex-1 border-0 bg-transparent px-0"
+              className="h-full flex-1 border-0 bg-transparent px-0"
+              style={{ height: "100%" }}
             />
           </View>
         </View>

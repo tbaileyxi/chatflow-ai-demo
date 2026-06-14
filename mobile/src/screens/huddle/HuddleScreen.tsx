@@ -441,6 +441,7 @@ export function HuddleScreen() {
                   }
                   onReply={() => handleReply(msg)}
                   isReply={isReply}
+                  hideReplyQuote={!!prevMsg && prevMsg.id === msg.replyToId}
                   isGroupedWithPrev={isGroupedWithPrev}
                   replyTo={
                     parentMsg
