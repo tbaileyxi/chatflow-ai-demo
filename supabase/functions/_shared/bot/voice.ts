@@ -56,9 +56,10 @@ function buildUserPrompt(payload: VoicePayload): string {
   ].filter(Boolean).join("\n");
 
   if (payload.mode === "news") {
-    return base + `\n\nWrite a single-line take on this headline IN YOUR OWN WORDS. Do not copy the headline verbatim. Do not include the link — it is appended after.`;
+    return base + `\n\nWrite a single-line take on this headline IN YOUR OWN WORDS. Do not copy the headline verbatim.
+DO NOT invent or assume ANY detail not literally in the headline — no venue, no stadium ("the Garden", "at home", "at MSG"), no city, no opponent, no score, no date, no player role. If the headline doesn't say it, you don't know it. React only to what the headline literally states. Do not include the link — it is appended after.`;
   }
-  return base + `\n\nWrite a single-line reaction to this play. Reference only the listed facts.`;
+  return base + `\n\nWrite ONE sharp, analytical line about this exact moment using ONLY the listed facts (score, inning/quarter, run, win-probability swing). Lead with the stat or situation, not hype — think knowledgeable analyst, not cheerleader. No "we need a miracle", no "let's go", no rallying cries. Do not invent venue, location, or any number not given.`;
 }
 
 // ---- OpenAI ------------------------------------------------------

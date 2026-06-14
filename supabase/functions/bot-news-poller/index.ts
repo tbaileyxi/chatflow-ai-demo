@@ -216,8 +216,14 @@ serve(async (req) => {
       summary.entries_survived += scored.length;
 
       // Emit up to `remaining` survivors, breaking allowed +1.
+      // Per-RUN cap spaces news out across the day: the poller fires every
+      // 30 min, so capping each run at 1 (breaking can add 1 more) means a
+      // team's 5 daily slots land hours apart instead of 4-in-a-row.
+      const MAX_PER_RUN = Number(Deno.env.get("NEWS_MAX_PER_RUN") || 1);
+      let postedThisRun = 0;
       let budget = remaining;
       for (const s of scored) {
+        if (postedThisRun >= MAX_PER_RUN && !s.breaking) break;
         if (budget <= 0 && !s.breaking) break;
         if (budget <= 0 && s.breaking) budget = 1; // breaking can take one over the cap
 
@@ -284,6 +290,7 @@ serve(async (req) => {
           });
           summary.posts += result.huddleIdsPosted.length;
           budget -= 1;
+          postedThisRun += 1;
         } catch (err) {
           summary.errors.push(`emit ${s.entryId}: ${(err as Error).message}`);
         }
