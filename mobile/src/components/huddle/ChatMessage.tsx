@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { colors } from "@/theme/colors";
 import { PredictionCardInMessage } from "@/components/predictions/PredictionCardInMessage";
 import { PulseBubble } from "@/components/huddle/PulseBubble";
+import { YouTubeEmbed, parseYouTubeId } from "@/components/embeds/YouTubeEmbed";
 import type { HuddleMessage } from "@/hooks/useHuddleMessages";
 import type { ReactionSummary } from "@/hooks/useMessageReactions";
 
@@ -151,11 +152,16 @@ export function ChatMessage({
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
 
   const isPredictionCard = message.messageType === "prediction_card";
+  const youTubeId =
+    message.messageType === "youtube_highlight" && message.embedCode
+      ? parseYouTubeId(message.embedCode)
+      : null;
   const isPulse =
-    message.isPulseMoment ||
-    message.messageType === "pulse" ||
-    message.messageType === "highlight" ||
-    (message.embedCode != null && !isPredictionCard);
+    !youTubeId &&
+    (message.isPulseMoment ||
+      message.messageType === "pulse" ||
+      message.messageType === "highlight" ||
+      (message.embedCode != null && !isPredictionCard));
 
   // Pulse bot messages show source, not "@coach"
   const displayName =
@@ -278,8 +284,20 @@ export function ChatMessage({
                 </View>
               )}
 
-              {/* Pulse / Social Embed — X posts, Reddit buzz */}
-              {isPulse ? (
+              {/* YouTube highlight — poster + inline player (tap to play) */}
+              {youTubeId ? (
+                <View
+                  className={cn(
+                    "rounded-2xl px-3 py-2.5",
+                    "border border-primary/30 bg-primary/10",
+                  )}
+                >
+                  <Text className="mb-1 text-base text-foreground">
+                    {cleanBotContent(message.content)}
+                  </Text>
+                  <YouTubeEmbed videoId={youTubeId} />
+                </View>
+              ) : isPulse ? (
                 <PulseBubble message={message} />
               ) : isPredictionCard ? (
                 <PredictionCardInMessage content={message.content} huddleId={huddleId} />

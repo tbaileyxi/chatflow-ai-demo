@@ -94,6 +94,10 @@ export interface InGameFacts {
   // model never computes percentages or makes up numbers.
   teamShootingLine?: string;          // e.g. "15/38 3PT (39%)"
   rivalShootingLine?: string;
+  // Game leaders pulled from the ESPN box score — real stat lines the smart
+  // bot can cite. Pre-formatted strings; the model never computes them.
+  teamLeader?: string;                // e.g. "Brunson 31 PTS, 7 AST"
+  rivalLeader?: string;
 }
 
 export interface NewsFacts {

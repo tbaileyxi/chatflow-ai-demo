@@ -17,6 +17,45 @@ import type {
 
 const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports";
 
+// Pull real box-score stat leaders from the ESPN summary so the smart in-game
+// bot can cite actual numbers ("Brunson 31 PTS, 7 AST"). Returns a map of
+// lowercased team display name -> one compact leader line. Best-effort.
+const STAT_ABBR: Record<string, string> = {
+  points: "PTS", assists: "AST", rebounds: "REB",
+  passingYards: "PASS YDS", rushingYards: "RUSH YDS", receivingYards: "REC YDS",
+  hits: "H", rbis: "RBI", homeRuns: "HR", strikeouts: "K",
+  goals: "G", saves: "SV", shots: "SOG",
+};
+export async function fetchEspnLeaders(
+  gameProviderId: string,
+  league: League,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const p = leaguePath(league);
+  if (!p) return out;
+  const data = await safeJson(`${ESPN_BASE}/${p.sport}/${p.league}/summary?event=${gameProviderId}`);
+  const teams: any[] = Array.isArray(data?.leaders) ? data.leaders : [];
+  for (const t of teams) {
+    const teamName = String(t?.team?.displayName ?? "").toLowerCase();
+    if (!teamName) continue;
+    // Use the team's single top performer (first category names the athlete)
+    // and append that athlete's other stat lines for a richer line.
+    const cats: any[] = Array.isArray(t?.leaders) ? t.leaders : [];
+    const headLd = cats[0]?.leaders?.[0];
+    const who = headLd?.athlete?.shortName ?? headLd?.athlete?.displayName;
+    if (!who) continue;
+    const parts: string[] = [];
+    for (const c of cats.slice(0, 2)) {
+      const ld = c?.leaders?.[0];
+      if (!ld?.displayValue) continue;
+      const abbr = STAT_ABBR[String(c?.name ?? "")] ?? String(c?.shortDisplayName ?? c?.name ?? "").toUpperCase();
+      parts.push(`${ld.displayValue} ${abbr}`);
+    }
+    if (parts.length > 0) out.set(teamName, `${who} ${parts.join(", ")}`);
+  }
+  return out;
+}
+
 function leaguePath(league: League): { sport: string; league: string } | null {
   switch (league) {
     case "NBA":   return { sport: "basketball", league: "nba" };

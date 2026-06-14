@@ -59,7 +59,8 @@ function buildUserPrompt(payload: VoicePayload): string {
     return base + `\n\nWrite a single-line take on this headline IN YOUR OWN WORDS. Do not copy the headline verbatim.
 DO NOT invent or assume ANY detail not literally in the headline — no venue, no stadium ("the Garden", "at home", "at MSG"), no city, no opponent, no score, no date, no player role. If the headline doesn't say it, you don't know it. React only to what the headline literally states. Do not include the link — it is appended after.`;
   }
-  return base + `\n\nWrite ONE sharp, analytical line about this exact moment using ONLY the listed facts (score, inning/quarter, run, win-probability swing). Lead with the stat or situation, not hype — think knowledgeable analyst, not cheerleader. No "we need a miracle", no "let's go", no rallying cries. Do not invent venue, location, or any number not given.`;
+  return base + `\n\nWrite ONE sharp, analytical line about this exact moment using ONLY the listed facts.
+If teamLeader / rivalLeader stat lines are present, work the most relevant real number in naturally (e.g. "Brunson's up to 31 and 7 dimes as the Knicks pull within 3"). Lead with the stat or situation, not hype — knowledgeable analyst, not cheerleader. No "we need a miracle", no "let's go", no rallying cries. Do not invent venue, location, or any number not in the facts.`;
 }
 
 // ---- OpenAI ------------------------------------------------------
