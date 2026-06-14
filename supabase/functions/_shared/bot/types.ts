@@ -83,6 +83,7 @@ export interface InGameFacts {
     | "final";
   scorer?: string;
   pointsScored?: number;
+  play?: string;                      // real ESPN play text — names the player
   scoreLine: string;                  // e.g. "Knicks 88, Spurs 85"
   gameTime: string;                   // e.g. "3:40 Q4"
   winProbSwingPct?: number;           // |Δ win prob| * 100, integer

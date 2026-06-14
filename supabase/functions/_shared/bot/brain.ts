@@ -111,8 +111,10 @@ export function gateEvents(allPlaysChronological: PlayEvent[]): GatedEvent[] {
         pointsScored: play.pointsScored,
         scoreLine: scoreLineText(game, play.scoreAfter),
         gameTime: gameTimeText(play, game.league),
-        winProbSwingPct: Math.round(swing * 100),
-        runText,
+        // The real ESPN play text — names the actual player and what happened.
+        // This replaces the fake "win probability swing" heuristic, which was
+        // meaningless and repetitive.
+        play: (play.description || "").slice(0, 200) || undefined,
         leadChangeNote,
         excitementScore: excitement,
       };

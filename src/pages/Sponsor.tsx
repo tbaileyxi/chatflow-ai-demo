@@ -304,14 +304,14 @@ function Hero({ onCta }: { onCta: () => void }) {
           <span style={{ color: G.gold }}>When the game is on the line.</span>
         </h1>
         <p style={{ fontSize: 'clamp(15px, 1.6vw, 19px)', lineHeight: 1.6, color: '#aaa', maxWidth: 760, marginTop: 36, fontWeight: 400 }}>
-          We're opening Side Huddle Founding Team Sponsorships for a limited time. Brands can secure exclusive access
-          at <strong style={{ color: G.white }}>$250/month per team</strong> — locked for the duration of your sponsorship.
-          Pricing increases in stages as inventory fills.
+          We're opening Side Huddle Founding Team Sponsorships for a limited time. Own a team's entire fanbase —
+          exclusive, always-on, inside the conversation. <strong style={{ color: G.white }}>Founding rates are
+          locked for the life of your sponsorship.</strong> Reach out and we'll send pricing and availability.
         </p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 28 }}>
           {[
-            { phase: 'Early Founding', price: '$250/mo', active: true },
-            { phase: 'Next Phase',     price: 'Increased pricing', active: false },
+            { phase: 'Early Founding', price: 'Locked founding rate', active: true },
+            { phase: 'Next Phase',     price: 'Higher as inventory fills', active: false },
             { phase: 'Full Rollout',   price: 'Market pricing',    active: false },
           ].map(p => (
             <div key={p.phase} style={{ padding: '10px 16px', border: `1px solid ${p.active ? G.gold : G.border}`, borderRadius: 4, background: p.active ? 'rgba(255,215,0,.08)' : 'transparent' }}>
@@ -322,7 +322,7 @@ function Hero({ onCta }: { onCta: () => void }) {
         </div>
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 36 }}>
           <button className="btn-gold" onClick={onCta}>Claim your team →</button>
-          <button className="btn-outline" onClick={() => document.getElementById('rate-card')?.scrollIntoView({ behavior: 'smooth' })}>See pricing</button>
+          <button className="btn-outline" onClick={() => document.getElementById('rate-card')?.scrollIntoView({ behavior: 'smooth' })}>How it works</button>
         </div>
       </div>
     </section>
@@ -492,16 +492,16 @@ function ROISection() {
       <div style={{ border: `1px solid ${G.gold}`, borderRadius: 8, padding: 'clamp(28px, 5vw, 56px)', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,2fr)', gap: 40, alignItems: 'center', background: `rgba(255,215,0,.03)` }}>
         <div>
           <div className="sh-label" style={{ marginBottom: 12 }}>FOUNDING RATE</div>
-          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(80px, 11vw, 140px)', color: G.gold, lineHeight: 0.9, letterSpacing: '-0.02em' }}>$250</div>
-          <div className="sh-label" style={{ color: G.muted, marginTop: 8 }}>per month · per team</div>
+          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(44px, 6vw, 76px)', color: G.gold, lineHeight: 0.95, letterSpacing: '-0.02em' }}>Locked for life</div>
+          <div className="sh-label" style={{ color: G.muted, marginTop: 8 }}>founding sponsors only</div>
         </div>
         <div>
           <div className="sh-label" style={{ marginBottom: 16 }}>COMPARABLE VALUE</div>
           <p style={{ fontSize: 18, lineHeight: 1.65, color: '#ddd' }}>
-            A single local radio spot runs <strong>$500–1,500/week</strong>. One local TV placement: <strong>$2,000–5,000</strong>. A Side Huddle founding sponsorship is <strong style={{ color: G.gold }}>$250/month</strong> — exclusive, always-on, inside the conversation when fans are most engaged.
+            A single local radio spot runs <strong>$500–1,500/week</strong>. One local TV placement: <strong>$2,000–5,000</strong>. A Side Huddle founding sponsorship is a fraction of that — exclusive, always-on, inside the conversation when fans are most engaged.
           </p>
           <p style={{ fontSize: 18, lineHeight: 1.65, color: '#ddd', marginTop: 16 }}>
-            Own an entire fanbase on Side Huddle for less than one radio ad per week.
+            Own an entire fanbase on Side Huddle. <strong style={{ color: G.gold }}>Reach out for current founding rates and availability.</strong>
           </p>
         </div>
       </div>
@@ -546,44 +546,23 @@ function RateCard({ free }: { free: number }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 32 }}>
         <div style={{ border: `1px solid ${G.border}`, borderRadius: 8, padding: 24, background: G.surface }}>
           <div className="sh-label" style={{ color: G.muted }}>SINGLE TEAM</div>
-          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(44px,6vw,72px)', color: G.white, lineHeight: 1, marginTop: 8 }}>$250<span style={{ fontSize: 18, color: G.muted, fontWeight: 400 }}>/mo</span></div>
-          <div style={{ fontSize: 13, color: G.muted2, marginTop: 6 }}>1 team · $250/team</div>
-          <div style={{ marginTop: 14, fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>Own one team completely — exclusive placement, zero competitors in that community.</div>
+          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(28px,4vw,44px)', color: G.white, lineHeight: 1.05, marginTop: 8 }}>Own one team</div>
+          <div style={{ marginTop: 14, fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>Exclusive placement across every huddle for your team — zero competitors in that community.</div>
         </div>
         <div style={{ border: `2px solid ${G.gold}`, borderRadius: 8, padding: 24, background: 'rgba(255,215,0,.04)', position: 'relative' }}>
           <div style={{ position: 'absolute', top: -12, left: 20, background: G.gold, color: '#000', fontSize: 10, fontWeight: 800, padding: '3px 10px', borderRadius: 999, letterSpacing: '0.1em' }}>BEST VALUE</div>
-          <div className="sh-label" style={{ color: G.gold }}>BUNDLE · 10+ TEAMS</div>
-          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(44px,6vw,72px)', color: G.gold, lineHeight: 1, marginTop: 8 }}>$180<span style={{ fontSize: 18, color: G.muted, fontWeight: 400 }}>/team</span></div>
-          <div style={{ fontSize: 13, color: G.muted2, marginTop: 6 }}>10+ teams · $1,800/mo total</div>
-          <div style={{ marginTop: 14, fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>Own your conference. Own your market. 28% cheaper per team than buying one at a time.</div>
+          <div className="sh-label" style={{ color: G.gold }}>BUNDLE · MULTIPLE TEAMS</div>
+          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(28px,4vw,44px)', color: G.gold, lineHeight: 1.05, marginTop: 8 }}>Own your market</div>
+          <div style={{ marginTop: 14, fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>Bundle a conference or a whole market — best per-team founding rate. Ask us for a bundle quote.</div>
         </div>
       </div>
 
-      <div style={{ overflowX: 'auto', marginTop: 24 }}>
-        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: 680 }}>
-          <thead>
-            <tr>
-              {['Teams', 'Monthly (Founding)', 'Per Team', 'You Save vs. Standard'].map(h => (
-                <th key={h} className="sh-label" style={{ padding: '14px 20px', borderBottom: `1px solid ${G.border}`, color: G.muted, textAlign: 'left' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              { teams: '1 team',       monthly: '$250 / mo',    perTeam: '$250',             savings: 'Up to $500/mo off standard',      hl: false },
-              { teams: '3 teams',      monthly: '$650 / mo',    perTeam: '~$217/team',       savings: 'Save ~$100/team vs. 1 at a time', hl: false },
-              { teams: '6 teams',      monthly: '$1,200 / mo',  perTeam: '$200/team',        savings: 'Save $50/team vs. 3-pack',        hl: false },
-              { teams: '10+ teams ⭐', monthly: '$1,800 / mo',  perTeam: '$180/team · floor', savings: "Best rate — won't go lower",      hl: true  },
-            ].map(t => (
-              <tr key={t.teams} style={{ background: t.hl ? 'rgba(255,215,0,.06)' : 'transparent' }}>
-                <td style={{ padding: '18px 20px', borderBottom: `1px solid ${G.border}`, fontWeight: 700, color: t.hl ? G.gold : G.white }}>{t.teams}</td>
-                <td style={{ padding: '18px 20px', borderBottom: `1px solid ${G.border}`, fontWeight: 700, fontSize: 18 }}>{t.monthly}</td>
-                <td style={{ padding: '18px 20px', borderBottom: `1px solid ${G.border}`, color: '#ccc' }}>{t.perTeam}</td>
-                <td style={{ padding: '18px 20px', borderBottom: `1px solid ${G.border}`, color: t.hl ? '#7ec85f' : G.muted2, fontSize: 13 }}>{t.savings}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div style={{ marginTop: 24, border: `1px solid ${G.gold}`, borderRadius: 8, padding: 'clamp(20px,3vw,32px)', background: 'rgba(255,215,0,.04)', textAlign: 'center' }}>
+        <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(20px,2.6vw,30px)', textTransform: 'uppercase' }}>
+          Email us for current founding rates
+        </div>
+        <p style={{ color: '#ccc', marginTop: 10, fontSize: 15 }}>Pick your team(s) below and send your info — we'll reply with pricing and availability, usually same day.</p>
+        <a href="mailto:qb1@sidehuddlesports.com" style={{ display: 'inline-block', marginTop: 16, color: G.gold, fontWeight: 700, fontSize: 18, textDecoration: 'none' }}>qb1@sidehuddlesports.com</a>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px,1fr))', gap: 14, marginTop: 28 }}>
@@ -616,7 +595,7 @@ function TeamPicker({ filtered, selected, toggle, search, setSearch, league, set
         First in <span style={{ color: G.gold }}>owns the team.</span>
       </h2>
       <p style={{ color: '#aaa', marginTop: 16, maxWidth: 720, fontSize: 17, lineHeight: 1.6 }}>
-        Pick the team(s) you want below — then fill out your info and we'll send an invoice within 2 hours.
+        Pick the team(s) you want below — then fill out your info and we'll email you founding rates within a day.
         {free > 0 && <> Start today — <strong style={{ color: G.gold }}>{freeLabel(free)}</strong>.</>}
       </p>
 
@@ -624,9 +603,9 @@ function TeamPicker({ filtered, selected, toggle, search, setSearch, league, set
         <div style={{ marginTop: 20, padding: '14px 20px', background: 'rgba(255,215,0,.06)', border: `1px solid ${G.gold}`, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 22, color: G.gold }}>{count} team{count !== 1 ? 's' : ''} selected</span>
-            <span style={{ color: G.muted2, fontSize: 14, marginLeft: 12 }}>${bundlePrice(count).total}/mo · {bundlePrice(count).label}</span>
+            <span style={{ color: G.muted2, fontSize: 14, marginLeft: 12 }}>Founding bundle — we'll send pricing</span>
           </div>
-          <span style={{ fontSize: 13, color: '#7ec85f' }}>↓ Fill your info below to get an invoice</span>
+          <span style={{ fontSize: 13, color: '#7ec85f' }}>↓ Fill your info below and we'll be in touch</span>
         </div>
       )}
 
@@ -652,7 +631,7 @@ function TeamPicker({ filtered, selected, toggle, search, setSearch, league, set
               <div style={{ fontWeight: 700, fontSize: 14, color: on ? G.gold : G.white, lineHeight: 1.2 }}>{t.city} {t.name}</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
                 <span className="sh-label" style={{ fontSize: 9, color: on ? G.gold : G.muted }}>{displayLeague(t.league)}</span>
-                <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 18, color: on ? G.gold : G.muted2 }}>$250<span style={{ fontSize: 11, fontWeight: 400 }}>/mo</span></span>
+                <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 13, color: on ? G.gold : G.muted2 }}>{on ? 'SELECTED' : 'AVAILABLE'}</span>
               </div>
             </button>
           );
@@ -682,9 +661,7 @@ function ContactForm({ selectedTeams, price, free, onClearAll }: {
 TEAMS REQUESTED (${selectedTeams.length}):
 ${teamList}
 
-PRICING: $${price.total}/mo (${price.label})
-FREE MONTHS: ${free > 0 ? freeLabel(free) : 'None — billing starts immediately'}
-BILLING START: ${free > 0 ? 'September 1' : 'Immediately'}
+(Please send founding rates + availability for these teams.)
 
 BRAND INFO:
 Company: ${f.brand}
@@ -710,7 +687,7 @@ Submitted via sidehuddlesports.com/sponsors`
           <div style={{ fontSize: 56, marginBottom: 20 }}>🏆</div>
           <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 40, color: G.gold, textTransform: 'uppercase' }}>Your email is ready.</div>
           <p style={{ color: '#ccc', marginTop: 16, fontSize: 17, lineHeight: 1.65 }}>
-            Your mail app opened with all your info pre-filled. Hit send and we'll have an invoice to you within 2 hours.
+            Your mail app opened with all your info pre-filled. Hit send and we'll reply with founding rates and availability, usually same day.
           </p>
           <p style={{ color: G.muted, marginTop: 12, fontSize: 14 }}>
             No mail app? Email us directly: <a href="mailto:qb1@sidehuddlesports.com" style={{ color: G.gold }}>qb1@sidehuddlesports.com</a>
@@ -728,7 +705,7 @@ Submitted via sidehuddlesports.com/sponsors`
         Lock in your spot. <span style={{ color: G.gold }}>We'll handle the rest.</span>
       </h2>
       <p style={{ color: '#aaa', marginTop: 12, fontSize: 16, lineHeight: 1.6, maxWidth: 680 }}>
-        No payment today. We'll send you an invoice within 2 hours of receiving this.
+        No payment today. We'll reply with pricing and availability, usually same day.
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.1fr)', gap: 40, marginTop: 48, alignItems: 'start' }}>
@@ -742,21 +719,16 @@ Submitted via sidehuddlesports.com/sponsors`
                   <div style={{ fontWeight: 700, fontSize: 14 }}>{t.city} {t.name}</div>
                   <div className="sh-label" style={{ fontSize: 9, color: G.muted, marginTop: 2 }}>{displayLeague(t.league)}</div>
                 </div>
-                <div style={{ fontSize: 13, color: G.muted2 }}>{price.label}</div>
+                <div style={{ fontSize: 13, color: G.muted2 }}>Founding rate</div>
               </div>
             ))}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 20, paddingTop: 16, borderTop: `1px solid ${G.gold}44` }}>
-            <div className="sh-label">TOTAL / MONTH</div>
-            <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 36, color: G.gold }}>${price.total}<span style={{ fontSize: 13, color: G.muted, fontWeight: 400 }}>/mo</span></div>
+            <div className="sh-label">PRICING</div>
+            <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 20, color: G.gold }}>We'll email you</div>
           </div>
-          {free > 0 && (
-            <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(255,215,0,.06)', border: `1px solid ${G.gold}44`, borderRadius: 6, fontSize: 13, color: G.gold }}>
-              🎁 {freeLabel(free)} — first charge September 1
-            </div>
-          )}
           <div style={{ marginTop: 16, padding: '12px 14px', background: G.bg, border: `1px solid ${G.border}`, borderRadius: 6, fontSize: 13, color: '#bbb', lineHeight: 1.6 }}>
-            <strong style={{ color: G.white }}>No card charged today.</strong> We'll send an invoice to your email within 2 hours. Your spot is held as soon as we receive this.
+            <strong style={{ color: G.white }}>No card charged.</strong> Send your info and we'll reply with founding rates and availability for your team(s) — usually same day. Your spot is held while we talk.
           </div>
         </div>
 
@@ -769,7 +741,7 @@ Submitted via sidehuddlesports.com/sponsors`
           <FF label="Message (optional)"   value={f.message} onChange={v => setF({ ...f, message: v })} multiline />
           <button className="btn-gold" type="submit" style={{ marginTop: 8, width: '100%', fontSize: 15, padding: '16px 28px' }}
             disabled={!f.brand || !f.name || !f.email}>
-            Send inquiry & get invoice →
+            Request pricing →
           </button>
           <p style={{ fontSize: 12, color: G.muted, textAlign: 'center', marginTop: 4 }}>
             This opens your email app with everything pre-filled. Just hit send.

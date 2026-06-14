@@ -56,21 +56,24 @@ function buildUserPrompt(payload: VoicePayload): string {
   ].filter(Boolean).join("\n");
 
   if (payload.mode === "news") {
-    return base + `\n\nWrite a single-line take on this headline IN YOUR OWN WORDS. Do not copy the headline verbatim.
-DO NOT invent or assume ANY detail not literally in the headline — no venue, no stadium ("the Garden", "at home", "at MSG"), no city, no opponent, no score, no date, no player role. If the headline doesn't say it, you don't know it. React only to what the headline literally states. Do not include the link — it is appended after.`;
+    return base + `\n\nFirst CONVEY WHAT THE NEWS IS, then react. The reader hasn't seen the headline — if you only give a vague reaction ("devastating for Aldon") they have no idea what happened. State the substance from the headline (who + what) in your own words, then add a short take.
+Format: "[what happened]. [quick take]." e.g. "Aldon Smith's reportedly out for the year with a torn ACL — brutal blow to the pass rush."
+DO NOT invent or assume ANY detail not in the headline — no venue, stadium, city, opponent, score, date, or role that isn't stated. If the headline is thin, just relay what little it says plainly. Don't copy the headline verbatim. Do not include the link — it is appended after.`;
   }
-  return base + `\n\nYou are a stats nerd, not a play-by-play announcer. The play already happened seconds ago — DO NOT narrate it as news ("X hits a three", "Y drains the free throw"). That reads stale and repetitive.
+  return base + `\n\nYou're a stats-savvy fan reacting to a real moment. Use the "play" field (the actual play — it names the player) plus teamLeader / rivalLeader (real season/game stat lines) and teamShootingLine / rivalShootingLine.
 
-INSTEAD: lead with the most INTERESTING DATA the moment reveals. Good angles, pick ONE:
-- a shooting/efficiency trend (teamShootingLine / rivalShootingLine), e.g. "Knicks heating up — 4-of-5 from three in the 3rd"
-- a player's updated stat line (teamLeader / rivalLeader), e.g. "Harper's quietly got 21 and 5 dimes"
-- the run / win-probability swing / margin context
+Write ONE line that does BOTH:
+1. Names WHO did what, from the "play" text (e.g. "Soto with the RBI single", "Brunson hit a three").
+2. Adds a real STAT or INSIGHT from the leader/shooting fields — a number that makes it interesting (e.g. "...that's his 3rd hit today" / "...Brunson up to 31 and 7 dimes" / "Knicks now 5-of-7 from deep").
 
-Hard rules:
-- Open with the stat or trend, NOT the player + verb of the play.
-- Do NOT just restate a running point total you'd obviously have said already (no "Brunson up to 30" three times). If the only fact is a total you've likely mentioned, find a different angle (efficiency, rival, margin) or be brief.
-- One sentence preferred, two max. Analyst, not cheerleader. No "we need a miracle", "let's go", rallying cries.
-- Never invent a venue, location, or any number not in the facts.`;
+Think "Soto singles — that's 3 knocks on the day" not "a 27% win probability swing."
+
+HARD RULES:
+- NEVER use "win probability", "win prob", "X% swing", or "X-point swing" — that data is unreliable, don't reference it.
+- NEVER say "X-0 run" unless runText explicitly says so.
+- If you have no fresh stat to add beyond the score, keep it to a short factual beat — do NOT pad with generic drama ("feels like it's over", "thin margins", "meaningful jolt"). Vary your wording; never repeat a framing you'd obviously have used already.
+- One sentence preferred, two max. Analyst, not cheerleader. No rallying cries.
+- Only use names/numbers present in the facts. Never invent a venue, location, or stat.`;
 }
 
 // ---- OpenAI ------------------------------------------------------

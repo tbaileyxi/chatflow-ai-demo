@@ -51,18 +51,29 @@ Deno.serve(async (req) => {
         const data = await response.json();
         const kalshiMarket = data.market;
 
-        if (!kalshiMarket || kalshiMarket.status !== 'settled') continue;
+        // Kalshi marks resolved markets status 'finalized' (and sometimes
+        // 'settled'). The old code only accepted 'settled', so NOTHING ever
+        // settled — bets sat open forever. Accept either, and trust `result`.
+        const resolved =
+          kalshiMarket &&
+          (kalshiMarket.status === 'settled' || kalshiMarket.status === 'finalized') &&
+          (kalshiMarket.result === 'yes' || kalshiMarket.result === 'no');
+        if (!resolved) continue;
 
-        const result = kalshiMarket.result;
-        if (result !== 'yes' && result !== 'no') continue;
-
-        const resolution = result.toUpperCase();
+        const resolution = kalshiMarket.result.toUpperCase();
 
         // Settle bets
         const { data: settledCount } = await supabase.rpc('settle_shadow_bets', {
           p_market_id: market.id,
           p_resolution: resolution,
         });
+
+        // Mark the market resolved so it leaves the open-markets list and
+        // doesn't get re-checked every run.
+        await supabase
+          .from('kalshi_markets')
+          .update({ is_resolved: true, resolution })
+          .eq('id', market.id);
 
         totalSettled += (settledCount || 0);
 

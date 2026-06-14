@@ -90,7 +90,16 @@ serve(async (req) => {
           .eq("emitted", true);
         const emittedIds = new Set((seen ?? []).map((r) => r.event_id));
 
-        const gated = gateEvents(plays).filter((g) => !emittedIds.has(g.play.providerId));
+        // Dedupe by SCORE STATE, not ESPN play id (which can shift between
+        // polls and caused the same "1-1 in the 1st" to post 3 times). One
+        // emission per game per resulting score per scoring side.
+        const scoreKey = (
+          sa: { home: number; away: number } | undefined,
+          side: string,
+        ) => `${side}@${sa?.away ?? 0}-${sa?.home ?? 0}`;
+        const gated = gateEvents(plays).filter(
+          (g) => !emittedIds.has(scoreKey(g.play.scoreAfter, g.scoringSide)),
+        );
         summary.plays_gated += gated.length;
 
         for (const g of gated) {
@@ -156,7 +165,7 @@ serve(async (req) => {
               .from("seen_events")
               .insert({
                 game_id: game.providerId,
-                event_id: g.play.providerId,
+                event_id: scoreKey(g.play.scoreAfter, g.scoringSide),
                 team_id: dbTeam.id,
                 excitement_score: g.facts.excitementScore,
                 emitted: true,
