@@ -1,11 +1,13 @@
 # Web app needs only src/, public/, index.html, configs.
-chatflow-ai-demo/
-mobile/
-design_handoff_side_huddle_ios/
-design_handoff_side_huddle_rebrand/
-supabase/
-sponsor-outreach/
-cloudflare-worker/
+# Leading slashes anchor to repo root so we don't accidentally exclude
+# nested dirs like src/integrations/supabase/ (which holds the Supabase client).
+/chatflow-ai-demo/
+/mobile/
+/design_handoff_side_huddle_ios/
+/design_handoff_side_huddle_rebrand/
+/supabase/
+/sponsor-outreach/
+/cloudflare-worker/
 *.md
 .claude/
 .codex/
