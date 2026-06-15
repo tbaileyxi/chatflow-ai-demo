@@ -14,7 +14,17 @@ import {
 
 const TEXT_SEARCH_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json";
 const PLACE_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json";
-const APOLLO_URL = "https://api.apollo.io/v1/mixed_people/api_search";
+const APOLLO_SEARCH_URL = "https://api.apollo.io/v1/mixed_people/api_search";
+const APOLLO_MATCH_URL = "https://api.apollo.io/api/v1/people/match?reveal_personal_emails=true";
+
+// Titles to target, in priority order: sponsorship/partnerships → marketing → owner/CEO.
+const APOLLO_TITLES = [
+  "head of partnerships", "director of partnerships", "partnerships manager",
+  "sponsorship manager", "head of sponsorships",
+  "cmo", "chief marketing officer", "vp marketing", "marketing director",
+  "director of marketing", "head of marketing", "marketing manager", "brand manager",
+  "ceo", "chief executive officer", "owner", "founder", "president", "general manager",
+];
 
 // ── Google Places (ported from lib/prospector.ts) ──────────────────────────────
 function getThresholds(vertical: string): { minRating: number; minReviews: number } {
@@ -122,43 +132,53 @@ async function hunterFindEmail(domain: string): Promise<Contact | null> {
   return null;
 }
 
-// ── Apollo (optional — only used when APOLLO_API_KEY is configured) ─────────────
+// ── Apollo: search for the decision-maker, then enrich to reveal their email ────
+// Two steps because Apollo's search endpoint returns titles only (emails locked);
+// the people/match endpoint with reveal=true returns the verified email (1 credit).
 async function apolloFindEmail(domain: string): Promise<Contact | null> {
   const key = Deno.env.get("APOLLO_API_KEY");
   if (!key || !domain) return null;
   try {
-    const resp = await fetch(APOLLO_URL, {
+    // 1. Search people at this domain by target title.
+    const sResp = await fetch(APOLLO_SEARCH_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Api-Key": key },
       body: JSON.stringify({
         q_organization_domains: domain,
         page: 1,
-        per_page: 20,
-        person_titles: [
-          // sponsorship / partnerships (top priority)
-          "head of partnerships", "director of partnerships", "partnerships manager",
-          "sponsorship manager", "head of sponsorships", "director of sponsorships",
-          // marketing
-          "cmo", "chief marketing officer", "vp marketing", "marketing director",
-          "director of marketing", "head of marketing", "brand manager", "brand director",
-          // owner / ceo
-          "ceo", "chief executive officer", "owner", "founder", "president",
-        ],
-        contact_email_status: ["verified", "likely to engage"],
+        per_page: 25,
+        person_titles: APOLLO_TITLES,
       }),
     });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    const people = (data.people ?? []) as Array<{ email?: string; name?: string; title?: string }>;
-    const personal = people
-      .filter((p) => isPersonal((p.email || "").toLowerCase()))
-      .sort((a, b) => titleTier(a.title || "") - titleTier(b.title || ""));
-    if (personal.length) {
-      const best = personal[0];
-      return { email: best.email!.toLowerCase(), confidence: "high", name: best.name || null, title: best.title || null };
+    if (!sResp.ok) return null;
+    const sData = await sResp.json();
+    const people = (sData.people ?? []) as Array<{ id?: string; title?: string; has_email?: boolean }>;
+    if (!people.length) return null;
+
+    // Best title tier first; within a tier, prefer someone Apollo has an email for.
+    people.sort((a, b) =>
+      titleTier(a.title || "") - titleTier(b.title || "") ||
+      (b.has_email ? 1 : 0) - (a.has_email ? 1 : 0)
+    );
+    const best = people.find((p) => p.id);
+    if (!best?.id) return null;
+
+    // 2. Enrich that one person to reveal the email (spends a credit).
+    const mResp = await fetch(APOLLO_MATCH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": key },
+      body: JSON.stringify({ id: best.id }),
+    });
+    if (!mResp.ok) return null;
+    const mData = await mResp.json();
+    const person = (mData.person ?? {}) as { first_name?: string; last_name?: string; title?: string; email?: string };
+    const email = (person.email || "").toLowerCase().trim();
+    if (email && isValidEmail(email)) {
+      const name = [person.first_name, person.last_name].filter(Boolean).join(" ") || null;
+      return { email, confidence: "high", name, title: person.title || best.title || null };
     }
-  } catch {
-    // ignore
+  } catch (e) {
+    console.error("[apollo] error:", e instanceof Error ? e.message : e);
   }
   return null;
 }

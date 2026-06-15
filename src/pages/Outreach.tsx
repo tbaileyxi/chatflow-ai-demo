@@ -22,6 +22,8 @@ type Lead = {
   company: string;
   vertical: string;
   region: string | null;
+  website: string | null;
+  phone: string | null;
   contact_name: string | null;
   contact_title: string | null;
   contact_email: string | null;
@@ -95,7 +97,7 @@ export default function Outreach() {
     const { data, error } = await supabase
       .from("sponsor_leads")
       .select(
-        "id,company,vertical,region,contact_name,contact_title,contact_email,instagram_handle,email_confidence,priority,emailed,sequence_step,bounced,unsubscribed",
+        "id,company,vertical,region,website,phone,contact_name,contact_title,contact_email,instagram_handle,email_confidence,priority,emailed,sequence_step,bounced,unsubscribed",
       )
       .order("created_at", { ascending: false })
       .limit(300);
@@ -222,6 +224,36 @@ export default function Outreach() {
     } finally {
       setSending(null);
     }
+  }
+
+  function dmText(l: Lead) {
+    return `Hey ${l.company}! I run partnerships at Side Huddle Sports — AI-enhanced fan group chats where fans pack into live rooms every game day. We're signing one exclusive sponsor per team before launch ($2k for 3 teams all season). Want me to send the details?`;
+  }
+
+  async function copyDm(l: Lead) {
+    try {
+      await navigator.clipboard.writeText(dmText(l));
+      toast({ title: "DM copied", description: l.instagram_handle ? `Paste into ${l.instagram_handle}` : l.company });
+    } catch {
+      toast({ title: "Copy failed", variant: "destructive" });
+    }
+  }
+
+  function downloadCsv() {
+    const cols = [
+      "company", "vertical", "region", "website", "phone", "contact_name",
+      "contact_title", "contact_email", "instagram_handle", "email_confidence",
+      "priority", "emailed", "sequence_step",
+    ] as const;
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = leads.map((l) => cols.map((c) => esc((l as Record<string, unknown>)[c])).join(","));
+    const csv = [cols.join(","), ...rows].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `sponsor-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   const withEmail = leads.filter((l) => l.contact_email).length;
@@ -369,9 +401,14 @@ export default function Outreach() {
             <p className="text-sm text-muted-foreground">
               {leads.length} leads · {withEmail} with email · {emailed} contacted
             </p>
-            <Button variant="ghost" size="sm" onClick={loadLeads}>
-              Refresh
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={downloadCsv} disabled={leads.length === 0}>
+                Download CSV
+              </Button>
+              <Button variant="ghost" size="sm" onClick={loadLeads}>
+                Refresh
+              </Button>
+            </div>
           </div>
           <Card className="overflow-hidden">
             <Table>
@@ -383,12 +420,13 @@ export default function Outreach() {
                   <TableHead>Instagram</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>Step</TableHead>
+                  <TableHead>DM</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {leads.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                       No leads yet. Run enrichment to populate.
                     </TableCell>
                   </TableRow>
@@ -432,6 +470,11 @@ export default function Outreach() {
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm" onClick={() => copyDm(l)}>
+                        Copy DM
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
