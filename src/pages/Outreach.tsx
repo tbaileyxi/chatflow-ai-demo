@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -66,6 +65,31 @@ export default function Outreach() {
   const [maxEmails, setMaxEmails] = useState("40");
   const [lastResult, setLastResult] = useState<SendResult | null>(null);
 
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setLoggingIn(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: loginEmail.trim(),
+        password: loginPassword,
+      });
+      if (error) throw error;
+      // useAuth's onAuthStateChange picks up the session and role automatically.
+    } catch (err) {
+      toast({
+        title: "Login failed",
+        description: err instanceof Error ? err.message : String(err),
+        variant: "destructive",
+      });
+    } finally {
+      setLoggingIn(false);
+    }
+  }
+
   async function loadLeads() {
     const { data, error } = await supabase
       .from("sponsor_leads")
@@ -93,11 +117,52 @@ export default function Outreach() {
       </div>
     );
   }
-  if (!user) return <Navigate to="/" replace />;
+  if (!user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <Card className="w-full max-w-sm space-y-4 p-6">
+          <div>
+            <h1 className="text-xl font-bold">Sponsor Outreach</h1>
+            <p className="text-sm text-muted-foreground">Sign in with your admin account.</p>
+          </div>
+          <form onSubmit={handleLogin} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="loginEmail">Email</Label>
+              <Input
+                id="loginEmail"
+                type="email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                autoComplete="username"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="loginPassword">Password</Label>
+              <Input
+                id="loginPassword"
+                type="password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loggingIn}>
+              {loggingIn ? "Signing in…" : "Sign in"}
+            </Button>
+          </form>
+        </Card>
+      </div>
+    );
+  }
   if (!isAdmin) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-        Admin access required.
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 text-muted-foreground">
+        <p>This account isn’t an admin.</p>
+        <Button variant="outline" size="sm" onClick={() => supabase.auth.signOut()}>
+          Sign out
+        </Button>
       </div>
     );
   }

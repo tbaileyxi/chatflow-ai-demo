@@ -65,7 +65,7 @@ function subject(step: number, lead: Lead): string {
   switch (step) {
     case 2: return `Following up — ${lead.company} x Side Huddle`;
     case 3: return `Closing the loop on ${lead.company}`;
-    default: return `${lead.company} in front of local sports fans`;
+    default: return `Put ${lead.company} on top of every fan room`;
   }
 }
 
@@ -92,14 +92,15 @@ function body(step: number, lead: Lead): string {
       <p style="font-size:13px;color:#999;margin:0;">Not relevant? Reply "unsubscribe" and I won't follow up.</p>`);
   }
 
-  // step 1
+  // step 1 — short, punchy, generic
+  const teamsPhrase = region ? `${region.split(",")[0]}'s teams` : "the teams your customers follow";
   return shell(`
     <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
-    <p style="margin:0 0 18px 0;">I run partnerships at <strong>Side Huddle</strong> — a sports app where fans join small group "huddles" to talk every game live. Think the energy of a group text during a big game, built for it.</p>
-    <p style="margin:0 0 18px 0;">We're opening a handful of sponsor slots and ${lead.company} stood out for reaching fans${where}. Sponsors get native placement in the live feed and scoreboard, tied to the teams our members follow — one brand per category, so ${v} stays exclusive.</p>
-    ${cta("See how sponsorship works")}
-    <p style="font-size:13px;color:#999;margin:0 0 4px 0;">Open to a quick look? Reply "interested" and I'll send the deck + pricing.</p>
-    <p style="font-size:12px;color:#bbb;margin:0;">No commitment — just exploring fit.</p>`);
+    <p style="margin:0 0 18px 0;">Imagine every fan group for ${teamsPhrase} — arguing, predicting, and reacting in live chat rooms on game day — with <strong>${lead.company}'s</strong> logo on top of all of them.</p>
+    <p style="margin:0 0 18px 0;">That's <strong>Side Huddle Sports</strong>. Hundreds of fan huddles running at once, an AI bot feeding them real-time stats and highlights, and one sponsor owning each team. Not one billboard — hundreds of live moments, every game.</p>
+    <p style="margin:0 0 18px 0;">We're locking <strong>founding partners</strong> before launch: <strong>$2,000 for 3 teams all season</strong> (later $4,500). One spot per team, first come.</p>
+    ${cta("Reserve your teams")}
+    <p style="font-size:14px;color:#555;margin:0;">Open to a quick look? Just reply with the teams you want.</p>`);
 }
 
 async function brevoSend(apiKey: string, to: string, subj: string, html: string): Promise<void> {
