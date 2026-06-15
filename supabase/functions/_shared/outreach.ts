@@ -37,8 +37,14 @@ export async function requireAdmin(req: Request): Promise<SupabaseClient> {
   );
 
   const { data: role, error } = await userClient.rpc("get_current_user_role");
-  if (error) throw json({ error: `Role check failed: ${error.message}` }, 403);
-  if (role !== "admin") throw json({ error: "Admin access required" }, 403);
+  if (error) {
+    console.error("[requireAdmin] role check error:", error.message);
+    throw json({ error: `Role check failed: ${error.message}` }, 403);
+  }
+  if (role !== "admin") {
+    console.error("[requireAdmin] non-admin role:", role);
+    throw json({ error: "Admin access required" }, 403);
+  }
 
   return serviceClient();
 }

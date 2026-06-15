@@ -40,6 +40,7 @@ async function placesTextSearch(
   const query = region ? `${vertical} in ${region}` : vertical;
   const collected: PlaceResult[] = [];
   let nextPageToken: string | undefined;
+  let firstPage = true;
 
   while (collected.length < maxResults) {
     const url = new URL(TEXT_SEARCH_URL);
@@ -51,16 +52,24 @@ async function placesTextSearch(
     url.searchParams.set("key", apiKey);
 
     const resp = await fetch(url.toString(), { cache: "no-store" });
-    if (!resp.ok) throw new Error(`Google Places request failed (${resp.status})`);
+    if (!resp.ok) {
+      if (firstPage) throw new Error(`Google Places request failed (${resp.status})`);
+      break;
+    }
     const payload = await resp.json();
     const status = payload.status ?? "UNKNOWN";
-    if (status !== "OK" && status !== "ZERO_RESULTS") {
-      throw new Error(payload.error_message || `Text Search failed: ${status}`);
+    if (status === "ZERO_RESULTS") break;
+    if (status !== "OK") {
+      // Only the first page is fatal. Later pages can return INVALID_REQUEST when the
+      // next_page_token isn't active yet — just stop and use what we already have.
+      if (firstPage) throw new Error(payload.error_message || `Text Search failed: ${status}`);
+      break;
     }
     collected.push(...((payload.results ?? []) as PlaceResult[]));
     nextPageToken = payload.next_page_token;
-    if (!nextPageToken || status === "ZERO_RESULTS") break;
-    await new Promise((r) => setTimeout(r, 2000)); // page tokens need a moment to activate
+    firstPage = false;
+    if (!nextPageToken) break;
+    await new Promise((r) => setTimeout(r, 2500)); // page tokens need a moment to activate
   }
   return collected.slice(0, maxResults);
 }
@@ -245,6 +254,7 @@ serve(async (req) => {
       rows,
     });
   } catch (e) {
+    console.error("[outreach-enrich] failed:", e instanceof Error ? e.stack || e.message : e);
     return json({ error: e instanceof Error ? e.message : "Enrichment failed" }, 500);
   }
 });
