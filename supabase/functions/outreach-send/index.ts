@@ -65,7 +65,7 @@ function subject(step: number, lead: Lead): string {
   switch (step) {
     case 2: return `Following up — ${lead.company} x Side Huddle`;
     case 3: return `Closing the loop on ${lead.company}`;
-    default: return `Put ${lead.company} on top of every fan room`;
+    default: return `Want to be the exclusive sponsor?`;
   }
 }
 
@@ -92,15 +92,16 @@ function body(step: number, lead: Lead): string {
       <p style="font-size:13px;color:#999;margin:0;">Not relevant? Reply "unsubscribe" and I won't follow up.</p>`);
   }
 
-  // step 1 — short, punchy, generic
-  const teamsPhrase = region ? `${region.split(",")[0]}'s teams` : "the teams your customers follow";
+  // step 1 — short, human, conversational
+  const teamsPhrase = region ? `${region.split(",")[0]}'s teams` : "your area's teams";
   return shell(`
     <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
-    <p style="margin:0 0 18px 0;">Imagine every fan group for ${teamsPhrase} — arguing, predicting, and reacting in live chat rooms on game day — with <strong>${lead.company}'s</strong> logo on top of all of them.</p>
-    <p style="margin:0 0 18px 0;">That's <strong>Side Huddle Sports</strong>. Hundreds of fan huddles running at once, an AI bot feeding them real-time stats and highlights, and one sponsor owning each team. Not one billboard — hundreds of live moments, every game.</p>
-    <p style="margin:0 0 18px 0;">We're locking <strong>founding partners</strong> before launch: <strong>$2,000 for 3 teams all season</strong> (later $4,500). One spot per team, first come.</p>
-    ${cta("Reserve your teams")}
-    <p style="font-size:14px;color:#555;margin:0;">Open to a quick look? Just reply with the teams you want.</p>`);
+    <p style="margin:0 0 18px 0;">Want to be the exclusive sponsor for ${teamsPhrase} this season?</p>
+    <p style="margin:0 0 18px 0;">Side Huddle Sports is AI-enhanced group chats where fans pack into live rooms on game day to predict, react, and talk trash. One brand owns each team, and your logo sits on top of every room.</p>
+    <p style="margin:0 0 18px 0;">We're signing founding partners before we launch: $2,000 for 3 teams all season (it goes to $4,500 after). One spot per team, first come.</p>
+    <p style="margin:0 0 18px 0;">Worth a quick look? Just reply with the teams you'd want and I'll hold them for you.</p>
+    ${cta("Grab your teams")}
+    <p style="font-size:14px;color:#555;margin:0;">Thanks,<br>Ty</p>`);
 }
 
 async function brevoSend(apiKey: string, to: string, subj: string, html: string): Promise<void> {
