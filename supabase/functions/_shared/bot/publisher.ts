@@ -56,9 +56,10 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
   let body = input.message;
   const embedUrl = input.newsLink && mode === "news" ? input.newsLink : null;
 
-  // Sponsor whisper: append "— presented by X" to the FIRST bot message of the
-  // calendar day for this team. One sponsor impression per team per day, on the
-  // highest-attention moment — never on every play.
+  // Sponsor whisper: append "— presented by X" to ~1 of every 5 bot messages
+  // for this team (the 1st, 6th, 11th… emission of the calendar day). Frequent
+  // enough to be real inventory, sparse enough to not pollute the feed. The
+  // always-on header line is separate (room header).
   try {
     const sinceMidnight = new Date();
     sinceMidnight.setUTCHours(0, 0, 0, 0);
@@ -67,7 +68,7 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
       .select("id", { count: "exact", head: true })
       .eq("team_id", teamId)
       .gte("created_at", sinceMidnight.toISOString());
-    if ((todayCount ?? 0) === 0) {
+    if ((todayCount ?? 0) % 5 === 0) {
       const { data: sponsor } = await client
         .from("team_sponsors")
         .select("brand_name, is_active, end_date")
