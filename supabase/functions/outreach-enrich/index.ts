@@ -163,6 +163,59 @@ async function apolloFindEmail(domain: string): Promise<Contact | null> {
   return null;
 }
 
+// ── homepage scrape (ported from enrichment.py: _find_email_homepage / find_instagram) ──
+// The reliable, no-quota path: pull email + Instagram straight off the company site.
+const IG_SKIP = new Set(["p", "explore", "accounts", "stories", "reels", "tv", "direct", "sharer", "embed"]);
+
+function emailsFromHtml(html: string): string[] {
+  const out = new Set<string>();
+  for (const m of html.matchAll(/mailto:([^\s"'<>?&]+)/gi)) out.add(m[1].toLowerCase().trim());
+  for (const m of html.matchAll(/\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g)) {
+    out.add(m[0].toLowerCase().trim());
+  }
+  return [...out];
+}
+
+function igHandle(html: string): string {
+  const m = html.match(/instagram\.com\/([A-Za-z0-9_.]+)/i);
+  if (m && !IG_SKIP.has(m[1].toLowerCase())) return `@${m[1]}`;
+  return "";
+}
+
+async function scrapeSite(website: string): Promise<{ email: string | null; confidence: string; instagram: string }> {
+  const base = website.replace(/\/$/, "");
+  const paths = ["", "/contact", "/contact-us", "/about", "/about-us"];
+  let acceptableFallback: string | null = null;
+  let instagram = "";
+
+  for (const p of paths) {
+    let html = "";
+    try {
+      const r = await fetch(base + p, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; sidehuddle-bot/1.0)" },
+        signal: AbortSignal.timeout(7000),
+      });
+      if (!r.ok) continue;
+      html = await r.text();
+    } catch {
+      continue;
+    }
+    if (!instagram) instagram = igHandle(html);
+
+    const emails = emailsFromHtml(html);
+    const personal = emails.find((e) => isPersonal(e));
+    if (personal) return { email: personal, confidence: "high", instagram };
+    if (!acceptableFallback) acceptableFallback = emails.find((e) => isAcceptable(e)) ?? null;
+
+    if (acceptableFallback && instagram) break; // got the useful bits, stop early
+  }
+  return {
+    email: acceptableFallback,
+    confidence: acceptableFallback ? "medium" : "low",
+    instagram,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -195,15 +248,25 @@ serve(async (req) => {
     let withEmail = 0;
     const rows: Array<Record<string, unknown>> = [];
 
-    // 2. For each, get website + phone, then find a contact email (Apollo → Hunter).
+    // 2. For each, get website + phone, then find email + Instagram.
+    //    Waterfall: Apollo (named decision-maker, if unlocked) → site scrape → Hunter.
     for (const p of places) {
       if (!p.place_id) continue;
       const { website, phone } = await placeDetails(placesKey, p.place_id);
       const domain = normalizeDomain(website);
 
-      let contact: Contact | null = null;
-      if (domain) {
-        contact = (await apolloFindEmail(domain)) || (await hunterFindEmail(domain));
+      let contact: Contact | null = domain ? await apolloFindEmail(domain) : null;
+      let instagram = "";
+
+      if (website) {
+        const scraped = await scrapeSite(website);
+        instagram = scraped.instagram;
+        if (!contact?.email && scraped.email) {
+          contact = { email: scraped.email, confidence: scraped.confidence, name: null, title: null };
+        }
+      }
+      if (!contact?.email && domain) {
+        contact = (await hunterFindEmail(domain)) ?? contact;
       }
       if (contact?.email) withEmail++;
 
@@ -216,11 +279,12 @@ serve(async (req) => {
         phone: phone || null,
         rating: p.rating ?? null,
         review_count: p.user_ratings_total ?? null,
+        instagram_handle: instagram || null,
         contact_name: contact?.name ?? null,
         contact_title: contact?.title ?? null,
         contact_email: contact?.email ?? null,
         email_confidence: contact?.confidence ?? "low",
-        // TIER1 = reachable sponsorship/marketing decision-maker; TIER2 = everyone else.
+        // TIER1 = reachable named decision-maker; TIER2 = everyone else.
         priority: contact?.email && titleTier(contact.title || "") <= 2 ? "TIER1" : "TIER2",
       });
     }

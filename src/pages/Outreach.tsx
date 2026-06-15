@@ -25,6 +25,7 @@ type Lead = {
   contact_name: string | null;
   contact_title: string | null;
   contact_email: string | null;
+  instagram_handle: string | null;
   email_confidence: string | null;
   priority: string | null;
   emailed: boolean;
@@ -94,7 +95,7 @@ export default function Outreach() {
     const { data, error } = await supabase
       .from("sponsor_leads")
       .select(
-        "id,company,vertical,region,contact_name,contact_title,contact_email,email_confidence,priority,emailed,sequence_step,bounced,unsubscribed",
+        "id,company,vertical,region,contact_name,contact_title,contact_email,instagram_handle,email_confidence,priority,emailed,sequence_step,bounced,unsubscribed",
       )
       .order("created_at", { ascending: false })
       .limit(300);
@@ -379,6 +380,7 @@ export default function Outreach() {
                   <TableHead>Company</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Instagram</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>Step</TableHead>
                 </TableRow>
@@ -386,7 +388,7 @@ export default function Outreach() {
               <TableBody>
                 {leads.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                       No leads yet. Run enrichment to populate.
                     </TableCell>
                   </TableRow>
@@ -408,6 +410,20 @@ export default function Outreach() {
                       {l.contact_email || <span className="text-muted-foreground">not found</span>}
                       {l.bounced && <span className="ml-1 text-destructive">(bounced)</span>}
                       {l.unsubscribed && <span className="ml-1 text-destructive">(unsub)</span>}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {l.instagram_handle ? (
+                        <a
+                          href={`https://instagram.com/${l.instagram_handle.replace(/^@/, "")}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sky-400 hover:underline"
+                        >
+                          {l.instagram_handle}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>{priorityBadge(l.priority)}</TableCell>
                     <TableCell>
