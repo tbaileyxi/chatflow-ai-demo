@@ -21,10 +21,25 @@ interface YouTubeSearchResult {
 
 // Trusted highlight channels (fast uploads, embeddable)
 const TRUSTED_CHANNELS = [
-  'NFL', 'NBA', 'ESPN', 'CBS Sports', 'Fox Sports',
+  'MLB', 'NFL', 'NBA', 'NHL', 'ESPN', 'CBS Sports', 'Fox Sports',
   'Highlight Heaven', 'Harris Highlights', 'Ding Productions',
-  'SEC Network', 'ACC Network', 'Big Ten Network'
+  'SEC Network', 'ACC Network', 'Big Ten Network', 'Bleacher Report',
+  'House of Highlights',
 ];
+
+// Junk to exclude — video-game sims, full broadcasts, livestreams, etc.
+// The biggest offender is "MLB The Show" gameplay that floods these searches.
+const BAD_TITLE = [
+  'the show', 'mlb the show', 'simulation', 'simulated', 'gameplay',
+  'full game', 'full broadcast', 'live stream', 'livestream', 'watch live',
+  'road to the show', 'franchise', 'mlb 2', 'nba 2k', 'madden', 'ps5', 'xbox',
+  'reaction', 'predict', 'preview', 'press conference',
+];
+
+function isJunk(title: string): boolean {
+  const t = title.toLowerCase();
+  return BAD_TITLE.some((b) => t.includes(b));
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -73,9 +88,12 @@ Deno.serve(async (req) => {
       searchUrl.searchParams.set('part', 'snippet');
       searchUrl.searchParams.set('q', query);
       searchUrl.searchParams.set('type', 'video');
-      searchUrl.searchParams.set('order', 'date');
-      searchUrl.searchParams.set('maxResults', '10');
+      searchUrl.searchParams.set('order', 'relevance');
+      searchUrl.searchParams.set('maxResults', '15');
       searchUrl.searchParams.set('videoEmbeddable', 'true');
+      // medium = 4–20 min → real highlight reels, excludes 1-hour full
+      // games and video-game sims.
+      searchUrl.searchParams.set('videoDuration', 'medium');
       searchUrl.searchParams.set('publishedAfter', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
       searchUrl.searchParams.set('key', YOUTUBE_API_KEY);
 
@@ -86,19 +104,24 @@ Deno.serve(async (req) => {
       }
 
       const data = await response.json();
-      const videos = data.items as YouTubeSearchResult[];
+      const videos = (data.items as YouTubeSearchResult[]) ?? [];
 
-      if (!videos || videos.length === 0) continue;
+      // Drop video-game sims, full broadcasts, reactions, etc.
+      const clean = videos.filter((v) => !isJunk(v.snippet.title));
+      if (clean.length === 0) continue;
 
-      // Prioritize trusted channels
-      const trusted = videos.find(v => 
-        TRUSTED_CHANNELS.some(ch => 
-          v.snippet.channelTitle.toLowerCase().includes(ch.toLowerCase())
-        )
+      // Prefer a trusted channel; otherwise prefer a title that actually says
+      // "highlight"; otherwise the top clean result.
+      const trusted = clean.find((v) =>
+        TRUSTED_CHANNELS.some((ch) =>
+          v.snippet.channelTitle.toLowerCase().includes(ch.toLowerCase()),
+        ),
       );
-      
-      foundVideo = trusted || videos[0];
-      
+      const sayshighlight = clean.find((v) =>
+        v.snippet.title.toLowerCase().includes('highlight'),
+      );
+      foundVideo = trusted || sayshighlight || clean[0];
+
       if (foundVideo) {
         console.log(`✅ Found video: "${foundVideo.snippet.title}" by ${foundVideo.snippet.channelTitle}`);
         break;

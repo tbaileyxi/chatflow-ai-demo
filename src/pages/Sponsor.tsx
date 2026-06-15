@@ -255,8 +255,7 @@ export default function Sponsor() {
       <Moment featured={featured} />
       <PlatformPreview />
       <WhatYouGet />
-      <ROISection />
-      <RateCard free={free} />
+      {/* No pricing tables / bundle checkout — pick teams, then email us. */}
       <div ref={formRef}>
         <TeamPicker
           filtered={filtered} selected={selected} toggle={toggle}
@@ -322,7 +321,7 @@ function Hero({ onCta }: { onCta: () => void }) {
         </div>
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 36 }}>
           <button className="btn-gold" onClick={onCta}>Claim your team →</button>
-          <button className="btn-outline" onClick={() => document.getElementById('rate-card')?.scrollIntoView({ behavior: 'smooth' })}>How it works</button>
+          <button className="btn-outline" onClick={() => document.getElementById('placements')?.scrollIntoView({ behavior: 'smooth' })}>How it works</button>
         </div>
       </div>
     </section>
@@ -414,7 +413,7 @@ const PLACEMENT_CARDS = [
 
 function PlatformPreview() {
   return (
-    <section className="sh-section" style={{ borderTop: `1px solid ${G.border}` }}>
+    <section id="placements" className="sh-section" style={{ borderTop: `1px solid ${G.border}` }}>
       <div className="sh-label">02 — THE PLATFORM</div>
       <h2 style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(36px, 5vw, 60px)', lineHeight: 1.0, marginTop: 16, textTransform: 'uppercase' }}>
         Three placements. <span style={{ color: G.gold }}>One sponsor.</span> Always on.
