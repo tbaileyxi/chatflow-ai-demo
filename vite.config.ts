@@ -2,7 +2,6 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
-import { VitePWA } from 'vite-plugin-pwa';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -10,39 +9,12 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  // PWA/service-worker removed: it relied on a flaky workbox/ajv build dep and
+  // its aggressive precache was serving stale pages (old logo, old pricing).
+  // The marketing/landing/invite site doesn't need offline support.
   plugins: [
     react(),
     mode === 'development' && componentTagger(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-      },
-      manifest: {
-        name: 'Side Huddle',
-        short_name: 'Huddle',
-        description: 'AI-powered sports chat',
-        theme_color: '#000000',
-        background_color: '#ffffff',
-        display: 'standalone',
-        orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
-        icons: [
-          {
-            src: '/src/assets/sh-logo-updated.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: '/src/assets/sh-logo-updated.png',
-            sizes: '512x512',
-            type: 'image/png'
-          }
-        ]
-      }
-    })
   ].filter(Boolean),
   resolve: {
     alias: {
