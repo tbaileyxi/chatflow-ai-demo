@@ -119,21 +119,27 @@ const SPONSORSHIP_TITLES = [
   "brand partnership", "sponsor",
 ];
 const MARKETING_TITLES = [
-  "cmo", "chief marketing", "vp marketing", "vice president marketing", "vp of marketing",
-  "marketing director", "director of marketing", "marketing manager", "head of marketing",
-  "marketing lead", "brand", "media buyer", "advertising", "growth",
+  "marketing", "cmo", "chief marketing", "brand", "advertising", "media buyer",
+  "communications", "public relations", " pr ", "growth", "demand generation", "digital",
 ];
-const OWNER_TITLES = [
-  "owner", "founder", "co-founder", "cofounder", "president", "ceo", "chief executive",
-  "principal", "managing director", "managing partner", "proprietor",
+// Any senior decision-maker — used so we still get a named exec when there's no
+// marketing/sponsorship person in Apollo's data for that company.
+const LEADERSHIP_TITLES = [
+  "owner", "founder", "co-founder", "cofounder", "proprietor",
+  "ceo", "chief executive", "coo", "chief operating", "president", "principal",
+  "general manager", "managing director", "managing partner", "partner",
+  "chief", "vice president", "vp ", "vp,", "evp", "svp", "head of", "director",
 ];
 
-/** Lower number = contact first. 1 = sponsorship/partnerships, 2 = marketing, 3 = owner/CEO, 4 = other. */
+/**
+ * Lower number = contact first.
+ * 1 = sponsorship/partnerships, 2 = marketing/brand/comms, 3 = any senior exec, 4 = other.
+ */
 export function titleTier(title: string): number {
-  const t = (title || "").toLowerCase();
+  const t = ` ${(title || "").toLowerCase()} `;
   if (SPONSORSHIP_TITLES.some((kw) => t.includes(kw))) return 1;
   if (MARKETING_TITLES.some((kw) => t.includes(kw))) return 2;
-  if (OWNER_TITLES.some((kw) => t.includes(kw))) return 3;
+  if (LEADERSHIP_TITLES.some((kw) => t.includes(kw))) return 3;
   return 4;
 }
 

@@ -138,21 +138,24 @@ async function hunterFindEmail(domain: string): Promise<Contact | null> {
 async function apolloFindEmail(domain: string): Promise<Contact | null> {
   const key = Deno.env.get("APOLLO_API_KEY");
   if (!key || !domain) return null;
-  try {
-    // 1. Search people at this domain by target title.
-    const sResp = await fetch(APOLLO_SEARCH_URL, {
+  type Person = { id?: string; title?: string; has_email?: boolean };
+  const search = async (withTitles: boolean): Promise<Person[]> => {
+    const body: Record<string, unknown> = { q_organization_domains: domain, page: 1, per_page: 25 };
+    if (withTitles) body.person_titles = APOLLO_TITLES;
+    const r = await fetch(APOLLO_SEARCH_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Api-Key": key },
-      body: JSON.stringify({
-        q_organization_domains: domain,
-        page: 1,
-        per_page: 25,
-        person_titles: APOLLO_TITLES,
-      }),
+      body: JSON.stringify(body),
     });
-    if (!sResp.ok) return null;
-    const sData = await sResp.json();
-    const people = (sData.people ?? []) as Array<{ id?: string; title?: string; has_email?: boolean }>;
+    if (!r.ok) return [];
+    return ((await r.json()).people ?? []) as Person[];
+  };
+
+  try {
+    // 1. Prefer marketing/sponsorship titles; if Apollo has none for this company,
+    //    fall back to everyone at the domain and rank them ourselves.
+    let people = await search(true);
+    if (!people.length) people = await search(false);
     if (!people.length) return null;
 
     // Best title tier first; within a tier, prefer someone Apollo has an email for.
@@ -160,7 +163,8 @@ async function apolloFindEmail(domain: string): Promise<Contact | null> {
       titleTier(a.title || "") - titleTier(b.title || "") ||
       (b.has_email ? 1 : 0) - (a.has_email ? 1 : 0)
     );
-    const best = people.find((p) => p.id);
+    // Skip rank-and-file (recruiters, tellers, analysts) — only contact tier 1–3.
+    const best = people.find((p) => p.id && titleTier(p.title || "") <= 3);
     if (!best?.id) return null;
 
     // 2. Enrich that one person to reveal the email (spends a credit).
