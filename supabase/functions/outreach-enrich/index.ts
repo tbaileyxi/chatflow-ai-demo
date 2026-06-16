@@ -250,6 +250,49 @@ async function scrapeSite(website: string): Promise<{ email: string | null; conf
   };
 }
 
+// ── Apollo company discovery (primary path — finds brands, not store locations) ──
+const APOLLO_ORG_URL = "https://api.apollo.io/api/v1/mixed_companies/search";
+
+type Company = { name: string; website: string; domain: string };
+
+async function apolloOrgSearch(vertical: string, region: string, cap: number): Promise<Company[]> {
+  const key = Deno.env.get("APOLLO_API_KEY");
+  if (!key) return [];
+  const out = new Map<string, Company>();
+  try {
+    for (let page = 1; page <= 4 && out.size < cap; page++) {
+      const body: Record<string, unknown> = {
+        q_organization_keyword_tags: [vertical],
+        page,
+        per_page: 25,
+      };
+      if (region) body.organization_locations = [region];
+      const r = await fetch(APOLLO_ORG_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": key },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) break;
+      const data = await r.json();
+      const orgs = (data.organizations ?? data.accounts ?? []) as Array<{
+        name?: string;
+        primary_domain?: string;
+        website_url?: string;
+      }>;
+      if (!orgs.length) break;
+      for (const o of orgs) {
+        const domain = normalizeDomain(o.primary_domain || o.website_url || "");
+        if (!domain || out.has(domain)) continue;
+        out.set(domain, { name: o.name || domain, website: o.website_url || `https://${domain}`, domain });
+        if (out.size >= cap) break;
+      }
+    }
+  } catch (e) {
+    console.error("[apollo org] error:", e instanceof Error ? e.message : e);
+  }
+  return [...out.values()];
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -270,30 +313,45 @@ serve(async (req) => {
     const reg = region ? String(region).trim() : "";
     const cap = Math.min(Math.max(Number(maxResults) || 25, 1), 60);
 
-    const placesKey = Deno.env.get("GOOGLE_PLACES_API_KEY");
-    if (!placesKey) return json({ error: "GOOGLE_PLACES_API_KEY not configured" }, 500);
+    // 1. Discover companies. Apollo company search first (returns brands, one per
+    //    company); fall back to Google Places only for hyper-local searches Apollo
+    //    doesn't index.
+    type Disc = { name: string; website: string; domain: string };
+    let companies: Disc[] = (await apolloOrgSearch(v, reg, cap)).map((o) => ({
+      name: o.name,
+      website: o.website,
+      domain: o.domain,
+    }));
+    let source = "apollo";
 
-    // 1. Discover businesses via Places, keep well-reviewed ones (reference thresholds).
-    const thresholds = getThresholds(v);
-    const places = (await placesTextSearch(placesKey, v, reg, cap)).filter(
-      (p) => (p.rating ?? 0) >= thresholds.minRating && (p.user_ratings_total ?? 0) >= thresholds.minReviews,
-    );
+    if (!companies.length) {
+      source = "places";
+      const placesKey = Deno.env.get("GOOGLE_PLACES_API_KEY");
+      if (placesKey) {
+        const thresholds = getThresholds(v);
+        const places = (await placesTextSearch(placesKey, v, reg, cap)).filter(
+          (p) => (p.rating ?? 0) >= thresholds.minRating && (p.user_ratings_total ?? 0) >= thresholds.minReviews,
+        );
+        for (const p of places) {
+          if (!p.place_id) continue;
+          const { website } = await placeDetails(placesKey, p.place_id);
+          companies.push({ name: p.name || "", website, domain: normalizeDomain(website) });
+        }
+      }
+    }
 
     let withEmail = 0;
     const rows: Array<Record<string, unknown>> = [];
 
-    // 2. For each, get website + phone, then find email + Instagram.
-    //    Waterfall: Apollo (named decision-maker, if unlocked) → site scrape → Hunter.
-    for (const p of places) {
-      if (!p.place_id) continue;
-      const { website, phone } = await placeDetails(placesKey, p.place_id);
-      const domain = normalizeDomain(website);
-
+    // 2. For each company, find the decision-maker email + Instagram.
+    //    Waterfall: Apollo people (named) → site scrape → Hunter.
+    for (const c of companies) {
+      const domain = c.domain;
       let contact: Contact | null = domain ? await apolloFindEmail(domain) : null;
       let instagram = "";
 
-      if (website) {
-        const scraped = await scrapeSite(website);
+      if (c.website) {
+        const scraped = await scrapeSite(c.website);
         instagram = scraped.instagram;
         if (!contact?.email && scraped.email) {
           contact = { email: scraped.email, confidence: scraped.confidence, name: null, title: null };
@@ -307,19 +365,16 @@ serve(async (req) => {
       rows.push({
         vertical: v,
         region: reg || null,
-        company: p.name || "",
-        website: website || null,
+        company: c.name || domain,
+        website: c.website || null,
         domain: domain || null,
-        phone: phone || null,
-        rating: p.rating ?? null,
-        review_count: p.user_ratings_total ?? null,
         instagram_handle: instagram || null,
         contact_name: contact?.name ?? null,
         contact_title: contact?.title ?? null,
         contact_email: contact?.email ?? null,
         email_confidence: contact?.confidence ?? "low",
         // TIER1 = reachable named decision-maker; TIER2 = everyone else.
-        priority: contact?.email && titleTier(contact.title || "") <= 2 ? "TIER1" : "TIER2",
+        priority: contact?.email && titleTier(contact.title || "") <= 3 ? "TIER1" : "TIER2",
       });
     }
 
@@ -348,7 +403,7 @@ serve(async (req) => {
       found: rows.length,
       stored,
       withEmail,
-      usedApollo: !!Deno.env.get("APOLLO_API_KEY"),
+      source,
       rows,
     });
   } catch (e) {
