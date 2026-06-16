@@ -57,6 +57,7 @@ export default function Outreach() {
   const { toast } = useToast();
 
   const [vertical, setVertical] = useState("");
+  const [company, setCompany] = useState("");
   const [region, setRegion] = useState("");
   const [maxResults, setMaxResults] = useState("25");
 
@@ -172,14 +173,14 @@ export default function Outreach() {
   }
 
   async function runEnrich() {
-    if (!vertical.trim()) {
-      toast({ title: "Enter a vertical", variant: "destructive" });
+    if (!vertical.trim() && !company.trim()) {
+      toast({ title: "Enter a vertical or a company", variant: "destructive" });
       return;
     }
     setEnriching(true);
     try {
       const { data, error } = await supabase.functions.invoke("outreach-enrich", {
-        body: { vertical, region, maxResults: Number(maxResults) || 25 },
+        body: { vertical, company, region, maxResults: Number(maxResults) || 25 },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -289,13 +290,24 @@ export default function Outreach() {
           <Card className="space-y-4 p-5">
             <h2 className="text-lg font-semibold">1 · Find prospects</h2>
             <div className="space-y-1.5">
-              <Label htmlFor="vertical">Vertical</Label>
+              <Label htmlFor="vertical">Vertical / category</Label>
               <Input
                 id="vertical"
                 value={vertical}
                 onChange={(e) => setVertical(e.target.value)}
-                placeholder="e.g. QSR, auto dealers, regional banks"
+                placeholder="e.g. restaurants, auto dealers, banks"
               />
+              <p className="text-xs text-muted-foreground">Finds many companies in this category.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="company">Company name (optional)</Label>
+              <Input
+                id="company"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="e.g. Bojangles"
+              />
+              <p className="text-xs text-muted-foreground">Target one specific brand. Overrides the vertical.</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="region">Region (optional)</Label>

@@ -255,17 +255,49 @@ const APOLLO_ORG_URL = "https://api.apollo.io/api/v1/mixed_companies/search";
 
 type Company = { name: string; website: string; domain: string };
 
-async function apolloOrgSearch(vertical: string, region: string, cap: number): Promise<Company[]> {
+// Map common sponsor-vertical jargon to keyword tags real companies actually carry
+// (e.g. "QSR" → restaurants, otherwise it matches vendors that *serve* QSRs).
+const VERTICAL_SYNONYMS: Record<string, string[]> = {
+  "qsr": ["fast food", "quick service restaurant", "restaurants"],
+  "fast food": ["fast food", "quick service restaurant", "restaurants"],
+  "restaurant": ["restaurants"],
+  "restaurants": ["restaurants"],
+  "bank": ["banking"],
+  "banks": ["banking"],
+  "credit union": ["credit unions", "banking"],
+  "credit unions": ["credit unions", "banking"],
+  "auto dealer": ["car dealership", "automotive"],
+  "auto dealers": ["car dealership", "automotive"],
+  "car dealer": ["car dealership", "automotive"],
+  "car dealers": ["car dealership", "automotive"],
+  "sportsbook": ["sports betting", "gambling"],
+  "sportsbooks": ["sports betting", "gambling"],
+  "brewery": ["breweries", "craft beer"],
+  "breweries": ["breweries", "craft beer"],
+  "gym": ["fitness", "gyms"],
+  "gyms": ["fitness", "gyms"],
+};
+
+function keywordTags(vertical: string): string[] {
+  const k = (vertical || "").toLowerCase().trim();
+  return VERTICAL_SYNONYMS[k] ?? (vertical ? [vertical] : []);
+}
+
+async function apolloOrgSearch(
+  vertical: string,
+  company: string,
+  region: string,
+  cap: number,
+): Promise<Company[]> {
   const key = Deno.env.get("APOLLO_API_KEY");
   if (!key) return [];
   const out = new Map<string, Company>();
   try {
     for (let page = 1; page <= 4 && out.size < cap; page++) {
-      const body: Record<string, unknown> = {
-        q_organization_keyword_tags: [vertical],
-        page,
-        per_page: 25,
-      };
+      const body: Record<string, unknown> = { page, per_page: 25 };
+      // A specific company name overrides the vertical search.
+      if (company) body.q_organization_name = company;
+      else body.q_organization_keyword_tags = keywordTags(vertical);
       if (region) body.organization_locations = [region];
       const r = await fetch(APOLLO_ORG_URL, {
         method: "POST",
@@ -305,11 +337,12 @@ serve(async (req) => {
   }
 
   try {
-    const { vertical, region, maxResults = 25 } = await req.json();
-    if (!vertical || !String(vertical).trim()) {
-      return json({ error: "vertical is required" }, 400);
+    const { vertical, company, region, maxResults = 25 } = await req.json();
+    const v = vertical ? String(vertical).trim() : "";
+    const co = company ? String(company).trim() : "";
+    if (!v && !co) {
+      return json({ error: "Enter a vertical or a company name" }, 400);
     }
-    const v = String(vertical).trim();
     const reg = region ? String(region).trim() : "";
     const cap = Math.min(Math.max(Number(maxResults) || 25, 1), 60);
 
@@ -317,14 +350,15 @@ serve(async (req) => {
     //    company); fall back to Google Places only for hyper-local searches Apollo
     //    doesn't index.
     type Disc = { name: string; website: string; domain: string };
-    let companies: Disc[] = (await apolloOrgSearch(v, reg, cap)).map((o) => ({
+    let companies: Disc[] = (await apolloOrgSearch(v, co, reg, cap)).map((o) => ({
       name: o.name,
       website: o.website,
       domain: o.domain,
     }));
     let source = "apollo";
 
-    if (!companies.length) {
+    // Places fallback only makes sense for a vertical (not a named company).
+    if (!companies.length && v && !co) {
       source = "places";
       const placesKey = Deno.env.get("GOOGLE_PLACES_API_KEY");
       if (placesKey) {
