@@ -12,8 +12,6 @@ import {
   normalizeDomain,
 } from "../_shared/outreach.ts";
 
-const TEXT_SEARCH_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json";
-const PLACE_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json";
 const APOLLO_SEARCH_URL = "https://api.apollo.io/v1/mixed_people/api_search";
 const APOLLO_MATCH_URL = "https://api.apollo.io/api/v1/people/match?reveal_personal_emails=true";
 
@@ -25,78 +23,6 @@ const APOLLO_TITLES = [
   "director of marketing", "head of marketing", "marketing manager", "brand manager",
   "ceo", "chief executive officer", "owner", "founder", "president", "general manager",
 ];
-
-// ── Google Places (ported from lib/prospector.ts) ──────────────────────────────
-function getThresholds(vertical: string): { minRating: number; minReviews: number } {
-  const lower = vertical.toLowerCase();
-  const financeLike = /(bank|banking|financial|advisor|advisory|wealth|accounting|accountant|insurance|mortgage|credit union|investment)/i.test(lower);
-  const legalLike = /(\blawyer\b|\battorney\b|\blaw firm\b|\blegal\b)/i.test(lower);
-  return { minRating: 4.0, minReviews: financeLike ? 3 : legalLike ? 5 : 5 };
-}
-
-type PlaceResult = {
-  name?: string;
-  rating?: number;
-  user_ratings_total?: number;
-  place_id?: string;
-};
-
-async function placesTextSearch(
-  apiKey: string,
-  vertical: string,
-  region: string,
-  maxResults: number,
-): Promise<PlaceResult[]> {
-  const query = region ? `${vertical} in ${region}` : vertical;
-  const collected: PlaceResult[] = [];
-  let nextPageToken: string | undefined;
-  let firstPage = true;
-
-  while (collected.length < maxResults) {
-    const url = new URL(TEXT_SEARCH_URL);
-    if (nextPageToken) {
-      url.searchParams.set("pagetoken", nextPageToken);
-    } else {
-      url.searchParams.set("query", query);
-    }
-    url.searchParams.set("key", apiKey);
-
-    const resp = await fetch(url.toString(), { cache: "no-store" });
-    if (!resp.ok) {
-      if (firstPage) throw new Error(`Google Places request failed (${resp.status})`);
-      break;
-    }
-    const payload = await resp.json();
-    const status = payload.status ?? "UNKNOWN";
-    if (status === "ZERO_RESULTS") break;
-    if (status !== "OK") {
-      // Only the first page is fatal. Later pages can return INVALID_REQUEST when the
-      // next_page_token isn't active yet — just stop and use what we already have.
-      if (firstPage) throw new Error(payload.error_message || `Text Search failed: ${status}`);
-      break;
-    }
-    collected.push(...((payload.results ?? []) as PlaceResult[]));
-    nextPageToken = payload.next_page_token;
-    firstPage = false;
-    if (!nextPageToken) break;
-    await new Promise((r) => setTimeout(r, 2500)); // page tokens need a moment to activate
-  }
-  return collected.slice(0, maxResults);
-}
-
-async function placeDetails(apiKey: string, placeId: string): Promise<{ website: string; phone: string }> {
-  const url = new URL(PLACE_DETAILS_URL);
-  url.searchParams.set("place_id", placeId);
-  url.searchParams.set("fields", "website,formatted_phone_number");
-  url.searchParams.set("key", apiKey);
-  const resp = await fetch(url.toString(), { cache: "no-store" });
-  if (!resp.ok) return { website: "", phone: "" };
-  const payload = await resp.json();
-  return {
-    website: payload.result?.website ?? "",
-    phone: payload.result?.formatted_phone_number ?? "",
-  };
-}
 
 // ── Hunter.io domain search (ported from enrichment.py:_find_email_hunter) ──────
 type Contact = { email: string; confidence: string; name: string | null; title: string | null };
@@ -292,14 +218,19 @@ async function apolloOrgSearch(
   const key = Deno.env.get("APOLLO_API_KEY");
   if (!key) return [];
   const out = new Map<string, Company>();
-  try {
-    for (let page = 1; page <= 4 && out.size < cap; page++) {
-      const body: Record<string, unknown> = { page, per_page: 25 };
-      // A specific company name overrides the vertical search.
-      if (company) body.q_organization_name = company;
-      else body.q_organization_keyword_tags = keywordTags(vertical);
-      // US-only: use the region if given (already domestic), else default to United States.
-      body.organization_locations = region ? [region] : ["United States"];
+  const locations = region ? [region] : ["United States"];
+
+  // Build query variants so one box handles both brands and categories:
+  //  - name search catches a specific brand ("DraftKings", "Raising Cane's")
+  //  - keyword search catches a category ("insurance", "restaurants")
+  const term = company || vertical;
+  const variants: Record<string, unknown>[] = [];
+  if (term) variants.push({ q_organization_name: term });
+  if (!company && vertical) variants.push({ q_organization_keyword_tags: keywordTags(vertical) });
+
+  const runQuery = async (variant: Record<string, unknown>) => {
+    for (let page = 1; page <= 3 && out.size < cap; page++) {
+      const body = { ...variant, organization_locations: locations, page, per_page: 25 };
       const r = await fetch(APOLLO_ORG_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Api-Key": key },
@@ -319,6 +250,13 @@ async function apolloOrgSearch(
         out.set(domain, { name: o.name || domain, website: o.website_url || `https://${domain}`, domain });
         if (out.size >= cap) break;
       }
+    }
+  };
+
+  try {
+    for (const variant of variants) {
+      if (out.size >= cap) break;
+      await runQuery(variant);
     }
   } catch (e) {
     console.error("[apollo org] error:", e instanceof Error ? e.message : e);
@@ -347,33 +285,15 @@ serve(async (req) => {
     const reg = region ? String(region).trim() : "";
     const cap = Math.min(Math.max(Number(maxResults) || 25, 1), 60);
 
-    // 1. Discover companies. Apollo company search first (returns brands, one per
-    //    company); fall back to Google Places only for hyper-local searches Apollo
-    //    doesn't index.
+    // 1. Discover companies via Apollo company search (brands + categories).
+    //    No Google Places fallback — it returned store locations / junk with no emails.
     type Disc = { name: string; website: string; domain: string };
-    let companies: Disc[] = (await apolloOrgSearch(v, co, reg, cap)).map((o) => ({
+    const companies: Disc[] = (await apolloOrgSearch(v, co, reg, cap)).map((o) => ({
       name: o.name,
       website: o.website,
       domain: o.domain,
     }));
-    let source = "apollo";
-
-    // Places fallback only makes sense for a vertical (not a named company).
-    if (!companies.length && v && !co) {
-      source = "places";
-      const placesKey = Deno.env.get("GOOGLE_PLACES_API_KEY");
-      if (placesKey) {
-        const thresholds = getThresholds(v);
-        const places = (await placesTextSearch(placesKey, v, reg, cap)).filter(
-          (p) => (p.rating ?? 0) >= thresholds.minRating && (p.user_ratings_total ?? 0) >= thresholds.minReviews,
-        );
-        for (const p of places) {
-          if (!p.place_id) continue;
-          const { website } = await placeDetails(placesKey, p.place_id);
-          companies.push({ name: p.name || "", website, domain: normalizeDomain(website) });
-        }
-      }
-    }
+    const source = "apollo";
 
     let withEmail = 0;
     const rows: Array<Record<string, unknown>> = [];
