@@ -298,7 +298,8 @@ async function apolloOrgSearch(
       // A specific company name overrides the vertical search.
       if (company) body.q_organization_name = company;
       else body.q_organization_keyword_tags = keywordTags(vertical);
-      if (region) body.organization_locations = [region];
+      // US-only: use the region if given (already domestic), else default to United States.
+      body.organization_locations = region ? [region] : ["United States"];
       const r = await fetch(APOLLO_ORG_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Api-Key": key },
