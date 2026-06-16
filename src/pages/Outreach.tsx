@@ -67,6 +67,7 @@ export default function Outreach() {
   const [live, setLive] = useState(false);
   const [maxEmails, setMaxEmails] = useState("40");
   const [lastResult, setLastResult] = useState<SendResult | null>(null);
+  const [tab, setTab] = useState<"prospects" | "contacted">("prospects");
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -239,9 +240,19 @@ export default function Outreach() {
     }
   }
 
+  async function deleteLead(l: Lead) {
+    const { error } = await supabase.from("sponsor_leads").delete().eq("id", l.id);
+    if (error) {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    setLeads((prev) => prev.filter((x) => x.id !== l.id));
+    toast({ title: "Removed", description: l.company });
+  }
+
   function downloadCsv() {
     const cols = [
-      "company", "vertical", "region", "website", "phone", "contact_name",
+      "company", "vertical", "region", "contact_name",
       "contact_title", "contact_email", "instagram_handle", "email_confidence",
       "priority", "emailed", "sequence_step",
     ] as const;
@@ -256,8 +267,10 @@ export default function Outreach() {
     URL.revokeObjectURL(url);
   }
 
-  const withEmail = leads.filter((l) => l.contact_email).length;
-  const emailed = leads.filter((l) => l.emailed).length;
+  const prospects = leads.filter((l) => !l.emailed);
+  const contacted = leads.filter((l) => l.emailed);
+  const shown = tab === "contacted" ? contacted : prospects;
+  const withEmail = prospects.filter((l) => l.contact_email).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -398,9 +411,22 @@ export default function Outreach() {
         {/* Right: leads table */}
         <div>
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              {leads.length} leads · {withEmail} with email · {emailed} contacted
-            </p>
+            <div className="flex gap-2">
+              <Button
+                variant={tab === "prospects" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setTab("prospects")}
+              >
+                Prospects ({prospects.length})
+              </Button>
+              <Button
+                variant={tab === "contacted" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setTab("contacted")}
+              >
+                Contacted ({contacted.length})
+              </Button>
+            </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={downloadCsv} disabled={leads.length === 0}>
                 Download CSV
@@ -410,6 +436,11 @@ export default function Outreach() {
               </Button>
             </div>
           </div>
+          <p className="mb-2 text-xs text-muted-foreground">
+            {tab === "prospects"
+              ? `${prospects.length} prospects · ${withEmail} with email`
+              : `${contacted.length} contacted`}
+          </p>
           <Card className="overflow-hidden">
             <Table>
               <TableHeader>
@@ -420,18 +451,20 @@ export default function Outreach() {
                   <TableHead>Instagram</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>Step</TableHead>
-                  <TableHead>DM</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {leads.length === 0 && (
+                {shown.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                      No leads yet. Run enrichment to populate.
+                      {tab === "prospects"
+                        ? "No prospects yet. Run enrichment to populate."
+                        : "Nothing contacted yet."}
                     </TableCell>
                   </TableRow>
                 )}
-                {leads.map((l) => (
+                {shown.map((l) => (
                   <TableRow key={l.id}>
                     <TableCell>
                       <div className="font-medium">{l.company}</div>
@@ -472,9 +505,19 @@ export default function Outreach() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button variant="outline" size="sm" onClick={() => copyDm(l)}>
-                        Copy DM
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button variant="outline" size="sm" onClick={() => copyDm(l)}>
+                          Copy DM
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => deleteLead(l)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -187,13 +187,18 @@ async function apolloFindEmail(domain: string): Promise<Contact | null> {
 // The reliable, no-quota path: pull email + Instagram straight off the company site.
 const IG_SKIP = new Set(["p", "explore", "accounts", "stories", "reels", "tv", "direct", "sharer", "embed"]);
 
-function emailsFromHtml(html: string): string[] {
-  const out = new Set<string>();
-  for (const m of html.matchAll(/mailto:([^\s"'<>?&]+)/gi)) out.add(m[1].toLowerCase().trim());
+// Split emails by trust: mailto: links are intentional contacts; bare-text emails
+// are only trusted when they're on the company's own domain (kills tracking tokens
+// / third-party emails embedded in page scripts, e.g. trp8z9...@7qa.jyl).
+function emailsFromHtml(html: string): { mailto: string[]; bare: string[] } {
+  const mailto = new Set<string>();
+  const bare = new Set<string>();
+  for (const m of html.matchAll(/mailto:([^\s"'<>?&]+)/gi)) mailto.add(m[1].toLowerCase().trim());
   for (const m of html.matchAll(/\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g)) {
-    out.add(m[0].toLowerCase().trim());
+    const e = m[0].toLowerCase().trim();
+    if (!mailto.has(e)) bare.add(e);
   }
-  return [...out];
+  return { mailto: [...mailto], bare: [...bare] };
 }
 
 function igHandle(html: string): string {
@@ -204,6 +209,7 @@ function igHandle(html: string): string {
 
 async function scrapeSite(website: string): Promise<{ email: string | null; confidence: string; instagram: string }> {
   const base = website.replace(/\/$/, "");
+  const siteDomain = normalizeDomain(website);
   const paths = ["", "/contact", "/contact-us", "/about", "/about-us"];
   let acceptableFallback: string | null = null;
   let instagram = "";
@@ -222,10 +228,14 @@ async function scrapeSite(website: string): Promise<{ email: string | null; conf
     }
     if (!instagram) instagram = igHandle(html);
 
-    const emails = emailsFromHtml(html);
-    const personal = emails.find((e) => isPersonal(e));
+    const { mailto, bare } = emailsFromHtml(html);
+    // Trust mailto: links + bare emails only on the company's own domain.
+    const sameDomainBare = bare.filter((e) => normalizeDomain(e.split("@")[1] || "") === siteDomain);
+    const candidates = [...mailto, ...sameDomainBare];
+
+    const personal = candidates.find((e) => isPersonal(e));
     if (personal) return { email: personal, confidence: "high", instagram };
-    if (!acceptableFallback) acceptableFallback = emails.find((e) => isAcceptable(e)) ?? null;
+    if (!acceptableFallback) acceptableFallback = candidates.find((e) => isAcceptable(e)) ?? null;
 
     if (acceptableFallback && instagram) break; // got the useful bits, stop early
   }
