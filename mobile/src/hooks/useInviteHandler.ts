@@ -25,7 +25,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
  *   exp://...?--/i/abc123 (Expo dev clients)
  *   https://sidehuddle.com/i/abc123 (future universal link)
  */
-function extractInviteCode(url: string): string | null {
+export function extractInviteCode(url: string): string | null {
   try {
     const { hostname, path, queryParams } = Linking.parse(url);
     // Custom scheme: sidehuddle://i/CODE → hostname = "i", path = "CODE"

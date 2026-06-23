@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { View, Text, Image, Alert, Pressable, Keyboard, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-import { Bell, Camera, Crown, LogOut, Shield, Megaphone } from "lucide-react-native";
+import { Bell, Camera, Crown, LogOut, Shield, Megaphone, X } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useAuth } from "@/hooks/useAuth";
 import { useInAppNotifications } from "@/hooks/useInAppNotifications";
+import { consumeInvite, extractInviteCode } from "@/hooks/useInviteHandler";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -197,12 +198,31 @@ export function ProfileScreen() {
     }
 
     const data = notification.data;
-    const dataHuddleId =
+    const obj =
       data && typeof data === "object" && !Array.isArray(data)
-        ? (data as { huddleId?: string }).huddleId
+        ? (data as { huddleId?: string; url?: string })
         : null;
-    const huddleId = notification.huddleId ?? dataHuddleId ?? null;
 
+    // Room invite: accept it (join + friend-connect) then route in. The invite
+    // notification carries a deep-link url and no huddleId, so without this the
+    // tap did nothing — the whole "join my huddle" flow was dead.
+    const inviteCode = obj?.url ? extractInviteCode(obj.url) : null;
+    if (inviteCode) {
+      const res = await consumeInvite(inviteCode, navigation as any);
+      if (!res.ok) {
+        Alert.alert(
+          "Couldn't join",
+          res.error?.includes("expired")
+            ? "That invite has expired — ask for a fresh one."
+            : // Surface the real reason so failures are diagnosable in the field
+              // instead of a dead-end "didn't work". (e.g. "invite not found".)
+              `This invite link didn't work. Ask them to re-send it.\n\n[${res.error ?? "unknown error"}] code: ${inviteCode}`,
+        );
+      }
+      return;
+    }
+
+    const huddleId = notification.huddleId ?? obj?.huddleId ?? null;
     if (huddleId) {
       navigation.navigate("Huddle" as any, { huddleId });
       return;
@@ -317,36 +337,70 @@ export function ProfileScreen() {
               </Text>
             ) : (
               <View className="gap-2">
-                {notifications.map((notification) => (
-                  <Pressable
-                    key={notification.id}
-                    className={`rounded-xl border p-3 active:opacity-80 ${
-                      notification.readAt
-                        ? "border-border bg-muted/20"
-                        : "border-primary/35 bg-primary/10"
-                    }`}
-                    onPress={() => handleOpenNotification(notification.id)}
-                  >
-                    <View className="flex-row items-start gap-2">
-                      {!notification.readAt && (
-                        <View className="mt-2 h-2 w-2 rounded-full bg-primary" />
-                      )}
-                      <View className="flex-1">
-                        <View className="flex-row items-start justify-between gap-2">
-                          <Text className="flex-1 text-sm font-bold text-foreground">
-                            {notification.title}
+                {notifications.map((notification) => {
+                  const d = notification.data;
+                  const isInvite =
+                    notification.type === "room_invite" ||
+                    (!!d &&
+                      typeof d === "object" &&
+                      !Array.isArray(d) &&
+                      typeof (d as { url?: string }).url === "string");
+                  return (
+                    <Pressable
+                      key={notification.id}
+                      className={`rounded-xl border p-3 active:opacity-80 ${
+                        notification.readAt
+                          ? "border-border bg-muted/20"
+                          : "border-primary/35 bg-primary/10"
+                      }`}
+                      onPress={() => handleOpenNotification(notification.id)}
+                    >
+                      <View className="flex-row items-start gap-2">
+                        {!notification.readAt && (
+                          <View className="mt-2 h-2 w-2 rounded-full bg-primary" />
+                        )}
+                        <View className="flex-1">
+                          <View className="flex-row items-start justify-between gap-2">
+                            <Text className="flex-1 text-sm font-bold text-foreground">
+                              {notification.title}
+                            </Text>
+                            <Text className="text-xs font-semibold text-muted-foreground">
+                              {formatNotificationTime(notification.createdAt)}
+                            </Text>
+                          </View>
+                          <Text className="mt-1 text-sm leading-5 text-muted-foreground">
+                            {notification.body}
                           </Text>
-                          <Text className="text-xs font-semibold text-muted-foreground">
-                            {formatNotificationTime(notification.createdAt)}
-                          </Text>
+
+                          {/* Pending invite: explicit Join + Dismiss so it's
+                              obvious how to act (not a guess-the-tap). */}
+                          {isInvite && !notification.readAt && (
+                            <View className="mt-2.5 flex-row items-center gap-2">
+                              <Pressable
+                                onPress={() => handleOpenNotification(notification.id)}
+                                className="flex-1 items-center rounded-lg bg-primary py-2 active:opacity-80"
+                              >
+                                <Text
+                                  className="text-sm font-bold"
+                                  style={{ color: colors.primaryForeground }}
+                                >
+                                  Join huddle
+                                </Text>
+                              </Pressable>
+                              <Pressable
+                                onPress={() => markRead(notification.id)}
+                                className="h-9 w-9 items-center justify-center rounded-lg border border-border active:opacity-70"
+                                hitSlop={8}
+                              >
+                                <X color={colors.mutedForeground} size={16} />
+                              </Pressable>
+                            </View>
+                          )}
                         </View>
-                        <Text className="mt-1 text-sm leading-5 text-muted-foreground">
-                          {notification.body}
-                        </Text>
                       </View>
-                    </View>
-                  </Pressable>
-                ))}
+                    </Pressable>
+                  );
+                })}
               </View>
             )}
           </CardContent>

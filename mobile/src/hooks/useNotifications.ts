@@ -6,6 +6,7 @@ import Constants from "expo-constants";
 import { useNavigation } from "@react-navigation/native";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { consumeInvite, extractInviteCode } from "@/hooks/useInviteHandler";
 
 // Configure notification handling behavior
 Notifications.setNotificationHandler({
@@ -89,6 +90,17 @@ export function useNotifications() {
     responseListener.current =
       Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data;
+
+        // Room invite: the payload carries an invite deep link (sidehuddle://i/CODE)
+        // and NO huddleId — tapping must actually ACCEPT the invite (join +
+        // friend-connect via accept_room_invite), then route into the huddle.
+        // Without this, tapping the push did nothing and the join silently failed.
+        const inviteCode =
+          typeof data?.url === "string" ? extractInviteCode(data.url) : null;
+        if (inviteCode) {
+          consumeInvite(inviteCode, navigation as any);
+          return;
+        }
 
         // Navigate based on notification type
         if (data?.huddleId) {
