@@ -1,5 +1,8 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import shLogo from '@/assets/sh-logo-updated.png';
+import { supabase } from '@/integrations/supabase/client';
+
+type ClaimStatus = 'reserved' | 'claimed';
 
 // ─── Brand palette ────────────────────────────────────────────────────────────
 const G = {
@@ -216,13 +219,36 @@ const ALL_TEAMS: StaticTeam[] = [
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Sponsor() {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search,   setSearch]   = useState('');
   const [league,   setLeague]   = useState<LeagueFilter>('ALL');
+  const [claims,   setClaims]   = useState<Record<string, ClaimStatus>>({});
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [justPaid, setJustPaid] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
   const free = freeMonths();
 
   const featured = ALL_TEAMS.find(t => t.city === 'Chicago' && t.league === 'NFL')!;
+
+  // Live claim statuses from real DB rows, if the optional status view exists.
+  async function loadClaims() {
+    const { data } = await supabase.from('sponsor_claim_status').select('team_key, status');
+    if (data) {
+      const m: Record<string, ClaimStatus> = {};
+      data.forEach((r: { team_key: string; status: ClaimStatus }) => { m[r.team_key] = r.status; });
+      setClaims(m);
+    }
+  }
+
+  useEffect(() => {
+    loadClaims();
+    // Returning from a completed Square checkout: ?paid=1
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('paid')) {
+      setJustPaid(true);
+      window.history.replaceState({}, '', '/sponsors');
+    }
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -233,8 +259,10 @@ export default function Sponsor() {
     });
   }, [search, league]);
 
-  const selectedTeams = ALL_TEAMS.filter(t => selected.has(teamKey(t)));
-  const price = bundlePrice(selectedTeams.length);
+  const claimedCount  = Object.values(claims).filter(s => s === 'claimed').length;
+  const reservedCount = Object.values(claims).filter(s => s === 'reserved').length;
+  const takenCount    = claimedCount + reservedCount;
+  const openCount     = ALL_TEAMS.length - takenCount;
 
   function toggle(t: StaticTeam) {
     const k = teamKey(t);
@@ -245,6 +273,7 @@ export default function Sponsor() {
     });
   }
 
+  const selectedTeams = ALL_TEAMS.filter(t => selected.has(teamKey(t)));
   const scrollToForm = () => formRef.current?.scrollIntoView({ behavior: 'smooth' });
 
   return (
@@ -255,22 +284,26 @@ export default function Sponsor() {
       <Moment featured={featured} />
       <PlatformPreview />
       <WhatYouGet />
-      {/* No pricing tables / bundle checkout — pick teams, then email us. */}
+      <ROISection />
+      <RateCard free={free} />
       <div ref={formRef}>
         <TeamPicker
-          filtered={filtered} selected={selected} toggle={toggle}
+          filtered={filtered} claims={claims} selected={selected} toggle={toggle}
           search={search} setSearch={setSearch}
           league={league} setLeague={setLeague}
-          free={free}
+          taken={takenCount} open={openCount}
         />
-        {selectedTeams.length > 0 && (
-          <ContactForm
-            selectedTeams={selectedTeams} price={price} free={free}
-            onClearAll={() => setSelected(new Set())}
-          />
-        )}
       </div>
       <Footer onCta={scrollToForm} />
+
+      {/* Sticky cart bar */}
+      {selectedTeams.length > 0 && !checkoutOpen && (
+        <CartBar teams={selectedTeams} onCheckout={() => setCheckoutOpen(true)} onClear={() => setSelected(new Set())} />
+      )}
+      {checkoutOpen && (
+        <CheckoutModal teams={selectedTeams} onClose={() => setCheckoutOpen(false)} />
+      )}
+      {justPaid && <PaidSuccess onClose={() => { setJustPaid(false); setSelected(new Set()); }} />}
     </div>
   );
 }
@@ -497,10 +530,10 @@ function ROISection() {
         <div>
           <div className="sh-label" style={{ marginBottom: 16 }}>COMPARABLE VALUE</div>
           <p style={{ fontSize: 18, lineHeight: 1.65, color: '#ddd' }}>
-            A single local radio spot runs <strong>$500–1,500/week</strong>. One local TV placement: <strong>$2,000–5,000</strong>. A Side Huddle founding sponsorship is a fraction of that — exclusive, always-on, inside the conversation when fans are most engaged.
+            A single local radio spot runs <strong>$500–1,500/week</strong>. One local TV placement: <strong>$2,000–5,000</strong>. A Side Huddle founding sponsorship comes in <strong>below the average local-sponsorship spend</strong> — exclusive, always-on, inside the conversation when fans are most engaged.
           </p>
           <p style={{ fontSize: 18, lineHeight: 1.65, color: '#ddd', marginTop: 16 }}>
-            Own an entire fanbase on Side Huddle. <strong style={{ color: G.gold }}>Reach out for current founding rates and availability.</strong>
+            Own an entire fanbase on Side Huddle. <strong style={{ color: G.gold }}>Reserve your team for $200 today — $550 balance due Aug 29.</strong>
           </p>
         </div>
       </div>
@@ -558,10 +591,13 @@ function RateCard({ free }: { free: number }) {
 
       <div style={{ marginTop: 24, border: `1px solid ${G.gold}`, borderRadius: 8, padding: 'clamp(20px,3vw,32px)', background: 'rgba(255,215,0,.04)', textAlign: 'center' }}>
         <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(20px,2.6vw,30px)', textTransform: 'uppercase' }}>
-          Email us for current founding rates
+          Reserve: <span style={{ color: G.gold }}>$200</span> holds your team
         </div>
-        <p style={{ color: '#ccc', marginTop: 10, fontSize: 15 }}>Pick your team(s) below and send your info — we'll reply with pricing and availability, usually same day.</p>
-        <a href="mailto:qb1@sidehuddlesports.com" style={{ display: 'inline-block', marginTop: 16, color: G.gold, fontWeight: 700, fontSize: 18, textDecoration: 'none' }}>qb1@sidehuddlesports.com</a>
+        <p style={{ color: '#ddd', marginTop: 12, fontSize: 16, lineHeight: 1.6, maxWidth: 620, margin: '12px auto 0' }}>
+          $200 holds your team; the <strong style={{ color: G.white }}>$550 balance is due Aug 29</strong>. Or pay in full today —{' '}
+          <strong style={{ color: G.gold }}>$750</strong> — and we add <strong style={{ color: G.white }}>two months free</strong>: your team stays locked into the new year.
+        </p>
+        <p style={{ color: G.muted, marginTop: 14, fontSize: 13 }}>Pick your team on the board below to reserve. Multiple teams or a market bundle? <a href="mailto:qb1@sidehuddlesports.com" style={{ color: G.gold }}>Email us</a>.</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px,1fr))', gap: 14, marginTop: 28 }}>
@@ -580,33 +616,33 @@ function RateCard({ free }: { free: number }) {
 const LEAGUES: LeagueFilter[] = ['ALL', 'NCAA', 'NFL', 'NBA', 'MLB', 'NHL'];
 const LEAGUE_DISPLAY: Record<LeagueFilter, string> = { ALL: 'ALL', NCAA: 'CFB', NFL: 'NFL', NBA: 'NBA', MLB: 'MLB', NHL: 'NHL' };
 
-function TeamPicker({ filtered, selected, toggle, search, setSearch, league, setLeague, free }: {
-  filtered: StaticTeam[]; selected: Set<string>; toggle: (t: StaticTeam) => void;
+function TeamPicker({ filtered, claims, selected, toggle, search, setSearch, league, setLeague, taken, open }: {
+  filtered: StaticTeam[]; claims: Record<string, ClaimStatus>;
+  selected: Set<string>; toggle: (t: StaticTeam) => void;
   search: string; setSearch: (s: string) => void;
   league: LeagueFilter; setLeague: (l: LeagueFilter) => void;
-  free: number;
+  taken: number; open: number;
 }) {
-  const count = selected.size;
   return (
-    <section className="sh-section" style={{ borderTop: `1px solid ${G.border}` }}>
+    <section className="sh-section" style={{ borderTop: `1px solid ${G.border}`, paddingBottom: 160 }}>
       <div className="sh-label">05 — CLAIM YOUR TEAM</div>
       <h2 style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(44px,6vw,80px)', lineHeight: 0.95, marginTop: 16, textTransform: 'uppercase' }}>
         First in <span style={{ color: G.gold }}>owns the team.</span>
       </h2>
       <p style={{ color: '#aaa', marginTop: 16, maxWidth: 720, fontSize: 17, lineHeight: 1.6 }}>
-        Pick the team(s) you want below — then fill out your info and we'll email you founding rates within a day.
-        {free > 0 && <> Start today — <strong style={{ color: G.gold }}>{freeLabel(free)}</strong>.</>}
+        Tap the team(s) you want — one sponsor per team, across every huddle that follows them.
+        Reserve is $200 per team ($550 balance due Aug 29). Pick more than one and you check out once for the full total.
       </p>
 
-      {count > 0 && (
-        <div style={{ marginTop: 20, padding: '14px 20px', background: 'rgba(255,215,0,.06)', border: `1px solid ${G.gold}`, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 22, color: G.gold }}>{count} team{count !== 1 ? 's' : ''} selected</span>
-            <span style={{ color: G.muted2, fontSize: 14, marginLeft: 12 }}>Founding bundle — we'll send pricing</span>
-          </div>
-          <span style={{ fontSize: 13, color: '#7ec85f' }}>↓ Fill your info below and we'll be in touch</span>
+      {/* Honest scarcity — live counts from real DB rows. */}
+      <div style={{ marginTop: 20, padding: '14px 20px', background: 'rgba(255,215,0,.06)', border: `1px solid ${G.gold}`, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 22, color: G.gold }}>
+          {taken} claimed · {open} founding slots open
         </div>
-      )}
+        <span style={{ fontSize: 13, color: G.muted2, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+          Founding window closes August 29, 2026
+        </span>
+      </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 28, alignItems: 'center' }}>
         {LEAGUES.map(l => (
@@ -622,15 +658,23 @@ function TeamPicker({ filtered, selected, toggle, search, setSearch, league, set
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px,1fr))', gap: 10, marginTop: 28 }}>
         {filtered.length === 0 && <div style={{ gridColumn: '1/-1', color: G.muted, padding: 48, textAlign: 'center' }}>No teams match your search.</div>}
         {filtered.map(t => {
+          const status = claims[teamKey(t)]; // undefined => open
+          const locked = status === 'reserved' || status === 'claimed';
           const on = selected.has(teamKey(t));
+          const badge = status === 'claimed' ? 'CLAIMED' : status === 'reserved' ? 'RESERVED' : on ? 'SELECTED' : 'OPEN';
+          const badgeColor = locked ? G.muted2 : on ? G.gold : '#7ec85f';
           return (
-            <button key={teamKey(t)} onClick={() => toggle(t)}
-              style={{ background: on ? 'rgba(255,215,0,.08)' : G.surface, border: `1px solid ${on ? G.gold : G.border}`, borderRadius: 8, padding: '14px 16px', cursor: 'pointer', textAlign: 'left', transition: 'border-color .15s, background .15s', position: 'relative' }}>
-              {on && <span style={{ position: 'absolute', top: 8, right: 10, color: G.gold, fontWeight: 800, fontSize: 14 }}>✓</span>}
-              <div style={{ fontWeight: 700, fontSize: 14, color: on ? G.gold : G.white, lineHeight: 1.2 }}>{t.city} {t.name}</div>
+            <button key={teamKey(t)} disabled={locked} onClick={() => !locked && toggle(t)}
+              aria-label={locked ? `${t.city} ${t.name} — ${badge}` : `Select ${t.city} ${t.name}`}
+              style={{ background: locked ? '#0c0c0c' : on ? 'rgba(255,215,0,.08)' : G.surface, border: `1px solid ${on ? G.gold : G.border}`, borderRadius: 8, padding: '14px 16px', cursor: locked ? 'not-allowed' : 'pointer', textAlign: 'left', transition: 'border-color .15s, background .15s', position: 'relative', opacity: locked ? 0.55 : 1 }}
+              onMouseEnter={e => { if (!locked && !on) e.currentTarget.style.borderColor = G.gold; }}
+              onMouseLeave={e => { if (!locked && !on) e.currentTarget.style.borderColor = G.border; }}>
+              {locked && <span style={{ position: 'absolute', top: 8, right: 10, fontSize: 13 }}>🔒</span>}
+              {on && !locked && <span style={{ position: 'absolute', top: 8, right: 10, color: G.gold, fontWeight: 800, fontSize: 14 }}>✓</span>}
+              <div style={{ fontWeight: 700, fontSize: 14, color: locked ? G.muted2 : on ? G.gold : G.white, lineHeight: 1.2 }}>{t.city} {t.name}</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
-                <span className="sh-label" style={{ fontSize: 9, color: on ? G.gold : G.muted }}>{displayLeague(t.league)}</span>
-                <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 13, color: on ? G.gold : G.muted2 }}>{on ? 'SELECTED' : 'AVAILABLE'}</span>
+                <span className="sh-label" style={{ fontSize: 9, color: G.muted }}>{displayLeague(t.league)}</span>
+                <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 13, color: badgeColor }}>{badge}</span>
               </div>
             </button>
           );
@@ -793,6 +837,116 @@ function FF({ label, value, onChange, type = 'text', multiline = false }: { labe
         : <input className="sh-input" type={type} value={value} onChange={e => onChange(e.target.value)} />
       }
     </label>
+  );
+}
+
+// ─── Cart bar + Square checkout ──────────────────────────────────────────────
+const RESERVE_PER_TEAM = 200;
+const FULL_PER_TEAM = 750;
+
+function CartBar({ teams, onCheckout, onClear }: { teams: StaticTeam[]; onCheckout: () => void; onClear: () => void }) {
+  const total = teams.length * RESERVE_PER_TEAM;
+  return (
+    <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 90, background: '#0c0c0cf2', backdropFilter: 'blur(10px)', borderTop: `1px solid ${G.gold}`, padding: '14px clamp(16px,5vw,48px)' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 22, color: G.gold }}>{teams.length} team{teams.length !== 1 ? 's' : ''} selected</span>
+          <span style={{ color: G.muted2, fontSize: 14, marginLeft: 12 }}>${RESERVE_PER_TEAM} reserve each · ${total} total today</span>
+          <button onClick={onClear} style={{ marginLeft: 14, background: 'none', border: 'none', color: G.muted, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>clear</button>
+        </div>
+        <button className="btn-gold" onClick={onCheckout} style={{ fontSize: 14, padding: '13px 26px' }}>Review &amp; checkout →</button>
+      </div>
+    </div>
+  );
+}
+
+function CheckoutModal({ teams, onClose }: { teams: StaticTeam[]; onClose: () => void }) {
+  const [plan, setPlan] = useState<'reserve' | 'full'>('reserve');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const per = plan === 'full' ? FULL_PER_TEAM : RESERVE_PER_TEAM;
+  const total = teams.length * per;
+
+  async function go() {
+    setLoading(true); setError('');
+    try {
+      const { data, error } = await supabase.functions.invoke('create-sponsor-square-checkout', {
+        body: {
+          plan,
+          teams: teams.map(t => ({ teamKey: teamKey(t), teamName: `${t.city} ${t.name}`, league: t.league })),
+        },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.url) { window.location.href = data.url; return; }
+      throw new Error(data?.error || 'Could not start checkout.');
+    } catch (e) {
+      setError((e as Error)?.message || 'Something went wrong. Please try again.');
+      setLoading(false);
+    }
+  }
+
+  const plans = [
+    { id: 'reserve' as const, head: `Reserve — $${RESERVE_PER_TEAM}/team`, sub: '$200 holds each team. $550 balance per team due Aug 29.' },
+    { id: 'full' as const,    head: `Pay in full — $${FULL_PER_TEAM}/team`, sub: 'Pay in full today and we add two months free — your team(s) stay locked into the new year.' },
+  ];
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.78)', backdropFilter: 'blur(4px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, overflowY: 'auto' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: G.surface, border: `1px solid ${G.gold}`, borderRadius: 12, padding: 'clamp(22px,4vw,34px)', maxWidth: 500, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 30px 80px rgba(0,0,0,.7)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div className="sh-label" style={{ color: G.gold }}>FOUNDING SPONSOR CHECKOUT</div>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: G.muted, fontSize: 26, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+
+        <div style={{ marginTop: 16, maxHeight: 180, overflowY: 'auto', border: `1px solid ${G.border}`, borderRadius: 8 }}>
+          {teams.map(t => (
+            <div key={teamKey(t)} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: `1px solid ${G.border}` }}>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>{t.city} {t.name}</span>
+              <span style={{ color: G.muted2, fontSize: 13 }}>{displayLeague(t.league)} · ${per}</span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
+          {plans.map(p => (
+            <button key={p.id} onClick={() => setPlan(p.id)} style={{ textAlign: 'left', background: plan === p.id ? 'rgba(255,215,0,.1)' : G.bg, border: `1.5px solid ${plan === p.id ? G.gold : G.border}`, borderRadius: 8, padding: '14px 16px', cursor: 'pointer' }}>
+              <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 18, color: plan === p.id ? G.gold : G.white }}>{p.head}</div>
+              <div style={{ fontSize: 12.5, color: '#bbb', marginTop: 4, lineHeight: 1.5 }}>{p.sub}</div>
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 18, paddingTop: 14, borderTop: `1px solid ${G.gold}44` }}>
+          <span className="sh-label">TOTAL TODAY</span>
+          <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 30, color: G.gold }}>${total.toLocaleString()}</span>
+        </div>
+
+        {error && <p style={{ color: '#ff6b6b', fontSize: 13, marginTop: 12 }}>{error}</p>}
+
+        <button className="btn-gold" onClick={go} disabled={loading} style={{ marginTop: 16, width: '100%', fontSize: 15, padding: '15px 28px' }}>
+          {loading ? 'Starting Square checkout…' : `Checkout ${teams.length} team${teams.length !== 1 ? 's' : ''} — $${total.toLocaleString()} →`}
+        </button>
+        <p style={{ fontSize: 11, color: G.muted, textAlign: 'center', marginTop: 10, lineHeight: 1.5 }}>
+          Secure checkout powered by Square. The reserve is a non-refundable hold; the balance per team is due Aug 29.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function PaidSuccess({ onClose }: { onClose: () => void }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.82)', backdropFilter: 'blur(4px)', zIndex: 101, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: G.surface, border: `1px solid ${G.gold}`, borderRadius: 12, padding: 'clamp(28px,5vw,44px)', maxWidth: 460, width: '100%', textAlign: 'center', boxShadow: '0 30px 80px rgba(0,0,0,.7)' }}>
+        <div style={{ fontSize: 52 }}>🏆</div>
+        <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 34, color: G.gold, textTransform: 'uppercase', marginTop: 8 }}>You're in.</div>
+        <p style={{ color: '#ddd', marginTop: 14, fontSize: 16, lineHeight: 1.6 }}>
+          Payment received — your team(s) are locked as founding sponsorships. We'll email you next steps and (for the reserve plan) the balance invoice ahead of Aug 29.
+        </p>
+        <button className="btn-gold" onClick={onClose} style={{ marginTop: 24 }}>Back to the board</button>
+      </div>
+    </div>
   );
 }
 

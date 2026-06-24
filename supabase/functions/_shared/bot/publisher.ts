@@ -17,6 +17,7 @@ export interface PublishInput {
   excitementScore?: number;
   shouldPush?: boolean;
   newsLink?: string;                        // appended outside the model (news mode)
+  imageUrl?: string;                        // Source 2: article action photo (og:image)
 }
 
 export interface PublishResult {
@@ -56,10 +57,11 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
   let body = input.message;
   const embedUrl = input.newsLink && mode === "news" ? input.newsLink : null;
 
-  // Sponsor whisper: append "— presented by X" to ~1 of every 5 bot messages
-  // for this team (the 1st, 6th, 11th… emission of the calendar day). Frequent
-  // enough to be real inventory, sparse enough to not pollute the feed. The
-  // always-on header line is separate (room header).
+  // Sponsor whisper: append "— presented by X" to ~1 of every 5 NEWS messages
+  // for this team. News-only on purpose: in-game scoring plays arrive in rapid
+  // bursts (8+ in under a minute), so 1-in-5 of THOSE reads as "every other
+  // bubble." News is the calm, substantial cadence where a credit lands well.
+  // In-game rooms still carry the always-on header sponsor line separately.
   try {
     const sinceMidnight = new Date();
     sinceMidnight.setUTCHours(0, 0, 0, 0);
@@ -67,8 +69,9 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
       .from("bot_emit_log")
       .select("id", { count: "exact", head: true })
       .eq("team_id", teamId)
+      .eq("mode", "news")
       .gte("created_at", sinceMidnight.toISOString());
-    if ((todayCount ?? 0) % 5 === 0) {
+    if (mode === "news" && (todayCount ?? 0) % 5 === 0) {
       const { data: sponsor } = await client
         .from("team_sponsors")
         .select("brand_name, is_active, end_date")
@@ -95,6 +98,11 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
     embed_code: embedUrl,
     is_bot_message: true,
     message_type: mode === "in_game" ? "live_play" : "news",
+    // Source 2: when the news item has an action photo, the client renders it
+    // inline below the text (ChatMessage already handles media_url + image).
+    ...(input.imageUrl
+      ? { media_url: input.imageUrl, media_type: "image" }
+      : {}),
   }));
 
   const { data: inserted, error: insertErr } = await client

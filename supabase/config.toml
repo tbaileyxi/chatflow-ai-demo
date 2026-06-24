@@ -132,3 +132,6 @@ verify_jwt = true
 
 [functions.outreach-send]
 verify_jwt = true
+
+[functions.create-sponsor-square-checkout]
+verify_jwt = false

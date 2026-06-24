@@ -107,6 +107,7 @@ export interface NewsFacts {
   category: string;                   // HIGH / MED / LOW
   link: string;
   breaking: boolean;
+  summary?: string;                   // feed synopsis — the actual news, not just the teaser
   published_at?: string;              // tense anchor — when the story ran
   now?: string;                       // tense anchor — current time
 }

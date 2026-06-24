@@ -33,6 +33,13 @@ function isPast(date: Date): boolean {
   return date.getTime() < Date.now();
 }
 
+// Pull the team out of "Will the Yankees win?" / "Will Detroit win?" so a
+// resolved card can say "Yankees won" instead of the cryptic "Resolved: YES".
+function teamFromQuestion(question: string): string {
+  const m = question.match(/will\s+(?:the\s+)?(.+?)\s+win\??$/i);
+  return m ? m[1].trim() : "";
+}
+
 function timeUntil(dateStr: string): string {
   const diff = new Date(dateStr).getTime() - Date.now();
   if (diff <= 0) return "In progress";
@@ -199,7 +206,13 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
                 market.resolution === "YES" ? "text-success" : "text-destructive",
               )}
             >
-              Resolved: {market.resolution}
+              {(() => {
+                const team = teamFromQuestion(market.question);
+                if (!team) return `Final: ${market.resolution === "YES" ? "Yes" : "No"}`;
+                return market.resolution === "YES"
+                  ? `Final — ${team} won`
+                  : `Final — ${team} lost`;
+              })()}
             </Text>
           </View>
           {userBet && (
@@ -251,11 +264,11 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
         </View>
       )}
 
-      {/* Locked */}
+      {/* Locked — game has started (or is over), so no new bets. */}
       {!isResolved && isLocked && !userBet && (
         <View className="flex-row items-center gap-2">
           <Lock color={colors.accent} size={14} />
-          <Text className="text-sm text-accent">Betting locked</Text>
+          <Text className="text-sm text-accent">Game underway — betting closed</Text>
         </View>
       )}
 

@@ -74,19 +74,25 @@ export function BetCard({ bet }: Props) {
         )}
 
         {isWin && (
-          <View className="ml-auto flex-row items-center gap-1">
-            <Check color={colors.success} size={14} />
+          <View className="ml-auto flex-row items-center gap-1.5">
+            <View className="flex-row items-center gap-1 rounded-full bg-success/15 px-2 py-0.5">
+              <Check color={colors.success} size={13} />
+              <Text className="text-xs font-bold text-success">WON</Text>
+            </View>
             <Text className="text-xs font-semibold text-success">
-              +{bet.chipsWon ?? 0} coins
+              +{bet.chipsWon ?? 0}
             </Text>
           </View>
         )}
 
         {isLoss && (
-          <View className="ml-auto flex-row items-center gap-1">
-            <X color={colors.destructive} size={14} />
+          <View className="ml-auto flex-row items-center gap-1.5">
+            <View className="flex-row items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5">
+              <X color={colors.destructive} size={13} />
+              <Text className="text-xs font-bold text-destructive">LOST</Text>
+            </View>
             <Text className="text-xs font-semibold text-destructive">
-              -{bet.chipsRisked} coins
+              -{bet.chipsRisked}
             </Text>
           </View>
         )}

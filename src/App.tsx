@@ -12,6 +12,7 @@ import InviteCodePage from "./pages/InviteCodePage";
 import AdminEventsPage from "./pages/AdminEventsPage";
 import PickSharePage from "./pages/PickSharePage";
 import Sponsor from "./pages/Sponsor";
+import SponsorAdmin from "./pages/SponsorAdmin";
 import Outreach from "./pages/Outreach";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const AppContent = () => (
       <Route path="/admin/events" element={<AdminEventsPage />} />
       <Route path="/picks/:betId" element={<PickSharePage />} />
       <Route path="/sponsors" element={<Sponsor />} />
+      <Route path="/sponsors/admin" element={<SponsorAdmin />} />
       <Route path="/outreach" element={<Outreach />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

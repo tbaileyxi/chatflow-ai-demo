@@ -56,9 +56,12 @@ function buildUserPrompt(payload: VoicePayload): string {
   ].filter(Boolean).join("\n");
 
   if (payload.mode === "news") {
-    return base + `\n\nFirst CONVEY WHAT THE NEWS IS, then react. The reader hasn't seen the headline — if you only give a vague reaction ("devastating for Aldon") they have no idea what happened. State the substance from the headline (who + what) in your own words, then add a short take.
-Format: "[what happened]. [quick take]." e.g. "Aldon Smith's reportedly out for the year with a torn ACL — brutal blow to the pass rush."
-DO NOT invent or assume ANY detail not in the headline — no venue, stadium, city, opponent, score, date, or role that isn't stated. If the headline is thin, just relay what little it says plainly. Don't copy the headline verbatim. Do not include the link — it is appended after.`;
+    return base + `\n\nGIVE THE READER THE NEWS so they DON'T need to read the article. The headline is a teaser — your job is the payoff.
+- When a "summary" field is present, that's the real synopsis: pull the SPECIFICS out of it (who, what, the actual development) and state them. Don't just echo the headline.
+- Bad (teaser): "Leon Rose might be cooking up something big." Good (payoff): "Knicks are reportedly shopping Randle in a package for a backup center — Rose finally making a move."
+- Bad: "Big QB news in Tuscaloosa." Good: "The QB battle's down to Henderson vs. Avery and Henderson's pulling ahead in camp."
+Format: "[the actual news, specifics included]. [short take]." 1–2 sentences. Then STOP.
+ONLY use details present in the headline or summary — never invent a venue, score, opponent, date, or name that isn't there. If there's no summary and the headline is thin, relay what little it says plainly. Don't copy text verbatim. Do not include the link — it is appended after.`;
   }
   return base + `\n\nYou're a stats-savvy fan reacting to a real moment. Use the "play" field (the actual play — it names the player) plus teamLeader / rivalLeader (real season/game stat lines) and teamShootingLine / rivalShootingLine.
 

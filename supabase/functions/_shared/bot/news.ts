@@ -1,7 +1,10 @@
 // Bot Engine v2 — news pipeline.
 // 4 gates, cheapest first: category -> subject -> cluster -> LLM judge.
 // LLM judge is bypassed when category is HIGH or cluster_size >= 3 (cost guard).
-// IRON RULE: never store or emit the article body. Title + source + link only.
+// RULE: use only what the feed provides for syndication — title, the feed's own
+// short description/summary (so the bot can convey the actual news, not just
+// tease the headline), source, link, image. Never scrape the full article body,
+// and never persist the summary (it's passed to the model in-memory only).
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { judgeHeadline } from "./voice.ts";
@@ -12,6 +15,8 @@ export interface RssEntry {
   link: string;
   source: string;           // best-effort outlet name
   publishedAt: string | null;
+  imageUrl: string | null;  // Source 2: action photo pulled inline from the feed XML
+  summary: string | null;   // feed-provided synopsis so the bot conveys the actual news
 }
 
 export interface ScoredEntry extends RssEntry {
@@ -43,9 +48,26 @@ const LOW_DROP = [
   "slideshow", "gallery", "rumor mill", "what to watch",
 ];
 
+// Retail / merch / affiliate listings that the Google News feed surfaces as
+// "news" (e.g. "Jarvis Landry custom sewn jerseys available in adult sizes M
+// through 2XL"). These are shopping results, not stories — drop them outright so
+// the bot never posts an ad, and the sponsor whisper never lands on one.
+// Phrases are deliberately commerce-distinctive: bare "jersey" is avoided
+// because it collides with "New Jersey" and "retire his jersey" (a real story).
+const RETAIL_DROP = [
+  "available in", "for sale", "on sale", "% off", "percent off",
+  "discount", "promo code", "coupon", "where to buy", "best deals",
+  "shop the", "shop now", "buy now", "order your", "order now", "get your",
+  "custom sewn", "custom jersey", "custom jerseys", "merch", "merchandise",
+  "memorabilia", "adult sizes", "youth sizes", "gift guide",
+];
+
 export function categoryGate(title: string): "HIGH" | "MED" | "LOW" | "DROP" {
   const t = title.toLowerCase();
   for (const k of LOW_DROP) {
+    if (t.includes(k)) return "DROP";
+  }
+  for (const k of RETAIL_DROP) {
     if (t.includes(k)) return "DROP";
   }
   for (const k of HIGH) {
@@ -210,6 +232,8 @@ export function parseRss(xml: string, fallbackSource: string): RssEntry[] {
       link: stripCdata(link).trim(),
       source: stripCdata(source).trim(),
       publishedAt: pub ? new Date(stripCdata(pub).trim()).toISOString() : null,
+      imageUrl: extractRssImage(body),
+      summary: extractRssSummary(body, stripCdata(title).trim()),
     });
   }
   return items;
@@ -219,9 +243,80 @@ function pickTag(body: string, tag: string): string | null {
   const m = body.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\/${tag}>`, "i"));
   return m ? m[1] : null;
 }
+
+// Pull a short SYNOPSIS from the feed item so the bot can convey what actually
+// happened instead of teasing the headline. Feeds publish this in
+// <description>/<summary>/<content:encoded> for syndication — it's meant to be
+// shown. Strips HTML, decodes entities, drops boilerplate, caps length. Returns
+// null when the feed only echoes the title (e.g. bare Google News items).
+function extractRssSummary(body: string, title: string): string | null {
+  const raw =
+    pickTag(body, "description") ||
+    pickTag(body, "summary") ||
+    pickTag(body, "content:encoded") ||
+    pickTag(body, "content");
+  if (!raw) return null;
+  let text = stripCdata(raw)
+    .replace(/<[^>]+>/g, " ")                 // strip tags
+    .replace(/&#0*38;|&amp;/g, "&")
+    .replace(/&#0*39;|&apos;|&rsquo;|&#8217;/g, "’")
+    .replace(/&quot;|&#0*34;/g, '"')
+    .replace(/&nbsp;|&#160;/g, " ")
+    .replace(/&hellip;|&#8230;/g, "…")
+    .replace(/&[a-z]+;|&#\d+;/gi, " ")          // drop any other entities
+    .replace(/\s+/g, " ")
+    .trim();
+  // Drop SB-Nation/outlet boilerplate that sometimes leads the description.
+  text = text.replace(/^continue reading[…\.]*/i, "").trim();
+  if (!text) return null;
+  // If the description is just the headline echoed, it adds nothing.
+  if (text.toLowerCase().startsWith(title.toLowerCase().slice(0, 40))) {
+    const rest = text.slice(title.length).trim();
+    if (rest.length < 30) return null;
+  }
+  if (text.length < 30) return null;            // too thin to be a real synopsis
+  return text.length > 320 ? text.slice(0, 317).trimEnd() + "…" : text;
+}
 function pickAttr(body: string, tag: string, attr: string): string | null {
   const m = body.match(new RegExp(`<${tag}[^>]*\\s${attr}="([^"]+)"`, "i"));
   return m ? m[1] : null;
+}
+
+// Source 2: pull an inline image URL from a feed item. Good outlet feeds (CBS,
+// many others) embed the article's action photo right in the XML via
+// <media:content>, <media:thumbnail>, or an image <enclosure> — full-res, no
+// scraping. Returns null for image-less feeds (e.g. Google News), which then
+// stay text-only. Junk (logos/svg/non-http) is filtered out.
+function extractRssImage(body: string): string | null {
+  const candidates: (string | null)[] = [
+    pickAttr(body, "media:content", "url"),
+    pickAttr(body, "media:thumbnail", "url"),
+    // <enclosure> only counts when it's actually an image.
+    /(<enclosure[^>]*type="image\/)/i.test(body)
+      ? pickAttr(body, "enclosure", "url")
+      : null,
+    // Last resort: an <img src> inside the description/content HTML.
+    (body.match(/<img[^>]+src="([^"]+)"/i) || [])[1] || null,
+  ];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const url = decodeEntities(stripCdata(raw)).trim();
+    if (!/^https:\/\//i.test(url)) continue;          // RN needs https
+    if (/\.svg(\?|$)/i.test(url)) continue;
+    if (/logo|sprite|favicon|placeholder|avatar|1x1|spacer/i.test(url)) continue;
+    return url;
+  }
+  return null;
+}
+
+// Feed img URLs come HTML-encoded (e.g. SB Nation: "?quality=90&#038;strip=all").
+// React Native's <Image> needs the raw "&" or the query string breaks. Decode
+// the ampersand entities (named, decimal, hex).
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&#0*38;/g, "&")
+    .replace(/&#x0*26;/gi, "&");
 }
 function stripCdata(s: string): string {
   return s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
@@ -233,4 +328,69 @@ function hash16(s: string): string {
     h |= 0;
   }
   return Math.abs(h).toString(36).padStart(8, "0").slice(0, 12);
+}
+
+// ---------------------------------------------------------------
+// Source 2 — news action photo. Fetch the article's OpenGraph hero image
+// (og:image / twitter:image). For real outlets this is a Getty/AP ACTION shot,
+// not a headshot — exactly the "player turning it up" visual we want on a news
+// post. Defensive: 5s timeout, junk filter, never throws (returns null).
+// IRON RULE stays intact: we read one <meta> URL, never the article body.
+// ---------------------------------------------------------------
+export async function fetchOgImage(url: string): Promise<string | null> {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      redirect: "follow",
+      headers: {
+        // Some outlets gate bots; a real UA gets the OG tags reliably.
+        "User-Agent":
+          "Mozilla/5.0 (compatible; SideHuddleBot/1.0; +https://sidehuddlesports.com)",
+      },
+    });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("html")) return null;
+    // Only need the <head>; cap the read so we never pull a huge page.
+    const html = (await res.text()).slice(0, 200_000);
+
+    const meta = (key: string): string | null => {
+      // Attribute order varies (property|name first OR content first).
+      const a = html.match(
+        new RegExp(
+          `<meta[^>]+(?:property|name)=["']${key}["'][^>]*content=["']([^"']+)["']`,
+          "i",
+        ),
+      );
+      if (a) return a[1];
+      const b = html.match(
+        new RegExp(
+          `<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${key}["']`,
+          "i",
+        ),
+      );
+      return b ? b[1] : null;
+    };
+
+    let img =
+      meta("og:image:secure_url") ||
+      meta("og:image") ||
+      meta("twitter:image") ||
+      meta("twitter:image:src");
+    if (!img) return null;
+
+    img = img.replace(/&amp;/g, "&").trim();
+    if (!/^https:\/\//i.test(img)) return null;               // require https (RN image-safe)
+    if (/\.svg(\?|$)/i.test(img)) return null;                 // vector logos, not photos
+    // Drop obvious non-action assets: site chrome, default share images, avatars.
+    if (/logo|sprite|favicon|placeholder|default[-_]?(share|image)|avatar|1x1|spacer/i.test(img)) {
+      return null;
+    }
+    return img;
+  } catch {
+    return null; // offline / abort / parse fail — news still posts, just text-only
+  }
 }

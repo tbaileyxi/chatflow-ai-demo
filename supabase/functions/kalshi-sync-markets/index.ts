@@ -347,10 +347,14 @@ Deno.serve(async (req) => {
           else cents = ask ?? bid ?? last;
           const yesPrice = Math.max(1, Math.min(99, Math.round(cents ?? 50)));
 
-          // Kalshi-faithful wording: per-side game markets read
-          // "Will <team> win?" — futures keep their full market title.
-          const question = isGameSeries && side
-            ? `Will ${side} win?`
+          // Per-side game markets: use the correctly-matched team MASCOT so the
+          // card reads cleanly ("Will the Yankees win?") instead of Kalshi's
+          // abbreviated "New York Y". Opponent context comes from the room's
+          // score bar above. (Pairing both sides for a "X vs Y" card is a
+          // future polish — Kalshi abbreviates names in the title, so it can't
+          // be parsed reliably from one market alone.)
+          const question = isGameSeries
+            ? `Will the ${team ? team.name : side} win?`
             : m.title || m.subtitle || m.ticker;
 
           const { error } = await supabase
@@ -393,15 +397,15 @@ Deno.serve(async (req) => {
       console.log('Unmatched markets:', unmatched.slice(0, 10).map(u => `${u.league}: "${u.title}"`));
     }
 
-    // Purge legacy per-game rows from before the per-side rewrite — they
-    // carry event-title questions ("X vs Y Winner?") and trading-halt times
-    // days after the game, so they show finished games as upcoming.
+    // Purge legacy per-game rows that still carry the old event-title wording
+    // ("… Winner?"). The current wording is "X to beat the Y?" / "Will X win?",
+    // neither of which contains "Winner", so only stale rows match.
     const { error: purgeErr } = await supabase
       .from('kalshi_markets')
       .delete()
       .eq('is_resolved', false)
       .like('kalshi_ticker', '%GAME%')
-      .not('question', 'like', 'Will %');
+      .ilike('question', '%winner%');
     if (purgeErr) console.error('legacy purge error:', purgeErr.message);
 
     // Check for resolved markets in our DB

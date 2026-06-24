@@ -10,7 +10,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { isNewsQuietWindow, parseRss, scoreEntries } from "../_shared/bot/news.ts";
+import { fetchOgImage, isNewsQuietWindow, parseRss, scoreEntries } from "../_shared/bot/news.ts";
 import { generateMessage, defaultPersona } from "../_shared/bot/voice.ts";
 import { newsCapRemaining, publish } from "../_shared/bot/publisher.ts";
 import { getProvider } from "../_shared/bot/providers.ts";
@@ -163,8 +163,16 @@ serve(async (req) => {
         const tb = b.publishedAt ? Date.parse(b.publishedAt) : 0;
         return tb - ta;
       });
-      const fresh = sorted.slice(0, SCORE_BATCH);
-      const deferred = sorted.slice(SCORE_BATCH);
+      // Source 2: photo-bearing feeds (SB Nation) publish ~10 items/day, but the
+      // Google News feed floods 100+ fresher-timestamped items that would push
+      // every photo item past SCORE_BATCH and get it deferred (marked seen,
+      // never scored). Pull image-bearing items to the front so they always
+      // reach the scorer — recency still orders within each group.
+      const withImg = sorted.filter((e) => e.imageUrl);
+      const noImg = sorted.filter((e) => !e.imageUrl);
+      const prioritized = [...withImg, ...noImg];
+      const fresh = prioritized.slice(0, SCORE_BATCH);
+      const deferred = prioritized.slice(SCORE_BATCH);
 
       // Record deferred entries up front as "seen" so we don't rescore them.
       if (deferred.length > 0) {
@@ -215,6 +223,15 @@ serve(async (req) => {
       if (scored.length === 0) return;
       summary.entries_survived += scored.length;
 
+      // Source 2 bias: among survivors, nudge photo-bearing items up so a news
+      // post is far more likely to carry an action shot. The +8 is small enough
+      // that a genuinely bigger story (breaking/HIGH, scored well above) still
+      // wins — it only flips near-ties toward the one with a picture.
+      scored.sort((a, b) =>
+        (b.finalScore + (b.imageUrl ? 8 : 0)) -
+        (a.finalScore + (a.imageUrl ? 8 : 0))
+      );
+
       // Emit up to `remaining` survivors, breaking allowed +1.
       // Per-RUN cap spaces news out across the day: the poller fires every
       // 30 min, so capping each run at 1 (breaking can add 1 more) means a
@@ -239,6 +256,8 @@ serve(async (req) => {
               category: s.category,
               link: s.link,
               breaking: s.breaking,
+              // Feed synopsis so the bot tells WHAT happened, not just the teaser.
+              summary: s.summary ?? undefined,
               // Anchors tense: old game recaps must read as past, not live.
               published_at: s.publishedAt ?? undefined,
               now: new Date().toISOString(),
@@ -272,6 +291,15 @@ serve(async (req) => {
             continue;
           }
 
+          // Source 2: action photo. Prefer the image embedded in the feed XML
+          // (full-res, no fetch). Only scrape og:image as a fallback for DIRECT
+          // article links — never for Google News, whose opaque redirect pages
+          // expose nothing useful. Null → the post just stays text-only.
+          let imageUrl: string | undefined = s.imageUrl ?? undefined;
+          if (!imageUrl && !/news\.google\.com/i.test(s.link)) {
+            imageUrl = (await fetchOgImage(s.link)) ?? undefined;
+          }
+
           const result = await publish({
             client: supabase,
             teamId: bundle.teamId,
@@ -287,6 +315,7 @@ serve(async (req) => {
               breaking: s.breaking,
             },
             newsLink: s.link,
+            imageUrl,
           });
           summary.posts += result.huddleIdsPosted.length;
           budget -= 1;

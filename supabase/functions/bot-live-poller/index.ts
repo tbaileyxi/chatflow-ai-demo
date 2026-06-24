@@ -202,11 +202,12 @@ serve(async (req) => {
     // YouTube highlight clip into every room for that team. Throttled to
     // ~every 10 min (the poller fires every minute) to protect YouTube
     // quota, and guarded per-room so we never double-post.
-    // Sendoff recap runs every poll (no YouTube cost, guarded once per room).
+    // Sendoff recap runs every poll (guarded once per room).
     await postFinals(supabase, summary);
-    // Highlights + pregame are throttled to protect YouTube quota / dedupe.
+    // YouTube highlights REMOVED — the search returned junk (video-game sims,
+    // betting shows, ad clips) and embeds threw Error 153. Pregame heads-up
+    // stays (it's templated, reliable).
     if (new Date().getUTCMinutes() % 5 === 0) {
-      await postHighlights(supabase, summary);
       await postPregames(supabase, summary);
     }
   } catch (err) {
