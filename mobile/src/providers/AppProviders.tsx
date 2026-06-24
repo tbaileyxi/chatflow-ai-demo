@@ -8,6 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
 import { AuthProvider } from "@/hooks/useAuth";
+import { GlobalPresenceProvider } from "@/contexts/GlobalPresenceContext";
 import { ensureConfigured as configureRevenueCat } from "@/lib/revenuecat";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
@@ -72,9 +73,11 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <NavigationContainer theme={navTheme} linking={linking}>
-            {children}
-          </NavigationContainer>
+          <GlobalPresenceProvider>
+            <NavigationContainer theme={navTheme} linking={linking}>
+              {children}
+            </NavigationContainer>
+          </GlobalPresenceProvider>
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

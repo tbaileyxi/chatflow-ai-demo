@@ -24,6 +24,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useInAppNotifications } from "@/hooks/useInAppNotifications";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
+import { useFriends } from "@/hooks/useFriends";
+import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { colors } from "@/theme/colors";
 
 function initials(name: string) {
@@ -64,6 +66,10 @@ function MonogramAvatar({ name, size = 36 }: { name: string; size?: number }) {
 }
 
 function FriendsNowSection() {
+  const navigation = useNavigation<any>();
+  const { presentUsers } = useGlobalPresence();
+  const { data: friendIds } = useFriends();
+
   const inviteFriends = useCallback(() => {
     Share.share({
       message:
@@ -71,11 +77,19 @@ function FriendsNowSection() {
     });
   }, []);
 
+  // Friends who are signed in AND currently inside a huddle.
+  const liveFriends = presentUsers.filter(
+    (u) => u.huddleId && friendIds?.has(u.userId),
+  );
+  const anyLive = liveFriends.length > 0;
+
   return (
     <View className="px-4">
       <View className="mb-3 flex-row items-center justify-between">
         <View className="flex-row items-center gap-2">
-          <View className="h-2 w-2 rounded-full bg-muted-foreground" />
+          <View
+            className={`h-2 w-2 rounded-full ${anyLive ? "bg-primary" : "bg-muted-foreground"}`}
+          />
           <Text className="text-sm font-black uppercase tracking-widest text-foreground">
             Friends Now
           </Text>
@@ -85,15 +99,48 @@ function FriendsNowSection() {
           <Text className="text-xs font-black text-primary">Invite</Text>
         </Pressable>
       </View>
-      <View className="rounded-2xl border border-border bg-card p-4">
-        <Text className="text-base font-black text-foreground">
-          No friends watching yet
-        </Text>
-        <Text className="mt-2 text-sm leading-5 text-muted-foreground">
-          When a friend checks into a room, it appears here so you can jump in
-          without searching.
-        </Text>
-      </View>
+
+      {anyLive ? (
+        <View className="gap-2">
+          {liveFriends.map((f) => (
+            <Pressable
+              key={f.userId}
+              onPress={() =>
+                navigation.navigate("Huddle", { huddleId: f.huddleId })
+              }
+              className="flex-row items-center gap-3 rounded-2xl border border-border bg-card p-3 active:opacity-80"
+            >
+              {f.avatarUrl ? (
+                <Image
+                  source={{ uri: f.avatarUrl }}
+                  className="h-9 w-9 rounded-full"
+                />
+              ) : (
+                <MonogramAvatar name={f.displayName || "User"} size={36} />
+              )}
+              <View className="flex-1">
+                <Text className="text-base font-black text-foreground" numberOfLines={1}>
+                  {f.displayName || "Friend"}
+                </Text>
+                <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+                  in {f.huddleName ?? "a huddle"}
+                </Text>
+              </View>
+              <Text className="text-xs font-black text-primary">Jump in →</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : (
+        <View className="rounded-2xl border border-border bg-card p-4">
+          <Text className="text-base font-black text-foreground">
+            No friends watching yet
+          </Text>
+          <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+            When a friend checks into a room, it appears here so you can jump in
+            without searching.
+          </Text>
+        </View>
+      )}
     </View>
   );
 }

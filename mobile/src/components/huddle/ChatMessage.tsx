@@ -120,6 +120,26 @@ function cleanBotContent(text: string): string {
     .trim();
 }
 
+// The publisher appends "\n\n— presented by X" to ~1-in-5 bot messages. Pull it
+// off the body so it can be rendered as a small, muted, italic credit line
+// instead of looking like part of the bot's sentence.
+function splitSponsorCredit(text: string): { body: string; sponsor: string | null } {
+  const m = text.match(/\n+\s*—?\s*presented by\s+(.+?)\s*$/i);
+  if (!m || m.index == null) return { body: text, sponsor: null };
+  return { body: text.slice(0, m.index).trim(), sponsor: m[1].trim() };
+}
+
+// Friendly outlet name from a URL host: "https://www.amazinavenue.com/x" →
+// "amazinavenue.com". Keeps attribution tiny without a "source:" label.
+function outletName(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    return host;
+  } catch {
+    return "link";
+  }
+}
+
 function formatTime(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
@@ -156,8 +176,16 @@ export function ChatMessage({
     message.messageType === "youtube_highlight" && message.embedCode
       ? parseYouTubeId(message.embedCode)
       : null;
+  // News & live-play are ALWAYS the gold-accented "@coach" bubble (+ a 'Read
+  // source' chip when embed_code holds a link). They were leaking into the
+  // catch-all below — any embed_code routed them to the plain muted PulseBubble
+  // card with no gold accent, which is exactly why the gold looked
+  // inconsistent ("on some chats and not others"). Pin them out first.
+  const isNewsOrPlay =
+    message.messageType === "news" || message.messageType === "live_play";
   const isPulse =
     !youTubeId &&
+    !isNewsOrPlay &&
     (message.isPulseMoment ||
       message.messageType === "pulse" ||
       message.messageType === "highlight" ||
@@ -213,6 +241,12 @@ export function ChatMessage({
     onReply?.();
     setShowPicker(false);
   };
+
+  // Highlights were removed (junk search results + Error 153 embeds). Hide any
+  // legacy youtube_highlight messages entirely so they stop polluting the feed.
+  if (message.messageType === "youtube_highlight") {
+    return null;
+  }
 
   return (
     <>
@@ -305,7 +339,10 @@ export function ChatMessage({
                   message.content === "🎤 Voice message") ? null : (
                 <View
                   className={cn(
-                    "rounded-2xl px-4 py-2.5",
+                    "rounded-2xl",
+                    // Replies render tighter so they read as secondary to the
+                    // message they answer.
+                    isReply ? "px-3 py-1.5" : "px-4 py-2.5",
                     isOwnMessage
                       ? "bg-primary"
                       : message.isBotMessage
@@ -318,28 +355,57 @@ export function ChatMessage({
                       : undefined
                   }
                 >
-                  <Text
-                    className="text-base"
-                    style={{
-                      color: isOwnMessage
-                        ? colors.primaryForeground
-                        : colors.foreground,
-                    }}
-                  >
-                    {message.isBotMessage
-                      ? cleanBotContent(message.content)
-                      : message.content}
-                  </Text>
-                  {/* News-style 'Read source' chip when an embed URL exists.
-                      Keeps the raw URL off the bubble while preserving access. */}
+                  {(() => {
+                    if (!message.isBotMessage) {
+                      return (
+                        <Text
+                          className={isReply ? "text-sm" : "text-base"}
+                          style={{
+                            color: isOwnMessage
+                              ? colors.primaryForeground
+                              : colors.foreground,
+                          }}
+                        >
+                          {message.content}
+                        </Text>
+                      );
+                    }
+                    const { body, sponsor } = splitSponsorCredit(
+                      cleanBotContent(message.content),
+                    );
+                    return (
+                      <>
+                        <Text className="text-base" style={{ color: colors.foreground }}>
+                          {body}
+                        </Text>
+                        {sponsor ? (
+                          <Text
+                            style={{
+                              marginTop: 6,
+                              fontSize: 11,
+                              fontStyle: "italic",
+                              letterSpacing: 0.2,
+                              color: colors.primary,
+                              opacity: 0.75,
+                            }}
+                          >
+                            presented by {sponsor}
+                          </Text>
+                        ) : null}
+                      </>
+                    );
+                  })()}
+                  {/* Tiny outlet attribution — just the publication, no "source"
+                      label and no chunky chip. Taps through to the article. */}
                   {message.isBotMessage && message.embedCode &&
                    /^https?:\/\//.test(message.embedCode) ? (
                     <Pressable
                       onPress={() => Linking.openURL(message.embedCode!).catch(() => {})}
-                      className="mt-2 flex-row items-center gap-1.5 self-start rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1"
+                      hitSlop={6}
+                      className="mt-1.5 self-start"
                     >
-                      <Text className="text-[11px] font-bold uppercase tracking-wider text-primary">
-                        Read source
+                      <Text className="text-[10px] text-muted-foreground/70">
+                        {outletName(message.embedCode)} ↗
                       </Text>
                     </Pressable>
                   ) : null}

@@ -27,6 +27,7 @@ import { useHuddleDetails } from "@/hooks/useHuddleDetails";
 import { useHuddleMessages, type HuddleMessage } from "@/hooks/useHuddleMessages";
 import { useMessageReactions, useToggleReaction } from "@/hooks/useMessageReactions";
 import { useHuddlePresence } from "@/hooks/useHuddlePresence";
+import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { HuddleHeader } from "@/components/huddle/HuddleHeader";
 import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
 import { PresenceBar } from "@/components/huddle/PresenceBar";
@@ -179,6 +180,14 @@ export function HuddleScreen() {
   const flatListRef = useRef<FlatList<ListItem>>(null);
   const { presentUsers, typingUsers, entryBanner, sendTyping } =
     useHuddlePresence(huddleId);
+
+  // Publish this room as the user's current location to the global lobby so it
+  // surfaces in friends' "Friends Now" — and clear it on leave.
+  const { setCurrentHuddle } = useGlobalPresence();
+  useEffect(() => {
+    setCurrentHuddle(huddleId, huddle?.name ?? null);
+    return () => setCurrentHuddle(null);
+  }, [huddleId, huddle?.name, setCurrentHuddle]);
 
   // Prediction markets for this huddle's team
   const teamId = huddle?.teamId;

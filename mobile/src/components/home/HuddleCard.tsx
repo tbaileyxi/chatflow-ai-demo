@@ -38,7 +38,13 @@ export function HuddleCard({ huddle, onPress }: Props) {
       {/* Content */}
       <View className="flex-1 gap-1">
         <View className="flex-row items-center gap-2">
-          <Text className="flex-1 text-base font-semibold text-foreground" numberOfLines={1}>
+          <Text
+            className={cn(
+              "flex-1 text-base text-foreground",
+              huddle.hasUnread ? "font-black" : "font-semibold",
+            )}
+            numberOfLines={1}
+          >
             {huddle.name}
           </Text>
           {huddle.roomRole === "owner" ? (
@@ -58,6 +64,12 @@ export function HuddleCard({ huddle, onPress }: Props) {
           </Text>
         </View>
       </View>
+
+      {/* Unread marker — a clear dot at the trailing edge so new activity is
+          obvious on the room list, not just the subtle avatar ring. */}
+      {huddle.hasUnread ? (
+        <View className="ml-1 h-3 w-3 rounded-full bg-primary" />
+      ) : null}
     </Pressable>
   );
 }
