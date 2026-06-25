@@ -25,6 +25,7 @@ const AppContent = () => (
       <Route path="/i/:code" element={<InviteCodePage />} />
       <Route path="/admin/events" element={<AdminEventsPage />} />
       <Route path="/picks/:betId" element={<PickSharePage />} />
+      <Route path="/sponsor" element={<Navigate to="/sponsors" replace />} />
       <Route path="/sponsors" element={<Sponsor />} />
       <Route path="/sponsors/admin" element={<SponsorAdmin />} />
       <Route path="/outreach" element={<Outreach />} />

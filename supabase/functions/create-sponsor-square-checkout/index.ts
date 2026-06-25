@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 // Founding-sponsor checkout via Square Payment Links (Online Checkout).
 // Builds ONE hosted Square checkout for all selected teams, at the correct total
@@ -33,6 +34,22 @@ serve(async (req) => {
     if (!Array.isArray(teams) || teams.length === 0) {
       return json({ error: "Select at least one team." }, 400);
     }
+    if (teams.length > 20) {
+      return json({ error: "Contact partnerships for packages larger than 20 teams." }, 400);
+    }
+
+    const cleanTeams = teams.map((team: unknown) => {
+      const candidate = team as { teamKey?: unknown; teamName?: unknown; league?: unknown };
+      return {
+        teamKey: String(candidate.teamKey || "").trim(),
+        teamName: String(candidate.teamName || "").trim(),
+        league: String(candidate.league || "").trim(),
+      };
+    });
+    if (cleanTeams.some((team) => !team.teamKey || !team.teamName || !team.league)) {
+      return json({ error: "One or more selected teams are invalid." }, 400);
+    }
+
     const checkoutPlan = plan === "full" ? "full" : "reserve";
 
     const accessToken = Deno.env.get("SQUARE_ACCESS_TOKEN");
@@ -43,12 +60,32 @@ serve(async (req) => {
     const squareBase = (Deno.env.get("SQUARE_ENV") || "sandbox") === "production"
       ? "https://connect.squareup.com"
       : "https://connect.squareupsandbox.com";
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    const { data: unavailable, error: availabilityError } = await supabase
+      .from("sponsor_claims")
+      .select("team_key, team_name, status")
+      .in("team_key", cleanTeams.map((team) => team.teamKey))
+      .in("status", ["reserved", "claimed"]);
+
+    if (availabilityError) {
+      console.error("Sponsor availability check failed:", availabilityError);
+      return json({ error: "Could not verify team availability." }, 500);
+    }
+    if (unavailable?.length) {
+      return json({
+        error: `${unavailable.map((team) => team.team_name).join(", ")} already ${unavailable[0].status}. Refresh the page and choose another team.`,
+      }, 409);
+    }
 
     const perTeam = checkoutPlan === "full" ? FULL_PER_TEAM : RESERVE_PER_TEAM;
-    const count = teams.length;
+    const count = cleanTeams.length;
     const total = perTeam * count;
 
-    const teamNames: string[] = teams.map((t: { teamName: string }) => t.teamName);
+    const teamNames: string[] = cleanTeams.map((team) => team.teamName);
     const teamList = teamNames.join(", ");
     const planLabel = checkoutPlan === "full" ? "Paid in full" : "Reserve deposit";
     const productName = count === 1
@@ -86,7 +123,35 @@ serve(async (req) => {
       return json({ error: "Square checkout failed.", detail: data?.errors ?? data }, 502);
     }
 
-    return json({ url: data.payment_link?.url, total, count });
+    const paymentLink = data.payment_link;
+    const orderId = paymentLink?.order_id;
+    if (!paymentLink?.url || !orderId) {
+      console.error("Square response missing payment link/order:", JSON.stringify(data));
+      return json({ error: "Square checkout did not return a usable order." }, 502);
+    }
+
+    const claimRows = cleanTeams.map((team) => ({
+      team_key: team.teamKey,
+      team_name: team.teamName,
+      league: team.league,
+      status: "open",
+      plan: checkoutPlan,
+      amount_paid_cents: 0,
+      balance_due_cents: checkoutPlan === "full" ? 0 : 55000,
+      square_checkout_id: paymentLink.id ?? null,
+      square_order_id: orderId,
+    }));
+
+    const { error: claimError } = await supabase
+      .from("sponsor_claims")
+      .upsert(claimRows, { onConflict: "team_key" });
+
+    if (claimError) {
+      console.error("Sponsor claims creation failed:", claimError);
+      return json({ error: "Checkout was created, but the team reservation record failed. Please contact partnerships." }, 500);
+    }
+
+    return json({ url: paymentLink.url, total, count });
   } catch (err) {
     console.error("create-sponsor-square-checkout error:", err);
     return json({ error: (err as Error).message }, 500);

@@ -73,37 +73,40 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { data: claim, error: findErr } = await supabase
+    const { data: claims, error: findErr } = await supabase
       .from("sponsor_claims")
       .select("id, plan, status")
-      .eq("square_order_id", orderId)
-      .maybeSingle();
+      .eq("square_order_id", orderId);
 
-    if (findErr || !claim) {
+    if (findErr || !claims?.length) {
       console.error("No sponsor_claims row for order_id", orderId, findErr);
       return ok();
     }
-    if (claim.status === "reserved" || claim.status === "claimed") return ok(); // idempotent
+    if (claims.every((claim) => claim.status === "reserved" || claim.status === "claimed")) return ok();
 
-    const amountPaid = payment.amount_money?.amount ?? 0;
+    const totalPaid = payment.amount_money?.amount ?? 0;
+    const amountPaidPerTeam = Math.round(totalPaid / claims.length);
     const now = new Date().toISOString();
-    const isFull = claim.plan === "full";
 
-    const { error: updErr } = await supabase
-      .from("sponsor_claims")
-      .update({
-        status: isFull ? "claimed" : "reserved",
-        amount_paid_cents: amountPaid,
-        balance_due_cents: isFull ? 0 : 55000,
-        square_payment_id: payment.id ?? null,
-        reserved_at: now,
-        claimed_at: isFull ? now : null,
-        updated_at: now,
-      })
-      .eq("id", claim.id);
+    for (const claim of claims) {
+      if (claim.status === "reserved" || claim.status === "claimed") continue;
+      const isFull = claim.plan === "full";
+      const { error: updErr } = await supabase
+        .from("sponsor_claims")
+        .update({
+          status: isFull ? "claimed" : "reserved",
+          amount_paid_cents: amountPaidPerTeam,
+          balance_due_cents: isFull ? 0 : 55000,
+          square_payment_id: payment.id ?? null,
+          reserved_at: now,
+          claimed_at: isFull ? now : null,
+          updated_at: now,
+        })
+        .eq("id", claim.id);
 
-    if (updErr) console.error("sponsor_claims update error:", updErr);
-    else console.log(`Sponsor claim ${claim.id} -> ${isFull ? "claimed" : "reserved"}`);
+      if (updErr) console.error("sponsor_claims update error:", updErr);
+      else console.log(`Sponsor claim ${claim.id} -> ${isFull ? "claimed" : "reserved"}`);
+    }
 
     return ok();
   } catch (err) {

@@ -135,3 +135,6 @@ verify_jwt = true
 
 [functions.create-sponsor-square-checkout]
 verify_jwt = false
+
+[functions.square-webhook]
+verify_jwt = false

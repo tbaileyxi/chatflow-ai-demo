@@ -337,12 +337,12 @@ function Hero({ onCta }: { onCta: () => void }) {
         </h1>
         <p style={{ fontSize: 'clamp(15px, 1.6vw, 19px)', lineHeight: 1.6, color: '#aaa', maxWidth: 760, marginTop: 36, fontWeight: 400 }}>
           We're opening Side Huddle Founding Team Sponsorships for a limited time. Own a team's entire fanbase —
-          exclusive, always-on, inside the conversation. <strong style={{ color: G.white }}>Founding rates are
-          locked for the life of your sponsorship.</strong> Reach out and we'll send pricing and availability.
+          exclusive, always-on, inside the conversation. <strong style={{ color: G.white }}>Your founding rate
+          and team exclusivity are locked for your full 12-month term.</strong> Select your team and check out securely below.
         </p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 28 }}>
           {[
-            { phase: 'Early Founding', price: 'Locked founding rate', active: true },
+            { phase: 'Early Founding', price: '12-month rate lock', active: true },
             { phase: 'Next Phase',     price: 'Higher as inventory fills', active: false },
             { phase: 'Full Rollout',   price: 'Market pricing',    active: false },
           ].map(p => (
@@ -363,14 +363,14 @@ function Hero({ onCta }: { onCta: () => void }) {
 
 // ─── Section 1: The Moment ────────────────────────────────────────────────────
 const HUDDLE_BUBBLES = [
-  { name: 'The Boys Fantasy',    live: 5 },
-  { name: 'Bears War Room',      live: 3 },
-  { name: 'Section 204 Crew',    live: 8 },
-  { name: 'Sports Degenerates',  live: 4 },
-  { name: 'Da Bears Diehards',   live: 6 },
-  { name: 'Halftime Hustle',     live: 2 },
-  { name: 'Monsters of Midway',  live: 7 },
-  { name: 'Sunday Ritual',       live: 4 },
+  { name: 'The Boys Fantasy',    live: 18, jump: 'Ty + 3 friends joined', initials: ['TY', 'MD', 'JR'] },
+  { name: 'Bears War Room',      live: 24, jump: 'Alex hopped in', initials: ['AL', 'KB', 'DS'] },
+  { name: 'Section 204 Crew',    live: 31, jump: '5 friends watching', initials: ['TM', 'CJ', 'RB'] },
+  { name: 'Sports Degenerates',  live: 16, jump: 'Dan + 2 joined', initials: ['DL', 'NS', 'PG'] },
+  { name: 'Da Bears Diehards',   live: 27, jump: 'Sarah hopped in', initials: ['SK', 'BT', 'AM'] },
+  { name: 'Halftime Hustle',     live: 14, jump: '4 friends watching', initials: ['RW', 'KM', 'JT'] },
+  { name: 'Monsters of Midway',  live: 22, jump: 'Mike + 3 joined', initials: ['MB', 'TC', 'LP'] },
+  { name: 'Sunday Ritual',       live: 19, jump: 'Jimmy hopped in', initials: ['JS', 'EV', 'NG'] },
 ];
 
 function Moment({ featured }: { featured: StaticTeam }) {
@@ -397,9 +397,10 @@ function Moment({ featured }: { featured: StaticTeam }) {
 
 function HuddleMultiplier() {
   return (
-    <div style={{ position: 'relative', margin: '72px auto 0', height: 540, maxWidth: 900 }}>
-      <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 120, height: 120, borderRadius: '50%', background: G.surface2, border: `2px solid ${G.gold}`, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, boxShadow: `0 0 48px rgba(255,215,0,.18)` }}>
-        <img src={shLogo} alt="Side Huddle" style={{ width: 64, height: 64, objectFit: 'contain', borderRadius: '50%' }} />
+    <div className="huddle-multiplier" style={{ position: 'relative', margin: '72px auto 0', height: 540, maxWidth: 900 }}>
+      <div className="huddle-brand-center" style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 138, height: 138, borderRadius: '50%', background: G.surface2, border: `2px solid ${G.gold}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 5, boxShadow: `0 0 48px rgba(255,215,0,.18)`, textAlign: 'center' }}>
+        <div className="sh-label" style={{ color: G.muted2, fontSize: 8 }}>POWERED BY</div>
+        <div style={{ fontFamily: FONT_H, color: G.gold, fontWeight: 700, fontSize: 21, lineHeight: 1.05, marginTop: 5 }}>YOUR<br />BRAND</div>
       </div>
       {HUDDLE_BUBBLES.map((h, i) => {
         const a = (i / HUDDLE_BUBBLES.length) * Math.PI * 2 - Math.PI / 2;
@@ -407,12 +408,22 @@ function HuddleMultiplier() {
         const x = Math.cos(a) * r;
         const y = Math.sin(a) * r;
         return (
-          <div key={h.name} className="bubble-in" style={{ position: 'absolute', left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)`, transform: 'translate(-50%,-50%)', width: 176, animationDelay: `${i * 0.09}s` }}>
+          <div key={h.name} className="bubble-in huddle-bubble" style={{ position: 'absolute', left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)`, transform: 'translate(-50%,-50%)', width: 176, animationDelay: `${i * 0.09}s` }}>
             <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: '12px 14px' }}>
               <div style={{ fontWeight: 700, fontSize: 12 }}>{h.name}</div>
               <div style={{ fontSize: 11, color: '#7ec85f', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 6, height: 6, background: '#7ec85f', borderRadius: '50%', flexShrink: 0 }} />
                 {h.live} live
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 8 }}>
+                <div style={{ display: 'flex' }}>
+                  {h.initials.map((initial, avatarIndex) => (
+                    <span key={initial} style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: avatarIndex === 0 ? '#20364d' : avatarIndex === 1 ? '#3a2d50' : '#273e30', border: `2px solid ${G.surface}`, marginLeft: avatarIndex ? -6 : 0, color: '#ddd', fontSize: 7, fontWeight: 800 }}>
+                      {initial}
+                    </span>
+                  ))}
+                </div>
+                <span className="huddle-jump" style={{ color: G.muted2, fontSize: 8.5, whiteSpace: 'nowrap' }}>{h.jump}</span>
               </div>
               <div className="pulse-gold" style={{ marginTop: 9, borderTop: `1px solid ${G.goldDim}`, paddingTop: 7, fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase', color: G.gold, fontWeight: 700 }}>
                 powered by YOUR BRAND
@@ -421,7 +432,7 @@ function HuddleMultiplier() {
           </div>
         );
       })}
-      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
+      <svg className="huddle-lines" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
         {HUDDLE_BUBBLES.map((_, i) => {
           const a = (i / HUDDLE_BUBBLES.length) * Math.PI * 2 - Math.PI / 2;
           return (
@@ -495,7 +506,7 @@ function PhoneFrame({ label, children }: { label: string; children: React.ReactN
 // ─── Section 3: What You Get ──────────────────────────────────────────────────
 function WhatYouGet() {
   const cards = [
-    { icon: '⚡', title: 'Bot Attribution',    body: 'Every team-bot message carries a "powered by" line. One sponsor per team — no competitors in your community. Ever.' },
+    { icon: '⚡', title: 'Bot Attribution',    body: 'Every team-bot message carries a "powered by" line. One sponsor per team throughout the 12-month term.' },
     { icon: '🛡️', title: 'Team Feed Badge',    body: '"Presented by" lockup at the top of your team\'s live feed. Visible to every fan in every session, all season.' },
     { icon: '📣', title: '1 Branded Drop / Week', body: 'One sponsor-controlled message per week during active season. Optional QR code for offers or traffic. Side Huddle approved before posting.', note: 'Drive fans to your location, offer, or event on game day.' },
   ];
@@ -524,8 +535,8 @@ function ROISection() {
       <div style={{ border: `1px solid ${G.gold}`, borderRadius: 8, padding: 'clamp(28px, 5vw, 56px)', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,2fr)', gap: 40, alignItems: 'center', background: `rgba(255,215,0,.03)` }}>
         <div>
           <div className="sh-label" style={{ marginBottom: 12 }}>FOUNDING RATE</div>
-          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(44px, 6vw, 76px)', color: G.gold, lineHeight: 0.95, letterSpacing: '-0.02em' }}>Locked for life</div>
-          <div className="sh-label" style={{ color: G.muted, marginTop: 8 }}>founding sponsors only</div>
+          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(44px, 6vw, 76px)', color: G.gold, lineHeight: 0.95 }}>12 months locked</div>
+          <div className="sh-label" style={{ color: G.muted, marginTop: 8 }}>rate + category exclusivity</div>
         </div>
         <div>
           <div className="sh-label" style={{ marginBottom: 16 }}>COMPARABLE VALUE</div>
@@ -550,10 +561,10 @@ function RateCard({ free }: { free: number }) {
     { when: 'Start Sep 1+',  detail: 'No free months',           sub: 'Season live — charged immediately', active: free === 0 },
   ];
   const infoCards = [
-    { title: 'BILLING',     body: 'Month-to-month. No annual contract. Up to 3 free months for founding sponsors who start now. First charge September 1.' },
-    { title: 'RATE LOCK',   body: 'Founding rate locked through your first active season. Pricing increases in stages as inventory fills. Cancel and it\'s gone.' },
-    { title: 'EXCLUSIVITY', body: 'One sponsor per team. No competitors in your community. Ever.' },
-    { title: 'RENEWAL',     body: 'End-of-season pricing based on platform performance at that time.' },
+    { title: 'TERM',        body: 'Your founding sponsorship runs for 12 months. Up to 3 launch months are included for sponsors who start now.' },
+    { title: 'RATE LOCK',   body: 'Your founding price is locked for the entire 12-month term.' },
+    { title: 'EXCLUSIVITY', body: 'One sponsor per team during your term. No competing brand shares your team placement.' },
+    { title: 'RENEWAL',     body: 'Before the term ends, you receive the first opportunity to renew your team.' },
   ];
   return (
     <section className="sh-section" id="rate-card" style={{ borderTop: `1px solid ${G.border}` }}>
@@ -597,7 +608,7 @@ function RateCard({ free }: { free: number }) {
           $200 holds your team; the <strong style={{ color: G.white }}>$550 balance is due Aug 29</strong>. Or pay in full today —{' '}
           <strong style={{ color: G.gold }}>$750</strong> — and we add <strong style={{ color: G.white }}>two months free</strong>: your team stays locked into the new year.
         </p>
-        <p style={{ color: G.muted, marginTop: 14, fontSize: 13 }}>Pick your team on the board below to reserve. Multiple teams or a market bundle? <a href="mailto:qb1@sidehuddlesports.com" style={{ color: G.gold }}>Email us</a>.</p>
+        <p style={{ color: G.muted, marginTop: 14, fontSize: 13 }}>Pick one or more teams below and check out once. Custom conference or market packages can still be arranged through partnerships.</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px,1fr))', gap: 14, marginTop: 28 }}>
@@ -684,117 +695,6 @@ function TeamPicker({ filtered, claims, selected, toggle, search, setSearch, lea
   );
 }
 
-// ─── Section 7: Contact Form (sends email directly) ───────────────────────────
-function ContactForm({ selectedTeams, price, free, onClearAll }: {
-  selectedTeams: StaticTeam[]; price: { total: number; label: string }; free: number; onClearAll: () => void;
-}) {
-  const [f, setF] = useState({ brand: '', name: '', email: '', phone: '', message: '' });
-  const [sent, setSent] = useState(false);
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!f.brand || !f.name || !f.email) return;
-
-    const teamList = selectedTeams.map(t => `• ${t.city} ${t.name} (${displayLeague(t.league)})`).join('\n');
-    const subject = encodeURIComponent(`Founding Sponsor Inquiry — ${f.brand} — ${selectedTeams.length} team${selectedTeams.length !== 1 ? 's' : ''}`);
-    const body = encodeURIComponent(
-`FOUNDING SPONSOR INQUIRY
-========================
-
-TEAMS REQUESTED (${selectedTeams.length}):
-${teamList}
-
-(Please send founding rates + availability for these teams.)
-
-BRAND INFO:
-Company: ${f.brand}
-Contact: ${f.name}
-Email: ${f.email}
-Phone: ${f.phone || 'Not provided'}
-
-MESSAGE:
-${f.message || 'No message provided'}
-
----
-Submitted via sidehuddlesports.com/sponsors`
-    );
-
-    window.location.href = `mailto:qb1@sidehuddlesports.com?subject=${subject}&body=${body}`;
-    setSent(true);
-  }
-
-  if (sent) {
-    return (
-      <section className="sh-section" style={{ borderTop: `1px solid ${G.border}` }}>
-        <div style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center', padding: '40px 0' }}>
-          <div style={{ fontSize: 56, marginBottom: 20 }}>🏆</div>
-          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 40, color: G.gold, textTransform: 'uppercase' }}>Your email is ready.</div>
-          <p style={{ color: '#ccc', marginTop: 16, fontSize: 17, lineHeight: 1.65 }}>
-            Your mail app opened with all your info pre-filled. Hit send and we'll reply with founding rates and availability, usually same day.
-          </p>
-          <p style={{ color: G.muted, marginTop: 12, fontSize: 14 }}>
-            No mail app? Email us directly: <a href="mailto:qb1@sidehuddlesports.com" style={{ color: G.gold }}>qb1@sidehuddlesports.com</a>
-          </p>
-          <button className="btn-outline" style={{ marginTop: 28 }} onClick={() => { setSent(false); onClearAll(); }}>Start over</button>
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section className="sh-section" style={{ borderTop: `1px solid ${G.border}` }}>
-      <div className="sh-label">06 — YOUR INFO</div>
-      <h2 style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(36px, 5vw, 56px)', lineHeight: 1.0, marginTop: 16, textTransform: 'uppercase' }}>
-        Lock in your spot. <span style={{ color: G.gold }}>We'll handle the rest.</span>
-      </h2>
-      <p style={{ color: '#aaa', marginTop: 12, fontSize: 16, lineHeight: 1.6, maxWidth: 680 }}>
-        No payment today. We'll reply with pricing and availability, usually same day.
-      </p>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.1fr)', gap: 40, marginTop: 48, alignItems: 'start' }}>
-        {/* Order summary */}
-        <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: 28 }}>
-          <div className="sh-label" style={{ marginBottom: 16 }}>ORDER SUMMARY</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {selectedTeams.map(t => (
-              <div key={teamKey(t)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${G.border}` }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{t.city} {t.name}</div>
-                  <div className="sh-label" style={{ fontSize: 9, color: G.muted, marginTop: 2 }}>{displayLeague(t.league)}</div>
-                </div>
-                <div style={{ fontSize: 13, color: G.muted2 }}>Founding rate</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 20, paddingTop: 16, borderTop: `1px solid ${G.gold}44` }}>
-            <div className="sh-label">PRICING</div>
-            <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 20, color: G.gold }}>We'll email you</div>
-          </div>
-          <div style={{ marginTop: 16, padding: '12px 14px', background: G.bg, border: `1px solid ${G.border}`, borderRadius: 6, fontSize: 13, color: '#bbb', lineHeight: 1.6 }}>
-            <strong style={{ color: G.white }}>No card charged.</strong> Send your info and we'll reply with founding rates and availability for your team(s) — usually same day. Your spot is held while we talk.
-          </div>
-        </div>
-
-        {/* Contact form */}
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <FF label="Brand / Company *"    value={f.brand}   onChange={v => setF({ ...f, brand: v })} />
-          <FF label="Your name *"          value={f.name}    onChange={v => setF({ ...f, name: v })} />
-          <FF label="Email *"              value={f.email}   onChange={v => setF({ ...f, email: v })} type="email" />
-          <FF label="Phone (optional)"     value={f.phone}   onChange={v => setF({ ...f, phone: v })} />
-          <FF label="Message (optional)"   value={f.message} onChange={v => setF({ ...f, message: v })} multiline />
-          <button className="btn-gold" type="submit" style={{ marginTop: 8, width: '100%', fontSize: 15, padding: '16px 28px' }}
-            disabled={!f.brand || !f.name || !f.email}>
-            Request pricing →
-          </button>
-          <p style={{ fontSize: 12, color: G.muted, textAlign: 'center', marginTop: 4 }}>
-            This opens your email app with everything pre-filled. Just hit send.
-          </p>
-        </form>
-      </div>
-    </section>
-  );
-}
-
 // ─── Footer ───────────────────────────────────────────────────────────────────
 function Footer({ onCta }: { onCta: () => void }) {
   return (
@@ -824,19 +724,6 @@ function Footer({ onCta }: { onCta: () => void }) {
         © {new Date().getFullYear()} Side Huddle Sports · sidehuddlesports.com/sponsors
       </div>
     </footer>
-  );
-}
-
-// ─── Shared form field ────────────────────────────────────────────────────────
-function FF({ label, value, onChange, type = 'text', multiline = false }: { label: string; value: string; onChange: (v: string) => void; type?: string; multiline?: boolean }) {
-  return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <span className="sh-label" style={{ color: G.muted }}>{label}</span>
-      {multiline
-        ? <textarea className="sh-input" rows={3} value={value} onChange={e => onChange(e.target.value)} style={{ resize: 'vertical' }} />
-        : <input className="sh-input" type={type} value={value} onChange={e => onChange(e.target.value)} />
-      }
-    </label>
   );
 }
 
@@ -942,7 +829,7 @@ function PaidSuccess({ onClose }: { onClose: () => void }) {
         <div style={{ fontSize: 52 }}>🏆</div>
         <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 34, color: G.gold, textTransform: 'uppercase', marginTop: 8 }}>You're in.</div>
         <p style={{ color: '#ddd', marginTop: 14, fontSize: 16, lineHeight: 1.6 }}>
-          Payment received — your team(s) are locked as founding sponsorships. We'll email you next steps and (for the reserve plan) the balance invoice ahead of Aug 29.
+          Payment received — your team(s) are locked for the 12-month founding term. We will send your setup details and, for reserve plans, the balance invoice ahead of Aug 29.
         </p>
         <button className="btn-gold" onClick={onClose} style={{ marginTop: 24 }}>Back to the board</button>
       </div>
@@ -968,6 +855,13 @@ const css = `
 @keyframes pulseDot { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(231,76,60,.4); } 50% { opacity: .7; box-shadow: 0 0 0 4px rgba(231,76,60,.1); } }
 @keyframes pulseGold { 0%,100% { opacity: .8; } 50% { opacity: 1; } }
 @keyframes bubbleIn { from { opacity: 0; transform: translate(-50%,-50%) scale(.88); } to { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
-@media (max-width: 700px) { .sh-section { padding: 64px 20px; } }
+@media (max-width: 700px) {
+  .sh-section { padding: 64px 20px; }
+  .huddle-multiplier { height: auto !important; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 42px !important; }
+  .huddle-brand-center { position: relative !important; left: auto !important; top: auto !important; transform: none !important; grid-column: 1 / -1; margin: 0 auto 12px; }
+  .huddle-bubble { position: relative !important; left: auto !important; top: auto !important; transform: none !important; width: auto !important; animation: none !important; }
+  .huddle-jump { white-space: normal !important; line-height: 1.25; }
+  .huddle-lines { display: none; }
+}
 @media (max-width: 860px) { .contact-grid { grid-template-columns: 1fr !important; } }
 `;
