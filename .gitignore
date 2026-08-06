@@ -52,3 +52,6 @@ chapter-db/
 
 # Supabase CLI scratch
 supabase/.temp/
+
+# Vite writes these while resolving the config; regenerated every run
+vite.config.ts.timestamp-*.mjs
