@@ -72,6 +72,9 @@ verify_jwt = false
 [functions.kalshi-post-predictions]
 verify_jwt = false
 
+[functions.fade-post-props]
+verify_jwt = false
+
 [functions.kalshi-settle]
 verify_jwt = false
 

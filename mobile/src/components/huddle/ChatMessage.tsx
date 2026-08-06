@@ -5,6 +5,7 @@ import { Audio } from "expo-av";
 import { cn } from "@/lib/utils";
 import { colors } from "@/theme/colors";
 import { PredictionCardInMessage } from "@/components/predictions/PredictionCardInMessage";
+import { FadeCardInMessage } from "@/components/huddle/FadeCardInMessage";
 import { PulseBubble } from "@/components/huddle/PulseBubble";
 import { YouTubeEmbed, parseYouTubeId } from "@/components/embeds/YouTubeEmbed";
 import type { HuddleMessage } from "@/hooks/useHuddleMessages";
@@ -172,6 +173,7 @@ export function ChatMessage({
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
 
   const isPredictionCard = message.messageType === "prediction_card";
+  const isFadeProp = message.messageType === "fade_prop";
   const youTubeId =
     message.messageType === "youtube_highlight" && message.embedCode
       ? parseYouTubeId(message.embedCode)
@@ -333,6 +335,12 @@ export function ChatMessage({
                 <PulseBubble message={message} />
               ) : isPredictionCard ? (
                 <PredictionCardInMessage content={message.content} huddleId={huddleId} />
+              ) : isFadeProp ? (
+                <FadeCardInMessage
+                  content={message.content}
+                  huddleId={huddleId}
+                  messageId={message.id}
+                />
               ) : message.mediaUrl &&
                 (!message.content?.trim() ||
                   message.content === "📷 Photo" ||

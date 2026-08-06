@@ -110,6 +110,8 @@ async function resolveGamesForTeams(teamIds: string[]) {
       status: game.status,
       startTime: game.start_time,
       sportKey: game.sport_key ?? "",
+      // Sourced from the `games` table above, so fade-settle can grade it.
+      settleable: true,
       homeTeamName: game.home_team_id
         ? teamMap.get(game.home_team_id)?.name ?? null
         : null,

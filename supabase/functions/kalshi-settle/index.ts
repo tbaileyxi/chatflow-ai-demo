@@ -165,7 +165,8 @@ Deno.serve(async (req) => {
             .in('user_id', Array.from(userIds));
           
           for (const p of profiles || []) {
-            userNames.set(p.user_id, p.username || p.display_name || 'User');
+            // Prefer the real display name; username is a confusing fallback only.
+            userNames.set(p.user_id, p.display_name || p.username || 'User');
           }
         }
 
@@ -189,12 +190,12 @@ Deno.serve(async (req) => {
 
         if (topPredictor && topPredictor.wins > 0) {
           const name = userNames.get(topPredictor.userId) || 'User';
-          summary += `• 🏆 Top predictor: @${name} (${topPredictor.wins} wins, ${topPredictor.profit >= 0 ? '+' : ''}${topPredictor.profit}¢)\n`;
+          summary += `• 🏆 Top predictor: ${name} (${topPredictor.wins} wins, ${topPredictor.profit >= 0 ? '+' : ''}${topPredictor.profit}¢)\n`;
         }
 
         if (biggestWin) {
           const name = userNames.get(biggestWin.userId) || 'User';
-          summary += `• 💰 Biggest win: @${name} (+${biggestWin.profit}¢)\n`;
+          summary += `• 💰 Biggest win: ${name} (+${biggestWin.profit}¢)\n`;
         }
 
         if (accuracyDiff > 0) {

@@ -1,9 +1,10 @@
-// useFriends — the caller's accepted friend graph, as a Set of the *other*
-// user's id for each connection. Friends are created on invite-accept
-// (accept_room_invite → friend_connections, source 'invite_link') and via other
-// social paths. We only need the id set here: display name + avatar for anyone
-// currently online come from their own global-presence payload, so this hook
-// stays independent of profile read policies.
+// useFriends — the people you share a room with, as a Set of their user ids.
+//
+// Side Huddle is "friend rooms only": the rooms you're in ARE your friend graph.
+// This used to read `friend_connections`, but that table is only written on the
+// invite-link accept path and in practice stays empty, so "Friends Now" was
+// always blank even when a roommate was online. Deriving from shared
+// huddle_members is what actually matches how people get into rooms together.
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,22 +19,33 @@ export function useFriends() {
     staleTime: 60_000,
     queryFn: async (): Promise<Set<string>> => {
       const uid = user!.id;
-      const { data, error } = await supabase
-        .from("friend_connections")
-        .select("requester_id, addressee_id")
-        .eq("status", "accepted")
-        .or(`requester_id.eq.${uid},addressee_id.eq.${uid}`);
 
-      if (error) {
-        console.warn("[friends] load failed", error);
+      // Rooms I'm in.
+      const { data: mine, error: e1 } = await supabase
+        .from("huddle_members")
+        .select("huddle_id")
+        .eq("user_id", uid);
+      if (e1) {
+        console.warn("[friends] my rooms load failed", e1);
+        return new Set();
+      }
+      const huddleIds = (mine ?? []).map((m: any) => m.huddle_id);
+      if (huddleIds.length === 0) return new Set();
+
+      // Everyone else in those rooms.
+      const { data: others, error: e2 } = await supabase
+        .from("huddle_members")
+        .select("user_id")
+        .in("huddle_id", huddleIds)
+        .neq("user_id", uid);
+      if (e2) {
+        console.warn("[friends] co-members load failed", e2);
         return new Set();
       }
 
       const ids = new Set<string>();
-      for (const row of data ?? []) {
-        const other =
-          row.requester_id === uid ? row.addressee_id : row.requester_id;
-        if (other && other !== uid) ids.add(other);
+      for (const row of others ?? []) {
+        if (row.user_id) ids.add(row.user_id as string);
       }
       return ids;
     },

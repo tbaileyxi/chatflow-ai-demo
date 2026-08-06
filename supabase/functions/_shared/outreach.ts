@@ -43,7 +43,7 @@ export async function requireAdmin(req: Request): Promise<SupabaseClient> {
   }
   if (role !== "admin") {
     console.error("[requireAdmin] non-admin role:", role);
-    throw json({ error: "Admin access required" }, 403);
+    throw json({ error: `Admin access required. Current role: ${role ?? "none"}` }, 403);
   }
 
   return serviceClient();

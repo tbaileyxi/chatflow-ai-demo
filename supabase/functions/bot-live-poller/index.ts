@@ -24,9 +24,39 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function enabledLeagues(): League[] {
-  const raw = (Deno.env.get("ENABLED_LEAGUES") || "NBA").toUpperCase();
-  return raw.split(",").map((s) => s.trim()).filter(Boolean) as League[];
+// Map a games.sport_key ("baseball_mlb", "basketball_nba", …) to our League.
+function sportKeyToLeague(sportKey: string | null | undefined): League | null {
+  const s = (sportKey || "").toLowerCase();
+  const college = s.includes("ncaa") || s.includes("college");
+  if (s.includes("basketball")) return college ? "NCAAB" : "NBA";
+  if (s.includes("baseball")) return "MLB";
+  if (s.includes("hockey")) return "NHL";
+  if (s.includes("football")) return college ? "NCAAF" : "NFL";
+  return null;
+}
+
+// Which leagues to poll this tick.
+//   • ENABLED_LEAGUES env set → honor it verbatim (manual override / TEST_MODE).
+//   • otherwise → derive from the games the score-sync has marked live right
+//     now. Zero ESPN calls when nothing is live (cheap idle), and it auto-covers
+//     every league + same-day doubleheaders with no secret to maintain.
+async function resolveLeagues(
+  supabase: ReturnType<typeof createClient>,
+): Promise<League[]> {
+  const raw = (Deno.env.get("ENABLED_LEAGUES") || "").toUpperCase().trim();
+  if (raw) {
+    return raw.split(",").map((s) => s.trim()).filter(Boolean) as League[];
+  }
+  const { data } = await supabase
+    .from("games")
+    .select("sport_key")
+    .in("status", ["in_progress", "live", "halftime"]);
+  const set = new Set<League>();
+  for (const g of (data ?? []) as { sport_key: string | null }[]) {
+    const lg = sportKeyToLeague(g.sport_key);
+    if (lg) set.add(lg);
+  }
+  return [...set];
 }
 
 serve(async (req) => {
@@ -46,7 +76,7 @@ serve(async (req) => {
   const summary = {
     started_at: new Date().toISOString(),
     provider: provider.name,
-    leagues: enabledLeagues(),
+    leagues: [] as League[],
     games_seen: 0,
     games_with_followed_team: 0,
     plays_fetched: 0,
@@ -67,6 +97,8 @@ serve(async (req) => {
       teamIndex.set(display.toLowerCase(), { id: t.id, name: display, league: t.league });
       teamIndex.set(String(t.name).toLowerCase(), { id: t.id, name: display, league: t.league });
     }
+
+    summary.leagues = await resolveLeagues(supabase);
 
     for (const league of summary.leagues) {
       const games = await provider.liveGames(league);

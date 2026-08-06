@@ -18,6 +18,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { colors } from "@/theme/colors";
 import { env } from "@/config/env";
+import {
+  isReviewerEmail,
+  REVIEWER_CODE,
+  REVIEWER_EMAIL,
+  REVIEWER_PASSWORD,
+} from "@/config/reviewer";
 import type { AuthStackParamList } from "@/navigation/types";
 
 type Nav = NativeStackNavigationProp<AuthStackParamList, "OTPVerification">;
@@ -55,6 +61,32 @@ export function OTPVerificationScreen() {
     setStatusMessage("Checking code...");
     console.log("Verifying OTP - method:", method, "phone:", phone, "email:", email);
     try {
+      // App Store reviewer bypass: the fixed reviewer email + code signs in
+      // through the pre-provisioned password account instead of verifyOtp,
+      // since no OTP email was ever sent for this address.
+      if (
+        method === "email" &&
+        email &&
+        isReviewerEmail(email) &&
+        code === REVIEWER_CODE
+      ) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: REVIEWER_EMAIL,
+          password: REVIEWER_PASSWORD,
+        });
+        if (error) {
+          setErrorMessage(error.message);
+          Alert.alert("Verification Failed", error.message);
+          setCode("");
+          return;
+        }
+        if (data.user) {
+          setStatusMessage("Signed in. Loading app...");
+          await ensureProfile(data.user.id, { email, method });
+        }
+        return;
+      }
+
       const { data, error } =
         method === "email"
           ? await supabase.auth.verifyOtp({

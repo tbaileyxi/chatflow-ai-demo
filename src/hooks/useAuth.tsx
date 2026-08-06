@@ -15,6 +15,18 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function clearSupabaseAuthStorage() {
+  try {
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('sb-') || key.includes('supabase') || key.includes('auth-token')) {
+        localStorage.removeItem(key);
+      }
+    });
+  } catch (error) {
+    console.error('Failed to clear auth storage:', error);
+  }
+}
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -23,6 +35,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let roleTimeout: NodeJS.Timeout;
+    const forceLogout = new URLSearchParams(window.location.search).get('logout') === '1';
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -103,16 +116,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Check for existing session with better error handling
     const initializeAuth = async () => {
       try {
+        if (forceLogout) {
+          await supabase.auth.signOut({ scope: 'local' }).catch((error) => {
+            console.error('Local sign out failed:', error);
+          });
+          clearSupabaseAuthStorage();
+          window.history.replaceState({}, '', window.location.pathname);
+          setSession(null);
+          setUser(null);
+          setUserRole(null);
+          setLoading(false);
+          return;
+        }
+
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Session error:', error);
-          // If there's a session error, try to refresh
-          if (error.message?.includes('refresh')) {
-            console.log('Attempting to refresh session...');
-            await supabase.auth.refreshSession();
-            return;
-          }
+          clearSupabaseAuthStorage();
+          setSession(null);
+          setUser(null);
+          setUserRole(null);
           setLoading(false);
           return;
         }
@@ -153,6 +177,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setLoading(false);
       } catch (error) {
         console.error('Auth initialization error:', error);
+        clearSupabaseAuthStorage();
+        setSession(null);
+        setUser(null);
+        setUserRole(null);
         setLoading(false);
       }
     };

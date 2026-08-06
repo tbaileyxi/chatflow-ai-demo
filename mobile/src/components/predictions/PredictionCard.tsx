@@ -16,6 +16,7 @@ interface Market {
   is_resolved: boolean;
   resolution: string | null;
   kalshi_ticker: string;
+  metadata?: { away?: string; home?: string } | null;
 }
 
 interface PredictionCardProps {
@@ -68,10 +69,18 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
   const isResolved = market.is_resolved;
 
   useEffect(() => {
+    // Reset per-card state whenever the market changes. Without this, swiping
+    // the carousel leaked the previous card's pick onto the next one (the
+    // "applied to every card" bug) because a card with no pick never cleared it.
+    setUserBet(null);
+    setStats({ total: 0, yesCount: 0, noCount: 0 });
+
     if (!user) {
       setLoadingBet(false);
       return;
     }
+    setLoadingBet(true);
+    let cancelled = false;
 
     const fetchBetAndStats = async () => {
       const [{ data: betData }, { data: statsData }] = await Promise.all([
@@ -86,17 +95,17 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
           .select("position")
           .eq("market_id", market.id),
       ]);
-      if (betData) setUserBet({ ...betData, chips_won: betData.chips_won ?? undefined });
-      if (statsData) {
-        setStats({
-          total: statsData.length,
-          yesCount: statsData.filter((b) => b.position === "YES").length,
-          noCount: statsData.filter((b) => b.position === "NO").length,
-        });
-      }
+      if (cancelled) return; // a newer market.id is loading — drop this result
+      setUserBet(betData ? { ...betData, chips_won: betData.chips_won ?? undefined } : null);
+      setStats({
+        total: statsData?.length ?? 0,
+        yesCount: statsData?.filter((b) => b.position === "YES").length ?? 0,
+        noCount: statsData?.filter((b) => b.position === "NO").length ?? 0,
+      });
       setLoadingBet(false);
     };
     fetchBetAndStats();
+    return () => { cancelled = true; };
   }, [user, market.id]);
 
   // Realtime for new bets on this market
@@ -145,7 +154,7 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
         queryClient.invalidateQueries({ queryKey: ["portfolio"] });
         queryClient.invalidateQueries({ queryKey: ["shadow-bets"] });
       } catch (err: any) {
-        Alert.alert("Error", err.message || "Failed to place bet");
+        Alert.alert("Error", err.message || "Couldn't make that pick");
       } finally {
         setPlacing(false);
       }
@@ -185,6 +194,11 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
   return (
     <View className={cn("rounded-lg border-2 p-3 gap-2", borderStyle, bgStyle)}>
       <Text className="text-sm font-semibold text-foreground">{market.question}</Text>
+      {market.metadata?.away && market.metadata?.home && (
+        <Text className="-mt-1 text-xs text-muted-foreground">
+          {market.metadata.away} @ {market.metadata.home}
+        </Text>
+      )}
 
       {/* Resolved State */}
       {isResolved && (
@@ -207,11 +221,11 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
               )}
             >
               {(() => {
-                const team = teamFromQuestion(market.question);
-                if (!team) return `Final: ${market.resolution === "YES" ? "Yes" : "No"}`;
-                return market.resolution === "YES"
-                  ? `Final — ${team} won`
-                  : `Final — ${team} lost`;
+                const hit = market.resolution === "YES";
+                // Moneyline reads as won/lost; spread/total read as hit/missed.
+                const team = market.market_type === "winner" ? teamFromQuestion(market.question) : "";
+                if (team) return hit ? `Final — ${team} won` : `Final — ${team} lost`;
+                return hit ? "Final — hit ✓" : "Final — missed ✗";
               })()}
             </Text>
           </View>
@@ -268,7 +282,7 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
       {!isResolved && isLocked && !userBet && (
         <View className="flex-row items-center gap-2">
           <Lock color={colors.accent} size={14} />
-          <Text className="text-sm text-accent">Game underway — betting closed</Text>
+          <Text className="text-sm text-accent">Game underway — picks closed</Text>
         </View>
       )}
 
@@ -296,7 +310,7 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
             <View className="gap-1">
               <View className="flex-row justify-between">
                 <Text className="text-xs text-muted-foreground">
-                  Community: {communityYesPct}% YES ({stats.total} bets)
+                  Community: {communityYesPct}% YES ({stats.total} picks)
                 </Text>
                 <Text className="text-xs text-muted-foreground">Market: {yesCost}%</Text>
               </View>

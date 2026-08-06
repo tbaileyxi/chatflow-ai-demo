@@ -62,11 +62,14 @@ Deno.serve(async (req) => {
 
       if (!huddles || huddles.length === 0) continue;
 
-      // One compact card: top 2 markets by volume (usually the team's
-      // own "Will X win?" plus one more).
+      // Compact card carousel: up to 3 markets. Odds-API team markets carry a
+      // sort_weight (winner/spread/total) so the card shows real variety, not
+      // three flavors of the same moneyline; Kalshi markets fall back to volume.
+      const rank = (m: any) =>
+        ((m.metadata as any)?.sort_weight || 0) * 1_000_000 + ((m.metadata as any)?.volume || 0);
       const topMarkets = teamMarkets
-        .sort((a, b) => ((b.metadata as any)?.volume || 0) - ((a.metadata as any)?.volume || 0))
-        .slice(0, 2);
+        .sort((a, b) => rank(b) - rank(a))
+        .slice(0, 3);
 
       const marketIds = topMarkets.map(m => m.id);
       const content = JSON.stringify({ market_ids: marketIds });

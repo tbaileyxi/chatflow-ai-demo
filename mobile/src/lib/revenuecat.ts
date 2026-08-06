@@ -13,9 +13,10 @@ import Purchases, {
 import { Platform } from "react-native";
 import { supabase } from "@/integrations/supabase/client";
 
-// The single source of truth for the SDK key. Swap when production iOS key
-// is available (will start with `appl_...`).
-const REVENUECAT_IOS_KEY = "test_sypoGZMOgpTBVecrxIjvRMSWmJg";
+// Production RevenueCat iOS key for the "Side Huddle Actual" project
+// (app com.sidehuddle.sports). appl_ prefix → SDK_ENABLED is true, so the
+// paywall connects to real App Store products.
+const REVENUECAT_IOS_KEY = "appl_ZZbhjOvmbHfNcIndjSqTrpBrHhM";
 
 // Apple's TestFlight + App Store builds force-quit the app when a test_
 // RevenueCat key is detected (RC's built-in safety). Skip configure entirely

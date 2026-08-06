@@ -15,16 +15,47 @@ import Sponsor from "./pages/Sponsor";
 import SponsorAdmin from "./pages/SponsorAdmin";
 import Outreach from "./pages/Outreach";
 import Privacy from "./pages/Privacy";
+import Arena from "./pages/Arena";
+import ArenaProfile from "./pages/ArenaProfile";
+import { OutreachErrorBoundary } from "@/components/OutreachErrorBoundary";
 
 const queryClient = new QueryClient();
+
+// VITE_ARENA_ONLY=1 -> this deployment is ProphetDome, a standalone product
+// with zero Side Huddle surface. Unset -> the Side Huddle site, with NO arena.
+const ARENA_ONLY = import.meta.env.VITE_ARENA_ONLY === "1";
+if (ARENA_ONLY) {
+  document.title = "ProphetDome";
+  document.querySelector('meta[name="description"]')
+    ?.setAttribute("content", "Pick a side. Throw your chips. The live arena for the moments everyone's arguing about.");
+  document.querySelector('meta[property="og:title"]')?.setAttribute("content", "ProphetDome");
+  document.querySelector('meta[property="og:description"]')
+    ?.setAttribute("content", "Pick a side. Throw your chips. The live arena for the moments everyone's arguing about.");
+}
 
 const AppContent = () => {
   const path = window.location.pathname.toLowerCase();
 
-  if (path === "/outreach") {
+  if (ARENA_ONLY) {
     return (
       <div className="min-h-screen w-full bg-background">
-        <Outreach />
+        <Routes>
+          <Route path="/" element={<Arena />} />
+          <Route path="/arena" element={<Navigate to="/" replace />} />
+          <Route path="/arena/p/:clientId" element={<ArenaProfile />} />
+          <Route path="/arena/:gameId" element={<Arena />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    );
+  }
+
+  if (path === "/outreach" || path === "/oureach") {
+    return (
+      <div className="min-h-screen w-full bg-background">
+        <OutreachErrorBoundary>
+          <Outreach />
+        </OutreachErrorBoundary>
       </div>
     );
   }

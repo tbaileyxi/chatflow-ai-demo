@@ -1,14 +1,16 @@
 import { View, Text, Image, Animated } from "react-native";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { colors } from "@/theme/colors";
 import type { PresenceUser } from "@/hooks/useHuddlePresence";
 
 type Props = {
   users: PresenceUser[];
   entryBanner: string | null;
+  // Optional action rendered on the same row, right-aligned (e.g. the ping pill).
+  rightSlot?: ReactNode;
 };
 
-export function PresenceBar({ users, entryBanner }: Props) {
+export function PresenceBar({ users, entryBanner, rightSlot }: Props) {
   const bannerOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -30,7 +32,8 @@ export function PresenceBar({ users, entryBanner }: Props) {
     }
   }, [entryBanner, bannerOpacity]);
 
-  if (users.length === 0) return null;
+  // Hide only when there's nothing to show at all (no one present AND no action).
+  if (users.length === 0 && !rightSlot) return null;
 
   const maxAvatars = 8;
   const visibleUsers = users.slice(0, maxAvatars);
@@ -73,6 +76,7 @@ export function PresenceBar({ users, entryBanner }: Props) {
             </Text>
           </View>
         )}
+        {rightSlot ? <View className="ml-auto pl-2">{rightSlot}</View> : null}
       </View>
 
       {/* Animated entry banner — absolute positioned so it doesn't shift layout */}

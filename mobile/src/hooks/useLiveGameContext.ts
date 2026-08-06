@@ -13,6 +13,11 @@ export type GameContext = {
   status: string; // "scheduled" | "in_progress" | "final" etc.
   startTime: string;
   sportKey: string;
+  // True only when this game lives in the `games` table — i.e. the fade-settle
+  // cron can grade it from a final score. Games sourced from live_events or the
+  // ESPN fallback are NOT settleable, so fades must never be posted on them
+  // (they'd lock chips into a prop the cron can never grade). See FadeStrip.
+  settleable: boolean;
   // Resolved team names
   homeTeamName: string | null;
   awayTeamName: string | null;
@@ -178,6 +183,7 @@ export function useLiveGameContext(teamId: string | undefined) {
           status: liveEvent.status,
           startTime: liveEvent.start_time,
           sportKey: "",
+          settleable: false, // live_events isn't graded by fade-settle
           homeTeamName: t1?.name ?? null,
           awayTeamName: t2?.name ?? null,
           homeTeamCity: t1?.city ?? null,
@@ -324,6 +330,7 @@ export async function resolveExternalGameForTeam(
         status: mapEspnStatus(competition?.status),
         startTime: event.date,
         sportKey: team.league,
+        settleable: false, // ESPN fallback id (espn-…) isn't in `games`
         homeTeamName: home.name,
         awayTeamName: away.name,
         homeTeamCity: home.city,
@@ -373,6 +380,7 @@ async function resolveGame(game: any): Promise<GameContext> {
     status: game.status,
     startTime: game.start_time,
     sportKey: game.sport_key ?? "",
+    settleable: true, // from the `games` table → fade-settle can grade it
     homeTeamName: home?.name ?? null,
     awayTeamName: away?.name ?? null,
     homeTeamCity: home?.city ?? null,

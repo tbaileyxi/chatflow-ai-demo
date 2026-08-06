@@ -16,9 +16,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     backgroundColor: "#0A0A0A",
   },
   ios: {
-    supportsTablet: true,
+    // iPhone-only for 1.0. The app has no iPad-specific layouts, so claiming
+    // tablet support meant reviewers would test an unoptimized UI on iPad (and
+    // Apple demanded 13" iPad screenshots we have no honest way to produce).
+    supportsTablet: false,
     bundleIdentifier: "com.sidehuddle.sports",
-    buildNumber: "2",
+    buildNumber: "40",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
     },

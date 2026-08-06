@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { colors } from "@/theme/colors";
 import { formatPhoneForAuth } from "@/config/testLogins";
+import { isReviewerEmail } from "@/config/reviewer";
 import type { AuthStackParamList } from "@/navigation/types";
 
 type Nav = NativeStackNavigationProp<AuthStackParamList, "PhoneEntry">;
@@ -57,6 +58,17 @@ export function PhoneEntryScreen() {
       console.log("Sending OTP to:", fullPhone);
 
       if (authMethod === "email") {
+        // App Store reviewer: no real inbox exists for this address, so skip
+        // sending an email and go straight to the code screen. The fixed
+        // reviewer code there completes a password sign-in.
+        if (isReviewerEmail(trimmedEmail)) {
+          navigation.navigate("OTPVerification", {
+            email: trimmedEmail,
+            method: "email",
+          });
+          return;
+        }
+
         const { error } = await supabase.auth.signInWithOtp({
           email: trimmedEmail,
           options: {
@@ -133,29 +145,8 @@ export function PhoneEntryScreen() {
                 until SMS is ready.
               </Text>
 
-              <View className="mt-6 flex-row rounded-xl border border-border bg-muted p-1">
-                <Button
-                  variant={authMethod === "email" ? "default" : "ghost"}
-                  className="flex-1"
-                  onPress={() => {
-                    Keyboard.dismiss();
-                    setAuthMethod("email");
-                  }}
-                >
-                  Email Code
-                </Button>
-                <Button
-                  variant={authMethod === "sms" ? "default" : "ghost"}
-                  className="flex-1"
-                  onPress={() => {
-                    Keyboard.dismiss();
-                    setAuthMethod("sms");
-                  }}
-                >
-                  SMS Code
-                </Button>
-              </View>
-
+              {/* SMS isn't live yet — sign-in is email-only. Restore the
+                  email/SMS toggle here once SMS sending works. */}
               <View className="mt-6 gap-4">
                 {authMethod === "email" && (
                   <Input

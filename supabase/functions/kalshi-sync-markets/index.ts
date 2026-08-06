@@ -10,12 +10,16 @@ const KALSHI_BASE = 'https://api.elections.kalshi.com/trade-api/v2';
 // Series tickers for sports markets on Kalshi.
 // Include both season/championship series AND per-game series so the feed
 // shows day-of and in-game cards (not just Feb 2027 futures).
+// NOTE: MLB is intentionally NOT here. MLB markets now come exclusively from
+// The Odds API (odds-sync-markets) — richer lines (moneyline/spread/total, props
+// next) than Kalshi's thin baseball coverage. Syncing both would double-post
+// cards into MLB rooms. Other leagues stay on Kalshi until they get the same
+// Odds API treatment.
 const SPORT_SERIES: Record<string, string[]> = {
   NBA: ['KXNBA', 'KXNBAGAME'],
   NFL: ['KXNFL', 'KXNFLGAME'],
   NHL: ['KXNHL', 'KXNHLGAME'],
   NCAA: ['KXNCAAB', 'KXNCAAF', 'KXNCAABGAME', 'KXNCAAFGAME'],
-  MLB: ['KXMLB', 'KXMLBGAME'],
 };
 
 // Map series ticker -> our DB league value

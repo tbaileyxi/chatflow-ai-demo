@@ -8,6 +8,26 @@ const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
 const FROM_EMAIL = "ty@sidehuddlesports.com";
 const FROM_NAME = "Ty";
 const SPONSOR_URL = "https://sidehuddlesports.com/sponsors";
+// Square hosted payment link for the deposit. The CTA points straight here
+// rather than at the sponsor page: the ask in these emails is the deposit, and
+// a page in between is one more place to lose someone reading on a phone.
+const CHECKOUT_URL = "https://square.link/u/iq7jW1sF";
+const SCHOOL_PARTNER_VERTICAL = "school partner";
+
+// Season sponsorship, collected in two parts. The deposit is what the email
+// actually asks for — it is the decision small enough to make from an inbox —
+// and the balance date carries "whichever is later" so the offer never depends
+// on an App Store review date we do not control.
+const SEASON_PRICE = "$2,500";
+const DEPOSIT = "$500";
+const BALANCE = "$2,000";
+const BALANCE_DATE = "Sept 1";
+
+// Trademark posture: we describe who the fans are, never claim affiliation.
+// Never render a school or club mark, logo, or the word "official" beside one.
+const DISCLAIMER =
+  "Side Huddle is an independent app and is not affiliated with, endorsed by, " +
+  "or sponsored by any school, team, or league.";
 
 type Lead = {
   id: string;
@@ -33,6 +53,33 @@ function firstName(lead: Lead): string {
   return n ? n.split(/\s+/)[0] : "there";
 }
 
+function slotName(lead: Lead): string {
+  return (lead.school || lead.market || lead.region || "your local team").trim();
+}
+
+function fanGroup(lead: Lead): string {
+  const slot = slotName(lead);
+  return slot === "your local team"
+    ? "local fans, friends, parents, and alumni"
+    : `${slot} fans, friends, parents, and alumni`;
+}
+
+function isSchoolPartnerLead(lead: Lead): boolean {
+  return lead.vertical === SCHOOL_PARTNER_VERTICAL ||
+    (lead.best_angle || "").toLowerCase().startsWith("official side huddle partner");
+}
+
+function schoolName(lead: Lead): string {
+  return (lead.school || lead.market || lead.region || "your school").trim();
+}
+
+// Always the school's own name, never a mascot. Mascot names ("Tiger",
+// "Demon Deacon") are registered marks in their own right, and we have no
+// licence to any of them — naming the school is ordinary descriptive use.
+function huddleLabel(lead: Lead): string {
+  return schoolName(lead);
+}
+
 // ── HTML shell (Side Huddle branding; structure from brevo_send.py:_body) ──────
 function shell(inner: string): string {
   return `<!DOCTYPE html>
@@ -50,7 +97,8 @@ ${inner}
     </td></tr>
     <tr><td style="background:#f8f8f8;padding:20px 32px;border-top:1px solid #eee;">
       <p style="font-size:13px;color:#888;margin:0 0 4px 0;">— Ty &nbsp;|&nbsp; Side Huddle Sports &nbsp;|&nbsp; <a href="mailto:${FROM_EMAIL}" style="color:#888;">${FROM_EMAIL}</a></p>
-      <p style="font-size:12px;color:#bbb;margin:0;">Reply "unsubscribe" to opt out.</p>
+      <p style="font-size:12px;color:#bbb;margin:0 0 6px 0;">Reply "unsubscribe" to opt out.</p>
+      <p style="font-size:11px;color:#c4c4c4;margin:0;line-height:1.5;">${DISCLAIMER}</p>
     </td></tr>
   </table>
   </td></tr>
@@ -61,53 +109,100 @@ ${inner}
 function cta(label: string): string {
   return `<table cellpadding="0" cellspacing="0" style="margin:4px 0 18px 0;"><tr>
     <td style="background-color:#00c47d;border-radius:6px;">
-      <a href="${SPONSOR_URL}" style="display:inline-block;padding:13px 26px;color:#000;font-size:15px;font-weight:bold;text-decoration:none;">${label} &rarr;</a>
+      <a href="${CHECKOUT_URL}" style="display:inline-block;padding:13px 26px;color:#000;font-size:15px;font-weight:bold;text-decoration:none;">${label} &rarr;</a>
     </td></tr></table>`;
+}
+
+function detailsLink(): string {
+  return `<p style="font-size:13px;color:#999;margin:0 0 6px 0;">`
+    + `Full details: <a href="${SPONSOR_URL}" style="color:#999;">${SPONSOR_URL.replace("https://", "")}</a></p>`;
 }
 
 // ── step templates ─────────────────────────────────────────────────────────────
 function subject(step: number, lead: Lead): string {
+  // Lowercase, specific, no hype words — subject lines that read like a person
+  // wrote them clear spam filtering and get opened more than titled ones.
+  if (isSchoolPartnerLead(lead)) {
+    const huddle = huddleLabel(lead);
+    switch (step) {
+      case 2: return `${huddle} slot`;
+      case 3: return `last note — ${huddle}`;
+      default: return `one sponsor slot — ${huddle} fans`;
+    }
+  }
+
+  const slot = slotName(lead);
   switch (step) {
-    case 2: return `Following up — ${lead.company} x Side Huddle`;
-    case 3: return `Closing the loop on ${lead.company}`;
-    default: return `Want to be the exclusive sponsor?`;
+    case 2: return `${slot} slot`;
+    case 3: return `last note — ${slot}`;
+    default: return `one sponsor slot — ${slot} fans`;
   }
 }
 
 function body(step: number, lead: Lead): string {
-  const v = (lead.vertical || "your brand").toLowerCase();
-  const region = (lead.school || lead.market || lead.region || "").trim();
-  const where = region ? ` in ${region}` : "";
-  const angle = lead.best_angle || "Player of the Week";
-  const pkg = lead.best_package || "$1,500";
+  if (isSchoolPartnerLead(lead)) return schoolPartnerBody(step, lead);
+
+  const slot = slotName(lead);
+  const fans = fanGroup(lead);
 
   if (step === 2) {
     return shell(`
-      <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
-      <p style="margin:0 0 18px 0;">Circling back on Side Huddle. Quick why-now for ${lead.company}: ${lead.sponsor_signal || "you are a strong fit for local sports fans and families"}.</p>
-      <p style="margin:0 0 18px 0;">The easiest slot to understand is ${angle}${where}: your business attached to a local sports moment parents, athletes, coaches, and fans already care about.</p>
-      ${cta("See sponsorship options")}
-      <p style="font-size:13px;color:#999;margin:0;">Worth a 15-minute call? Reply and I'll send a couple of times.</p>`);
+      <p style="margin:0 0 18px 0;">Hi ${firstName(lead)} — quick follow-up.</p>
+      <p style="margin:0 0 18px 0;">One sponsor, every ${slot} huddle. ${DEPOSIT} holds it; ${BALANCE} on ${BALANCE_DATE} or the day we launch, whichever is later.</p>
+      ${cta("Claim the slot")}`);
   }
 
   if (step === 3) {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
-      <p style="margin:0 0 18px 0;">Last note from me. If reaching engaged sports fans${where} isn't a priority for ${lead.company} right now, no worries at all.</p>
-      <p style="margin:0 0 18px 0;">If it might be, the ${angle} slot for ${v} is still open and the deck takes two minutes to skim.</p>
-      ${cta("Take a look")}
+      <p style="margin:0 0 18px 0;">Last note on ${slot}. One brand gets to be the only one inside those huddles this season.</p>
+      ${cta("Claim the slot")}
       <p style="font-size:13px;color:#999;margin:0;">Not relevant? Reply "unsubscribe" and I won't follow up.</p>`);
   }
 
-  // step 1 — short, human, conversational
-  const teamsPhrase = region ? `${region.split(",")[0]} sports` : "your local sports community";
+  // step 1 — the whole offer in four lines; anything longer stops being read
+  // on a phone, which is where a local owner opens their mail.
   return shell(`
     <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
-    <p style="margin:0 0 18px 0;">I am with Side Huddle Sports. We cover local athletes, teams, and game-day stories around ${teamsPhrase}.</p>
-    <p style="margin:0 0 18px 0;">I noticed ${lead.company} ${lead.sponsor_signal || "is active in a category that fits parents, athletes, coaches, and fans"}, and thought you could be a strong fit for ${angle}.</p>
-    <p style="margin:0 0 18px 0;">Would you be open to seeing the sponsor options? Packages start at ${pkg}.</p>
-    ${cta("See the sponsor options")}
-    <p style="font-size:14px;color:#555;margin:0;">Thanks,<br>Ty</p>`);
+    <p style="margin:0 0 18px 0;">Side Huddle is the digital tailgate — AI-enhanced team chat where one fanbase splits into hundreds of small huddles, each with a bot pulling live scores, news and highlights into the room.</p>
+    <p style="margin:0 0 18px 0;">We sell one sponsor per category. ${lead.company} would be the only one across every ${slot} huddle, in front of ${fans}.</p>
+    <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season.</strong> ${DEPOSIT} holds it; the ${BALANCE} balance runs ${BALANCE_DATE} or the day we launch, whichever is later — your 12 months start then, so you never pay for a day you didn't get.</p>
+    ${cta("Claim the slot")}
+    ${detailsLink()}
+    <p style="font-size:13px;color:#999;margin:0;">Price goes up each week until kickoff.</p>`);
+}
+
+function schoolPartnerBody(step: number, lead: Lead): string {
+  const organization = lead.company;
+  const huddle = huddleLabel(lead);
+
+  if (step === 2) {
+    return shell(`
+      <p style="margin:0 0 18px 0;">Hi ${firstName(lead)} — quick follow-up.</p>
+      <p style="margin:0 0 18px 0;">One sponsor, every ${huddle} huddle. ${DEPOSIT} holds it; ${BALANCE} on ${BALANCE_DATE} or the day we launch, whichever is later.</p>
+      ${cta("Claim the slot")}`);
+  }
+
+  if (step === 3) {
+    return shell(`
+      <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
+      <p style="margin:0 0 18px 0;">Last note on ${huddle}. One brand gets to be the only one inside those huddles this season.</p>
+      ${cta("Claim the slot")}
+      <p style="font-size:13px;color:#999;margin:0;">Not relevant? Reply "unsubscribe" and I won't follow up.</p>`);
+  }
+
+  // These leads already sponsor the athletics program, so the opener names that
+  // fact and nothing else — no comparison to what they pay their rights holder,
+  // which reads as adversarial and invites "so you are worth less".
+  return shell(`
+    <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
+    <p style="margin:0 0 18px 0;">You already put your name in front of ${huddle} fans, so I'll be quick.</p>
+    <p style="margin:0 0 18px 0;">Side Huddle is the digital tailgate — AI-enhanced team chat where one fanbase splits into hundreds of small huddles, each with a bot pulling live scores, news and highlights into the room.</p>
+    <p style="margin:0 0 18px 0;">We sell one sponsor per category. ${organization} would be the only one across every ${huddle} huddle.</p>
+    <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season.</strong> ${DEPOSIT} holds it; the ${BALANCE} balance runs ${BALANCE_DATE} or the day we launch, whichever is later — your 12 months start then.</p>
+    ${cta("Claim the slot")}
+    ${detailsLink()}
+    <p style="font-size:13px;color:#999;margin:0;">Price goes up each week until kickoff.</p>`);
 }
 
 async function brevoSend(apiKey: string, to: string, subj: string, html: string): Promise<void> {
@@ -127,13 +222,27 @@ async function brevoSend(apiKey: string, to: string, subj: string, html: string)
   }
 }
 
-async function selectTargets(supabase: SupabaseClient, step: number): Promise<Lead[]> {
+async function selectTargets(supabase: SupabaseClient, step: number, campaign: string): Promise<Lead[]> {
   let q = supabase
     .from("sponsor_leads")
     .select("id,company,domain,website,contact_name,contact_email,vertical,region,market,school,best_package,best_angle,sponsor_signal,sequence_step")
     .eq("bounced", false)
     .eq("unsubscribed", false)
     .not("contact_email", "is", null);
+
+  if (campaign.startsWith("school_partner")) {
+    q = q.eq("vertical", SCHOOL_PARTNER_VERTICAL);
+  }
+  // Batch labels live in `region` so each import can be sent independently
+  // without touching leads from an earlier batch.
+  const BATCH_REGION: Record<string, string> = {
+    school_partner_batch_2: "College athletics batch 2",
+    school_partner_batch_3: "College athletics batch 3",
+    school_partner_batch_4: "College athletics batch 4",
+  };
+  if (BATCH_REGION[campaign]) {
+    q = q.eq("region", BATCH_REGION[campaign]);
+  }
 
   if (step === 1) q = q.eq("emailed", false);
   else q = q.eq("emailed", true).eq("sequence_step", step - 1);
@@ -155,7 +264,7 @@ serve(async (req) => {
   }
 
   try {
-    const { sequenceStep = 1, mode = "test", maxEmails = 40 } = await req.json();
+    const { sequenceStep = 1, mode = "test", maxEmails = 40, campaign = "school_partner_batch_4" } = await req.json();
     const step = Number(sequenceStep);
     if (![1, 2, 3].includes(step)) return json({ error: "sequenceStep must be 1, 2, or 3" }, 400);
     const live = mode === "live";
@@ -164,7 +273,12 @@ serve(async (req) => {
     const apiKey = Deno.env.get("BREVO_API_KEY");
     if (live && !apiKey) return json({ error: "BREVO_API_KEY not configured" }, 500);
 
-    const targets = await selectTargets(supabase, step);
+    const KNOWN_CAMPAIGNS = new Set([
+      "school_partner", "school_partner_batch_2",
+      "school_partner_batch_3", "school_partner_batch_4",
+    ]);
+    const campaignKey = KNOWN_CAMPAIGNS.has(campaign) ? campaign : "all";
+    const targets = await selectTargets(supabase, step, campaignKey);
 
     // Step 1: skip companies whose domain was already contacted (dedup like emailed_global.csv).
     const contactedDomains = new Set<string>();
@@ -236,6 +350,7 @@ serve(async (req) => {
     return json({
       step,
       mode,
+      campaign: campaignKey,
       sent,
       eligible: targets.length,
       skipped_duplicate: skippedDuplicate,

@@ -1,11 +1,13 @@
 import { useMemo, useState, useCallback } from "react";
 import { View, Text, ScrollView, RefreshControl, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Coins, Target, Clock, Trophy, TrendingUp, Sparkles } from "lucide-react-native";
+import { Coins, Target, Clock, Trophy, TrendingUp, Sparkles, Swords } from "lucide-react-native";
 import { useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useShadowBets } from "@/hooks/useShadowBets";
+import { useFadeRecord, type FadeRecord } from "@/hooks/useFadeRecord";
 import {
   useFollowedTeamMarkets,
   type TeamMarketGroup,
@@ -24,6 +26,7 @@ export function LedgerScreen() {
   const { data: bets, isLoading: betsLoading } = useShadowBets();
   const { data: teamMarkets, isLoading: marketsLoading } =
     useFollowedTeamMarkets();
+  const { data: fadeRecord } = useFadeRecord();
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
@@ -34,6 +37,7 @@ export function LedgerScreen() {
       queryClient.invalidateQueries({
         queryKey: ["followed-team-markets", user?.id],
       }),
+      queryClient.invalidateQueries({ queryKey: ["fade-record", user?.id] }),
     ]);
     setRefreshing(false);
   }, [queryClient, user?.id]);
@@ -88,6 +92,11 @@ export function LedgerScreen() {
             <PortfolioCard portfolio={portfolio} />
           ) : null}
 
+          {/* Fade record — head-to-head vs the huddle */}
+          {fadeRecord && fadeRecord.wins + fadeRecord.losses > 0 ? (
+            <FadeRecordSection record={fadeRecord} />
+          ) : null}
+
           {/* Live Markets — grouped by followed team */}
           {marketsLoading ? (
             <View className="gap-2">
@@ -119,7 +128,7 @@ export function LedgerScreen() {
           {openBets.length > 0 && (
             <BetSection
               icon={<Target color={colors.primary} size={18} />}
-              title="Open Bets"
+              title="Open Picks"
               count={openBets.length}
               bets={openBets}
             />
@@ -159,7 +168,7 @@ export function LedgerScreen() {
               <View className="items-center py-8">
                 <Coins color={colors.mutedForeground} size={32} />
                 <Text className="mt-2 text-base font-medium text-muted-foreground">
-                  No bets yet
+                  No picks yet
                 </Text>
                 <Text className="text-sm text-muted-foreground">
                   Follow teams and place predictions below
@@ -170,6 +179,59 @@ export function LedgerScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function FadeRecordSection({ record }: { record: FadeRecord }) {
+  return (
+    <View className="gap-3">
+      <View className="flex-row items-center gap-2">
+        <Swords color={colors.primary} size={18} />
+        <Text className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          Fade Record
+        </Text>
+      </View>
+      <View className="rounded-2xl border border-border bg-card p-4">
+        <View className="flex-row items-center justify-between">
+          <Text className="text-2xl font-black text-foreground">
+            {record.wins}-{record.losses}
+          </Text>
+          <Text
+            className={cn(
+              "text-base font-bold",
+              record.net >= 0 ? "text-success" : "text-destructive",
+            )}
+          >
+            {record.net >= 0 ? "+" : ""}
+            {record.net} chips
+          </Text>
+        </View>
+        {record.h2h.length > 0 && (
+          <View className="mt-3 gap-2 border-t border-border pt-3">
+            {record.h2h.map((h) => (
+              <View
+                key={h.opponentId}
+                className="flex-row items-center justify-between"
+              >
+                <Text className="text-sm text-foreground">vs {h.name}</Text>
+                <Text className="text-sm font-medium text-muted-foreground">
+                  {h.wins}-{h.losses}{"  "}
+                  <Text
+                    className={cn(
+                      "font-bold",
+                      h.net >= 0 ? "text-success" : "text-destructive",
+                    )}
+                  >
+                    {h.net >= 0 ? "+" : ""}
+                    {h.net}
+                  </Text>
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </View>
   );
 }
 

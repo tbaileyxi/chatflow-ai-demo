@@ -209,9 +209,20 @@ export function TeamsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
       <View className="px-4 pb-3 pt-2">
-        <View className="flex-row items-center gap-2">
-          <Newspaper color={colors.primary} size={20} />
-          <Text className="text-3xl font-black text-foreground">Teams</Text>
+        <View className="flex-row items-center justify-between gap-2">
+          <View className="flex-1 flex-row items-center gap-2">
+            <Newspaper color={colors.primary} size={20} />
+            <Text className="text-3xl font-black text-foreground">Teams</Text>
+          </View>
+          {/* Managing follows can't live only in the empty state — on an active
+              day the feed is full and there'd be no way back in. */}
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={() => navigation.navigate("ManageTeams")}
+          >
+            {teams.length > 0 ? "Manage" : "Follow Teams"}
+          </Button>
         </View>
         <Text className="mt-1 text-sm text-muted-foreground">
           Scores, news, and prediction markets for your teams.

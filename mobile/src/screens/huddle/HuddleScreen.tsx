@@ -31,6 +31,8 @@ import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { HuddleHeader } from "@/components/huddle/HuddleHeader";
 import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
 import { PresenceBar } from "@/components/huddle/PresenceBar";
+import { PingButton } from "@/components/huddle/PingButton";
+import { FadeButton } from "@/components/huddle/FadeButton";
 import { ChatMessage } from "@/components/huddle/ChatMessage";
 import { MessageInput } from "@/components/huddle/MessageInput";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -191,6 +193,10 @@ export function HuddleScreen() {
 
   // Prediction markets for this huddle's team
   const teamId = huddle?.teamId;
+
+  // Game window for the "Rally the huddle" ping (shown only when a game is near).
+  const { data: liveGame } = useLiveGameContext(teamId);
+  const pingGameState = getGameState(liveGame ?? null);
 
   // JUMP pills — the user's other rooms, same-team rooms first. This is the
   // core room-jumping loop; it previously existed only in the dev sandbox.
@@ -373,7 +379,25 @@ export function HuddleScreen() {
         </View>
         )}
 
-        <PresenceBar users={presentUsers} entryBanner={entryBanner} />
+        {/* Fades live in the chat as cards. The rail that used to sit here ate
+            the top of every room even when there was nothing to take, so the
+            entry point is now a chip in the presence bar. */}
+        <PresenceBar
+          users={presentUsers}
+          entryBanner={entryBanner}
+          rightSlot={
+            <View className="flex-row items-center gap-2">
+              <FadeButton
+                huddleId={huddleId}
+                game={liveGame ?? null}
+                gameState={pingGameState}
+              />
+              {pingGameState !== "none" ? (
+                <PingButton huddleId={huddleId} gameState={pingGameState} />
+              ) : null}
+            </View>
+          }
+        />
 
         {messagesLoading ? (
           <LoadingSpinner className="flex-1" />

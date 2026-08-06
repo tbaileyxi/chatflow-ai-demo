@@ -36,3 +36,6 @@ yarn-error.*
 *.mobileprovision
 *.pem
 .env*.local
+
+# build outputs — never upload (was bloating the archive ~180MB)
+*.ipa

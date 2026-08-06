@@ -24,6 +24,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useHuddleDetails } from "@/hooks/useHuddleDetails";
 import { useHuddleMembers } from "@/hooks/useHuddleMembers";
 import { OfficialUpgradePaywall } from "@/components/paywall/OfficialUpgradePaywall";
+import { OFFICIAL_HUDDLES_ENABLED } from "@/config/features";
 import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -192,8 +193,14 @@ export function HuddleSettingsScreen() {
   const togglePrivate = async () => {
     if (!isRoomAdmin) return;
     // Private mode is an Official Huddle feature — gate behind the upgrade.
+    // With Official Huddles off for 1.0 there's no purchase to offer, so tell
+    // the owner it's coming rather than opening a paywall that can't complete.
     if (!isOfficial && !huddle.isPrivate) {
-      setShowPaywall(true);
+      if (OFFICIAL_HUDDLES_ENABLED) {
+        setShowPaywall(true);
+      } else {
+        Alert.alert("Coming soon", "Private, approval-only huddles arrive in a future update.");
+      }
       return;
     }
     const next = !huddle.isPrivate;
@@ -428,9 +435,10 @@ export function HuddleSettingsScreen() {
           </CardContent>
         </Card>
 
-        {/* Official Huddle upgrade — owner only.
-            Today only app admins can flip. Real paywall lands separately. */}
-        {isOwner && !isOfficial && (
+        {/* Official Huddle upgrade — owner only. Hidden for 1.0: the paid
+            subscription isn't set up in App Store Connect yet, so no purchase
+            can be started. Re-enabled by the OFFICIAL_HUDDLES_ENABLED flag. */}
+        {OFFICIAL_HUDDLES_ENABLED && isOwner && !isOfficial && (
           <Card>
             <CardContent className="gap-2 pt-4">
               <View className="flex-row items-center gap-2">
