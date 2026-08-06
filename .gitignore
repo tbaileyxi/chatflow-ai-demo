@@ -30,3 +30,17 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Secrets — .env was tracked until 2026-08-06; untracked then, keep it that way.
+# Its old values are still in git history, so treat those keys as exposed.
+.env
+.env.*
+!.env.example
+
+# iOS build output. Three .ipa files were committed before this rule existed,
+# which is most of why the packfiles are ~80MB.
+*.ipa
+_old_ipas/
+
+# App Store / marketing assets — large binaries, not source
+appstore-screenshots/
