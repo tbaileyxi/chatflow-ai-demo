@@ -2,7 +2,17 @@ import { useState, useEffect } from "react";
 import { View, Text, Image, Alert, Pressable, Keyboard, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-import { Bell, Camera, Crown, LogOut, Shield, Megaphone, X } from "lucide-react-native";
+import {
+  Bell,
+  Camera,
+  Crown,
+  FileText,
+  Lock,
+  LogOut,
+  Shield,
+  Megaphone,
+  X,
+} from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,11 +24,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { GamePingsToggle } from "@/components/profile/GamePingsToggle";
 import { Separator } from "@/components/ui/separator";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ScreenWrapper } from "@/components/ui/screen-wrapper";
 import { Badge } from "@/components/ui/badge";
 import { colors } from "@/theme/colors";
+import { PRIVACY_URL, TERMS_URL } from "@/lib/legal";
+import { OFFICIAL_HUDDLES_ENABLED } from "@/config/features";
 
 const BASE64_CHARS =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -121,6 +134,29 @@ export function ProfileScreen() {
         onPress: signOut,
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "This permanently deletes your account, picks, chips, and profile. This can't be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const { error } = await supabase.functions.invoke("delete-account");
+              if (error) throw error;
+              await signOut();
+            } catch (e: any) {
+              Alert.alert("Couldn't delete account", e?.message || "Please try again.");
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handlePickAvatar = async () => {
@@ -286,23 +322,25 @@ export function ProfileScreen() {
           </Text>
         </View>
 
-        <Card className="border-primary/25 bg-primary/5">
-          <CardContent className="gap-3 pt-4">
-            <View className="flex-row items-center gap-2">
-              <Crown color={colors.primary} size={18} />
-              <Text className="text-base font-bold text-foreground">
-                Official Huddles
+        {OFFICIAL_HUDDLES_ENABLED && (
+          <Card className="border-primary/25 bg-primary/5">
+            <CardContent className="gap-3 pt-4">
+              <View className="flex-row items-center gap-2">
+                <Crown color={colors.primary} size={18} />
+                <Text className="text-base font-bold text-foreground">
+                  Official Huddles
+                </Text>
+                <Badge variant="outline" className="ml-auto">
+                  $29/mo
+                </Badge>
+              </View>
+              <Text className="text-sm leading-5 text-muted-foreground">
+                Verified badge, team-page listing, multiple admins, approval
+                membership, and an about page with links.
               </Text>
-              <Badge variant="outline" className="ml-auto">
-                $29/mo
-              </Badge>
-            </View>
-            <Text className="text-sm leading-5 text-muted-foreground">
-              Verified badge, team-page listing, multiple admins, approval
-              membership, and an about page with links.
-            </Text>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardContent className="gap-3 pt-4">
@@ -449,6 +487,16 @@ export function ProfileScreen() {
 
         <Separator />
 
+        {/* Notifications */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Notifications</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <GamePingsToggle />
+          </CardContent>
+        </Card>
+
         {/* Account */}
         <Card>
           <CardHeader>
@@ -483,11 +531,41 @@ export function ProfileScreen() {
                 </Text>
               </View>
             </Button>
+            <Button
+              variant="outline"
+              onPress={() => Linking.openURL(TERMS_URL).catch(() => {})}
+            >
+              <View className="flex-row items-center gap-2">
+                <FileText color={colors.primary} size={16} />
+                <Text className="text-sm font-medium text-foreground">
+                  Terms of Use (EULA)
+                </Text>
+              </View>
+            </Button>
+            <Button
+              variant="outline"
+              onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}
+            >
+              <View className="flex-row items-center gap-2">
+                <Lock color={colors.primary} size={16} />
+                <Text className="text-sm font-medium text-foreground">
+                  Privacy Policy
+                </Text>
+              </View>
+            </Button>
             <Button variant="destructive" onPress={handleSignOut}>
               <View className="flex-row items-center gap-2">
                 <LogOut color={colors.destructiveForeground} size={16} />
                 <Text className="text-sm font-medium text-destructive-foreground">
                   Sign Out
+                </Text>
+              </View>
+            </Button>
+            <Button variant="ghost" onPress={handleDeleteAccount}>
+              <View className="flex-row items-center gap-2">
+                <X color={colors.destructive} size={16} />
+                <Text className="text-sm font-medium text-destructive">
+                  Delete Account
                 </Text>
               </View>
             </Button>

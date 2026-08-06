@@ -9,7 +9,7 @@
 // official_huddle_monthly product to see live pricing.
 
 import { useEffect, useState } from "react";
-import { Alert, Modal, Pressable, Text, View } from "react-native";
+import { Alert, Linking, Modal, Pressable, Text, View } from "react-native";
 import { ShieldCheck, X } from "lucide-react-native";
 import type { PurchasesPackage } from "react-native-purchases";
 import {
@@ -19,6 +19,7 @@ import {
   activateOfficialOnHuddle,
 } from "@/lib/revenuecat";
 import { Button } from "@/components/ui/button";
+import { PRIVACY_URL, TERMS_URL } from "@/lib/legal";
 import { colors } from "@/theme/colors";
 
 type Props = {
@@ -142,11 +143,18 @@ export function OfficialUpgradePaywall({
               </View>
             ) : pkg ? (
               <>
+                <Text className="mb-1 text-center text-base font-bold text-foreground">
+                  Official Huddle
+                </Text>
                 <Text className="mb-1 text-center text-2xl font-black text-foreground">
                   {priceLabel}
                 </Text>
                 <Text className="mb-4 text-center text-xs text-muted-foreground">
-                  Auto-renews monthly. Cancel anytime in your Apple ID settings.
+                  1-month auto-renewing subscription. Payment is charged to your
+                  Apple ID at confirmation of purchase and renews automatically
+                  for {priceLabel} each month unless cancelled at least 24 hours
+                  before the end of the current period. Manage or cancel in your
+                  Apple ID settings.
                 </Text>
                 <Button onPress={handlePurchase} disabled={busy}>
                   {busy ? "Processing…" : "Make Official"}
@@ -163,6 +171,27 @@ export function OfficialUpgradePaywall({
                 </Text>
               </View>
             )}
+
+            {/* Required by 3.1.2(c) — rendered even when the offering fails to
+                load, so the links are never missing from the purchase screen. */}
+            <View className="mt-5 flex-row items-center justify-center gap-6">
+              <Pressable
+                onPress={() => Linking.openURL(TERMS_URL).catch(() => {})}
+                hitSlop={8}
+              >
+                <Text className="text-xs font-medium text-muted-foreground underline">
+                  Terms of Use (EULA)
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}
+                hitSlop={8}
+              >
+                <Text className="text-xs font-medium text-muted-foreground underline">
+                  Privacy Policy
+                </Text>
+              </Pressable>
+            </View>
           </Pressable>
         </View>
       </Pressable>
