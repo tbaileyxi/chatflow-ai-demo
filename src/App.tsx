@@ -14,25 +14,38 @@ import PickSharePage from "./pages/PickSharePage";
 import Sponsor from "./pages/Sponsor";
 import SponsorAdmin from "./pages/SponsorAdmin";
 import Outreach from "./pages/Outreach";
+import Privacy from "./pages/Privacy";
 
 const queryClient = new QueryClient();
 
-const AppContent = () => (
-  <div className="min-h-screen w-full bg-background">
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/h/:huddleId" element={<HuddleInvitePage />} />
-      <Route path="/i/:code" element={<InviteCodePage />} />
-      <Route path="/admin/events" element={<AdminEventsPage />} />
-      <Route path="/picks/:betId" element={<PickSharePage />} />
-      <Route path="/sponsor" element={<Navigate to="/sponsors" replace />} />
-      <Route path="/sponsors" element={<Sponsor />} />
-      <Route path="/sponsors/admin" element={<SponsorAdmin />} />
-      <Route path="/outreach" element={<Outreach />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  </div>
-);
+const AppContent = () => {
+  const path = window.location.pathname.toLowerCase();
+
+  if (path === "/outreach") {
+    return (
+      <div className="min-h-screen w-full bg-background">
+        <Outreach />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen w-full bg-background">
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/h/:huddleId" element={<HuddleInvitePage />} />
+        <Route path="/i/:code" element={<InviteCodePage />} />
+        <Route path="/admin/events" element={<AdminEventsPage />} />
+        <Route path="/picks/:betId" element={<PickSharePage />} />
+        <Route path="/sponsor" element={<Navigate to="/sponsors" replace />} />
+        <Route path="/sponsors" element={<Sponsor />} />
+        <Route path="/sponsors/admin" element={<SponsorAdmin />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </div>
+  );
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

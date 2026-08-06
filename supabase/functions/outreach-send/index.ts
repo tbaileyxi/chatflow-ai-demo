@@ -18,6 +18,11 @@ type Lead = {
   contact_email: string | null;
   vertical: string;
   region: string | null;
+  market: string | null;
+  school: string | null;
+  best_package: string | null;
+  best_angle: string | null;
+  sponsor_signal: string | null;
   sequence_step: number;
 };
 
@@ -71,14 +76,16 @@ function subject(step: number, lead: Lead): string {
 
 function body(step: number, lead: Lead): string {
   const v = (lead.vertical || "your brand").toLowerCase();
-  const region = (lead.region || "").trim();
+  const region = (lead.school || lead.market || lead.region || "").trim();
   const where = region ? ` in ${region}` : "";
+  const angle = lead.best_angle || "Player of the Week";
+  const pkg = lead.best_package || "$1,500";
 
   if (step === 2) {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
-      <p style="margin:0 0 18px 0;">Circling back on Side Huddle. Quick why-now for ${lead.company}: our huddles are small, high-trust group chats where fans talk every game live — the moments where brand recall actually sticks, not a banner they scroll past.</p>
-      <p style="margin:0 0 18px 0;">Sponsors show up natively in the feed and on the scoreboard, tied to the teams${where} your customers already follow. We keep it to one sponsor per category, so ${v} stays exclusive.</p>
+      <p style="margin:0 0 18px 0;">Circling back on Side Huddle. Quick why-now for ${lead.company}: ${lead.sponsor_signal || "you are a strong fit for local sports fans and families"}.</p>
+      <p style="margin:0 0 18px 0;">The easiest slot to understand is ${angle}${where}: your business attached to a local sports moment parents, athletes, coaches, and fans already care about.</p>
       ${cta("See sponsorship options")}
       <p style="font-size:13px;color:#999;margin:0;">Worth a 15-minute call? Reply and I'll send a couple of times.</p>`);
   }
@@ -87,20 +94,19 @@ function body(step: number, lead: Lead): string {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
       <p style="margin:0 0 18px 0;">Last note from me. If reaching engaged sports fans${where} isn't a priority for ${lead.company} right now, no worries at all.</p>
-      <p style="margin:0 0 18px 0;">If it might be, the category slot for ${v} is still open and the deck takes two minutes to skim.</p>
+      <p style="margin:0 0 18px 0;">If it might be, the ${angle} slot for ${v} is still open and the deck takes two minutes to skim.</p>
       ${cta("Take a look")}
       <p style="font-size:13px;color:#999;margin:0;">Not relevant? Reply "unsubscribe" and I won't follow up.</p>`);
   }
 
   // step 1 — short, human, conversational
-  const teamsPhrase = region ? `${region.split(",")[0]}'s teams` : "your area's teams";
+  const teamsPhrase = region ? `${region.split(",")[0]} sports` : "your local sports community";
   return shell(`
     <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
-    <p style="margin:0 0 18px 0;">Want to be the exclusive sponsor for ${teamsPhrase} this season?</p>
-    <p style="margin:0 0 18px 0;">Side Huddle Sports is AI-enhanced group chats where fans pack into live rooms on game day to predict, react, and talk trash. One brand owns each team, and your logo sits on top of every room.</p>
-    <p style="margin:0 0 18px 0;">We're signing founding partners before we launch: $2,000 for 3 teams all season (it goes to $4,500 after). One spot per team, first come.</p>
-    <p style="margin:0 0 18px 0;">Worth a quick look? Just reply with the teams you'd want and I'll hold them for you.</p>
-    ${cta("Grab your teams")}
+    <p style="margin:0 0 18px 0;">I am with Side Huddle Sports. We cover local athletes, teams, and game-day stories around ${teamsPhrase}.</p>
+    <p style="margin:0 0 18px 0;">I noticed ${lead.company} ${lead.sponsor_signal || "is active in a category that fits parents, athletes, coaches, and fans"}, and thought you could be a strong fit for ${angle}.</p>
+    <p style="margin:0 0 18px 0;">Would you be open to seeing the sponsor options? Packages start at ${pkg}.</p>
+    ${cta("See the sponsor options")}
     <p style="font-size:14px;color:#555;margin:0;">Thanks,<br>Ty</p>`);
 }
 
@@ -124,7 +130,7 @@ async function brevoSend(apiKey: string, to: string, subj: string, html: string)
 async function selectTargets(supabase: SupabaseClient, step: number): Promise<Lead[]> {
   let q = supabase
     .from("sponsor_leads")
-    .select("id,company,domain,website,contact_name,contact_email,vertical,region,sequence_step")
+    .select("id,company,domain,website,contact_name,contact_email,vertical,region,market,school,best_package,best_angle,sponsor_signal,sequence_step")
     .eq("bounced", false)
     .eq("unsubscribed", false)
     .not("contact_email", "is", null);
@@ -213,6 +219,11 @@ serve(async (req) => {
           emailed: true,
           emailed_at: new Date().toISOString(),
           sequence_step: step,
+          status: step === 1 ? "Sent" : "Follow-up",
+          last_touch: new Date().toISOString().slice(0, 10),
+          follow_up_date: step < 3
+            ? new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+            : null,
           last_error: null,
         })
         .eq("id", lead.id);

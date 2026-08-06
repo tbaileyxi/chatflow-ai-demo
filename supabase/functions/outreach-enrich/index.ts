@@ -6,6 +6,7 @@ import {
   corsHeaders,
   json,
   requireAdmin,
+  isValidEmail,
   isPersonal,
   isAcceptable,
   titleTier,
@@ -204,9 +205,157 @@ const VERTICAL_SYNONYMS: Record<string, string[]> = {
   "gyms": ["fitness", "gyms"],
 };
 
+const SPONSOR_CATEGORY_SIGNALS: Record<string, { score: number; package: string; angle: string; signal: string }> = {
+  pizza: {
+    score: 14,
+    package: "$1,500",
+    angle: "Friday Night Scoreboard",
+    signal: "Game-day food category with parent, athlete, and student demand.",
+  },
+  wings: {
+    score: 14,
+    package: "$1,500",
+    angle: "Game of the Week",
+    signal: "Game-day food category with a natural watch-party tie-in.",
+  },
+  restaurant: {
+    score: 13,
+    package: "$1,500",
+    angle: "Game of the Week",
+    signal: "Family/customer base overlaps with local sports fans.",
+  },
+  restaurants: {
+    score: 13,
+    package: "$1,500",
+    angle: "Game of the Week",
+    signal: "Family/customer base overlaps with local sports fans.",
+  },
+  "car dealership": {
+    score: 14,
+    package: "$3,000",
+    angle: "Player of the Week",
+    signal: "Dealers commonly buy local sports/community visibility.",
+  },
+  automotive: {
+    score: 13,
+    package: "$3,000",
+    angle: "Player of the Week",
+    signal: "Auto brands often invest in visible local sponsorships.",
+  },
+  "physical therapy": {
+    score: 15,
+    package: "$1,500",
+    angle: "Athlete Spotlight",
+    signal: "Sports medicine relevance creates a direct athlete/parent fit.",
+  },
+  orthodontist: {
+    score: 14,
+    package: "$1,500",
+    angle: "Athlete Spotlight",
+    signal: "Parent/student customer base and strong local referral value.",
+  },
+  dentist: {
+    score: 13,
+    package: "$1,500",
+    angle: "Athlete Spotlight",
+    signal: "Family customer base and strong local referral value.",
+  },
+  "credit union": {
+    score: 14,
+    package: "$3,000",
+    angle: "Student Athlete of the Week",
+    signal: "Community banking category often sponsors schools and youth programs.",
+  },
+  bank: {
+    score: 13,
+    package: "$3,000",
+    angle: "Student Athlete of the Week",
+    signal: "Community banking category often sponsors schools and youth programs.",
+  },
+  "insurance agency": {
+    score: 12,
+    package: "$1,500",
+    angle: "Friday Night Scoreboard",
+    signal: "Local agents rely on trust and community awareness.",
+  },
+  "real estate agent": {
+    score: 12,
+    package: "$1,500",
+    angle: "Top Plays",
+    signal: "Community-facing category with parent and alumni reach.",
+  },
+  "urgent care": {
+    score: 13,
+    package: "$1,500",
+    angle: "Injury Report",
+    signal: "Healthcare category with a strong sports-family fit.",
+  },
+  gym: {
+    score: 12,
+    package: "$500",
+    angle: "Training Tip",
+    signal: "Fitness category aligns with athletes and active families.",
+  },
+  "car wash": {
+    score: 10,
+    package: "$500",
+    angle: "Top Plays",
+    signal: "Local service business with broad family/customer appeal.",
+  },
+  "roofing company": {
+    score: 10,
+    package: "$1,500",
+    angle: "Friday Night Scoreboard",
+    signal: "Home service category often buys local awareness and trust.",
+  },
+};
+
 function keywordTags(vertical: string): string[] {
   const k = (vertical || "").toLowerCase().trim();
   return VERTICAL_SYNONYMS[k] ?? (vertical ? [vertical] : []);
+}
+
+function splitCategories(raw: string): string[] {
+  const parts = (raw || "")
+    .split(/[,;\n]/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return parts.length ? parts : [raw].filter(Boolean);
+}
+
+function scoreForCategory(category: string, hasEmail: boolean, hasInstagram: boolean) {
+  const key = category.toLowerCase().trim();
+  const base = SPONSOR_CATEGORY_SIGNALS[key] ?? {
+    score: 9,
+    package: "$1,500",
+    angle: "Game of the Week",
+    signal: "Local business category worth verifying for community sponsorship intent.",
+  };
+  const score = Math.min(20, base.score + (hasEmail ? 1 : 0) + (hasInstagram ? 1 : 0));
+  return { ...base, score };
+}
+
+async function findContactForCompany(
+  website: string | null,
+  domain: string | null,
+): Promise<{ contact: Contact | null; instagram: string }> {
+  const normalizedDomain = normalizeDomain(domain || website || "");
+  let contact: Contact | null = normalizedDomain ? await apolloFindEmail(normalizedDomain) : null;
+  let instagram = "";
+
+  const site = website || (normalizedDomain ? `https://${normalizedDomain}` : "");
+  if (site) {
+    const scraped = await scrapeSite(site);
+    instagram = scraped.instagram;
+    if (!contact?.email && scraped.email) {
+      contact = { email: scraped.email, confidence: scraped.confidence, name: null, title: null };
+    }
+  }
+  if (!contact?.email && normalizedDomain) {
+    contact = (await hunterFindEmail(normalizedDomain)) ?? contact;
+  }
+
+  return { contact, instagram };
 }
 
 async function apolloOrgSearch(
@@ -276,23 +425,83 @@ serve(async (req) => {
   }
 
   try {
-    const { vertical, company, region, maxResults = 25 } = await req.json();
+    const { vertical, company, region, market, school, maxResults = 25, leadId } = await req.json();
+
+    if (leadId) {
+      const { data: lead, error: leadError } = await supabase
+        .from("sponsor_leads")
+        .select("id,company,website,domain,vertical,sponsor_score")
+        .eq("id", String(leadId))
+        .maybeSingle();
+      if (leadError) throw new Error(`Lead lookup failed: ${leadError.message}`);
+      if (!lead) return json({ error: "Lead not found" }, 404);
+
+      const { contact, instagram } = await findContactForCompany(
+        (lead as { website: string | null }).website,
+        (lead as { domain: string | null }).domain,
+      );
+
+      const update: Record<string, unknown> = {
+        instagram_handle: instagram || null,
+        last_error: null,
+      };
+      if (contact?.email) {
+        update.contact_email = contact.email;
+        update.contact_name = contact.name;
+        update.contact_title = contact.title;
+        update.email_confidence = contact.confidence;
+        update.priority = titleTier(contact.title || "") <= 3 ? "TIER1" : "TIER2";
+        update.sponsor_score = Math.min(20, Number((lead as { sponsor_score: number | null }).sponsor_score || 9) + 1);
+      }
+
+      const { error: updateError } = await supabase
+        .from("sponsor_leads")
+        .update(update)
+        .eq("id", String(leadId));
+      if (updateError) throw new Error(`Lead update failed: ${updateError.message}`);
+
+      return json({
+        leadId,
+        company: (lead as { company: string }).company,
+        contact_email: contact?.email ?? null,
+        contact_name: contact?.name ?? null,
+        contact_title: contact?.title ?? null,
+        email_confidence: contact?.confidence ?? null,
+        instagram_handle: instagram || null,
+      });
+    }
+
     const v = vertical ? String(vertical).trim() : "";
     const co = company ? String(company).trim() : "";
-    if (!v && !co) {
-      return json({ error: "Enter a vertical or a company name" }, 400);
+    const mkt = market ? String(market).trim() : "";
+    const sch = school ? String(school).trim() : "";
+    if (!v && !co && !mkt && !sch) {
+      return json({ error: "Enter a school, market, vertical, or company name" }, 400);
     }
-    const reg = region ? String(region).trim() : "";
-    const cap = Math.min(Math.max(Number(maxResults) || 25, 1), 60);
+    const reg = region ? String(region).trim() : mkt;
+    const cap = Math.min(Math.max(Number(maxResults) || 25, 1), 100);
+    const categories = co ? [v || "local sponsor"] : splitCategories(v);
+    const perCategoryCap = Math.max(1, Math.ceil(cap / Math.max(categories.length, 1)));
 
     // 1. Discover companies via Apollo company search (brands + categories).
     //    No Google Places fallback — it returned store locations / junk with no emails.
-    type Disc = { name: string; website: string; domain: string };
-    const companies: Disc[] = (await apolloOrgSearch(v, co, reg, cap)).map((o) => ({
-      name: o.name,
-      website: o.website,
-      domain: o.domain,
-    }));
+    type Disc = { name: string; website: string; domain: string; category: string };
+    const byDomain = new Map<string, Disc>();
+    for (const category of categories) {
+      const found = await apolloOrgSearch(category, co, reg, perCategoryCap);
+      for (const o of found) {
+        if (byDomain.has(o.domain)) continue;
+        byDomain.set(o.domain, {
+          name: o.name,
+          website: o.website,
+          domain: o.domain,
+          category,
+        });
+        if (byDomain.size >= cap) break;
+      }
+      if (byDomain.size >= cap) break;
+    }
+    const companies: Disc[] = [...byDomain.values()];
     const source = "apollo";
 
     let withEmail = 0;
@@ -302,24 +511,15 @@ serve(async (req) => {
     //    Waterfall: Apollo people (named) → site scrape → Hunter.
     for (const c of companies) {
       const domain = c.domain;
-      let contact: Contact | null = domain ? await apolloFindEmail(domain) : null;
-      let instagram = "";
-
-      if (c.website) {
-        const scraped = await scrapeSite(c.website);
-        instagram = scraped.instagram;
-        if (!contact?.email && scraped.email) {
-          contact = { email: scraped.email, confidence: scraped.confidence, name: null, title: null };
-        }
-      }
-      if (!contact?.email && domain) {
-        contact = (await hunterFindEmail(domain)) ?? contact;
-      }
+      const { contact, instagram } = await findContactForCompany(c.website, domain);
       if (contact?.email) withEmail++;
+      const score = scoreForCategory(c.category, Boolean(contact?.email), Boolean(instagram));
 
       rows.push({
-        vertical: v,
+        vertical: c.category || v,
         region: reg || null,
+        market: mkt || reg || null,
+        school: sch || null,
         company: c.name || domain,
         website: c.website || null,
         domain: domain || null,
@@ -330,6 +530,11 @@ serve(async (req) => {
         email_confidence: contact?.confidence ?? "low",
         // TIER1 = reachable named decision-maker; TIER2 = everyone else.
         priority: contact?.email && titleTier(contact.title || "") <= 3 ? "TIER1" : "TIER2",
+        sponsor_signal: score.signal,
+        sponsor_score: score.score,
+        best_package: score.package,
+        best_angle: score.angle,
+        status: "New",
       });
     }
 
@@ -341,7 +546,7 @@ serve(async (req) => {
     if (withEmailRows.length) {
       const { data, error } = await supabase
         .from("sponsor_leads")
-        .upsert(withEmailRows, { onConflict: "contact_email", ignoreDuplicates: true })
+        .upsert(withEmailRows, { onConflict: "contact_email" })
         .select();
       if (error) throw new Error(`DB upsert failed: ${error.message}`);
       stored += data?.length ?? 0;

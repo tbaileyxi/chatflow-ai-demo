@@ -90,22 +90,21 @@ serve(async (req) => {
 
     for (const claim of claims) {
       if (claim.status === "reserved" || claim.status === "claimed") continue;
-      const isFull = claim.plan === "full";
       const { error: updErr } = await supabase
         .from("sponsor_claims")
         .update({
-          status: isFull ? "claimed" : "reserved",
+          status: "claimed",
           amount_paid_cents: amountPaidPerTeam,
-          balance_due_cents: isFull ? 0 : 55000,
+          balance_due_cents: 0,
           square_payment_id: payment.id ?? null,
           reserved_at: now,
-          claimed_at: isFull ? now : null,
+          claimed_at: now,
           updated_at: now,
         })
         .eq("id", claim.id);
 
       if (updErr) console.error("sponsor_claims update error:", updErr);
-      else console.log(`Sponsor claim ${claim.id} -> ${isFull ? "claimed" : "reserved"}`);
+      else console.log(`Sponsor claim ${claim.id} -> claimed`);
     }
 
     return ok();

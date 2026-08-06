@@ -2,23 +2,28 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 // Founding-sponsor checkout via Square Payment Links (Online Checkout).
-// Builds ONE hosted Square checkout for all selected teams, at the correct total
-// ($200 reserve per team, or $750 paid-in-full per team).
+// Builds ONE hosted Square checkout for the first monthly sponsorship charge.
+// Founding tiers: $250 for 1-2 teams, $650 for 3-5, $1,200 for 6-9,
+// and $1,800 for 10+.
 //
 // Required edge-function secrets (set in Supabase → Edge Functions → Secrets):
 //   SQUARE_ACCESS_TOKEN  – Square access token (Production or Sandbox)
 //   SQUARE_LOCATION_ID   – your Square location id
 //   SQUARE_ENV           – "production" or "sandbox" (default "sandbox")
 //
-// Body: { teams: [{ teamKey, teamName, league }], plan: "reserve"|"full" }
+// Body: { teams: [{ teamKey, teamName, league }] }
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const RESERVE_PER_TEAM = 20000; // $200.00 hold per team
-const FULL_PER_TEAM = 75000;    // $750.00 paid-in-full per team
+function monthlyPriceCents(count: number) {
+  if (count >= 10) return 180000;
+  if (count >= 6) return 120000;
+  if (count >= 3) return 65000;
+  return count * 25000;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -30,7 +35,7 @@ serve(async (req) => {
     });
 
   try {
-    const { teams, plan } = await req.json();
+    const { teams } = await req.json();
     if (!Array.isArray(teams) || teams.length === 0) {
       return json({ error: "Select at least one team." }, 400);
     }
@@ -49,8 +54,6 @@ serve(async (req) => {
     if (cleanTeams.some((team) => !team.teamKey || !team.teamName || !team.league)) {
       return json({ error: "One or more selected teams are invalid." }, 400);
     }
-
-    const checkoutPlan = plan === "full" ? "full" : "reserve";
 
     const accessToken = Deno.env.get("SQUARE_ACCESS_TOKEN");
     const locationId = Deno.env.get("SQUARE_LOCATION_ID");
@@ -81,16 +84,14 @@ serve(async (req) => {
       }, 409);
     }
 
-    const perTeam = checkoutPlan === "full" ? FULL_PER_TEAM : RESERVE_PER_TEAM;
     const count = cleanTeams.length;
-    const total = perTeam * count;
+    const total = monthlyPriceCents(count);
 
     const teamNames: string[] = cleanTeams.map((team) => team.teamName);
     const teamList = teamNames.join(", ");
-    const planLabel = checkoutPlan === "full" ? "Paid in full" : "Reserve deposit";
     const productName = count === 1
-      ? `Side Huddle Founding Sponsor — ${teamNames[0]} (${planLabel})`
-      : `Side Huddle Founding Sponsor — ${count} teams (${planLabel})`;
+      ? `Side Huddle Founding Sponsor — ${teamNames[0]} (first monthly charge)`
+      : `Side Huddle Founding Sponsor — ${count} teams (first monthly charge)`;
 
     const origin = req.headers.get("origin") || "https://sidehuddlesports.com";
 
@@ -113,7 +114,7 @@ serve(async (req) => {
           ask_for_shipping_address: false,
         },
         // Team list is recorded on the order note so you can see what was bought.
-        payment_note: `${checkoutPlan} · ${teamList}`.slice(0, 500),
+        payment_note: `monthly · ${teamList}`.slice(0, 500),
       }),
     });
 
@@ -135,9 +136,9 @@ serve(async (req) => {
       team_name: team.teamName,
       league: team.league,
       status: "open",
-      plan: checkoutPlan,
+      plan: "monthly",
       amount_paid_cents: 0,
-      balance_due_cents: checkoutPlan === "full" ? 0 : 55000,
+      balance_due_cents: 0,
       square_checkout_id: paymentLink.id ?? null,
       square_order_id: orderId,
     }));

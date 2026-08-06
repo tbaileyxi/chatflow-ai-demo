@@ -19,21 +19,41 @@ type LeagueFilter = 'ALL' | League;
 interface StaticTeam { city: string; name: string; league: League; }
 function teamKey(t: StaticTeam) { return `${t.league}|${t.city}|${t.name}`; }
 
+const EXISTING_TAKEN_CLAIMS: Record<string, ClaimStatus> = {
+  'NFL|Chicago|Bears': 'claimed',
+  'NFL|Buffalo|Bills': 'reserved',
+  'NFL|Dallas|Cowboys': 'claimed',
+  'NFL|Kansas City|Chiefs': 'reserved',
+  'NFL|Philadelphia|Eagles': 'reserved',
+  'NFL|San Francisco|49ers': 'claimed',
+  'NFL|Detroit|Lions': 'reserved',
+  'NFL|Miami|Dolphins': 'reserved',
+  'NFL|Arizona|Cardinals': 'reserved',
+  'NFL|Baltimore|Ravens': 'claimed',
+  'NBA|Chicago|Bulls': 'reserved',
+  'NBA|Los Angeles|Lakers': 'claimed',
+  'NBA|Boston|Celtics': 'reserved',
+  'NBA|Golden State|Warriors': 'claimed',
+  'NBA|New York|Knicks': 'reserved',
+  'NBA|Dallas|Mavericks': 'reserved',
+  'NBA|Brooklyn|Nets': 'reserved',
+  'MLB|Chicago|Cubs': 'reserved',
+  'MLB|New York|Yankees': 'claimed',
+  'MLB|Los Angeles|Dodgers': 'claimed',
+  'MLB|Boston|Red Sox': 'reserved',
+  'MLB|St. Louis|Cardinals': 'reserved',
+  'MLB|Seattle|Mariners': 'reserved',
+  'MLB|Atlanta|Braves': 'claimed',
+  'NHL|Chicago|Blackhawks': 'reserved',
+  'NHL|New York|Rangers': 'claimed',
+  'NHL|Toronto|Maple Leafs': 'reserved',
+  'NHL|Vegas|Golden Knights': 'reserved',
+  'NHL|Boston|Bruins': 'claimed',
+};
+
 const LEAGUE_LABELS: Record<string, string> = { NCAA: 'CFB', NFL: 'NFL', NBA: 'NBA', MLB: 'MLB', NHL: 'NHL' };
 function displayLeague(l: string) { return LEAGUE_LABELS[l] || l; }
 
-function freeMonths(d = new Date()) {
-  const sep1 = new Date(d.getFullYear(), 8, 1);
-  if (d >= sep1) return 0;
-  const diff = (sep1.getFullYear() - d.getFullYear()) * 12 + (sep1.getMonth() - d.getMonth());
-  return Math.min(diff, 3);
-}
-function freeLabel(n: number) {
-  if (n >= 3) return 'June, July & August FREE — 3 months on us';
-  if (n === 2) return 'July & August FREE — 2 months on us';
-  if (n === 1) return 'August FREE — 1 month on us';
-  return 'Season live — first charge today';
-}
 function bundlePrice(count: number): { total: number; label: string } {
   if (count >= 10) return { total: 1800, label: '$180/team' };
   if (count >= 6)  return { total: 1200, label: '$200/team' };
@@ -176,7 +196,12 @@ const ALL_TEAMS: StaticTeam[] = [
   { city: 'Arkansas',       name: 'Razorbacks',      league: 'NCAA' },
   { city: 'Auburn',         name: 'Tigers',          league: 'NCAA' },
   { city: 'Baylor',         name: 'Bears',           league: 'NCAA' },
+  { city: 'Boston College', name: 'Eagles',          league: 'NCAA' },
   { city: 'BYU',            name: 'Cougars',         league: 'NCAA' },
+  { city: 'Arizona',        name: 'Wildcats',        league: 'NCAA' },
+  { city: 'Arizona State',  name: 'Sun Devils',      league: 'NCAA' },
+  { city: 'Boise State',    name: 'Broncos',         league: 'NCAA' },
+  { city: 'Cincinnati',     name: 'Bearcats',        league: 'NCAA' },
   { city: 'Clemson',        name: 'Tigers',          league: 'NCAA' },
   { city: 'Colorado',       name: 'Buffaloes',       league: 'NCAA' },
   { city: 'Duke',           name: 'Blue Devils',     league: 'NCAA' },
@@ -184,6 +209,9 @@ const ALL_TEAMS: StaticTeam[] = [
   { city: 'Florida State',  name: 'Seminoles',       league: 'NCAA' },
   { city: 'Georgia',        name: 'Bulldogs',        league: 'NCAA' },
   { city: 'Georgia Tech',   name: 'Yellow Jackets',  league: 'NCAA' },
+  { city: 'Houston',        name: 'Cougars',         league: 'NCAA' },
+  { city: 'Illinois',       name: 'Fighting Illini', league: 'NCAA' },
+  { city: 'Indiana',        name: 'Hoosiers',        league: 'NCAA' },
   { city: 'Iowa',           name: 'Hawkeyes',        league: 'NCAA' },
   { city: 'Iowa State',     name: 'Cyclones',        league: 'NCAA' },
   { city: 'Kansas',         name: 'Jayhawks',        league: 'NCAA' },
@@ -191,10 +219,13 @@ const ALL_TEAMS: StaticTeam[] = [
   { city: 'Kentucky',       name: 'Wildcats',        league: 'NCAA' },
   { city: 'LSU',            name: 'Tigers',          league: 'NCAA' },
   { city: 'Louisville',     name: 'Cardinals',       league: 'NCAA' },
+  { city: 'Miami',          name: 'Hurricanes',      league: 'NCAA' },
   { city: 'Michigan',       name: 'Wolverines',      league: 'NCAA' },
   { city: 'Michigan State', name: 'Spartans',        league: 'NCAA' },
-  { city: 'Mississippi St', name: 'Bulldogs',        league: 'NCAA' },
+  { city: 'Mississippi State', name: 'Bulldogs',     league: 'NCAA' },
   { city: 'Missouri',       name: 'Tigers',          league: 'NCAA' },
+  { city: 'Memphis',        name: 'Tigers',          league: 'NCAA' },
+  { city: 'NC State',       name: 'Wolfpack',        league: 'NCAA' },
   { city: 'Nebraska',       name: 'Cornhuskers',     league: 'NCAA' },
   { city: 'North Carolina', name: 'Tar Heels',       league: 'NCAA' },
   { city: 'Notre Dame',     name: 'Fighting Irish',  league: 'NCAA' },
@@ -204,16 +235,26 @@ const ALL_TEAMS: StaticTeam[] = [
   { city: 'Ole Miss',       name: 'Rebels',          league: 'NCAA' },
   { city: 'Oregon',         name: 'Ducks',           league: 'NCAA' },
   { city: 'Penn State',     name: 'Nittany Lions',   league: 'NCAA' },
+  { city: 'Pittsburgh',     name: 'Panthers',        league: 'NCAA' },
   { city: 'Purdue',         name: 'Boilermakers',    league: 'NCAA' },
   { city: 'South Carolina', name: 'Gamecocks',       league: 'NCAA' },
+  { city: 'SMU',            name: 'Mustangs',        league: 'NCAA' },
+  { city: 'Syracuse',       name: 'Orange',          league: 'NCAA' },
+  { city: 'TCU',            name: 'Horned Frogs',    league: 'NCAA' },
   { city: 'Tennessee',      name: 'Volunteers',      league: 'NCAA' },
   { city: 'Texas',          name: 'Longhorns',       league: 'NCAA' },
   { city: 'Texas A&M',      name: 'Aggies',          league: 'NCAA' },
+  { city: 'Texas Tech',     name: 'Red Raiders',     league: 'NCAA' },
+  { city: 'Tulane',         name: 'Green Wave',      league: 'NCAA' },
+  { city: 'UCF',            name: 'Knights',         league: 'NCAA' },
   { city: 'USC',            name: 'Trojans',         league: 'NCAA' },
   { city: 'Utah',           name: 'Utes',            league: 'NCAA' },
   { city: 'Vanderbilt',     name: 'Commodores',      league: 'NCAA' },
+  { city: 'Virginia',       name: 'Cavaliers',       league: 'NCAA' },
   { city: 'Virginia Tech',  name: 'Hokies',          league: 'NCAA' },
+  { city: 'Wake Forest',    name: 'Demon Deacons',   league: 'NCAA' },
   { city: 'Washington',     name: 'Huskies',         league: 'NCAA' },
+  { city: 'West Virginia',  name: 'Mountaineers',    league: 'NCAA' },
   { city: 'Wisconsin',      name: 'Badgers',         league: 'NCAA' },
 ];
 
@@ -221,12 +262,11 @@ const ALL_TEAMS: StaticTeam[] = [
 export default function Sponsor() {
   const [search,   setSearch]   = useState('');
   const [league,   setLeague]   = useState<LeagueFilter>('ALL');
-  const [claims,   setClaims]   = useState<Record<string, ClaimStatus>>({});
+  const [claims,   setClaims]   = useState<Record<string, ClaimStatus>>(EXISTING_TAKEN_CLAIMS);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [justPaid, setJustPaid] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
-  const free = freeMonths();
 
   const featured = ALL_TEAMS.find(t => t.city === 'Chicago' && t.league === 'NFL')!;
 
@@ -234,7 +274,7 @@ export default function Sponsor() {
   async function loadClaims() {
     const { data } = await supabase.from('sponsor_claim_status').select('team_key, status');
     if (data) {
-      const m: Record<string, ClaimStatus> = {};
+      const m: Record<string, ClaimStatus> = { ...EXISTING_TAKEN_CLAIMS };
       data.forEach((r: { team_key: string; status: ClaimStatus }) => { m[r.team_key] = r.status; });
       setClaims(m);
     }
@@ -285,7 +325,7 @@ export default function Sponsor() {
       <PlatformPreview />
       <WhatYouGet />
       <ROISection />
-      <RateCard free={free} />
+      <RateCard />
       <div ref={formRef}>
         <TeamPicker
           filtered={filtered} claims={claims} selected={selected} toggle={toggle}
@@ -337,12 +377,12 @@ function Hero({ onCta }: { onCta: () => void }) {
         </h1>
         <p style={{ fontSize: 'clamp(15px, 1.6vw, 19px)', lineHeight: 1.6, color: '#aaa', maxWidth: 760, marginTop: 36, fontWeight: 400 }}>
           We're opening Side Huddle Founding Team Sponsorships for a limited time. Own a team's entire fanbase —
-          exclusive, always-on, inside the conversation. <strong style={{ color: G.white }}>Your founding rate
-          and team exclusivity are locked for your full 12-month term.</strong> Select your team and check out securely below.
+          exclusive, always-on, inside the conversation. <strong style={{ color: G.white }}>Your founding rate is
+          protected for the first year, and your team stays exclusive while your sponsorship is active.</strong> Select your team and check out securely below.
         </p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 28 }}>
           {[
-            { phase: 'Early Founding', price: '12-month rate lock', active: true },
+            { phase: 'Early Founding', price: 'First-year rate protection', active: true },
             { phase: 'Next Phase',     price: 'Higher as inventory fills', active: false },
             { phase: 'Full Rollout',   price: 'Market pricing',    active: false },
           ].map(p => (
@@ -456,6 +496,34 @@ const PLACEMENT_CARDS = [
 ];
 
 function PlatformPreview() {
+  const screenshots = [
+    {
+      label: 'HUDDLE ROOM · PRESENTED BY HEADER + BOT CARD',
+      src: '/sponsor-screens/huddle-presented-browns.png',
+      alt: 'Side Huddle room showing Presented by Browns Backers sponsor placements',
+      featured: true,
+      marks: [
+        { label: 'Room sponsor header', top: '13.8%', left: '13%', width: '74%', height: '3.3%' },
+        { label: 'Bot-card attribution', top: '65.8%', left: '18%', width: '60%', height: '3.6%' },
+      ],
+    },
+    {
+      label: 'ROOM DIRECTORY · PRIVATE HUDDLES',
+      src: '/sponsor-screens/rooms-list.png',
+      alt: 'Side Huddle private rooms list',
+    },
+    {
+      label: 'LIVE HUDDLE · AI-ENHANCED PROMPTS',
+      src: '/sponsor-screens/huddle-buff-crew.png',
+      alt: 'Side Huddle live room with AI-enhanced team prompts',
+    },
+    {
+      label: 'TEAM FEED · NEWS SURFACE',
+      src: '/sponsor-screens/team-feed-news.png',
+      alt: 'Side Huddle team feed news cards',
+    },
+  ];
+
   return (
     <section id="placements" className="sh-section" style={{ borderTop: `1px solid ${G.border}` }}>
       <div className="sh-label">02 — THE PLATFORM</div>
@@ -475,28 +543,59 @@ function PlatformPreview() {
           </div>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))', gap: 28, marginTop: 64 }}>
-        <PhoneFrame label="TEAM FEED · Placement 01 & 02">
-          <img src="/sponsor-screens/team-feed.png" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', borderRadius: 18 }} alt="Team feed sponsor placement" />
-        </PhoneFrame>
-        <PhoneFrame label="BOT IN HUDDLE · Placement 03">
-          <img src="/sponsor-screens/huddle-bot.png" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', borderRadius: 18 }} alt="Huddle bot sponsor placement" />
-        </PhoneFrame>
-        <PhoneFrame label="WEEKLY IN-FEED SPONSOR DROP">
-          <img src="/sponsor-screens/sponsor-drop.png" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', borderRadius: 18 }} alt="Weekly sponsor drop placement" />
-        </PhoneFrame>
+      <div style={{ marginTop: 54, display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
+        <div>
+          <div className="sh-label" style={{ color: G.gold }}>ACTUAL APP SCREENS</div>
+          <h3 style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(26px,3vw,38px)', textTransform: 'uppercase', marginTop: 8 }}>
+            The sponsorship is visible inside the huddle.
+          </h3>
+        </div>
+        <p style={{ color: '#999', fontSize: 14, lineHeight: 1.55, maxWidth: 390, margin: 0 }}>
+          Gold callouts mark the sponsor inventory fans see in-room: the room-level Presented By line and the bot-card sponsor attribution.
+        </p>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1.1fr) repeat(3, minmax(190px, .75fr))', gap: 22, marginTop: 26, alignItems: 'start' }} className="sponsor-shot-grid">
+        {screenshots.map((shot) => (
+          <ScreenshotPhone
+            key={shot.src}
+            label={shot.label}
+            src={shot.src}
+            alt={shot.alt}
+            featured={shot.featured}
+            marks={shot.marks}
+          />
+        ))}
       </div>
     </section>
   );
 }
 
-function PhoneFrame({ label, children }: { label: string; children: React.ReactNode }) {
+function ScreenshotPhone({
+  label,
+  src,
+  alt,
+  featured,
+  marks = [],
+}: {
+  label: string;
+  src: string;
+  alt: string;
+  featured?: boolean;
+  marks?: Array<{ label: string; top: string; left: string; width: string; height: string }>;
+}) {
   return (
-    <div>
-      <div className="sh-label" style={{ color: G.muted, marginBottom: 12 }}>{label}</div>
-      <div style={{ background: '#000', border: `1.5px solid ${G.border}`, borderRadius: 32, padding: 10, maxWidth: 300, margin: '0 auto', boxShadow: '0 24px 64px rgba(0,0,0,.6)', aspectRatio: '9/19' }}>
-        <div style={{ background: G.bg, height: '100%', borderRadius: 24, overflow: 'hidden' }}>
-          {children}
+    <div style={{ minWidth: 0 }}>
+      <div className="sh-label" style={{ color: featured ? G.gold : G.muted, marginBottom: 12 }}>{label}</div>
+      <div style={{ background: '#000', border: `1.5px solid ${featured ? G.gold : G.border}`, borderRadius: featured ? 34 : 28, padding: featured ? 10 : 8, maxWidth: featured ? 360 : 260, margin: '0 auto', boxShadow: featured ? '0 28px 80px rgba(255,215,0,.16)' : '0 24px 64px rgba(0,0,0,.6)', aspectRatio: '750/1624' }}>
+        <div style={{ position: 'relative', background: G.bg, height: '100%', borderRadius: featured ? 24 : 21, overflow: 'hidden' }}>
+          <img src={src} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} alt={alt} />
+          {marks.map((mark) => (
+            <div key={mark.label} style={{ position: 'absolute', top: mark.top, left: mark.left, width: mark.width, height: mark.height, border: `2px solid ${G.gold}`, borderRadius: 8, boxShadow: '0 0 0 999px rgba(0,0,0,.18), 0 0 24px rgba(255,215,0,.48)', pointerEvents: 'none' }}>
+              <span style={{ position: 'absolute', left: 8, top: '-1.55em', background: G.gold, color: '#000', borderRadius: 999, padding: '3px 8px', fontSize: 9, fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                {mark.label}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -506,7 +605,7 @@ function PhoneFrame({ label, children }: { label: string; children: React.ReactN
 // ─── Section 3: What You Get ──────────────────────────────────────────────────
 function WhatYouGet() {
   const cards = [
-    { icon: '⚡', title: 'Bot Attribution',    body: 'Every team-bot message carries a "powered by" line. One sponsor per team throughout the 12-month term.' },
+    { icon: '⚡', title: 'Bot Attribution',    body: 'Every team-bot message carries a "powered by" line. One active sponsor per team — no competing brand shares your placement.' },
     { icon: '🛡️', title: 'Team Feed Badge',    body: '"Presented by" lockup at the top of your team\'s live feed. Visible to every fan in every session, all season.' },
     { icon: '📣', title: '1 Branded Drop / Week', body: 'One sponsor-controlled message per week during active season. Optional QR code for offers or traffic. Side Huddle approved before posting.', note: 'Drive fans to your location, offer, or event on game day.' },
   ];
@@ -535,8 +634,8 @@ function ROISection() {
       <div style={{ border: `1px solid ${G.gold}`, borderRadius: 8, padding: 'clamp(28px, 5vw, 56px)', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,2fr)', gap: 40, alignItems: 'center', background: `rgba(255,215,0,.03)` }}>
         <div>
           <div className="sh-label" style={{ marginBottom: 12 }}>FOUNDING RATE</div>
-          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(44px, 6vw, 76px)', color: G.gold, lineHeight: 0.95 }}>12 months locked</div>
-          <div className="sh-label" style={{ color: G.muted, marginTop: 8 }}>rate + category exclusivity</div>
+          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(44px, 6vw, 76px)', color: G.gold, lineHeight: 0.95 }}>First year protected</div>
+          <div className="sh-label" style={{ color: G.muted, marginTop: 8 }}>exclusive team sponsorship</div>
         </div>
         <div>
           <div className="sh-label" style={{ marginBottom: 16 }}>COMPARABLE VALUE</div>
@@ -544,7 +643,7 @@ function ROISection() {
             A single local radio spot runs <strong>$500–1,500/week</strong>. One local TV placement: <strong>$2,000–5,000</strong>. A Side Huddle founding sponsorship comes in <strong>below the average local-sponsorship spend</strong> — exclusive, always-on, inside the conversation when fans are most engaged.
           </p>
           <p style={{ fontSize: 18, lineHeight: 1.65, color: '#ddd', marginTop: 16 }}>
-            Own an entire fanbase on Side Huddle. <strong style={{ color: G.gold }}>Reserve your team for $200 today — $550 balance due Aug 29.</strong>
+            Own an entire fanbase on Side Huddle. <strong style={{ color: G.gold }}>$250/month for one team, with lower per-team founding rates for bundles.</strong>
           </p>
         </div>
       </div>
@@ -553,18 +652,19 @@ function ROISection() {
 }
 
 // ─── Section 5: Rate Card ─────────────────────────────────────────────────────
-function RateCard({ free }: { free: number }) {
+function RateCard() {
   const urgency = [
-    { when: 'Start today',   detail: 'June, July & August FREE',  sub: '3 months · first charge Sep 1', active: free >= 3 },
-    { when: 'Start in June', detail: 'July & August FREE',        sub: '2 months · first charge Sep 1', active: free === 2 },
-    { when: 'Start in July', detail: 'August FREE',               sub: '1 month · first charge Sep 1',  active: free === 1 },
-    { when: 'Start Sep 1+',  detail: 'No free months',           sub: 'Season live — charged immediately', active: free === 0 },
+    { when: 'Single team', detail: '$250/month', sub: 'Exclusive placement for one team', active: true },
+    { when: '3-team bundle', detail: '$650/month', sub: '~$217/team', active: false },
+    { when: '6-team bundle', detail: '$1,200/month', sub: '$200/team', active: false },
+    { when: '10+ teams', detail: '$1,800/month', sub: '$180/team', active: false },
   ];
   const infoCards = [
-    { title: 'TERM',        body: 'Your founding sponsorship runs for 12 months. Up to 3 launch months are included for sponsors who start now.' },
-    { title: 'RATE LOCK',   body: 'Your founding price is locked for the entire 12-month term.' },
-    { title: 'EXCLUSIVITY', body: 'One sponsor per team during your term. No competing brand shares your team placement.' },
-    { title: 'RENEWAL',     body: 'Before the term ends, you receive the first opportunity to renew your team.' },
+    { title: 'BILLING',     body: 'Month-to-month. No annual contract. Your first monthly charge is paid at checkout and recurring billing continues monthly.' },
+    { title: 'RATE LOCK',   body: 'Your founding monthly rate is protected for the first year.' },
+    { title: 'EXCLUSIVITY', body: 'One active sponsor per team. No competing brand shares your team placement while your sponsorship is active.' },
+    { title: 'FOUNDING BONUS', body: 'Founding sponsors receive two bonus months of placement plus sponsor drops inside the chat experience.' },
+    { title: 'BUNDLES',     body: '3 teams: $650/month. 6 teams: $1,200/month. 10 or more: $1,800/month.' },
   ];
   return (
     <section className="sh-section" id="rate-card" style={{ borderTop: `1px solid ${G.border}` }}>
@@ -572,9 +672,9 @@ function RateCard({ free }: { free: number }) {
 
       <div style={{ marginTop: 24, border: `1px solid ${G.gold}`, borderRadius: 8, padding: 'clamp(20px,3vw,32px)', background: 'rgba(255,215,0,.04)' }}>
         <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(20px,2.8vw,30px)', color: G.gold, textTransform: 'uppercase' }}>
-          🏈 Start today — get June, July & August free.
+          🏈 Claim your exclusive team sponsorship.
         </div>
-        <p style={{ color: '#ddd', marginTop: 10, fontSize: 16 }}>Paid season begins September 1 — right as college football hits full stride. The sooner you lock in, the more free runway you get.</p>
+        <p style={{ color: '#ddd', marginTop: 10, fontSize: 16 }}>Lock in one team or bundle multiple teams at the founding sponsor rate. One active sponsor per team.</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px,1fr))', gap: 10, marginTop: 20 }}>
           {urgency.map(u => (
             <div key={u.when} style={{ padding: 14, border: `1px solid ${u.active ? G.gold : G.border}`, borderRadius: 6, background: u.active ? 'rgba(255,215,0,.08)' : G.bg }}>
@@ -602,11 +702,12 @@ function RateCard({ free }: { free: number }) {
 
       <div style={{ marginTop: 24, border: `1px solid ${G.gold}`, borderRadius: 8, padding: 'clamp(20px,3vw,32px)', background: 'rgba(255,215,0,.04)', textAlign: 'center' }}>
         <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(20px,2.6vw,30px)', textTransform: 'uppercase' }}>
-          Reserve: <span style={{ color: G.gold }}>$200</span> holds your team
+          One team: <span style={{ color: G.gold }}>$250/month</span>
         </div>
         <p style={{ color: '#ddd', marginTop: 12, fontSize: 16, lineHeight: 1.6, maxWidth: 620, margin: '12px auto 0' }}>
-          $200 holds your team; the <strong style={{ color: G.white }}>$550 balance is due Aug 29</strong>. Or pay in full today —{' '}
-          <strong style={{ color: G.gold }}>$750</strong> — and we add <strong style={{ color: G.white }}>two months free</strong>: your team stays locked into the new year.
+          Pay the first monthly charge today to claim your team.
+          Founding sponsors receive <strong style={{ color: G.white }}>two bonus months of placement</strong> plus sponsor drops inside the chat experience.
+          Bundle pricing is applied automatically when you select multiple teams.
         </p>
         <p style={{ color: G.muted, marginTop: 14, fontSize: 13 }}>Pick one or more teams below and check out once. Custom conference or market packages can still be arranged through partnerships.</p>
       </div>
@@ -641,8 +742,8 @@ function TeamPicker({ filtered, claims, selected, toggle, search, setSearch, lea
         First in <span style={{ color: G.gold }}>owns the team.</span>
       </h2>
       <p style={{ color: '#aaa', marginTop: 16, maxWidth: 720, fontSize: 17, lineHeight: 1.6 }}>
-        Tap the team(s) you want — one sponsor per team, across every huddle that follows them.
-        Reserve is $200 per team ($550 balance due Aug 29). Pick more than one and you check out once for the full total.
+        Tap the team(s) you want — one active sponsor per team, across every huddle that follows them.
+        Your founding monthly price is calculated automatically, and multiple teams check out together.
       </p>
 
       {/* Honest scarcity — live counts from real DB rows. */}
@@ -680,7 +781,15 @@ function TeamPicker({ filtered, claims, selected, toggle, search, setSearch, lea
               style={{ background: locked ? '#0c0c0c' : on ? 'rgba(255,215,0,.08)' : G.surface, border: `1px solid ${on ? G.gold : G.border}`, borderRadius: 8, padding: '14px 16px', cursor: locked ? 'not-allowed' : 'pointer', textAlign: 'left', transition: 'border-color .15s, background .15s', position: 'relative', opacity: locked ? 0.55 : 1 }}
               onMouseEnter={e => { if (!locked && !on) e.currentTarget.style.borderColor = G.gold; }}
               onMouseLeave={e => { if (!locked && !on) e.currentTarget.style.borderColor = G.border; }}>
-              {locked && <span style={{ position: 'absolute', top: 8, right: 10, fontSize: 13 }}>🔒</span>}
+              {locked && (
+                <>
+                  <span aria-hidden="true" style={{ position: 'absolute', inset: 10, pointerEvents: 'none' }}>
+                    <span style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 2, background: '#d54f4f', transform: 'rotate(16deg)', opacity: 0.9 }} />
+                    <span style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 2, background: '#d54f4f', transform: 'rotate(-16deg)', opacity: 0.9 }} />
+                  </span>
+                  <span style={{ position: 'absolute', top: 8, right: 10, color: '#d54f4f', fontWeight: 900, fontSize: 14 }}>X</span>
+                </>
+              )}
               {on && !locked && <span style={{ position: 'absolute', top: 8, right: 10, color: G.gold, fontWeight: 800, fontSize: 14 }}>✓</span>}
               <div style={{ fontWeight: 700, fontSize: 14, color: locked ? G.muted2 : on ? G.gold : G.white, lineHeight: 1.2 }}>{t.city} {t.name}</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
@@ -728,17 +837,14 @@ function Footer({ onCta }: { onCta: () => void }) {
 }
 
 // ─── Cart bar + Square checkout ──────────────────────────────────────────────
-const RESERVE_PER_TEAM = 200;
-const FULL_PER_TEAM = 750;
-
 function CartBar({ teams, onCheckout, onClear }: { teams: StaticTeam[]; onCheckout: () => void; onClear: () => void }) {
-  const total = teams.length * RESERVE_PER_TEAM;
+  const price = bundlePrice(teams.length);
   return (
     <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 90, background: '#0c0c0cf2', backdropFilter: 'blur(10px)', borderTop: `1px solid ${G.gold}`, padding: '14px clamp(16px,5vw,48px)' }}>
       <div style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 22, color: G.gold }}>{teams.length} team{teams.length !== 1 ? 's' : ''} selected</span>
-          <span style={{ color: G.muted2, fontSize: 14, marginLeft: 12 }}>${RESERVE_PER_TEAM} reserve each · ${total} total today</span>
+          <span style={{ color: G.muted2, fontSize: 14, marginLeft: 12 }}>${price.total}/month · {price.label}</span>
           <button onClick={onClear} style={{ marginLeft: 14, background: 'none', border: 'none', color: G.muted, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>clear</button>
         </div>
         <button className="btn-gold" onClick={onCheckout} style={{ fontSize: 14, padding: '13px 26px' }}>Review &amp; checkout →</button>
@@ -748,19 +854,15 @@ function CartBar({ teams, onCheckout, onClear }: { teams: StaticTeam[]; onChecko
 }
 
 function CheckoutModal({ teams, onClose }: { teams: StaticTeam[]; onClose: () => void }) {
-  const [plan, setPlan] = useState<'reserve' | 'full'>('reserve');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const per = plan === 'full' ? FULL_PER_TEAM : RESERVE_PER_TEAM;
-  const total = teams.length * per;
+  const price = bundlePrice(teams.length);
 
   async function go() {
     setLoading(true); setError('');
     try {
       const { data, error } = await supabase.functions.invoke('create-sponsor-square-checkout', {
         body: {
-          plan,
           teams: teams.map(t => ({ teamKey: teamKey(t), teamName: `${t.city} ${t.name}`, league: t.league })),
         },
       });
@@ -772,11 +874,6 @@ function CheckoutModal({ teams, onClose }: { teams: StaticTeam[]; onClose: () =>
       setLoading(false);
     }
   }
-
-  const plans = [
-    { id: 'reserve' as const, head: `Reserve — $${RESERVE_PER_TEAM}/team`, sub: '$200 holds each team. $550 balance per team due Aug 29.' },
-    { id: 'full' as const,    head: `Pay in full — $${FULL_PER_TEAM}/team`, sub: 'Pay in full today and we add two months free — your team(s) stay locked into the new year.' },
-  ];
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.78)', backdropFilter: 'blur(4px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, overflowY: 'auto' }}>
@@ -790,32 +887,30 @@ function CheckoutModal({ teams, onClose }: { teams: StaticTeam[]; onClose: () =>
           {teams.map(t => (
             <div key={teamKey(t)} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: `1px solid ${G.border}` }}>
               <span style={{ fontWeight: 700, fontSize: 14 }}>{t.city} {t.name}</span>
-              <span style={{ color: G.muted2, fontSize: 13 }}>{displayLeague(t.league)} · ${per}</span>
+              <span style={{ color: G.muted2, fontSize: 13 }}>{displayLeague(t.league)}</span>
             </div>
           ))}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
-          {plans.map(p => (
-            <button key={p.id} onClick={() => setPlan(p.id)} style={{ textAlign: 'left', background: plan === p.id ? 'rgba(255,215,0,.1)' : G.bg, border: `1.5px solid ${plan === p.id ? G.gold : G.border}`, borderRadius: 8, padding: '14px 16px', cursor: 'pointer' }}>
-              <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 18, color: plan === p.id ? G.gold : G.white }}>{p.head}</div>
-              <div style={{ fontSize: 12.5, color: '#bbb', marginTop: 4, lineHeight: 1.5 }}>{p.sub}</div>
-            </button>
-          ))}
+        <div style={{ marginTop: 16, padding: '15px 16px', background: 'rgba(255,215,0,.07)', border: `1px solid ${G.gold}`, borderRadius: 8 }}>
+          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 19, color: G.gold }}>MONTH-TO-MONTH FOUNDING SPONSORSHIP</div>
+          <div style={{ fontSize: 13, color: '#ccc', marginTop: 5, lineHeight: 1.55 }}>
+            First monthly charge today. First recurring charge begins September 1. No annual contract.
+          </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 18, paddingTop: 14, borderTop: `1px solid ${G.gold}44` }}>
           <span className="sh-label">TOTAL TODAY</span>
-          <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 30, color: G.gold }}>${total.toLocaleString()}</span>
+          <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 30, color: G.gold }}>${price.total.toLocaleString()}</span>
         </div>
 
         {error && <p style={{ color: '#ff6b6b', fontSize: 13, marginTop: 12 }}>{error}</p>}
 
         <button className="btn-gold" onClick={go} disabled={loading} style={{ marginTop: 16, width: '100%', fontSize: 15, padding: '15px 28px' }}>
-          {loading ? 'Starting Square checkout…' : `Checkout ${teams.length} team${teams.length !== 1 ? 's' : ''} — $${total.toLocaleString()} →`}
+          {loading ? 'Starting Square checkout…' : `Checkout ${teams.length} team${teams.length !== 1 ? 's' : ''} — $${price.total.toLocaleString()} →`}
         </button>
         <p style={{ fontSize: 11, color: G.muted, textAlign: 'center', marginTop: 10, lineHeight: 1.5 }}>
-          Secure checkout powered by Square. The reserve is a non-refundable hold; the balance per team is due Aug 29.
+          Secure checkout powered by Square. This payment claims the selected team sponsorship(s).
         </p>
       </div>
     </div>
@@ -829,7 +924,7 @@ function PaidSuccess({ onClose }: { onClose: () => void }) {
         <div style={{ fontSize: 52 }}>🏆</div>
         <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 34, color: G.gold, textTransform: 'uppercase', marginTop: 8 }}>You're in.</div>
         <p style={{ color: '#ddd', marginTop: 14, fontSize: 16, lineHeight: 1.6 }}>
-          Payment received — your team(s) are locked for the 12-month founding term. We will send your setup details and, for reserve plans, the balance invoice ahead of Aug 29.
+          Payment received — your team sponsorship(s) are claimed. We will send setup details and confirm recurring billing.
         </p>
         <button className="btn-gold" onClick={onClose} style={{ marginTop: 24 }}>Back to the board</button>
       </div>
@@ -862,6 +957,8 @@ const css = `
   .huddle-bubble { position: relative !important; left: auto !important; top: auto !important; transform: none !important; width: auto !important; animation: none !important; }
   .huddle-jump { white-space: normal !important; line-height: 1.25; }
   .huddle-lines { display: none; }
+  .sponsor-shot-grid { grid-template-columns: 1fr !important; }
 }
+@media (max-width: 1080px) { .sponsor-shot-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)) !important; } }
 @media (max-width: 860px) { .contact-grid { grid-template-columns: 1fr !important; } }
 `;

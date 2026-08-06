@@ -8,6 +8,10 @@
 /supabase/
 /sponsor-outreach/
 /cloudflare-worker/
+/_old_ipas/
+/.vercel/
+/node_modules/
+/dist/
 *.md
 .claude/
 .codex/
