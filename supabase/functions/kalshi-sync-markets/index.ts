@@ -16,11 +16,31 @@ const KALSHI_BASE = 'https://api.elections.kalshi.com/trade-api/v2';
 // cards into MLB rooms. Other leagues stay on Kalshi until they get the same
 // Odds API treatment.
 const SPORT_SERIES: Record<string, string[]> = {
+  MLB: ['KXMLBGAME', 'KXMLBSPREAD', 'KXMLBTOTAL'],
   NBA: ['KXNBA', 'KXNBAGAME'],
-  NFL: ['KXNFL', 'KXNFLGAME'],
+  NFL: ['KXNFL', 'KXNFLGAME', 'KXNFLSPREAD', 'KXNFLTOTAL'],
   NHL: ['KXNHL', 'KXNHLGAME'],
-  NCAA: ['KXNCAAB', 'KXNCAAF', 'KXNCAABGAME', 'KXNCAAFGAME'],
+  NCAA: ['KXNCAAB', 'KXNCAAF', 'KXNCAABGAME', 'KXNCAAFGAME',
+         'KXNCAAFSPREAD', 'KXNCAAFTOTAL'],
 };
+
+// market_type derived from the SERIES, never from the title. Title text lies:
+// "San Diego wins by over 3.5 runs?" contains "win", so the old keyword sniff
+// classified a spread as a winner market. Series ticker is unambiguous.
+// Anything not listed falls back to the keyword sniff below.
+const SERIES_MARKET_TYPE: Record<string, string> = {
+  KXMLBGAME: 'winner',   KXNFLGAME: 'winner',   KXNBAGAME: 'winner',
+  KXNHLGAME: 'winner',   KXNCAAFGAME: 'winner', KXNCAABGAME: 'winner',
+  KXMLBSPREAD: 'spread', KXNFLSPREAD: 'spread', KXNCAAFSPREAD: 'spread',
+  KXMLBTOTAL: 'total',   KXNFLTOTAL: 'total',   KXNCAAFTOTAL: 'total',
+};
+
+// Series whose markets describe the WHOLE game rather than one side, so the
+// card belongs in both teams' rooms (the title names both, e.g. "Milwaukee vs
+// San Diego Total Runs?").
+const GAME_LEVEL_SERIES = new Set([
+  'KXMLBTOTAL', 'KXNFLTOTAL', 'KXNCAAFTOTAL',
+]);
 
 // Map series ticker -> our DB league value
 const TICKER_TO_LEAGUE: Record<string, string> = {
@@ -36,6 +56,12 @@ const TICKER_TO_LEAGUE: Record<string, string> = {
   KXNCAAFGAME: 'NCAA',
   KXMLB: 'MLB',
   KXMLBGAME: 'MLB',
+  KXMLBSPREAD: 'MLB',
+  KXMLBTOTAL: 'MLB',
+  KXNFLSPREAD: 'NFL',
+  KXNFLTOTAL: 'NFL',
+  KXNCAAFSPREAD: 'NCAA',
+  KXNCAAFTOTAL: 'NCAA',
 };
 
 interface TeamRecord {
@@ -333,11 +359,29 @@ Deno.serve(async (req) => {
           // produced identical "X vs Y Winner?" cards for both markets.
           const isGameSeries = seriesTicker.endsWith('GAME');
           const side: string = (m.yes_sub_title || '').trim();
+
+          // A total describes the whole game, not one side — its yes_sub_title
+          // is "Over 8.5 runs scored" and names no team at all. Match on the
+          // TITLE ("Milwaukee vs San Diego Total Runs?"), which names both,
+          // and post the card into both teams' rooms.
+          const isGameLevel = GAME_LEVEL_SERIES.has(seriesTicker);
           const { team, matchType } = matchTeam(
             isGameSeries && side ? side : title,
             league,
             leagueMaps,
           );
+
+          // For a game-level market, find the SECOND team too. matchTeam stops
+          // at the first hit, so re-run it on the title with the first team's
+          // names stripped out.
+          let team2: TeamRecord | null = null;
+          if (isGameLevel && team) {
+            const stripped = title
+              .replace(new RegExp(team.city, 'ig'), ' ')
+              .replace(new RegExp(team.name, 'ig'), ' ');
+            const r2 = matchTeam(stripped, league, leagueMaps);
+            if (r2.team && r2.team.id !== team.id) team2 = r2.team;
+          }
 
           matchLog.push({
             ticker: m.ticker,
@@ -347,13 +391,26 @@ Deno.serve(async (req) => {
             matchedTeam: team ? `${team.city} ${team.name}` : null,
           });
 
-          // Determine market type
-          let marketType = 'other';
+          // Market type comes from the SERIES, which is unambiguous. The old
+          // keyword sniff read the title, and "San Diego wins by over 3.5
+          // runs?" contains "win", so every spread was filed as a winner and
+          // never became fadeable. Keyword sniff stays as a fallback for
+          // series we haven't mapped.
           const titleLower = title.toLowerCase();
-          if (titleLower.includes('spread') || titleLower.includes('cover')) marketType = 'spread';
-          else if (titleLower.includes('total') || titleLower.includes('over') || titleLower.includes('under')) marketType = 'total';
-          else if (titleLower.includes('win') || titleLower.includes('winner') || titleLower.includes('moneyline')) marketType = 'winner';
-          else if (titleLower.includes('points') || titleLower.includes('rebounds') || titleLower.includes('assists')) marketType = 'player_prop';
+          let marketType = SERIES_MARKET_TYPE[seriesTicker] ?? 'other';
+          if (marketType === 'other') {
+            if (titleLower.includes('spread') || titleLower.includes('cover')) marketType = 'spread';
+            else if (titleLower.includes('total') || titleLower.includes('over') || titleLower.includes('under')) marketType = 'total';
+            else if (titleLower.includes('win') || titleLower.includes('winner') || titleLower.includes('moneyline')) marketType = 'winner';
+            else if (titleLower.includes('points') || titleLower.includes('rebounds') || titleLower.includes('assists')) marketType = 'player_prop';
+          }
+
+          // Kalshi puts the line in floor_strike ("Over 8.5 runs scored" ->
+          // 8.5). fade-post-props reads metadata.line, and without it a
+          // spread or total renders no card at all.
+          const strike = typeof m.floor_strike === 'number'
+            ? m.floor_strike
+            : (typeof m.cap_strike === 'number' ? m.cap_strike : null);
 
           // Fair price = midpoint of the YES ask/bid (what a market maker
           // would quote). last_price is exactly 0.50 for untraded games,
@@ -379,15 +436,28 @@ Deno.serve(async (req) => {
           // score bar above. (Pairing both sides for a "X vs Y" card is a
           // future polish — Kalshi abbreviates names in the title, so it can't
           // be parsed reliably from one market alone.)
+          // Spreads and totals carry the line in yes_sub_title ("Over 8.5 runs
+          // scored", "San Diego wins by over 3.5 runs"); the bare title drops
+          // it ("Milwaukee vs San Diego Total Runs?"), which would show a card
+          // with no number on it.
           const question = isGameSeries
             ? `Will the ${team ? team.name : side} win?`
-            : m.title || m.subtitle || m.ticker;
+            : (strike != null && side ? side : (m.title || m.subtitle || m.ticker));
 
+          // One Kalshi market can produce a row per room for game-level types.
+          // kalshi_ticker is the conflict key, so each row needs its own —
+          // suffix with the team when we fan out.
+          const targets: (TeamRecord | null)[] =
+            isGameLevel && team2 ? [team, team2] : [team ?? null];
+
+          for (const tgt of targets) {
           const { error } = await supabase
             .from('kalshi_markets')
             .upsert({
-              kalshi_ticker: m.ticker,
-              team_id: team?.id || null,
+              kalshi_ticker: targets.length > 1 && tgt
+                ? `${m.ticker}:${tgt.id.slice(0, 8)}`
+                : m.ticker,
+              team_id: tgt?.id || null,
               question,
               current_yes_price: yesPrice,
               market_type: marketType,
@@ -401,6 +471,11 @@ Deno.serve(async (req) => {
                 m.expiration_time,
               kalshi_event_ticker: m.event_ticker || '',
               metadata: {
+                // fade-post-props reads metadata.line to word the over/under
+                // buttons; without it a spread or total renders no card.
+                line: strike,
+                strike_type: m.strike_type ?? null,
+                side,
                 volume: m.volume,
                 open_interest: m.open_interest,
                 subtitle: m.subtitle,
@@ -411,6 +486,7 @@ Deno.serve(async (req) => {
 
           if (!error) totalUpserted++;
           else console.error(`Upsert error for ${m.ticker}:`, error.message);
+          }
         }
       }
     }
