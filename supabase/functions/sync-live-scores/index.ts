@@ -96,10 +96,31 @@ function findMatchingGame(
     const g1 = normalizeTeamName(competitors[0].team.displayName);
     const g2 = normalizeTeamName(competitors[1].team.displayName);
 
-    const match1 = n1 && (g1.includes(n1) || n1.includes(g1) || g2.includes(n1) || n1.includes(g2));
-    const match2 = n2 && (g1.includes(n2) || n2.includes(g1) || g2.includes(n2) || n2.includes(g2));
+    // Each of our two teams must match a DIFFERENT ESPN competitor. Matching
+    // on either team alone (the old `match1 || match2`) is what let a future
+    // "Bears @ Panthers" row claim last night's "Panthers @ Cardinals" result
+    // and inherit its score — seen in production 2026-08-07.
+    //
+    // This matters far more in college football: normalizeTeamName strips
+    // "State"/"University" and compares by substring in both directions, so
+    // "Michigan" matches "Michigan State" and "Miami" matches "Miami (OH)".
+    // With a full season of scheduled rows sitting in the table, single-team
+    // matching would corrupt games every week.
+    const hits = (n: string) => ({
+      first: !!n && (g1.includes(n) || n.includes(g1)),
+      second: !!n && (g2.includes(n) || n.includes(g2)),
+    });
+    const h1 = hits(n1);
+    const h2 = hits(n2);
 
-    if (match1 || match2) return game;
+    if (n1 && n2) {
+      // Both names known: require a consistent pairing across both slots.
+      if ((h1.first && h2.second) || (h1.second && h2.first)) return game;
+      continue;
+    }
+    // Only one name known — fall back to a single-team match, which is the
+    // best we can do, but never when we had both names available.
+    if ((n1 && (h1.first || h1.second)) || (n2 && (h2.first || h2.second))) return game;
   }
   return null;
 }
@@ -229,11 +250,19 @@ serve(async (req) => {
     const now = new Date();
     const sixHoursAgo = new Date(now.getTime() - 6 * 60 * 60 * 1000);
 
+    // Upper bound matters as much as the lower one: without it, EVERY future
+    // scheduled game (all of September, all season) stays an eligible match
+    // target forever, so one bad name match writes today's score onto a game
+    // weeks away. A game can only be live or final if it has kicked off, so
+    // only consider rows starting within the next few hours.
+    const sixHoursAhead = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+
     const { data: activeGames } = await supabase
       .from('games')
       .select('*, home_team:teams!games_home_team_id_fkey(id, name, city), away_team:teams!games_away_team_id_fkey(id, name, city)')
       .in('status', ['scheduled', 'in_progress', 'live'])
-      .gte('start_time', sixHoursAgo.toISOString());
+      .gte('start_time', sixHoursAgo.toISOString())
+      .lte('start_time', sixHoursAhead.toISOString());
 
     let gamesEnriched = 0;
 
