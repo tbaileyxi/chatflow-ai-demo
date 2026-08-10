@@ -66,6 +66,12 @@ const KALSHI_ALIASES: Record<string, Record<string, string>> = {
   NFL: {
     'los angeles r': 'Rams',
     'los angeles ch': 'Chargers',
+    // Kalshi truncates to "Los Angeles C" in per-game subtitles, which the
+    // longer 'los angeles ch' key never matched — seen unrouted 2026-08-07.
+    // Aliases are tried longest-first, so 'los angeles ch' still wins when
+    // present and this only catches the shorter form. Rams are 'los angeles r'
+    // so there is no collision.
+    'los angeles c': 'Chargers',
     'new york g': 'Giants',
     'new york j': 'Jets',
   },
@@ -120,14 +126,30 @@ function buildLeagueTeamMaps(teams: TeamRecord[]) {
     const cityCount = new Map<string, number>();
     const cityMap = new Map<string, TeamRecord>();
 
+    const mascotCount = new Map<string, number>();
+    const mascotMap = new Map<string, TeamRecord>();
+
     for (const t of roster) {
       const full = `${t.city} ${t.name}`.toLowerCase();
       fullNames.set(full, t);
-      mascots.set(t.name.toLowerCase(), t);
+
+      const mascotKey = t.name.toLowerCase();
+      mascotCount.set(mascotKey, (mascotCount.get(mascotKey) || 0) + 1);
+      mascotMap.set(mascotKey, t);
 
       const cityKey = t.city.toLowerCase();
       cityCount.set(cityKey, (cityCount.get(cityKey) || 0) + 1);
       cityMap.set(cityKey, t);
+    }
+
+    // Mascots get the same ambiguity guard cities already had. Inside NCAA,
+    // "Tigers" belongs to Missouri, Auburn, LSU and Clemson, and "Wildcats" to
+    // four more — a bare-mascot title was silently resolving to whichever
+    // loaded last, routing a market to the wrong school's rooms. A shared
+    // mascot cannot identify a team, so refuse it and let the city/full-name
+    // paths (which do work — Kalshi's per-game subtitle is the school) decide.
+    for (const [mascot, count] of mascotCount.entries()) {
+      if (count === 1) mascots.set(mascot, mascotMap.get(mascot)!);
     }
 
     // Only keep unambiguous cities (exactly 1 team with that city in this league)
