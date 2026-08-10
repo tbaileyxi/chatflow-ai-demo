@@ -56,6 +56,149 @@ export async function fetchEspnLeaders(
   return out;
 }
 
+// ---------------------------------------------------------------
+// Box-score stat lines.  This exists because ESPN's `leaders` array is EMPTY
+// for MLB (and thin elsewhere), which is why the bot had never once cited a
+// stat — it only ever had the score.  `boxscore.players` is always populated
+// and carries both game and season numbers, so we read it directly.
+//
+// Returns two indexes:
+//   byPlayer — every player, keyed by several name spellings, so the scorer
+//              named in a play can be matched to their own line.
+//   byTeam   — that team's best performer, keyed by EVERY team-name variant
+//              ESPN exposes (displayName / name / abbreviation / location).
+//              The old code keyed only on displayName ("New York Mets") and
+//              looked up with our DB nickname ("Mets"), so it always missed.
+// Strings are pre-formatted here; the model never computes a number.
+// ---------------------------------------------------------------
+
+// Priority is per stat GROUP, not global. This matters: "R", "H" and "HR" mean
+// runs/hits SCORED in a batting group and runs/hits ALLOWED in a pitching one.
+// A single flat list picks the batting labels off a pitcher's row and states
+// his line exactly backwards ("5 R, 8 H" for a guy who gave up five).
+const STAT_GROUPS: Array<{ when: string; priority: string[] }> = [
+  { when: "IP",    priority: ["IP", "K", "ER", "H", "ERA"] },          // pitching
+  { when: "H-AB",  priority: ["H-AB", "R", "RBI", "HR", "AVG"] },      // batting
+  { when: "C/ATT", priority: ["C/ATT", "YDS", "TD", "INT"] },          // passing
+  { when: "CAR",   priority: ["CAR", "YDS", "TD", "LONG"] },           // rushing
+  { when: "REC",   priority: ["REC", "YDS", "TD", "LONG"] },           // receiving
+  { when: "PTS",   priority: ["PTS", "REB", "AST", "3PT"] },           // basketball
+  { when: "SOG",   priority: ["G", "A", "SOG"] },                      // hockey
+];
+const STAT_PRIORITY_FALLBACK = ["YDS", "TD", "PTS", "G", "A"];
+// Labels that read better without the label — "2-5" beats "2-5 H-AB".
+const BARE_LABELS = new Set(["H-AB", "C/ATT"]);
+// Groups we never quote a player from. "fumbles" is the dangerous one: its
+// label REC means RECOVERED, which is indistinguishable from a reception once
+// formatted, so a fumble renders as "1 REC". The rest are noise for a
+// play reaction.
+const SKIP_GROUPS = new Set(["fumbles", "punting", "kickreturns", "puntreturns", "defensive", "interceptions"]);
+
+function isEmptyStat(v: string): boolean {
+  const s = v.trim();
+  return s === "" || s === "0" || s === "0.0" || s === "--" || s === "0-0" || s === ".000";
+}
+
+function formatStatLine(labels: string[], stats: string[]): string {
+  const pairs = new Map<string, string>();
+  labels.forEach((l, i) => {
+    const v = stats[i];
+    if (typeof v === "string" && !isEmptyStat(v)) pairs.set(l, v.trim());
+  });
+  // Pick the priority list belonging to THIS group, identified by a label only
+  // that group has. Falls back to a small generic list for unknown shapes.
+  const group = STAT_GROUPS.find((g) => labels.includes(g.when));
+  const priority = group ? group.priority : STAT_PRIORITY_FALLBACK;
+
+  const picked: string[] = [];
+  for (const label of priority) {
+    if (picked.length >= 4) break;
+    const v = pairs.get(label);
+    if (!v) continue;
+    picked.push(BARE_LABELS.has(label) ? v : `${v} ${label}`);
+  }
+  return picked.join(", ");
+}
+
+function nameKeys(athlete: any): string[] {
+  const short = String(athlete?.shortName ?? "").toLowerCase().trim();
+  const full = String(athlete?.displayName ?? "").toLowerCase().trim();
+  const last = String(athlete?.lastName ?? "").toLowerCase().trim()
+    || full.split(" ").slice(-1)[0] || "";
+  return [short, full, last].filter((s) => s.length > 1);
+}
+
+function teamKeys(team: any): string[] {
+  return [team?.displayName, team?.name, team?.shortDisplayName, team?.abbreviation, team?.location]
+    .map((s) => String(s ?? "").toLowerCase().trim())
+    .filter((s) => s.length > 0);
+}
+
+// The poller calls this once per GATED PLAY, and a busy game gates many plays
+// in one sweep — without a cache that is N identical downloads of the same
+// large summary payload, which is enough to blow the function's wall clock.
+// TTL is short so numbers still move during a game, but a single sweep pays
+// for one fetch per game instead of one per play.
+type BoxLines = { byPlayer: Map<string, string>; byTeam: Map<string, string> };
+const BOX_TTL_MS = 60_000;
+const boxCache = new Map<string, { at: number; value: BoxLines }>();
+
+export async function fetchEspnBoxScoreLines(
+  gameProviderId: string,
+  league: League,
+): Promise<BoxLines> {
+  const cacheKey = `${league}:${gameProviderId}`;
+  const hit = boxCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < BOX_TTL_MS) return hit.value;
+
+  const byPlayer = new Map<string, string>();
+  const byTeam = new Map<string, string>();
+  const p = leaguePath(league);
+  if (!p) return { byPlayer, byTeam };
+
+  const data = await safeJson(`${ESPN_BASE}/${p.sport}/${p.league}/summary?event=${gameProviderId}`);
+  const teams: any[] = Array.isArray(data?.boxscore?.players) ? data.boxscore.players : [];
+
+  for (const t of teams) {
+    let best = { line: "", who: "", score: -1 };
+    // Richest line wins, not the first one seen. A player can appear in several
+    // groups (Bijan Robinson rushes AND receives); ESPN lists rushing first, so
+    // first-write-wins would cite his 24 rushing yards on a 100-yard receiving
+    // day. Component count is a good proxy for "the line that tells the story".
+    const bestByKey = new Map<string, { line: string; score: number }>();
+
+    for (const group of (Array.isArray(t?.statistics) ? t.statistics : [])) {
+      const groupName = String(group?.name ?? "").toLowerCase();
+      if (SKIP_GROUPS.has(groupName)) continue;
+      const labels: string[] = Array.isArray(group?.labels) ? group.labels : [];
+      for (const a of (Array.isArray(group?.athletes) ? group.athletes : [])) {
+        const stats: string[] = Array.isArray(a?.stats) ? a.stats : [];
+        if (labels.length === 0 || stats.length === 0) continue;
+        const line = formatStatLine(labels, stats);
+        if (!line) continue;
+        const score = line.split(",").length;
+        const who = a?.athlete?.shortName ?? a?.athlete?.displayName ?? "";
+        for (const k of nameKeys(a?.athlete)) {
+          const prev = bestByKey.get(k);
+          if (!prev || score > prev.score) bestByKey.set(k, { line, score });
+        }
+        if (who && score > best.score) best = { line, who, score };
+      }
+    }
+    for (const [k, v] of bestByKey) {
+      if (!byPlayer.has(k)) byPlayer.set(k, v.line);
+    }
+    if (best.who) {
+      for (const k of teamKeys(t?.team)) {
+        if (!byTeam.has(k)) byTeam.set(k, `${best.who} ${best.line}`);
+      }
+    }
+  }
+  const value = { byPlayer, byTeam };
+  boxCache.set(cacheKey, { at: Date.now(), value });
+  return value;
+}
+
 function leaguePath(league: League): { sport: string; league: string } | null {
   switch (league) {
     case "NBA":   return { sport: "basketball", league: "nba" };

@@ -72,8 +72,17 @@ serve(async (req) => {
     const byTeam = new Map<string, TeamBundle>();
     for (const row of feeds as any[]) {
       const t = row.teams;
-      const display = t.highlightly_display_name || `${t.city ?? ""} ${t.name}`.trim();
-      const tokens = [t.name, display, t.city].filter(Boolean);
+      // ALWAYS prefer "City Nickname". highlightly_display_name holds only the
+      // bare nickname for NCAA rows, and it used to win via `||` — so the LSU
+      // bundle was named "Tigers", the persona read "an opinionated Tigers
+      // fan", and the model answered as a DETROIT Tigers fan. Seen in
+      // production 2026-08-07 in the LSU huddle. The team's identity must be
+      // unambiguous before it ever reaches the model.
+      const full = `${t.city ?? ""} ${t.name ?? ""}`.trim();
+      const display = full || t.highlightly_display_name || String(t.name ?? "");
+      // Tokens stay broad — they only gate whether a headline from this team's
+      // OWN feed is on-subject, so a loose nickname match is fine here.
+      const tokens = [t.name, display, t.city, t.highlightly_display_name].filter(Boolean);
       const bundle = byTeam.get(t.id) || {
         teamId: t.id,
         teamName: display,
@@ -245,7 +254,7 @@ serve(async (req) => {
         if (budget <= 0 && s.breaking) budget = 1; // breaking can take one over the cap
 
         try {
-          const persona = defaultPersona(bundle.teamName);
+          const persona = defaultPersona(bundle.teamName, bundle.league);
           const voice = await generateMessage({
             mode: "news",
             team: bundle.teamName,

@@ -99,6 +99,15 @@ export interface InGameFacts {
   // bot can cite. Pre-formatted strings; the model never computes them.
   teamLeader?: string;                // e.g. "Brunson 31 PTS, 7 AST"
   rivalLeader?: string;
+  // The stat line for the player who ACTUALLY made this play, matched out of
+  // the box score by name. This is the "something they don't know" fuel: the
+  // viewer just watched the homer, they did not see that it's his 3rd hit on a
+  // .231 season. Pre-formatted; the model never computes it.
+  scorerStatLine?: string;            // e.g. "2-5, 3 RBI, 1 HR, .231 AVG"
+  // The bot's own last few lines in this room. Without these the model cannot
+  // know what it already said, so a touchdown and its extra point produce two
+  // near-identical messages, and the same stat line repeats all game.
+  recentLines?: string[];
 }
 
 export interface NewsFacts {

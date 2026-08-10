@@ -12,7 +12,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getProvider, fetchEspnLeaders } from "../_shared/bot/providers.ts";
+import { getProvider, fetchEspnLeaders, fetchEspnBoxScoreLines } from "../_shared/bot/providers.ts";
 import { gateEvents } from "../_shared/bot/brain.ts";
 import { generateMessage, defaultPersona } from "../_shared/bot/voice.ts";
 import { publish } from "../_shared/bot/publisher.ts";
@@ -92,10 +92,57 @@ serve(async (req) => {
       .from("teams")
       .select("id, name, city, league, highlightly_display_name");
     const teamIndex = new Map<string, { id: string; name: string; league: string }>();
+
+    // Count how many teams share each bare nickname. College is full of these:
+    // Tigers is claimed by Missouri, Auburn, LSU, Clemson AND Detroit; Wildcats
+    // by four schools. A shared nickname cannot identify a team, so we refuse to
+    // index it rather than letting last-write-win silently pick the wrong one.
+    const nicknameCount = new Map<string, number>();
     for (const t of teams ?? []) {
-      const display = (t.highlightly_display_name || `${t.city ?? ""} ${t.name}`.trim());
-      teamIndex.set(display.toLowerCase(), { id: t.id, name: display, league: t.league });
-      teamIndex.set(String(t.name).toLowerCase(), { id: t.id, name: display, league: t.league });
+      const n = String(t.name ?? "").toLowerCase().trim();
+      if (n) nicknameCount.set(n, (nicknameCount.get(n) ?? 0) + 1);
+    }
+
+    // Nicknames are also counted PER LEAGUE. Most collisions are cross-sport:
+    // Panthers is Carolina (NFL), Florida (NHL) and Pittsburgh (NCAA), but it
+    // is unique inside each one. Since we always know which league we are
+    // polling, a league-scoped key makes 31 more teams resolvable by nickname
+    // than a global key does. Only 4 nicknames stay ambiguous after this, all
+    // inside NCAA (tigers, wildcats, bulldogs, cougars).
+    const perLeagueCount = new Map<string, number>();
+    for (const t of teams ?? []) {
+      const k = `${t.league}::${String(t.name ?? "").toLowerCase().trim()}`;
+      perLeagueCount.set(k, (perLeagueCount.get(k) ?? 0) + 1);
+    }
+
+    for (const t of teams ?? []) {
+      // ALWAYS index "City Nickname" — this is what ESPN sends as displayName
+      // ("Ohio State Buckeyes"). Previously highlightly_display_name won via
+      // `||`, and for NCAA rows it holds only the nickname ("Buckeyes"), so the
+      // full name was never indexed and every college game fell through to the
+      // ambiguous nickname path.
+      const full = `${t.city ?? ""} ${t.name ?? ""}`.trim();
+      const display = (t.highlightly_display_name || full);
+      const entry = { id: t.id, name: full || display, league: t.league };
+
+      // Full names are unambiguous, so they get both a global and a scoped key.
+      if (full) {
+        teamIndex.set(full.toLowerCase(), entry);
+        teamIndex.set(`${t.league}::${full.toLowerCase()}`, entry);
+      }
+
+      for (const alias of [t.highlightly_display_name, t.name]) {
+        const key = String(alias ?? "").toLowerCase().trim();
+        if (!key || key === full.toLowerCase()) continue;
+        // Scoped key: safe whenever the nickname is unique WITHIN its league.
+        const scoped = `${t.league}::${key}`;
+        if ((perLeagueCount.get(scoped) ?? 0) === 1 && !teamIndex.has(scoped)) {
+          teamIndex.set(scoped, entry);
+        }
+        // Global key: only when unique across every league.
+        if ((nicknameCount.get(key) ?? 0) > 1) continue;
+        if (!teamIndex.has(key)) teamIndex.set(key, entry);
+      }
     }
 
     summary.leagues = await resolveLeagues(supabase);
@@ -135,7 +182,7 @@ serve(async (req) => {
         summary.plays_gated += gated.length;
 
         for (const g of gated) {
-          const dbTeam = resolveTeam(g.team.fullName, g.team.name, teamIndex);
+          const dbTeam = lookupTeam(g.team.fullName, g.team.name, teamIndex, league);
           if (!dbTeam) continue;
           // TEST_MODE: also constrain emission to the test team.
           if (TEST_MODE && TEST_TEAM && !dbTeam.name.toLowerCase().includes(TEST_TEAM)) continue;
@@ -149,14 +196,45 @@ serve(async (req) => {
             // Real box-score stat leaders for ALL sports (ESPN). This is the
             // smart-bot fuel: "Brunson 31 PTS, 7 AST" / "Soto 3 H, 2 RBI".
             try {
-              const leaders = await fetchEspnLeaders(game.providerId, league);
-              const teamLine = leaders.get(dbTeam.name.toLowerCase());
-              const rivalName = (g.rival.fullName || g.rival.name).toLowerCase();
-              const rivalLine = leaders.get(rivalName);
-              if (teamLine) enrichedFacts.teamLeader = teamLine;
-              if (rivalLine) enrichedFacts.rivalLeader = rivalLine;
+              // Box score first: it is populated for every sport (ESPN's
+              // `leaders` array is empty for MLB) and it lets us look up the
+              // specific player who just did the thing.
+              const box = await fetchEspnBoxScoreLines(game.providerId, league);
+
+              // Match the scorer named in this play to their own stat line.
+              // This is the "something they didn't know" beat — they watched
+              // the homer, they didn't see it was his 3rd hit on a .231 year.
+              const scorer = String(g.facts.scorer ?? "").toLowerCase().trim();
+              if (scorer) {
+                const lastName = scorer.split(" ").slice(-1)[0] ?? "";
+                enrichedFacts.scorerStatLine =
+                  box.byPlayer.get(scorer) ?? box.byPlayer.get(lastName) ?? undefined;
+              }
+
+              // Team lines: try every name variant, since our DB stores the
+              // nickname ("Mets") and ESPN keys on the full name.
+              const teamVariants = [dbTeam.name, `${dbTeam.city ?? ""} ${dbTeam.name}`.trim()];
+              const rivalVariants = [g.rival.fullName, g.rival.name, g.rival.abbreviation];
+              for (const v of teamVariants) {
+                const hit = v && box.byTeam.get(String(v).toLowerCase().trim());
+                if (hit) { enrichedFacts.teamLeader = hit; break; }
+              }
+              for (const v of rivalVariants) {
+                const hit = v && box.byTeam.get(String(v).toLowerCase().trim());
+                if (hit) { enrichedFacts.rivalLeader = hit; break; }
+              }
+
+              // Legacy leaders call as a backstop for leagues where ESPN does
+              // populate it and the box score comes back thin.
+              if (!enrichedFacts.teamLeader) {
+                const leaders = await fetchEspnLeaders(game.providerId, league);
+                const teamLine = leaders.get(dbTeam.name.toLowerCase());
+                const rivalLine = leaders.get((g.rival.fullName || g.rival.name).toLowerCase());
+                if (teamLine) enrichedFacts.teamLeader = teamLine;
+                if (rivalLine && !enrichedFacts.rivalLeader) enrichedFacts.rivalLeader = rivalLine;
+              }
             } catch (err) {
-              console.warn("[live-poller] leaders skipped", err);
+              console.warn("[live-poller] box score skipped", err);
             }
 
             // NBA-only Highlightly shooting % (extra texture when available).
@@ -183,7 +261,28 @@ serve(async (req) => {
               }
             }
 
-            const persona = defaultPersona(dbTeam.name);
+            // What this bot already said in this team's rooms. One query per
+            // emit, cheap and capped, but it is the only way the model can
+            // avoid re-narrating the touchdown when the extra point lands.
+            try {
+              const { data: hRows } = await supabase
+                .from("huddles").select("id").eq("team_id", dbTeam.id).limit(1);
+              if (hRows?.[0]?.id) {
+                const { data: prev } = await supabase
+                  .from("huddle_messages")
+                  .select("content")
+                  .eq("huddle_id", hRows[0].id)
+                  .eq("message_type", "live_play")
+                  .order("created_at", { ascending: false })
+                  .limit(3);
+                const lines = (prev ?? []).map((r: any) => String(r.content)).filter(Boolean);
+                if (lines.length) enrichedFacts.recentLines = lines;
+              }
+            } catch (err) {
+              console.warn("[live-poller] recent lines skipped", err);
+            }
+
+            const persona = defaultPersona(dbTeam.name, dbTeam.league);
             const voice = await generateMessage({
               mode: "in_game",
               team: dbTeam.name,
@@ -326,7 +425,13 @@ async function postFinals(
         "away:teams!games_away_team_id_fkey(id, name, city)",
     )
     .eq("status", "final")
-    .gte("start_time", threeHoursAgo);
+    .gte("start_time", threeHoursAgo)
+    // A game that has not started cannot be final. Without this, a row with a
+    // FUTURE start_time that got wrongly marked final is always inside the
+    // "gte threeHoursAgo" window, so it never ages out and re-posts a bogus
+    // final every 6 hours forever. Seen in production 2026-08-07: two Week 2
+    // September games carrying the Aug 6 Panthers/Cardinals score.
+    .lte("start_time", new Date(now).toISOString());
   if (!finals || finals.length === 0) return;
 
   const { data: sysUser } = await supabase.rpc("get_or_create_system_user");
@@ -453,12 +558,12 @@ function matchedTeam(
   testMode: boolean,
   testTeam: string,
 ): boolean {
+  const knownHome = !!lookupTeam(g.home.fullName, g.home.name, index, g.league);
+  const knownAway = !!lookupTeam(g.away.fullName, g.away.name, index, g.league);
   const homeKey = g.home.fullName.toLowerCase();
   const awayKey = g.away.fullName.toLowerCase();
   const homeShort = g.home.name.toLowerCase();
   const awayShort = g.away.name.toLowerCase();
-  const knownHome = index.has(homeKey) || index.has(homeShort);
-  const knownAway = index.has(awayKey) || index.has(awayShort);
   if (!knownHome && !knownAway) return false;
   if (testMode && testTeam) {
     return homeKey.includes(testTeam) || awayKey.includes(testTeam)
@@ -467,10 +572,27 @@ function matchedTeam(
   return true;
 }
 
-function resolveTeam(
+// ESPN's League ("NCAAF"/"NCAAB") and our teams.league ("NCAA") are not the
+// same vocabulary. Both college leagues live under one DB league.
+function dbLeagueFor(league: League): string {
+  return league === "NCAAF" || league === "NCAAB" ? "NCAA" : league;
+}
+
+// Preferred lookup. Tries the league-scoped keys first — those are safe even
+// for shared nicknames like "Panthers" — then falls back to the global keys,
+// which only exist for names unique across every league.
+function lookupTeam(
   fullName: string,
   shortName: string,
   index: Map<string, { id: string; name: string; league: string }>,
-): { id: string; name: string } | null {
-  return index.get(fullName.toLowerCase()) || index.get(shortName.toLowerCase()) || null;
+  league: League,
+): { id: string; name: string; league: string } | null {
+  const lg = dbLeagueFor(league);
+  const full = String(fullName ?? "").toLowerCase().trim();
+  const short = String(shortName ?? "").toLowerCase().trim();
+  return index.get(`${lg}::${full}`)
+    ?? index.get(`${lg}::${short}`)
+    ?? index.get(full)
+    ?? index.get(short)
+    ?? null;
 }
