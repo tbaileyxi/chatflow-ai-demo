@@ -1,13 +1,22 @@
-// odds-sync-markets — MLB markets from SportsGameOdds (SGO), written into
-// kalshi_markets as YES/NO contracts the existing chips economy understands.
+// odds-sync-markets — MLB, NFL and college football markets from
+// SportsGameOdds (SGO), written into kalshi_markets as YES/NO contracts the
+// existing chips economy understands.
 //
 // SGO is one source for everything: a single /events call returns each game's
 // teams, a players map (playerID -> teamID, for routing), and all odds. So this
 // one function covers BOTH team markets and player props — no per-event calls,
 // no ESPN roster/probable scraping.
 //
-//   Team:   moneyline (ml), run line (sp, half-pt only), total (ou)
-//   Props:  pitcher strikeouts, batter home runs, batter hits  (ou, half-pt)
+//   Team:   moneyline (ml), spread (sp, half-pt only), total (ou)
+//   Props:  per-league, see LEAGUE_SPEC — MLB uses HR/hits/Ks, football uses
+//           passing/rushing/receiving yards, receptions and passing TDs.
+//
+// NOTE: the football prop statIDs are written from SGO's documented naming
+// convention but have NOT been confirmed against a live football response —
+// the account was rate-limited when this was built. Any statID we don't
+// recognise is counted into `unknown_prop_stats` in the response rather than
+// dropped, so the first successful football run reveals the real vocabulary.
+// Team and total markets do not depend on that and should work immediately.
 //
 // Each market stores its SGO eventID + oddID in metadata so odds-settle can read
 // the result straight from SGO (the odd's `score` / results.game).
@@ -26,13 +35,52 @@ const SGO_BASE = "https://api.sportsgameodds.com/v2";
 // A 24h window at 2 pages covers a full MLB slate (~15 games) and, paired with
 // the 4-hourly cron, costs ~12 calls/day.
 const WINDOW_MS = 24 * 60 * 60 * 1000;
-const MAX_PAGES = 2;
 
-// Player-prop statIDs we surface, with a card noun and carousel weight.
-const PROP_SPEC: Record<string, { noun: string; weight: number }> = {
-  batting_homeRuns:    { noun: "home runs",  weight: 7 },
-  batting_hits:        { noun: "hits",       weight: 6 },
-  pitching_strikeouts: { noun: "strikeouts", weight: 5 },
+// Leagues to sync. Env-overridable so the slate can be widened or cut back
+// without a deploy — useful because SGO bills per request and college football
+// Saturdays are far bigger than an MLB night.
+const LEAGUES = (Deno.env.get("ODDS_LEAGUES") || "MLB,NFL,NCAAF")
+  .split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+
+// Per-league config. `pages` is the real cost knob: each page is one billed
+// request. MLB runs ~15 games a night, the NFL ~16 a week, but a college
+// Saturday is 60+, and we only care about the ~70 schools in our teams table,
+// so college needs to page deeper to find them.
+const LEAGUE_SPEC: Record<string, {
+  dbLeague: string;
+  scoreNoun: string;                                   // "runs" / "points"
+  pages: number;
+  props: Record<string, { noun: string; weight: number }>;
+}> = {
+  MLB: {
+    dbLeague: "MLB", scoreNoun: "runs", pages: 2,
+    props: {
+      batting_homeRuns:    { noun: "home runs",  weight: 7 },
+      batting_hits:        { noun: "hits",       weight: 6 },
+      pitching_strikeouts: { noun: "strikeouts", weight: 5 },
+    },
+  },
+  NFL: {
+    dbLeague: "NFL", scoreNoun: "points", pages: 2,
+    props: {
+      passing_yards:        { noun: "passing yards",   weight: 7 },
+      rushing_yards:        { noun: "rushing yards",   weight: 6 },
+      receiving_yards:      { noun: "receiving yards", weight: 6 },
+      receiving_receptions: { noun: "receptions",      weight: 5 },
+      passing_touchdowns:   { noun: "passing TDs",     weight: 5 },
+    },
+  },
+  NCAAF: {
+    dbLeague: "NCAA", scoreNoun: "points",
+    pages: Number(Deno.env.get("ODDS_NCAAF_PAGES") || 4),
+    props: {
+      passing_yards:        { noun: "passing yards",   weight: 7 },
+      rushing_yards:        { noun: "rushing yards",   weight: 6 },
+      receiving_yards:      { noun: "receiving yards", weight: 6 },
+      receiving_receptions: { noun: "receptions",      weight: 5 },
+      passing_touchdowns:   { noun: "passing TDs",     weight: 5 },
+    },
+  },
 };
 
 interface TeamRecord { id: string; name: string; city: string }
@@ -70,42 +118,62 @@ Deno.serve(async (req) => {
     }
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // MLB teams indexed by full name ("Tampa Bay Rays") to match SGO names.long.
+    // Teams for every league we sync, indexed per DB league by full name
+    // ("Tampa Bay Rays", "Ohio State Buckeyes") to match SGO's names.long.
+    // Indexing per league matters: nicknames collide across sports, and an
+    // NCAAF event must never resolve to the NFL row of the same name.
+    const dbLeagues = [...new Set(LEAGUES.map((l) => LEAGUE_SPEC[l]?.dbLeague).filter(Boolean))];
     const { data: teams } = await supabase
-      .from("teams").select("id, name, city").eq("league", "MLB").eq("status", "active");
-    const byFullName = new Map<string, TeamRecord>();
-    for (const t of (teams ?? []) as TeamRecord[]) {
-      byFullName.set(`${t.city} ${t.name}`.toLowerCase(), t);
+      .from("teams").select("id, name, city, league")
+      .in("league", dbLeagues).eq("status", "active");
+    const byLeague = new Map<string, Map<string, TeamRecord>>();
+    for (const t of (teams ?? []) as (TeamRecord & { league: string })[]) {
+      if (!byLeague.has(t.league)) byLeague.set(t.league, new Map());
+      byLeague.get(t.league)!.set(`${t.city} ${t.name}`.toLowerCase(), t);
     }
 
-    // Upcoming MLB events with odds, paginated.
     const now = Date.now();
     const startsAfter = new Date(now).toISOString();
     const startsBefore = new Date(now + WINDOW_MS).toISOString();
-    const events: any[] = [];
-    let cursor = "";
-    for (let page = 0; page < MAX_PAGES; page++) {
-      const url =
-        `${SGO_BASE}/events/?leagueID=MLB&oddsAvailable=true&startsAfter=${startsAfter}` +
-        `&startsBefore=${startsBefore}&limit=10${cursor ? `&cursor=${cursor}` : ""}&apiKey=${SGO_KEY}`;
-      const res = await fetch(url);
-      if (!res.ok) {
-        if (page === 0) {
-          const txt = await res.text();
-          return new Response(JSON.stringify({ error: `SGO ${res.status}: ${txt.slice(0, 200)}` }), {
-            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        break;
-      }
-      const json = await res.json();
-      events.push(...(json.data ?? []));
-      cursor = json.nextCursor || "";
-      if (!cursor) break;
-    }
 
     const rows: any[] = [];
     let skippedNoTeam = 0;
+    let apiCalls = 0;
+    const leagueErrors: string[] = [];
+    const perLeague: Record<string, { events: number; rows: number }> = {};
+    // statIDs SGO returned that we have no card noun for. Reported rather than
+    // silently dropped — this is how we learn football's real prop vocabulary
+    // without guessing, since the MLB names tell us nothing about it.
+    const unknownProps = new Map<string, number>();
+
+    for (const league of LEAGUES) {
+      const spec = LEAGUE_SPEC[league];
+      if (!spec) { leagueErrors.push(`${league}: no spec`); continue; }
+      const byFullName = byLeague.get(spec.dbLeague) ?? new Map<string, TeamRecord>();
+      if (byFullName.size === 0) { leagueErrors.push(`${league}: no teams in DB`); continue; }
+
+      const events: any[] = [];
+      let cursor = "";
+      for (let page = 0; page < spec.pages; page++) {
+        const url =
+          `${SGO_BASE}/events/?leagueID=${league}&oddsAvailable=true&startsAfter=${startsAfter}` +
+          `&startsBefore=${startsBefore}&limit=10${cursor ? `&cursor=${cursor}` : ""}&apiKey=${SGO_KEY}`;
+        const res = await fetch(url);
+        apiCalls++;
+        if (!res.ok) {
+          // One league failing (rate limit, out of season) must not abort the
+          // others — MLB should still sync if college football 429s.
+          const txt = await res.text();
+          leagueErrors.push(`${league}: SGO ${res.status} ${txt.slice(0, 120)}`);
+          break;
+        }
+        const json = await res.json();
+        events.push(...(json.data ?? []));
+        cursor = json.nextCursor || "";
+        if (!cursor) break;
+      }
+      perLeague[league] = { events: events.length, rows: 0 };
+      const rowsBefore = rows.length;
 
     for (const ev of events) {
       const startsAt = ev.status?.startsAt;
@@ -127,7 +195,11 @@ Deno.serve(async (req) => {
         kalshi_event_ticker: ev.eventID,
         event_start_time: startsAt,
         metadata: {
-          source: "sgo", sgo_event_id: ev.eventID, odd_id: oddID,
+          // `league` lets odds-settle fetch ONLY the leagues that actually have
+          // pending markets instead of all of them every run. At 8 pages and a
+          // 30-minute cron, blindly fetching three leagues would cost ~1,150
+          // SGO calls/day — the same overrun that froze every line in June.
+          source: "sgo", league, sgo_event_id: ev.eventID, odd_id: oddID,
           // Matchup for the card's game line, e.g. "Chicago Cubs @ New York Mets".
           away: away?.names?.long, home: home?.names?.long, ...extra,
         },
@@ -149,7 +221,7 @@ Deno.serve(async (req) => {
             ...base(odd.oddID, { bet_type: "ml", side: odd.sideID, sort_weight: 1 }),
             kalshi_ticker: `sgo:${ev.eventID}:${odd.oddID}`,
             team_id: team.id,
-            question: `${team.name} to win tonight?`,
+            question: `${team.name} to win?`,
             current_yes_price: price,
             market_type: "winner",
           });
@@ -184,7 +256,7 @@ Deno.serve(async (req) => {
               ...base(odd.oddID, { bet_type: "ou", stat: "points", line, side: "over", sort_weight: 2 }),
               kalshi_ticker: `sgo:${ev.eventID}:${odd.oddID}:${side}`,
               team_id: team.id,
-              question: `Over ${line} runs — ${away?.names?.long} @ ${home?.names?.long}?`,
+              question: `Over ${line} ${spec.scoreNoun} — ${away?.names?.long} @ ${home?.names?.long}?`,
               current_yes_price: price,
               market_type: "total",
             });
@@ -193,8 +265,13 @@ Deno.serve(async (req) => {
         }
 
         // — Player props — YES = Over the line.
-        const spec = PROP_SPEC[odd.statID];
-        if (spec && odd.betTypeID === "ou" && odd.sideID === "over" && odd.playerID) {
+        const propSpec = spec.props[odd.statID];
+        // Record anything player-shaped we don't have a noun for, so the real
+        // football statIDs surface in the response instead of vanishing.
+        if (!propSpec && odd.playerID && odd.betTypeID === "ou" && odd.sideID === "over") {
+          unknownProps.set(odd.statID, (unknownProps.get(odd.statID) ?? 0) + 1);
+        }
+        if (propSpec && odd.betTypeID === "ou" && odd.sideID === "over" && odd.playerID) {
           const line = parseFloat(odd.fairOverUnder ?? odd.bookOverUnder);
           if (!isHalf(line)) continue;
           // Route by SGO's per-game player teamID (constrained to this game's two
@@ -207,16 +284,18 @@ Deno.serve(async (req) => {
           rows.push({
             ...base(odd.oddID, {
               bet_type: "ou", stat: odd.statID, line, side: "over",
-              player: name, sort_weight: spec.weight,
+              player: name, sort_weight: propSpec.weight,
             }),
             kalshi_ticker: `sgo:${ev.eventID}:${odd.oddID}`,
             team_id: team.id,
-            question: `${name} over ${line} ${spec.noun}?`,
+            question: `${name} over ${line} ${propSpec.noun}?`,
             current_yes_price: price,
             market_type: "player_prop",
           });
         }
       }
+    }
+      perLeague[league].rows = rows.length - rowsBefore;
     }
 
     let inserted = 0;
@@ -236,10 +315,18 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      events_seen: events.length,
+      leagues: LEAGUES,
+      per_league: perLeague,
+      api_calls: apiCalls,
       markets_built: rows.length,
       markets_inserted: inserted,
       skipped_no_tracked_team: skippedNoTeam,
+      league_errors: leagueErrors,
+      // Player statIDs SGO offered that we have no noun for. Empty for MLB;
+      // for football this is the list to fold into LEAGUE_SPEC.props once seen.
+      unknown_prop_stats: Object.fromEntries(
+        [...unknownProps.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25),
+      ),
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {

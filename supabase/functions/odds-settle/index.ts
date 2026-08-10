@@ -184,22 +184,34 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Pull finalized MLB events once, index by eventID.
+    // Fetch ONLY the leagues that actually have a market waiting to be graded.
+    // Fetching all configured leagues every run would cost MAX_PAGES x leagues
+    // x 48 runs/day (~1,150 SGO calls) and re-create the June overrun. A market
+    // whose league is never fetched can never grade and its chips stay locked,
+    // so this set must be derived from the pending markets themselves — never
+    // from a static list.
+    // Markets written before `league` was added to metadata are MLB.
+    const SETTLE_LEAGUES = [...new Set(
+      (markets as any[]).map((m) => String(m.metadata?.league ?? "MLB").toUpperCase()),
+    )];
+
     const startsAfter = new Date(Date.now() - LOOKBACK_MS).toISOString();
     const finals = new Map<string, FinalEvent>();
-    let cursor = "";
-    for (let page = 0; page < MAX_PAGES; page++) {
-      const url =
-        `${SGO_BASE}/events/?leagueID=MLB&finalized=true&startsAfter=${startsAfter}` +
-        `&expandResults=true&limit=10${cursor ? `&cursor=${cursor}` : ""}&apiKey=${SGO_KEY}`;
-      const res = await fetch(url);
-      if (!res.ok) break;
-      const json = await res.json();
-      for (const ev of json.data ?? []) {
-        finals.set(ev.eventID, { odds: ev.odds ?? {}, game: ev.results?.game ?? {} });
+    for (const league of SETTLE_LEAGUES) {
+      let cursor = "";
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const url =
+          `${SGO_BASE}/events/?leagueID=${league}&finalized=true&startsAfter=${startsAfter}` +
+          `&expandResults=true&limit=10${cursor ? `&cursor=${cursor}` : ""}&apiKey=${SGO_KEY}`;
+        const res = await fetch(url);
+        if (!res.ok) break;   // this league only; keep settling the others
+        const json = await res.json();
+        for (const ev of json.data ?? []) {
+          finals.set(ev.eventID, { odds: ev.odds ?? {}, game: ev.results?.game ?? {} });
+        }
+        cursor = json.nextCursor || "";
+        if (!cursor) break;
       }
-      cursor = json.nextCursor || "";
-      if (!cursor) break;
     }
 
     let settledMarkets = 0;
