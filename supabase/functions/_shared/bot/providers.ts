@@ -321,6 +321,27 @@ export class EspnProvider implements SportsDataProvider {
       .map((p) => normalizeEspnPlay(p, game))
       .filter((e): e is PlayEvent => e !== null);
 
+    // Sort chronologically. NOTHING guaranteed this before, and two things
+    // depend on it:
+    //   1. The score-delta loop below reads "consecutive chronological plays"
+    //      to work out who scored. Out of order, the deltas go negative and
+    //      the run is attributed to the wrong side or dropped entirely.
+    //   2. Emission order becomes message order in the room. Unsorted, a
+    //      first-inning RBI posted AFTER a fourth-inning blowout line, so the
+    //      chat read backwards — seen in production 2026-08-07.
+    // ESPN play ids increase with play order, so they are the tie-break when
+    // wallclock is missing (it falls back to game.startTime for every play).
+    const playSeq = (e: PlayEvent) => {
+      const n = Number(String(e.providerId).replace(/\D/g, ""));
+      return Number.isFinite(n) ? n : 0;
+    };
+    events.sort((a, b) => {
+      const ta = Date.parse(a.occurredAt) || 0;
+      const tb = Date.parse(b.occurredAt) || 0;
+      if (ta !== tb) return ta - tb;
+      return playSeq(a) - playSeq(b);
+    });
+
     // MLB/NHL: ESPN omits `scoreValue`, so normalizeEspnPlay can't tell which
     // plays scored. Derive runs/goals from the cumulative score CHANGING
     // between consecutive chronological plays. Without this every baseball
