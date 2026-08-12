@@ -483,9 +483,18 @@ Deno.serve(async (req) => {
           // scored", "San Diego wins by over 3.5 runs"); the bare title drops
           // it ("Milwaukee vs San Diego Total Runs?"), which would show a card
           // with no number on it.
+          // Kalshi truncates team names in subtitles ("Los Angeles D wins by
+          // over 1.5 runs", "New York M", "Chicago C") and those were landing
+          // verbatim in the card title and the post-game summary. We already
+          // resolved the real team, so put its name back.
+          let sideText = side;
+          if (team && sideText) {
+            sideText = sideText.replace(/^.+?(?=\s+wins by\s)/i, team.name);
+          }
+
           const question = isGameSeries
             ? `Will the ${team ? team.name : side} win?`
-            : (strike != null && side ? side : (m.title || m.subtitle || m.ticker));
+            : (strike != null && sideText ? sideText : (m.title || m.subtitle || m.ticker));
 
           // One Kalshi market can produce a row per room for game-level types.
           // kalshi_ticker is the conflict key, so each row needs its own —

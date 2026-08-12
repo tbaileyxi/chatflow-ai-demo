@@ -184,9 +184,16 @@ Deno.serve(async (req) => {
           return `${emoji} ${m.question} → ${m.resolution}`;
         }).join('\n');
 
-        let summary = `🏀 **Post-Game Summary**\n\n${resolvedList}\n\n`;
-        summary += `**Huddle Performance:**\n`;
-        summary += `• ${correctBets} correct / ${totalBets} total (${accuracy}%)\n`;
+        let summary = `🏁 **Post-Game Summary**\n\n${resolvedList}\n`;
+
+        // Only talk about the huddle's record if the huddle actually played.
+        // With zero picks this printed "0 correct / 0 total (0%)" and then
+        // "Kalshi was 100% more accurate this time", which is both meaningless
+        // and faintly insulting to a room that never bet.
+        if (totalBets > 0) {
+          summary += `\n**Huddle Performance:**\n`;
+          summary += `• ${correctBets} correct / ${totalBets} total (${accuracy}%)\n`;
+        }
 
         if (topPredictor && topPredictor.wins > 0) {
           const name = userNames.get(topPredictor.userId) || 'User';
@@ -198,12 +205,15 @@ Deno.serve(async (req) => {
           summary += `• 💰 Biggest win: ${name} (+${biggestWin.profit}¢)\n`;
         }
 
-        if (accuracyDiff > 0) {
-          summary += `\n🔥 Our huddle beat Kalshi by ${accuracyDiff}%!`;
-        } else if (accuracyDiff < 0) {
-          summary += `\n📊 Kalshi was ${Math.abs(accuracyDiff)}% more accurate this time.`;
-        } else {
-          summary += `\n📊 We matched Kalshi's accuracy!`;
+        // A comparison needs something to compare. No picks, no verdict.
+        if (totalBets > 0) {
+          if (accuracyDiff > 0) {
+            summary += `\n🔥 Our huddle beat Kalshi by ${accuracyDiff}%!`;
+          } else if (accuracyDiff < 0) {
+            summary += `\n📊 Kalshi was ${Math.abs(accuracyDiff)}% more accurate this time.`;
+          } else {
+            summary += `\n📊 We matched Kalshi's accuracy!`;
+          }
         }
 
         // Get or create system user for bot messages
