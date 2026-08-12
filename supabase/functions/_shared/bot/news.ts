@@ -20,7 +20,7 @@ export interface RssEntry {
 }
 
 export interface ScoredEntry extends RssEntry {
-  category: "HIGH" | "MED" | "LOW" | "DROP";
+  category: "HIGH" | "POP" | "MED" | "LOW" | "DROP";
   llmScore: number | null;  // null when bypassed
   finalScore: number;       // 0..100, used to rank
   breaking: boolean;
@@ -62,16 +62,43 @@ const RETAIL_DROP = [
   "memorabilia", "adult sizes", "youth sizes", "gift guide",
 ];
 
-export function categoryGate(title: string): "HIGH" | "MED" | "LOW" | "DROP" {
+// The stuff that actually travels. A uniform reveal, a viral clip, a tunnel
+// walk — none of it contains "trade" or "injury", so it scored MED (50) and
+// died under the 55 threshold, while the drop list explicitly killed "gallery"
+// and "slideshow", which is the exact shape visual content arrives in. The
+// pipeline was tuned to reject the only news anyone forwards.
+const POP = [
+  "uniform", "uniforms", "jersey reveal", "throwback", "helmet", "alternate",
+  "viral", "goes viral", "reaction", "mic'd up", "miked up", "hype video",
+  "trailer", "tunnel", "celebration", "walkout", "entrance", "crowd",
+  "student section", "tradition", "rivalry week", "trophy", "mascot",
+  "goes off", "breaks the internet", "insane", "unreal", "must see",
+  // Recruiting is the other thing fans follow daily and it rarely uses the
+  // hard-news verbs. "commit" is already HIGH; everything before the commit —
+  // the offer, the visit, the rankings chatter — was scoring MED and dying.
+  "recruit", "recruiting", "five-star", "5-star", "four-star", "4-star",
+  "offer", "offers", "official visit", "decommit", "flips", "transfer portal",
+  "signing day", "top target", "prospect",
+];
+
+export function categoryGate(title: string): "HIGH" | "POP" | "MED" | "LOW" | "DROP" {
   const t = title.toLowerCase();
-  for (const k of LOW_DROP) {
-    if (t.includes(k)) return "DROP";
-  }
+  // Ads are always out — a shopping listing is never news.
   for (const k of RETAIL_DROP) {
     if (t.includes(k)) return "DROP";
   }
+  // Hard news first: a signing is a signing even if it mentions a jersey.
   for (const k of HIGH) {
     if (t.includes(k)) return "HIGH";
+  }
+  // POP is checked BEFORE the low-value list on purpose. "Photo gallery: the
+  // new alternates" is exactly the post fans share, and the old order dropped
+  // it on the word "gallery" before anything else got a look.
+  for (const k of POP) {
+    if (t.includes(k)) return "POP";
+  }
+  for (const k of LOW_DROP) {
+    if (t.includes(k)) return "DROP";
   }
   return "MED";
 }
@@ -147,7 +174,7 @@ export async function scoreEntries(
     const clusterSize = await computeCluster(client, teamId, e.title);
 
     // Cheap signals: HIGH category OR cluster_size >= 3 bypass the LLM judge.
-    const bypassJudge = category === "HIGH" || clusterSize >= 3;
+    const bypassJudge = category === "HIGH" || category === "POP" || clusterSize >= 3;
     let llmScore: number | null = null;
     let breaking = false;
     if (!bypassJudge) {
@@ -177,8 +204,9 @@ function computeFinalScore(
   clusterSize: number,
   llmScore: number | null,
 ): number {
-  // Base by category.
-  let s = category === "HIGH" ? 85 : category === "MED" ? 50 : 25;
+  // Base by category. POP sits just above the 55 threshold so a viral post
+  // survives on its own, but below HIGH so a trade still outranks a uniform.
+  let s = category === "HIGH" ? 85 : category === "POP" ? 70 : category === "MED" ? 50 : 25;
   // Cluster boost — caps quickly so we don't double-count a swarm.
   s += Math.min(15, (clusterSize - 1) * 5);
   // Blend in judge score when available.
