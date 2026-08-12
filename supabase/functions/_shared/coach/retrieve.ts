@@ -58,6 +58,13 @@ export interface GameSnapshot {
   startTime: string;
 }
 
+export interface BoxScore {
+  /** "New York Yankees: 7 R, 11 H, 0 E" — one line per side, pre-formatted. */
+  teamLines: string[];
+  /** "Judge 2-4, HR, 3 RBI" — best performer per side. */
+  leaderLines: string[];
+}
+
 export interface HuddleContext {
   huddleId: string;
   huddleName: string;
@@ -281,6 +288,86 @@ async function resolveTeamNames(
 }
 
 /**
+ * Team totals and top performers for the team's current-or-most-recent game.
+ *
+ * This is what makes "how many hits do the Yankees have" answerable. It reads
+ * the SAME ESPN summary payload bot-live-poller already pulls for play-by-play,
+ * so there is no new vendor, no new key, and during a live game the response is
+ * usually already warm.
+ *
+ * Every number is copied verbatim out of the response — the model is never
+ * asked to add anything up.
+ */
+export async function getBoxScore(
+  supabase: SupabaseClient,
+  teamId: string,
+  league: string | null,
+): Promise<BoxScore | null> {
+  if (!league) return null;
+  const p = leaguePath(league);
+  if (!p) return null;
+
+  const { data: game } = await supabase
+    .from("games")
+    .select("odds_game_id, status, start_time")
+    .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+    .in("status", ["live", "in_progress", "halftime", "final"])
+    .order("start_time", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!game?.odds_game_id) return null;
+
+  // odds_game_id is "espn-{sport}-{id}". Match the trailing digits rather than
+  // stripping a prefix — "college-football" contains a hyphen, so a
+  // /^espn-[a-z]+-/ strip leaves "football-401872926" behind.
+  const idMatch = /(\d+)$/.exec(String(game.odds_game_id));
+  if (!idMatch) return null;
+
+  try {
+    const res = await fetch(
+      `${ESPN_BASE}/${p.sport}/${p.league}/summary?event=${idMatch[1]}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+
+    const teamLines: string[] = [];
+    for (const t of (data?.boxscore?.teams ?? []) as Record<string, unknown>[]) {
+      const team = t.team as Record<string, unknown> | undefined;
+      const name = String(team?.displayName ?? team?.name ?? "").trim();
+      if (!name) continue;
+      const stats = (t.statistics ?? []) as Record<string, unknown>[];
+      const parts = stats
+        .map((s) => {
+          const label = String(s.abbreviation ?? s.label ?? s.name ?? "").trim();
+          const val = String(s.displayValue ?? s.value ?? "").trim();
+          return label && val ? `${val} ${label}` : "";
+        })
+        .filter(Boolean)
+        .slice(0, 8);
+      if (parts.length > 0) teamLines.push(`${name}: ${parts.join(", ")}`);
+    }
+
+    const leaderLines: string[] = [];
+    for (const t of (data?.leaders ?? []) as Record<string, unknown>[]) {
+      const team = t.team as Record<string, unknown> | undefined;
+      const name = String(team?.displayName ?? "").trim();
+      const cats = (t.leaders ?? []) as Record<string, unknown>[];
+      const top = (cats[0]?.leaders as Record<string, unknown>[] | undefined)?.[0];
+      const who = (top?.athlete as Record<string, unknown> | undefined)?.displayName;
+      const val = top?.displayValue;
+      if (name && who && val) leaderLines.push(`${name}: ${who} — ${val}`);
+    }
+
+    if (teamLines.length === 0 && leaderLines.length === 0) return null;
+    return { teamLines, leaderLines };
+  } catch (err) {
+    console.warn("[coach.retrieve] boxscore unavailable", err);
+    return null;
+  }
+}
+
+/**
  * Season W-L computed from our own `games` rows.
  *
  * Deliberately NOT scraped from anywhere: we already store every final score
@@ -315,6 +402,91 @@ export async function getTeamRecord(
     else if (us < them) losses++;
   }
   return wins + losses > 0 ? { wins, losses } : null;
+}
+
+/**
+ * The next scheduled game, always — regardless of what just happened.
+ *
+ * Separate from getGameSnapshot on purpose. That one answers "what's the state
+ * of things" and prioritises live > just-finished > upcoming, which means an
+ * hour after a final it would answer "when do we play next?" with the game that
+ * just ended. "What time is the next game" is one of the two questions people
+ * will actually ask most, so it gets its own query.
+ */
+export async function getNextGame(
+  supabase: SupabaseClient,
+  teamId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("games")
+    .select("start_time, home_team_id, away_team_id")
+    .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+    .eq("status", "scheduled")
+    .gt("start_time", new Date().toISOString())
+    .order("start_time", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!data) return null;
+
+  const names = await resolveTeamNames(supabase, [data.home_team_id, data.away_team_id]);
+  const home = names.get(data.home_team_id) ?? "Home";
+  const away = names.get(data.away_team_id) ?? "Away";
+  const isHome = data.home_team_id === teamId;
+  const opponent = isHome ? away : home;
+
+  // ISO timestamp is included verbatim so the model never does timezone math —
+  // it states the date/time it is given and nothing else.
+  const when = new Date(data.start_time).toLocaleString("en-US", {
+    weekday: "long", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit", timeZoneName: "short",
+    timeZone: "America/New_York",
+  });
+  return `${isHome ? "vs" : "at"} ${opponent} — ${when} (ET)`;
+}
+
+/**
+ * Every final result this season, as pre-formatted lines.
+ *
+ * This is the grounding for trivia. General franchise-history trivia has no
+ * source here and the model must not invent it — a wrong trivia answer is
+ * caught instantly by the exact people in the room, which is the same
+ * credibility hit as a wrong roster. What IS defensible is trivia built from
+ * this season's real results plus the room's own ledger, and that version is
+ * differentiated: nobody else can generate it.
+ */
+export async function getSeasonResults(
+  supabase: SupabaseClient,
+  teamId: string,
+  limit = 30,
+): Promise<string[]> {
+  const seasonStart = new Date();
+  seasonStart.setMonth(seasonStart.getMonth() - 10);
+
+  const { data } = await supabase
+    .from("games")
+    .select("home_team_id, away_team_id, home_score, away_score, start_time")
+    .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+    .eq("status", "final")
+    .gte("start_time", seasonStart.toISOString())
+    .order("start_time", { ascending: false })
+    .limit(limit);
+  if (!data || data.length === 0) return [];
+
+  const names = await resolveTeamNames(
+    supabase,
+    data.flatMap((g) => [g.home_team_id, g.away_team_id]),
+  );
+
+  return data
+    .filter((g) => g.home_score != null && g.away_score != null)
+    .map((g) => {
+      const date = new Date(g.start_time).toLocaleDateString("en-US", {
+        month: "short", day: "numeric",
+      });
+      const home = names.get(g.home_team_id) ?? "Home";
+      const away = names.get(g.away_team_id) ?? "Away";
+      return `${date}: ${away} ${g.away_score} at ${home} ${g.home_score}`;
+    });
 }
 
 /**

@@ -8,6 +8,7 @@
 
 import { callLlm } from "../llm.ts";
 import type {
+  BoxScore,
   GameBeat,
   GameSnapshot,
   HuddleContext,
@@ -20,22 +21,24 @@ import type {
 // ---------------------------------------------------------------------------
 
 export type Lane =
-  | "room"        // what was said in here
-  | "ledger"      // who's up/down, records, head-to-head
-  | "game"        // score, plays, schedule, standings
-  | "mixed"       // recap-shaped: needs both room and game
-  | "unsupported"; // roster, player bios, nationality — no grounding exists
+  | "room"       // what was said in here
+  | "ledger"     // who's up/down, records, head-to-head
+  | "game"       // score, box score, schedule, record, standings — VOLATILE, data only
+  | "knowledge"  // franchise/school history, traditions, rivalries — STABLE, model may answer
+  | "mixed";     // recap-shaped: needs both room and game
 
 const ROUTE_SYSTEM =
   `You classify one question asked inside a sports group chat. Reply with ONE word, nothing else.
 
 room        - about what people in the chat said or did. "what did I miss", "what'd Brett say", "where are we meeting"
 ledger      - about the group's picks, records, chips, or who is winning/losing between members
-game        - about the actual game or team: score, plays, schedule, record, standings, who won
-mixed       - a broad catch-up that needs both the chat and the game
-unsupported - needs a roster, player biography, nationality, height/weight, contract, or a full player list
+game      - anything about the CURRENT state of the team or a game: score, box score, stats this game, next game, schedule, this season's record, standings, injuries, who is playing now, current roster
+knowledge - settled history that does not change: past championships, famous games, rivalries, traditions, the stadium, records set years ago, trivia about the franchise or school
+mixed     - a broad catch-up that needs both the chat and the game. "what did I miss", "catch me up", "what happened"
 
-Reply with exactly one of: room, ledger, game, mixed, unsupported`;
+When a question could be either, prefer "game" — being wrong about something current is far more costly than looking up something historical.
+
+Reply with exactly one of: room, ledger, game, knowledge, mixed`;
 
 export async function routeQuestion(question: string): Promise<Lane> {
   try {
@@ -45,7 +48,7 @@ export async function routeQuestion(question: string): Promise<Lane> {
       user: question.slice(0, 500),
     });
     const raw = res.text.toLowerCase().replace(/[^a-z]/g, "");
-    if (["room", "ledger", "game", "mixed", "unsupported"].includes(raw)) {
+    if (["room", "ledger", "game", "knowledge", "mixed"].includes(raw)) {
       return raw as Lane;
     }
   } catch (err) {
@@ -70,8 +73,9 @@ WHOSE SIDE YOU ARE ON
 - Opponents get named. Never "we" for them.
 
 HARD RULES — breaking these ruins the product:
-- Everything you say must come from the FACTS block. If a fact is not in there, you do not know it. No exceptions.
-- NEVER invent a name, number, score, date, venue, or quote.
+- ANYTHING CURRENT COMES FROM THE FACTS BLOCK. Scores, this season's record, standings, schedules, who is on the roster right now, who is starting, who is hurt, stats from a game in progress. If it is not in the FACTS, you do not know it — say what you do have instead. You are talking to people who are watching; being confidently wrong about today is the one thing you never recover from.
+- NEVER invent or guess a name, number, score, date, venue, or quote about anything current.
+- NEVER repeat a number from the chat as if you verified it.
 - NEVER mention "the facts", "the payload", "context", "the data", or that anything is missing or thin. Stay in character.
 - No profanity, no slurs, no insults toward players, fans, or rival teams. Sports-bar smart, not Twitter-troll.
 - No hashtags. At most one emoji, only if it genuinely fits.
@@ -115,7 +119,25 @@ function ledgerBlock(rows: LedgerRow[]): string {
     ).join("\n");
 }
 
-function gameBlock(g: GameSnapshot | null, record: { wins: number; losses: number } | null, standings: string | null): string {
+function boxScoreBlock(b: BoxScore | null): string {
+  if (!b) return "BOX SCORE: (not available for this game)";
+  const parts: string[] = [];
+  if (b.teamLines.length > 0) {
+    parts.push("TEAM TOTALS (copy these numbers exactly):\n" +
+      b.teamLines.map((l) => `- ${l}`).join("\n"));
+  }
+  if (b.leaderLines.length > 0) {
+    parts.push("TOP PERFORMERS:\n" + b.leaderLines.map((l) => `- ${l}`).join("\n"));
+  }
+  return parts.join("\n");
+}
+
+function gameBlock(
+  g: GameSnapshot | null,
+  record: { wins: number; losses: number } | null,
+  standings: string | null,
+  nextGame?: string | null,
+): string {
   const parts: string[] = [];
   if (g) {
     const score = g.homeScore != null && g.awayScore != null
@@ -131,7 +153,30 @@ function gameBlock(g: GameSnapshot | null, record: { wins: number; losses: numbe
   }
   if (record) parts.push(`SEASON RECORD: ${record.wins}-${record.losses}`);
   if (standings) parts.push(`STANDINGS: ${standings}`);
+  if (nextGame) parts.push(`NEXT GAME: ${nextGame}`);
   return parts.length > 0 ? parts.join("\n") : "GAME: (no game data available)";
+}
+
+// ---------------------------------------------------------------------------
+// Recap-shaped questions get the recap FORMAT.
+// ---------------------------------------------------------------------------
+
+/**
+ * "@coach what did I miss" and the recap the Coach posts on its own are the
+ * same question. They should not produce differently-shaped answers just
+ * because one arrived through a cron and the other through a mention — a user
+ * who sees the two-lane postgame post and then asks for it by name should get
+ * the same thing back.
+ *
+ * Checked on the question TEXT rather than on lane === "mixed" alone, because
+ * `mixed` is also where routing failures land, and a mis-routed "how many hits"
+ * should still get a direct answer rather than a game-and-room recap.
+ */
+const RECAP_SHAPED =
+  /\b(what(?:'?s| did| have)?\s+(?:i|we)?\s*miss|catch me up|catch us up|fill me in|what happened|whats been going on|what'?s been going on|recap|summar(?:y|ise|ize))\b/i;
+
+export function isRecapQuestion(question: string): boolean {
+  return RECAP_SHAPED.test(question);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,44 +195,61 @@ export interface AnswerInput {
   game: GameSnapshot | null;
   record: { wins: number; losses: number } | null;
   standings: string | null;
-}
-
-/**
- * The refusal for questions we have no grounding for.
- *
- * Written to keep the Coach's edges VISIBLE rather than pretending. A bot that
- * says "I've got the box score and what's been said in here, not the roster" is
- * more trustworthy than one that confidently lists seven names, three of them
- * wrong, to a room full of people who would instantly know.
- */
-export function unsupportedReply(ctx: HuddleContext): string {
-  const team = ctx.teamName ?? "the team";
-  return `That one's outside what I've got. I'm working off the live game feed, ${team}'s news, and everything said in this room — no roster sheets or player bios. Ask me what happened in here or what's going on in the game and I'm all over it.`;
+  boxScore: BoxScore | null;
+  seasonResults: string[];
+  nextGame: string | null;
 }
 
 export async function answerQuestion(input: AnswerInput): Promise<string> {
   const { ctx, lane } = input;
-
-  if (lane === "unsupported") return unsupportedReply(ctx);
 
   const facts: string[] = [];
   if (lane === "room" || lane === "mixed") facts.push(transcriptBlock(input.transcript));
   if (lane === "ledger") {
     facts.push(ledgerBlock(input.ledger));
     // A ledger question in a live room usually wants the game as texture too.
-    facts.push(gameBlock(input.game, input.record, input.standings));
+    facts.push(gameBlock(input.game, input.record, input.standings, input.nextGame));
   }
-  if (lane === "game" || lane === "mixed") {
-    facts.push(gameBlock(input.game, input.record, input.standings));
+  if (lane === "game" || lane === "mixed" || lane === "knowledge") {
+    facts.push(gameBlock(input.game, input.record, input.standings, input.nextGame));
+    // The box score is what makes "how many hits do the Yankees have" work.
+    // Team totals come straight off the ESPN summary the live poller already
+    // fetches, pre-formatted, so the model reads a number rather than deriving
+    // one.
+    facts.push(boxScoreBlock(input.boxScore));
     facts.push(beatsBlock("GAME BEATS", input.gameBeats));
     facts.push(beatsBlock("TEAM NEWS", input.newsBeats));
   }
   if (lane === "mixed") facts.push(ledgerBlock(input.ledger));
+  if (lane === "game" || lane === "knowledge") {
+    // Even a history question often turns on something current ("are we better
+    // than the '99 team?"). Hand over this season's real results either way so
+    // the answer is anchored rather than recalled.
+    facts.push(
+      input.seasonResults.length > 0
+        ? "THIS SEASON'S RESULTS SO FAR:\n" + input.seasonResults.map((r) => `- ${r}`).join("\n")
+        : "THIS SEASON'S RESULTS: (none on record yet)",
+    );
+  }
+
+  // The stable/volatile split. A fan bot that cannot tell you the team lost four
+  // straight Super Bowls looks broken — the model knows that as well as anyone
+  // in the room, and it has not changed since 1994. What it must never do is
+  // answer from memory about anything that moves week to week.
+  const knowledgeRules = lane === "knowledge"
+    ? `
+ANSWERING FROM WHAT YOU KNOW:
+- This is a history question. You may answer it from your own knowledge of the team, the school, and the sport — championships, famous games and plays, rivalries, traditions, the stadium, coaches and players from past eras, records set in previous seasons.
+- Be a fan telling the story, not an encyclopedia. One or two sentences.
+- HARD LINE: do not answer from memory about anything that changes. The current roster, who starts, who is hurt, this season's record, where we sit in the standings, this week's schedule, a live score. If the question turns out to be about any of those, say you would rather pull it up than guess, and give whatever IS in the FACTS.
+- If you are genuinely unsure of a historical detail, say so plainly rather than picking a number. "I want to say it was the mid-90s but don't quote me" is a good answer. A confident wrong year is not.
+`
+    : "";
 
   const system = `${coachCharacter(ctx)}
 
 ${ATTRIBUTION_RULES}
-
+${knowledgeRules}
 ANSWERING:
 - Answer the question directly, in 1-4 sentences. No preamble, no "great question".
 - If the FACTS do not contain the answer, say plainly what you do have instead. Never guess and never pad.

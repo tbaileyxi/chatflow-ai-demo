@@ -13,15 +13,24 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
+  getBoxScore,
   getEspnStandings,
   getGameBeats,
   getGameSnapshot,
   getHuddleContext,
   getLedger,
+  getNextGame,
   getRoomTranscript,
+  getSeasonResults,
   getTeamRecord,
 } from "../_shared/coach/retrieve.ts";
-import { answerQuestion, routeQuestion, type Lane } from "../_shared/coach/answer.ts";
+import {
+  answerQuestion,
+  composeRecap,
+  isRecapQuestion,
+  routeQuestion,
+  type Lane,
+} from "../_shared/coach/answer.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -131,39 +140,74 @@ serve(async (req) => {
 
     const sinceIso = new Date(Date.now() - TRANSCRIPT_HOURS * 3600 * 1000).toISOString();
     const needsRoom = lane === "room" || lane === "mixed";
-    const needsGame = lane === "game" || lane === "mixed" || lane === "ledger";
+    // "knowledge" gets game context too. History questions constantly turn on
+    // something current ("are we better than the '90 team?"), and handing over
+    // the real numbers is what stops the model reaching for remembered ones.
+    const needsGame =
+      lane === "game" || lane === "mixed" || lane === "ledger" || lane === "knowledge";
+    const needsLedger = lane === "ledger" || lane === "mixed";
     const teamId = ctx.teamId;
 
-    const [transcript, gameBeats, newsBeats, ledger, game, record] = await Promise.all([
-      needsRoom ? getRoomTranscript(supabase, payload.huddle_id, sinceIso) : Promise.resolve([]),
-      needsGame && teamId ? getGameBeats(supabase, teamId, sinceIso, "in_game") : Promise.resolve([]),
-      needsGame && teamId ? getGameBeats(supabase, teamId, sinceIso, "news") : Promise.resolve([]),
-      lane === "ledger" || lane === "mixed"
-        ? getLedger(supabase, payload.huddle_id)
-        : Promise.resolve([]),
-      needsGame && teamId ? getGameSnapshot(supabase, teamId) : Promise.resolve(null),
-      needsGame && teamId ? getTeamRecord(supabase, teamId) : Promise.resolve(null),
-    ]);
+    const [transcript, gameBeats, newsBeats, ledger, game, record, boxScore, seasonResults, nextGame] =
+      await Promise.all([
+        needsRoom ? getRoomTranscript(supabase, payload.huddle_id, sinceIso) : Promise.resolve([]),
+        needsGame && teamId ? getGameBeats(supabase, teamId, sinceIso, "in_game") : Promise.resolve([]),
+        needsGame && teamId ? getGameBeats(supabase, teamId, sinceIso, "news") : Promise.resolve([]),
+        needsLedger ? getLedger(supabase, payload.huddle_id) : Promise.resolve([]),
+        needsGame && teamId ? getGameSnapshot(supabase, teamId) : Promise.resolve(null),
+        needsGame && teamId ? getTeamRecord(supabase, teamId) : Promise.resolve(null),
+        // Box score answers "how many hits do the Yankees have". Best-effort —
+        // never let an ESPN hiccup fail the whole answer.
+        needsGame && teamId
+          ? getBoxScore(supabase, teamId, ctx.league).catch(() => null)
+          : Promise.resolve(null),
+        needsGame && teamId ? getSeasonResults(supabase, teamId) : Promise.resolve([]),
+        // "What time is the next game" is one of the two most likely questions
+        // in the whole product. It gets its own query rather than sharing the
+        // snapshot, which prefers a just-finished game over an upcoming one.
+        needsGame && teamId ? getNextGame(supabase, teamId) : Promise.resolve(null),
+      ]);
 
-    // Standings is best-effort and must never block or throw into the answer.
-    const standings = lane === "game"
+    // Standings: the OTHER most likely question. Try ESPN for table position,
+    // but our own W-L (getTeamRecord, computed from our games rows) is the
+    // reliable half and is always present. Best-effort, never throws.
+    const standings = needsGame
       ? await getEspnStandings(ctx.league, ctx.teamName).catch(() => null)
       : null;
 
     // --- 6. Answer -----------------------------------------------------------
-    const text = await answerQuestion({
-      ctx,
-      question,
-      asker,
-      lane,
-      transcript,
-      gameBeats,
-      newsBeats,
-      ledger,
-      game,
-      record,
-      standings,
-    });
+    // "what did I miss" asked out loud is the SAME question the proactive recap
+    // answers, so it gets the same two-lane shape. Without this the format
+    // depended on whether a cron or a human triggered it.
+    const wantsRecap = lane === "mixed" && isRecapQuestion(question);
+
+    const text = wantsRecap
+      ? (await composeRecap({
+          ctx,
+          kind: "daily",
+          transcript,
+          gameBeats,
+          newsBeats,
+          ledger,
+          game,
+          record,
+        })) ?? ""
+      : await answerQuestion({
+          ctx,
+          question,
+          asker,
+          lane,
+          transcript,
+          gameBeats,
+          newsBeats,
+          ledger,
+          game,
+          record,
+          standings,
+          boxScore,
+          seasonResults,
+          nextGame,
+        });
 
     if (!text.trim()) return json({ skipped: "empty answer" });
 
@@ -194,7 +238,7 @@ serve(async (req) => {
       huddle_id: payload.huddle_id,
       user_id: payload.user_id,
       question: question.slice(0, 500),
-      lane,
+      lane: wantsRecap ? "recap" : lane,
       answer_message_id: inserted?.id ?? null,
     });
 
