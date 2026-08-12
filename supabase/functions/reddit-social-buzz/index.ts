@@ -178,6 +178,30 @@ function meetsSpotlightQuality(post: RedditPost): boolean {
   const content = post.content.toLowerCase();
   const combined = title + ' ' + content;
   
+  // "Look at me, I'm at the game" filter.
+  //
+  // Media alone used to be an automatic pass, which is exactly how a fan's
+  // phone photo from their seat got the same treatment as a viral uniform
+  // reveal — both have an image. Reddit RSS exposes no score, so we cannot
+  // rank by upvotes; the top-of-day feed does that part. What is left is
+  // catching the personal posts that DO trend in small team subs.
+  const PERSONAL = [
+    'my seats', 'my seat', 'at the game', 'first game', 'my first',
+    'gameday fit', 'game day fit', 'my setup', 'my dog', 'my kid', 'my son',
+    'my daughter', 'my collection', 'my jersey', 'my ticket', 'my view',
+    'view from', 'section ', 'tailgate spot', 'cake', 'tattoo',
+    'i got', 'i met', 'i made', 'i found', 'look what', 'check out my',
+    'rate my', 'thoughts on my', 'birthday',
+  ];
+  if (PERSONAL.some((k) => combined.includes(k))) return false;
+
+  // Threads that are conversation, not content.
+  const THREADY = [
+    'game thread', 'post game thread', 'postgame thread', 'daily thread',
+    'free talk', 'off topic', 'weekly', 'mod post', 'megathread',
+  ];
+  if (THREADY.some((k) => combined.includes(k))) return false;
+
   // Priority 1: Has genuine media (image or video with thumbnail)
   const hasMedia = !!post.mediaUrl && (
     post.mediaUrl.includes('i.redd.it') ||
@@ -256,12 +280,31 @@ Deno.serve(async (req) => {
 
     console.log(`📡 Processing ${teamSubs.length} team subreddits...`);
 
+    // Batch, don't sweep. This looped every active team serially — one RSS
+    // fetch plus several DB round-trips each — and blew the 150s wall clock
+    // long before it posted anything, which is why the hourly cron produced
+    // zero Reddit content while appearing to run fine. bot-news-poller hit the
+    // same wall and fixed it the same way. Order is shuffled so no team starves.
+    const PER_RUN = Number(Deno.env.get('REDDIT_TEAMS_PER_RUN') || 8);
+    const shuffled = [...teamSubs].sort(() => Math.random() - 0.5).slice(0, PER_RUN);
+    console.log(`   -> handling ${shuffled.length} this run`);
+
     const results = [];
 
-    for (const teamSub of teamSubs) {
+    for (const teamSub of shuffled) {
       const teamId = teamSub.team_id;
       const teamName = teamSub.teams?.name || 'Team';
-      const rssUrl = teamSub.rss_url;
+      // Force Reddit's own top-of-day ranking. RSS carries no score field, so
+      // this is the ONLY engagement signal available to us — and it is the
+      // difference between a subreddit's best post and whatever someone
+      // uploaded ninety seconds ago from their seat.
+      // Rebuild from the subreddit name rather than patching the stored URL —
+      // chained replaces produced "/top/top/.rss" on feeds that already had a
+      // sort segment.
+      const subMatch = String(teamSub.rss_url || '').match(/reddit\.com\/r\/([A-Za-z0-9_]+)/i);
+      const rssUrl = subMatch
+        ? `https://www.reddit.com/r/${subMatch[1]}/top/.rss?t=day`
+        : String(teamSub.rss_url || '');
       
       console.log(`\n🏈 Processing: ${teamName} (r/${teamSub.subreddit_name})`);
 
