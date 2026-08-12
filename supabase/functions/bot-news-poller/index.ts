@@ -10,7 +10,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { fetchOgImage, isNewsQuietWindow, parseRss, scoreEntries } from "../_shared/bot/news.ts";
+import { fetchOgMeta, isNewsQuietWindow, parseRss, scoreEntries } from "../_shared/bot/news.ts";
 import { generateMessage, defaultPersona } from "../_shared/bot/voice.ts";
 import { newsCapRemaining, publish } from "../_shared/bot/publisher.ts";
 import { getProvider } from "../_shared/bot/providers.ts";
@@ -167,7 +167,18 @@ serve(async (req) => {
       // backlog we only need to consider the freshest slice. Anything older
       // we still record in seen_news below so we skip it next run.
       const SCORE_BATCH = Number(Deno.env.get("NEWS_SCORE_BATCH") || 25);
+      // Rank items that actually carry FACTS ahead of bare headlines.
+      // A Google News item is a title and a redirect — no body, no summary, and
+      // its opaque JS redirect exposes no OG tags either, so the bot can only
+      // re-tease the headline. Outlet feeds (SB Nation et al) ship a synopsis,
+      // and a direct link lets us read og:description. Same daily cap, but the
+      // sources that can support a real sentence fill it first.
+      const hasFacts = (e: { link: string; summary: string | null }) =>
+        (e.summary && e.summary.trim().length > 0) || !/news\.google\.com/i.test(e.link);
       const sorted = [...freshAll].sort((a, b) => {
+        const fa = hasFacts(a) ? 1 : 0;
+        const fb = hasFacts(b) ? 1 : 0;
+        if (fa !== fb) return fb - fa;
         const ta = a.publishedAt ? Date.parse(a.publishedAt) : 0;
         const tb = b.publishedAt ? Date.parse(b.publishedAt) : 0;
         return tb - ta;
@@ -254,6 +265,24 @@ serve(async (req) => {
         if (budget <= 0 && s.breaking) budget = 1; // breaking can take one over the cap
 
         try {
+          // Fetch the article's OG metadata BEFORE writing the message. This
+          // used to run afterwards, purely for the photo, which meant the
+          // article's own summary was never available to the model — so a feed
+          // that ships only a headline produced a re-teased headline
+          // ("Colorado is looking at an elite QB prospect", never naming him).
+          // One request now yields both the photo and the facts.
+          //
+          // Google News links are opaque JS redirects that expose no OG tags,
+          // so they are still skipped; for those the feed summary is all we
+          // have, and entries without one are ranked last (see ordering above).
+          let ogImage: string | undefined = s.imageUrl ?? undefined;
+          let ogSummary: string | undefined = s.summary ?? undefined;
+          if (!/news\.google\.com/i.test(s.link) && (!ogImage || !ogSummary)) {
+            const og = await fetchOgMeta(s.link);
+            if (!ogImage && og.image) ogImage = og.image;
+            if (!ogSummary && og.description) ogSummary = og.description;
+          }
+
           const persona = defaultPersona(bundle.teamName, bundle.league);
           const voice = await generateMessage({
             mode: "news",
@@ -266,7 +295,7 @@ serve(async (req) => {
               link: s.link,
               breaking: s.breaking,
               // Feed synopsis so the bot tells WHAT happened, not just the teaser.
-              summary: s.summary ?? undefined,
+              summary: ogSummary,
               // Anchors tense: old game recaps must read as past, not live.
               published_at: s.publishedAt ?? undefined,
               now: new Date().toISOString(),
@@ -304,10 +333,7 @@ serve(async (req) => {
           // (full-res, no fetch). Only scrape og:image as a fallback for DIRECT
           // article links — never for Google News, whose opaque redirect pages
           // expose nothing useful. Null → the post just stays text-only.
-          let imageUrl: string | undefined = s.imageUrl ?? undefined;
-          if (!imageUrl && !/news\.google\.com/i.test(s.link)) {
-            imageUrl = (await fetchOgImage(s.link)) ?? undefined;
-          }
+          const imageUrl: string | undefined = ogImage;
 
           const result = await publish({
             client: supabase,

@@ -42,6 +42,48 @@ const GAME_LEVEL_SERIES = new Set([
   'KXMLBTOTAL', 'KXNFLTOTAL', 'KXNCAAFTOTAL',
 ]);
 
+// Kalshi does not publish "the total" — it publishes a LADDER, one market per
+// strike (Over 4.5, 5.5, 7.5, 8.5, 10.5 …). Importing all of them put 34 cards
+// in one Mets room and averaged 21.7 per game. Keep exactly ONE line per game
+// per type: the one priced closest to 50c, because that is the line people will
+// actually argue about. An 87c/13c card is nobody's bet. The rest of the board
+// still exists in the DB for the Picks screen to browse.
+function kalshiCents(m: any): number {
+  const num = (s: unknown, n: unknown): number | undefined => {
+    if (typeof s === 'string' && parseFloat(s) > 0) return parseFloat(s) * 100;
+    if (typeof n === 'number' && n > 0) return n;
+    return undefined;
+  };
+  const ask = num(m.yes_ask_dollars, m.yes_ask);
+  const bid = num(m.yes_bid_dollars, m.yes_bid);
+  const last = num(m.last_price_dollars, m.last_price);
+  if (ask !== undefined && bid !== undefined) return (ask + bid) / 2;
+  return ask ?? bid ?? last ?? 50;
+}
+
+function pickOneLinePerGame(seriesTicker: string, markets: any[]): any[] {
+  const type = SERIES_MARKET_TYPE[seriesTicker];
+  // Only ladders need thinning. Winner markets are already one-per-side, and
+  // futures (championship winners) are one-per-team by design.
+  if (type !== 'total' && type !== 'spread') return markets;
+
+  const best = new Map<string, any>();
+  for (const m of markets) {
+    const game = String(m.event_ticker || m.ticker);
+    // Spreads ladder per TEAM as well as per strike ("SD wins by over 2.5",
+    // "SD wins by over 3.5"), so key on the side too or one team's whole
+    // ladder would knock out the other team's line entirely.
+    const key = type === 'spread'
+      ? `${game}|${String(m.yes_sub_title || '').replace(/[\d.]+/g, '').trim()}`
+      : game;
+    const prev = best.get(key);
+    if (!prev || Math.abs(kalshiCents(m) - 50) < Math.abs(kalshiCents(prev) - 50)) {
+      best.set(key, m);
+    }
+  }
+  return [...best.values()];
+}
+
 // Map series ticker -> our DB league value
 const TICKER_TO_LEAGUE: Record<string, string> = {
   KXNBA: 'NBA',
@@ -342,7 +384,8 @@ Deno.serve(async (req) => {
     for (const [_league, seriesTickers] of Object.entries(SPORT_SERIES)) {
       for (const seriesTicker of seriesTickers) {
         const league = TICKER_TO_LEAGUE[seriesTicker];
-        const markets = await fetchKalshiMarkets(seriesTicker);
+        const rawMarkets = await fetchKalshiMarkets(seriesTicker);
+        const markets = pickOneLinePerGame(seriesTicker, rawMarkets);
 
         for (const m of markets) {
           // Skip markets closing beyond 48 hours from now

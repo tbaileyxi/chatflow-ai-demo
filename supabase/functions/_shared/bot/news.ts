@@ -337,7 +337,17 @@ function hash16(s: string): string {
 // post. Defensive: 5s timeout, junk filter, never throws (returns null).
 // IRON RULE stays intact: we read one <meta> URL, never the article body.
 // ---------------------------------------------------------------
-export async function fetchOgImage(url: string): Promise<string | null> {
+// Returns the article's OG image AND description from a single request.
+//
+// The description matters as much as the photo: Google News RSS items carry a
+// headline and nothing else, so the bot has no facts to relay and can only
+// re-tease the headline ("Colorado is looking at an elite QB prospect" —
+// without ever naming him). That reads as clickbait because it literally is
+// the clickbait, rephrased. og:description is the article's own summary and
+// usually contains the name, number or detail the headline withholds.
+export async function fetchOgMeta(
+  url: string,
+): Promise<{ image: string | null; description: string | null }> {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 5000);
@@ -351,9 +361,9 @@ export async function fetchOgImage(url: string): Promise<string | null> {
       },
     });
     clearTimeout(timer);
-    if (!res.ok) return null;
+    if (!res.ok) return { image: null, description: null };
     const ct = res.headers.get("content-type") || "";
-    if (!ct.includes("html")) return null;
+    if (!ct.includes("html")) return { image: null, description: null };
     // Only need the <head>; cap the read so we never pull a huge page.
     const html = (await res.text()).slice(0, 200_000);
 
@@ -380,17 +390,37 @@ export async function fetchOgImage(url: string): Promise<string | null> {
       meta("og:image") ||
       meta("twitter:image") ||
       meta("twitter:image:src");
-    if (!img) return null;
 
-    img = img.replace(/&amp;/g, "&").trim();
-    if (!/^https:\/\//i.test(img)) return null;               // require https (RN image-safe)
-    if (/\.svg(\?|$)/i.test(img)) return null;                 // vector logos, not photos
-    // Drop obvious non-action assets: site chrome, default share images, avatars.
-    if (/logo|sprite|favicon|placeholder|default[-_]?(share|image)|avatar|1x1|spacer/i.test(img)) {
-      return null;
+    // The article's own summary. This is the payload that lets the bot state
+    // the actual news instead of re-teasing the headline.
+    let desc =
+      meta("og:description") ||
+      meta("twitter:description") ||
+      meta("description");
+    if (desc) {
+      desc = desc.replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim();
+      // Guard against a description that is just the headline echoed back, or
+      // a boilerplate site tagline — neither adds a fact.
+      if (desc.length < 40) desc = null;
     }
-    return img;
+
+    if (img) {
+      img = img.replace(/&amp;/g, "&").trim();
+      if (!/^https:\/\//i.test(img)) img = null;               // require https (RN image-safe)
+      else if (/\.svg(\?|$)/i.test(img)) img = null;            // vector logos, not photos
+      // Drop obvious non-action assets: site chrome, default share images, avatars.
+      else if (/logo|sprite|favicon|placeholder|default[-_]?(share|image)|avatar|1x1|spacer/i.test(img)) {
+        img = null;
+      }
+    }
+    return { image: img ?? null, description: desc ?? null };
   } catch {
-    return null; // offline / abort / parse fail — news still posts, just text-only
+    // offline / abort / parse fail — news still posts, just text-only
+    return { image: null, description: null };
   }
+}
+
+// Back-compat wrapper for callers that only want the photo.
+export async function fetchOgImage(url: string): Promise<string | null> {
+  return (await fetchOgMeta(url)).image;
 }
