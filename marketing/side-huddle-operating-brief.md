@@ -218,3 +218,10 @@ Neither is a code problem.
 SGO's naming convention, not confirmed against a live response. First successful
 run reports the real ones in `unknown_prop_stats`. College team-name matching
 against SGO's `names.long` is also unconfirmed — watch `skipped_no_tracked_team`.
+
+**2026-08-12 — market ladder pruned.** The Kalshi expansion imported every strike
+of every total/spread ladder (Over 4.5, 5.5, 7.5 …), leaving ~22 near-identical
+cards per game and 34 in one Mets room. `kalshi-sync-markets` now keeps only the
+line closest to 50c; a one-off `prune-ladder-markets` function deleted the 1,441
+rows already written (120 kept, 0 had a fade against them, verified with the
+service role). Result: totals 1.0 card/game, spreads 2.0 (one per side).
