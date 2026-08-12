@@ -19,6 +19,8 @@ type MediaAttachment = {
   type: "image" | "audio";
 };
 
+export type Mentionable = { key: string; label: string; sublabel?: string };
+
 type Props = {
   onSend: (
     content: string,
@@ -30,7 +32,31 @@ type Props = {
   onCancelReply?: () => void;
   onFocus?: () => void;
   onTypingChange?: (isTyping: boolean) => void;
+  /** Room members, for the @ autocomplete. Coach is pinned above these. */
+  mentionables?: Mentionable[];
 };
+
+// The Coach is always first in the @ list. This is the whole entry point for
+// the answerable Coach: there is no room in the composer for another icon
+// (camera, image, mic, input, send already fills the row) and no room in the
+// header (back, logo, title, invite, overflow). A mention costs zero pixels
+// until you type "@".
+const COACH_MENTION: Mentionable = {
+  key: "coach",
+  label: "coach",
+  sublabel: "ask about the game or this chat",
+};
+
+/**
+ * Find an in-progress @mention at the caret.
+ *
+ * Only matches at a word boundary so an email address or a mid-word @ doesn't
+ * pop the sheet.
+ */
+function activeMentionQuery(text: string): string | null {
+  const m = /(?:^|\s)@([\w-]*)$/.exec(text);
+  return m ? m[1] : null;
+}
 
 export function MessageInput({
   onSend,
@@ -39,6 +65,7 @@ export function MessageInput({
   onCancelReply,
   onFocus,
   onTypingChange,
+  mentionables = [],
 }: Props) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -197,6 +224,26 @@ export function MessageInput({
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
+  // @ autocomplete. Recomputed on render from `text` so there is no extra
+  // state to keep in sync with the input.
+  const mentionQuery = activeMentionQuery(text);
+  const suggestions =
+    mentionQuery === null
+      ? []
+      : [COACH_MENTION, ...mentionables]
+          .filter((m) =>
+            mentionQuery === "" ||
+            m.label.toLowerCase().startsWith(mentionQuery.toLowerCase()),
+          )
+          .slice(0, 5);
+
+  const applyMention = (m: Mentionable) => {
+    // Replace the partial "@foo" at the caret with the full handle.
+    const next = text.replace(/(^|\s)@[\w-]*$/, `$1@${m.label} `);
+    setText(next);
+    onTypingChange?.(next.trim().length > 0);
+  };
+
   const canSend = (text.trim() || media) && !sending && !disabled;
 
   return (
@@ -302,6 +349,47 @@ export function MessageInput({
           </Pressable>
         </View>
       ) : (
+        <>
+          {/* @ autocomplete — collapses to nothing when not mentioning, so it
+              costs no permanent chrome. */}
+          {suggestions.length > 0 && (
+            <View className="border-t border-border bg-card">
+              {suggestions.map((m) => (
+                <Pressable
+                  key={m.key}
+                  onPress={() => applyMention(m)}
+                  className="flex-row items-center gap-3 px-4 py-2.5 active:bg-muted"
+                >
+                  <View
+                    className="h-7 w-7 items-center justify-center rounded-full"
+                    style={{
+                      backgroundColor:
+                        m.key === "coach" ? colors.primary : colors.muted,
+                    }}
+                  >
+                    <Text
+                      className="text-xs font-bold"
+                      style={{
+                        color:
+                          m.key === "coach"
+                            ? colors.primaryForeground
+                            : colors.mutedForeground,
+                      }}
+                    >
+                      {m.key === "coach" ? "SH" : m.label.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text className="font-semibold text-foreground">@{m.label}</Text>
+                  {m.sublabel ? (
+                    <Text className="flex-1 text-xs text-muted-foreground" numberOfLines={1}>
+                      {m.sublabel}
+                    </Text>
+                  ) : null}
+                </Pressable>
+              ))}
+            </View>
+          )}
+
         <View className="flex-row items-end gap-1.5 px-3 py-3">
           {/* Media action icons */}
           <Pressable
@@ -356,6 +444,7 @@ export function MessageInput({
             <Send color={colors.primaryForeground} size={18} />
           </Pressable>
         </View>
+        </>
       )}
     </View>
   );

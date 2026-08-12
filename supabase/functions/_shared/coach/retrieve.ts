@@ -1,0 +1,446 @@
+// Coach retrieval layer.
+//
+// THE IRON RULE STILL HOLDS: the model is a MOUTH, never EYES. What changed is
+// who assembles the facts. The bot engine assembles them from a play gater;
+// this module assembles them from our own database and the sports APIs we
+// already call. The model still cannot search, cannot recall, and cannot say
+// anything that is not in the payload it is handed.
+//
+// Three tiers of grounding, in descending order of trust:
+//   1. OUR DATABASE   — chat, ledgers, members, the bot's own emitted lines.
+//                       Unique to us. Nobody else can answer from this.
+//   2. SPORTS APIS    — scores, schedule, records. Structured, already wired.
+//   3. (deliberately absent) open web / model memory. Rosters, player bios,
+//      nationalities. No grounding exists, so the Coach must decline instead
+//      of inventing. See answer.ts REFUSALS.
+
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports";
+
+// ---------------------------------------------------------------------------
+// Types — these ARE the payload contract. If a field isn't here, the model
+// cannot reference it.
+// ---------------------------------------------------------------------------
+
+export interface TranscriptLine {
+  /** 1-based index. The model cites these so we can verify attribution. */
+  n: number;
+  id: string;
+  speaker: string;
+  text: string;
+  at: string;
+  isBot: boolean;
+}
+
+export interface GameBeat {
+  at: string;
+  text: string;
+  excitement: number | null;
+}
+
+export interface LedgerRow {
+  name: string;
+  wins: number;
+  losses: number;
+  net: number;
+  streak: number;
+}
+
+export interface GameSnapshot {
+  state: "live" | "postgame" | "pregame" | "none";
+  home: string;
+  away: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  period: string | null;
+  clock: string | null;
+  startTime: string;
+}
+
+export interface HuddleContext {
+  huddleId: string;
+  huddleName: string;
+  teamId: string | null;
+  teamName: string | null;
+  league: string | null;
+  memberCount: number;
+}
+
+// ---------------------------------------------------------------------------
+// 1. The room — what people actually said.
+// ---------------------------------------------------------------------------
+
+/**
+ * Pull the room's recent conversation, oldest-first, numbered for citation.
+ *
+ * Bot messages are included and flagged. That matters: in a quiet room the
+ * bot's own news posts ARE the history, and "what did I miss" recapping team
+ * news for someone who just joined is a real answer, not a fallback.
+ */
+export async function getRoomTranscript(
+  supabase: SupabaseClient,
+  huddleId: string,
+  sinceIso: string,
+  limit = 250,
+): Promise<TranscriptLine[]> {
+  const { data, error } = await supabase
+    .from("huddle_messages")
+    .select("id, user_id, content, created_at, is_bot_message, message_type")
+    .eq("huddle_id", huddleId)
+    .gte("created_at", sinceIso)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error || !data) {
+    console.warn("[coach.retrieve] transcript failed", error);
+    return [];
+  }
+
+  const humanIds = [...new Set(
+    data.filter((m) => !m.is_bot_message).map((m) => m.user_id),
+  )];
+  const names = await resolveNames(supabase, humanIds);
+
+  // Back to chronological for the model — a recap that reads backwards is
+  // worse than no recap.
+  return data
+    .reverse()
+    .filter((m) => (m.content ?? "").trim().length > 0)
+    .map((m, i) => ({
+      n: i + 1,
+      id: m.id,
+      speaker: m.is_bot_message ? "Coach" : (names.get(m.user_id) ?? "Someone"),
+      text: String(m.content).slice(0, 500),
+      at: m.created_at,
+      isBot: !!m.is_bot_message,
+    }));
+}
+
+async function resolveNames(
+  supabase: SupabaseClient,
+  userIds: string[],
+): Promise<Map<string, string>> {
+  if (userIds.length === 0) return new Map();
+  const { data } = await supabase
+    .from("profiles")
+    .select("user_id, display_name, username")
+    .in("user_id", userIds);
+  return new Map(
+    (data ?? []).map((p: Record<string, string>) => [
+      p.user_id,
+      p.display_name || p.username || "Someone",
+    ]),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 2. The game — what the Coach already said about it.
+// ---------------------------------------------------------------------------
+
+/**
+ * The Coach's own emitted in-game lines, from bot_emit_log.
+ *
+ * This is the answer to "does it actually watch the game?" — bot-live-poller
+ * reads ESPN's play-by-play every 60s, gates plays on excitement, and logs
+ * every line it emits along with the structured facts behind it. So the game
+ * half of a recap is a SELECT against work already done, not a second
+ * integration and not a second pass over the play feed.
+ */
+export async function getGameBeats(
+  supabase: SupabaseClient,
+  teamId: string,
+  sinceIso: string,
+  mode: "in_game" | "news" = "in_game",
+  limit = 40,
+): Promise<GameBeat[]> {
+  const { data, error } = await supabase
+    .from("bot_emit_log")
+    .select("message_text, excitement_score, created_at")
+    .eq("team_id", teamId)
+    .eq("mode", mode)
+    .gte("created_at", sinceIso)
+    .order("created_at", { ascending: true })
+    .limit(limit);
+
+  if (error || !data) {
+    console.warn("[coach.retrieve] beats failed", error);
+    return [];
+  }
+  return data.map((r) => ({
+    at: r.created_at,
+    text: r.message_text,
+    excitement: r.excitement_score ?? null,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// 3. The ledger — who's actually winning in this room.
+// ---------------------------------------------------------------------------
+
+/**
+ * Season standings for THIS huddle only.
+ *
+ * Scoped hard to one huddle on purpose. The Coach must never surface another
+ * room's ledger, and "who's the worst bettor" is only a fair question about
+ * the people in the room being asked.
+ *
+ * Sorted worst-first is deliberate — the funny question is the common one.
+ */
+export async function getLedger(
+  supabase: SupabaseClient,
+  huddleId: string,
+): Promise<LedgerRow[]> {
+  const { data, error } = await supabase
+    .from("fade_season_stats")
+    .select("user_id, total_points, total_wins, total_losses, current_streak")
+    .eq("huddle_id", huddleId);
+
+  if (error || !data || data.length === 0) return [];
+
+  const names = await resolveNames(supabase, data.map((r) => r.user_id));
+  return data
+    .map((r) => ({
+      name: names.get(r.user_id) ?? "A member",
+      wins: r.total_wins ?? 0,
+      losses: r.total_losses ?? 0,
+      net: r.total_points ?? 0,
+      streak: r.current_streak ?? 0,
+    }))
+    .sort((a, b) => a.net - b.net);
+}
+
+// ---------------------------------------------------------------------------
+// 4. The scoreboard — from our own games table.
+// ---------------------------------------------------------------------------
+
+export async function getGameSnapshot(
+  supabase: SupabaseClient,
+  teamId: string,
+): Promise<GameSnapshot | null> {
+  // Most recent game touching this team, in either direction: a live one if
+  // there is one, otherwise the last final, otherwise the next scheduled.
+  const { data } = await supabase
+    .from("games")
+    .select(
+      "status, start_time, home_score, away_score, period, clock, home_team_id, away_team_id",
+    )
+    .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+    .order("start_time", { ascending: false })
+    .limit(8);
+
+  if (!data || data.length === 0) return null;
+
+  const live = data.find((g) => ["live", "in_progress", "halftime"].includes(String(g.status)));
+  const now = Date.now();
+  const lastFinal = data.find(
+    (g) => String(g.status) === "final" && Date.parse(g.start_time) <= now,
+  );
+  const nextUp = [...data]
+    .reverse()
+    .find((g) => String(g.status) === "scheduled" && Date.parse(g.start_time) > now);
+
+  const g = live ?? lastFinal ?? nextUp;
+  if (!g) return null;
+
+  const teamNames = await resolveTeamNames(supabase, [g.home_team_id, g.away_team_id]);
+  const state: GameSnapshot["state"] = live
+    ? "live"
+    : g === lastFinal
+      ? "postgame"
+      : "pregame";
+
+  return {
+    state,
+    home: teamNames.get(g.home_team_id) ?? "Home",
+    away: teamNames.get(g.away_team_id) ?? "Away",
+    homeScore: g.home_score ?? null,
+    awayScore: g.away_score ?? null,
+    period: g.period ?? null,
+    clock: g.clock ?? null,
+    startTime: g.start_time,
+  };
+}
+
+async function resolveTeamNames(
+  supabase: SupabaseClient,
+  ids: (string | null)[],
+): Promise<Map<string, string>> {
+  const clean = ids.filter((i): i is string => !!i);
+  if (clean.length === 0) return new Map();
+  const { data } = await supabase
+    .from("teams")
+    .select("id, name, city")
+    .in("id", clean);
+  return new Map(
+    (data ?? []).map((t: Record<string, string>) => [
+      t.id,
+      [t.city, t.name].filter(Boolean).join(" ").trim() || t.name,
+    ]),
+  );
+}
+
+/**
+ * Season W-L computed from our own `games` rows.
+ *
+ * Deliberately NOT scraped from anywhere: we already store every final score
+ * for tracked teams, so this is tier-1 data that cannot be wrong in a way the
+ * room can catch us on. Enrich with ESPN standings separately (below) —
+ * that call is allowed to fail.
+ */
+export async function getTeamRecord(
+  supabase: SupabaseClient,
+  teamId: string,
+): Promise<{ wins: number; losses: number } | null> {
+  const seasonStart = new Date();
+  seasonStart.setMonth(seasonStart.getMonth() - 10);
+
+  const { data } = await supabase
+    .from("games")
+    .select("home_team_id, away_team_id, home_score, away_score, status")
+    .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+    .eq("status", "final")
+    .gte("start_time", seasonStart.toISOString());
+
+  if (!data || data.length === 0) return null;
+
+  let wins = 0;
+  let losses = 0;
+  for (const g of data) {
+    if (g.home_score == null || g.away_score == null) continue;
+    const isHome = g.home_team_id === teamId;
+    const us = isHome ? g.home_score : g.away_score;
+    const them = isHome ? g.away_score : g.home_score;
+    if (us > them) wins++;
+    else if (us < them) losses++;
+  }
+  return wins + losses > 0 ? { wins, losses } : null;
+}
+
+/**
+ * ESPN standings — the same host bot/providers.ts already calls for scoreboard
+ * and summary, so no new vendor and no new key.
+ *
+ * BEST EFFORT ONLY. The exact standings path on the site API is not verified
+ * against a live response; if the shape changes we return null and the Coach
+ * simply doesn't mention standings, rather than guessing at a position. Never
+ * let this throw into the answer path.
+ */
+export async function getEspnStandings(
+  league: string | null,
+  teamName: string | null,
+): Promise<string | null> {
+  if (!league || !teamName) return null;
+  const p = leaguePath(league);
+  if (!p) return null;
+
+  try {
+    const res = await fetch(
+      `${ESPN_BASE}/${p.sport}/${p.league}/standings`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+
+    // Walk whatever grouping shape came back looking for our team's entry.
+    const needle = teamName.toLowerCase();
+    const found = findStandingEntry(data, needle);
+    return found;
+  } catch (err) {
+    console.warn("[coach.retrieve] standings unavailable", err);
+    return null;
+  }
+}
+
+// Depth-limited walk. ESPN nests standings differently per league and we would
+// rather return nothing than assert a wrong position.
+function findStandingEntry(node: unknown, needle: string, depth = 0): string | null {
+  if (depth > 8 || node == null || typeof node !== "object") return null;
+
+  const obj = node as Record<string, unknown>;
+  const team = obj.team as Record<string, unknown> | undefined;
+  if (team) {
+    const label = String(team.displayName ?? team.name ?? "").toLowerCase();
+    if (label && (label.includes(needle) || needle.includes(label))) {
+      const stats = (obj.stats ?? []) as Record<string, unknown>[];
+      const parts = stats
+        .filter((s) =>
+          ["wins", "losses", "playoffSeed", "winPercent", "gamesBehind"].includes(
+            String(s.name),
+          )
+        )
+        .map((s) => `${s.name}=${s.displayValue ?? s.value}`);
+      return parts.length > 0 ? parts.join(" ") : null;
+    }
+  }
+
+  for (const v of Object.values(obj)) {
+    if (Array.isArray(v)) {
+      for (const item of v) {
+        const hit = findStandingEntry(item, needle, depth + 1);
+        if (hit) return hit;
+      }
+    } else if (v && typeof v === "object") {
+      const hit = findStandingEntry(v, needle, depth + 1);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+function leaguePath(league: string): { sport: string; league: string } | null {
+  switch (league.toUpperCase()) {
+    case "NBA":   return { sport: "basketball", league: "nba" };
+    case "NCAAB": return { sport: "basketball", league: "mens-college-basketball" };
+    case "NFL":   return { sport: "football", league: "nfl" };
+    case "NCAAF":
+    case "NCAA":  return { sport: "football", league: "college-football" };
+    case "MLB":   return { sport: "baseball", league: "mlb" };
+    case "NHL":   return { sport: "hockey", league: "nhl" };
+    default:      return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5. Room metadata.
+// ---------------------------------------------------------------------------
+
+export async function getHuddleContext(
+  supabase: SupabaseClient,
+  huddleId: string,
+): Promise<HuddleContext | null> {
+  const { data: huddle } = await supabase
+    .from("huddles")
+    .select("id, name, team_id")
+    .eq("id", huddleId)
+    .maybeSingle();
+  if (!huddle) return null;
+
+  let teamName: string | null = null;
+  let league: string | null = null;
+  if (huddle.team_id) {
+    const { data: team } = await supabase
+      .from("teams")
+      .select("name, city, league")
+      .eq("id", huddle.team_id)
+      .maybeSingle();
+    if (team) {
+      teamName = [team.city, team.name].filter(Boolean).join(" ").trim() || team.name;
+      league = team.league ?? null;
+    }
+  }
+
+  const { count } = await supabase
+    .from("huddle_members")
+    .select("user_id", { count: "exact", head: true })
+    .eq("huddle_id", huddleId);
+
+  return {
+    huddleId: huddle.id,
+    huddleName: huddle.name,
+    teamId: huddle.team_id ?? null,
+    teamName,
+    league,
+    memberCount: count ?? 0,
+  };
+}

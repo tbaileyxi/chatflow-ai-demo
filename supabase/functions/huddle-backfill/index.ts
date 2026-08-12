@@ -118,14 +118,18 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Backfilled ${messagesAdded} messages to huddle ${huddle_id}`);
 
-    // If this is a new huddle, post the @coach welcome message
+    // If this is a new huddle, post the Coach welcome message.
+    // NOTE: do not tell users to type "@coach" here. The mention trigger is a
+    // no-op stub (see 20260607000003_bot_engine_v2.sql) — the Coach posts news
+    // and live plays on its own, but it does not answer questions yet.
+    // Only promise what the bot actually does today.
     if (is_new_huddle) {
       // Build a brief recap of the content
       const recapItems = contentRecap.slice(0, 4).map((s, i) => `${i + 1}. ${s}...`).join('\n');
-      
+
       const welcomeMessage = messagesAdded > 0
         ? `🏟️ Welcome to the ${team_name} huddle!\n\nHere's what's been buzzing:\n${recapItems || "Fresh content loading..."}\n\n🔥 Early take: This ${team_name} season is heating up. What's your prediction?`
-        : `🏟️ Welcome to the ${team_name} huddle — your private home for everything ${team_name}!\n\n📰 Stay updated with your team's social news, curated updates, and live scores.\n🤖 Chat @Coach for the latest team info.\n🗣️ Your space, your voice!\n\n🔥 What's your take on ${team_name} this season?`;
+        : `🏟️ Welcome to the ${team_name} huddle — your private home for everything ${team_name}!\n\n📰 Team news and updates land here as they break.\n🏟️ I'll be in here calling the game with you — live scores and plays, right in the thread.\n🗣️ Your space, your voice!\n\n🔥 What's your take on ${team_name} this season?`;
 
       const { error: welcomeError } = await supabase
         .from('huddle_messages')

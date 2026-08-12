@@ -234,6 +234,21 @@ export function HuddleScreen() {
   const { data: reactionsMap } = useMessageReactions(huddleId, messageIds);
   const toggleReaction = useToggleReaction();
 
+  // People you can @-mention, derived from who has actually spoken in here.
+  // Deliberately not a members query: the people worth mentioning are the ones
+  // talking, and this needs no extra round trip. Coach is pinned above these
+  // inside MessageInput.
+  const mentionables = useMemo(() => {
+    const seen = new Map<string, { key: string; label: string }>();
+    for (const m of messages ?? []) {
+      if (m.isBotMessage || m.userId === user?.id) continue;
+      const label = (m.username || m.displayName || "").trim().replace(/\s+/g, "");
+      if (!label || seen.has(m.userId)) continue;
+      seen.set(m.userId, { key: m.userId, label });
+    }
+    return [...seen.values()].slice(0, 20);
+  }, [messages, user?.id]);
+
   // Build a map of message id -> message for reply lookups
   const messageMap = useMemo(() => {
     const map = new Map<string, HuddleMessage>();
@@ -476,6 +491,9 @@ export function HuddleScreen() {
                   isReply={isReply}
                   hideReplyQuote={!!prevMsg && prevMsg.id === msg.replyToId}
                   isGroupedWithPrev={isGroupedWithPrev}
+                  // Drives the admin_welcome card's single CTA straight into
+                  // the invite sheet the header already opens.
+                  onInvite={() => setShowInvite(true)}
                   replyTo={
                     parentMsg
                       ? {
@@ -532,6 +550,7 @@ export function HuddleScreen() {
             onCancelReply={() => setReplyTo(null)}
             onFocus={scrollToBottom}
             onTypingChange={sendTyping}
+            mentionables={mentionables}
           />
           </>
         )}

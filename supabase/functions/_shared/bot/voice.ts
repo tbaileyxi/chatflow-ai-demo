@@ -2,6 +2,7 @@
 // The model only rephrases the facts it is handed. No search. No recall.
 // If a fact isn't in the payload, the model cannot say it.
 
+import { callLlm } from "../llm.ts";
 import type { InGameFacts, NewsFacts, VoicePayload } from "./types.ts";
 
 const SYSTEM_PROMPT = `You are a sharp, opinionated fan texting your group chat about your team. You are NOT an assistant.
@@ -27,22 +28,22 @@ export interface VoiceResult {
   model: string;
 }
 
+// Provider selection, model tiers, and cross-provider failover all live in
+// ../llm.ts now. The mode-aware split is still here — it's just expressed as a
+// job name instead of a hand-rolled env lookup, and a dead Anthropic balance no
+// longer takes the whole bot down with it.
 export async function generateMessage(payload: VoicePayload): Promise<VoiceResult> {
-  const provider = (Deno.env.get("LLM_PROVIDER") || "openai").toLowerCase();
-  const userBlock = buildUserPrompt(payload);
-
-  if (provider === "xai") {
-    return callXai(userBlock);
+  const res = await callLlm({
+    job: payload.mode === "in_game" ? "in_game" : "news",
+    system: SYSTEM_PROMPT,
+    user: buildUserPrompt(payload),
+  });
+  if (res.fellBackFrom.length > 0) {
+    console.warn(
+      `[voice] served by ${res.provider} after ${res.fellBackFrom.join(", ")} failed`,
+    );
   }
-  if (provider === "anthropic") {
-    // Mode-aware model split: cheap/fast for news one-liners, a smarter
-    // model for in-game digestion (scores, runs, momentum — the "smart bot").
-    const model = payload.mode === "in_game"
-      ? Deno.env.get("LLM_MODEL_INGAME") || "claude-sonnet-4-6"
-      : Deno.env.get("LLM_MODEL") || "claude-haiku-4-5";
-    return callAnthropic(userBlock, model);
-  }
-  return callOpenAi(userBlock);
+  return { message: res.text, provider: res.provider, model: res.model };
 }
 
 function buildUserPrompt(payload: VoicePayload): string {
@@ -94,133 +95,9 @@ HARD RULES:
 - Only use names/numbers present in the facts. Never invent a venue, location, or stat.`;
 }
 
-// ---- OpenAI ------------------------------------------------------
-
-async function callOpenAi(userPrompt: string): Promise<VoiceResult> {
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) throw new Error("OPENAI_API_KEY not set");
-  const model = Deno.env.get("LLM_MODEL") || "gpt-4o-mini";
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user",   content: userPrompt },
-      ],
-      temperature: 0.6,
-      max_tokens: 120,
-    }),
-  });
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`OpenAI ${res.status}: ${txt.slice(0, 300)}`);
-  }
-  const data = await res.json();
-  const message = (data?.choices?.[0]?.message?.content ?? "").trim();
-  return { message, provider: "openai", model };
-}
-
-// ---- xAI (Grok) --------------------------------------------------
-
-async function callXai(userPrompt: string): Promise<VoiceResult> {
-  const apiKey = Deno.env.get("XAI_API_KEY");
-  if (!apiKey) throw new Error("XAI_API_KEY not set");
-  const model = Deno.env.get("LLM_MODEL") || "grok-2-latest";
-  // NOTE: explicitly NO search_parameters — mouth, not eyes.
-  const res = await fetch("https://api.x.ai/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user",   content: userPrompt },
-      ],
-      temperature: 0.6,
-      max_tokens: 120,
-      stream: false,
-    }),
-  });
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`xAI ${res.status}: ${txt.slice(0, 300)}`);
-  }
-  const data = await res.json();
-  const message = (data?.choices?.[0]?.message?.content ?? "").trim();
-  return { message, provider: "xai", model };
-}
-
-// ---- Anthropic (Claude) ------------------------------------------
-
-async function callAnthropic(userPrompt: string, model?: string): Promise<VoiceResult> {
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
-  model = model || Deno.env.get("LLM_MODEL") || "claude-haiku-4-5";
-
-  const doFetch = () =>
-    fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 256,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
-
-  let res = await doFetch();
-  if (res.status === 429) {
-    // Org RPM limit — back off once and retry rather than dropping the post.
-    const retryAfter = Number(res.headers.get("retry-after")) || 20;
-    await new Promise((r) => setTimeout(r, Math.min(retryAfter, 30) * 1000));
-    res = await doFetch();
-  }
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`Anthropic ${res.status}: ${txt.slice(0, 300)}`);
-  }
-  const data = await res.json();
-  const message = (data?.content ?? [])
-    .filter((b: { type: string }) => b.type === "text")
-    .map((b: { text: string }) => b.text)
-    .join("")
-    .trim();
-  return { message, provider: "anthropic", model };
-}
-
-async function judgeViaAnthropic(sys: string, usr: string): Promise<string | null> {
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!apiKey) return null;
-  const model = Deno.env.get("JUDGE_MODEL") || "claude-haiku-4-5";
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 60,
-      system: sys,
-      messages: [{ role: "user", content: usr }],
-    }),
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return (data?.content ?? [])
-    .filter((b: { type: string }) => b.type === "text")
-    .map((b: { text: string }) => b.text)
-    .join("")
-    .trim();
-}
+// Provider transport lives in ../llm.ts. The three hand-rolled callers that
+// used to sit here (OpenAI / xAI / Anthropic) are gone — they duplicated each
+// other, and only one of them could ever run per deploy.
 
 // ---------------------------------------------------------------
 // Cheap LLM news judge. Tiny call, JSON only. Bypassed when the cheap
@@ -234,36 +111,16 @@ export interface JudgeResult {
 }
 
 export async function judgeHeadline(team: string, title: string, source: string): Promise<JudgeResult | null> {
-  const provider = (Deno.env.get("LLM_PROVIDER") || "openai").toLowerCase();
-
   const sys = `You score sports news headlines for one team's hardcore fan. Reply with JSON only: {"score":0-100,"category":"trade|injury|signing|coaching|recruit|result|opinion|other","breaking":true|false}. Never include any other text.`;
   const usr = `Team: ${team}\nHeadline: ${title}\nSource: ${source}`;
 
   try {
-    let raw: string | null;
-    if (provider === "anthropic") {
-      raw = await judgeViaAnthropic(sys, usr);
-    } else {
-      const apiKey = provider === "xai" ? Deno.env.get("XAI_API_KEY") : Deno.env.get("OPENAI_API_KEY");
-      if (!apiKey) return null;
-      const model = Deno.env.get("JUDGE_MODEL") || "gpt-4o-mini";
-      const endpoint = provider === "xai"
-        ? "https://api.x.ai/v1/chat/completions"
-        : "https://api.openai.com/v1/chat/completions";
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "system", content: sys }, { role: "user", content: usr }],
-          temperature: 0,
-          max_tokens: 60,
-        }),
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      raw = (data?.choices?.[0]?.message?.content ?? "").trim();
-    }
+    // "route" job = the cheap tier on whichever provider is up. The judge runs
+    // on every headline from every feed, so it is the highest-volume call in
+    // the system and the one that most needs a fallback rather than a hard
+    // failure — a dead judge silently stops all news.
+    const res = await callLlm({ job: "route", system: sys, user: usr });
+    const raw = res.text;
     if (!raw) return null;
     const clean = raw.replace(/```json\n?|```/g, "").trim();
     const parsed = JSON.parse(clean);

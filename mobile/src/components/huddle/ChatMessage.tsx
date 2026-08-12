@@ -7,6 +7,7 @@ import { colors } from "@/theme/colors";
 import { PredictionCardInMessage } from "@/components/predictions/PredictionCardInMessage";
 import { FadeCardInMessage } from "@/components/huddle/FadeCardInMessage";
 import { PulseBubble } from "@/components/huddle/PulseBubble";
+import { AdminWelcomeCard } from "@/components/huddle/AdminWelcomeCard";
 import { YouTubeEmbed, parseYouTubeId } from "@/components/embeds/YouTubeEmbed";
 import type { HuddleMessage } from "@/hooks/useHuddleMessages";
 import type { ReactionSummary } from "@/hooks/useMessageReactions";
@@ -108,6 +109,9 @@ type Props = {
   // When true the message follows another from the same sender within ~5 min.
   // Avatar + name row + tight spacing.
   isGroupedWithPrev?: boolean;
+  // Opens the invite sheet. Only the admin_welcome card uses this — it's the
+  // single action on the highest-leverage message in the product.
+  onInvite?: () => void;
 };
 
 // Strip raw URLs from bot message content so legacy posts (server fix now puts
@@ -167,6 +171,7 @@ export function ChatMessage({
   isReply,
   hideReplyQuote,
   isGroupedWithPrev,
+  onInvite,
 }: Props) {
   const lastTapRef = useRef<number>(0);
   const [showPicker, setShowPicker] = useState(false);
@@ -184,10 +189,19 @@ export function ChatMessage({
   // card with no gold accent, which is exactly why the gold looked
   // inconsistent ("on some chats and not others"). Pin them out first.
   const isNewsOrPlay =
-    message.messageType === "news" || message.messageType === "live_play";
+    message.messageType === "news" ||
+    message.messageType === "live_play" ||
+    // The Coach answering a question or posting a recap is the same voice as
+    // the news/play bubble and must get the same gold treatment. Pinned here
+    // for the same reason the others are: anything with an embed_code was
+    // leaking into the plain muted PulseBubble below.
+    message.messageType === "coach_answer" ||
+    message.messageType === "coach_recap";
+  const isAdminWelcome = message.messageType === "admin_welcome";
   const isPulse =
     !youTubeId &&
     !isNewsOrPlay &&
+    !isAdminWelcome &&
     (message.isPulseMoment ||
       message.messageType === "pulse" ||
       message.messageType === "highlight" ||
@@ -331,6 +345,11 @@ export function ChatMessage({
                   </Text>
                   <YouTubeEmbed videoId={youTubeId} />
                 </View>
+              ) : isAdminWelcome ? (
+                <AdminWelcomeCard
+                  content={message.content}
+                  onInvite={onInvite}
+                />
               ) : isPulse ? (
                 <PulseBubble message={message} />
               ) : isPredictionCard ? (
