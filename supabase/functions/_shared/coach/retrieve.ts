@@ -10,9 +10,11 @@
 //   1. OUR DATABASE   — chat, ledgers, members, the bot's own emitted lines.
 //                       Unique to us. Nobody else can answer from this.
 //   2. SPORTS APIS    — scores, schedule, records. Structured, already wired.
-//   3. (deliberately absent) open web / model memory. Rosters, player bios,
-//      nationalities. No grounding exists, so the Coach must decline instead
-//      of inventing. See answer.ts REFUSALS.
+//   3. MODEL KNOWLEDGE — only for settled history (past championships, famous
+//      games, rivalries). Never for anything that moves: roster, who starts,
+//      who is hurt, this season's record, standings. Those are tier 1 or 2 or
+//      the Coach says it doesn't have them. See the `knowledge` lane in
+//      answer.ts.
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -490,74 +492,118 @@ export async function getSeasonResults(
 }
 
 /**
- * ESPN standings — the same host bot/providers.ts already calls for scoreboard
- * and summary, so no new vendor and no new key.
+ * Team standing + record, straight from ESPN.
  *
- * BEST EFFORT ONLY. The exact standings path on the site API is not verified
- * against a live response; if the shape changes we return null and the Coach
- * simply doesn't mention standings, rather than guessing at a position. Never
- * let this throw into the answer path.
+ * VERIFIED against live responses, not guessed. The previous version walked the
+ * /standings tree looking for a matching team and usually found nothing, which
+ * meant the single most likely question in the product ("where are we in the
+ * standings?") fell back to a shrug. That is not acceptable — it is a basic
+ * fact and the alternative to having it is the model inventing one.
+ *
+ * Two steps, both confirmed working for pro AND college:
+ *   1. /teams?limit=1000  -> resolve our team name to ESPN's numeric id
+ *   2. /teams/{id}        -> team.standingSummary ("2nd in AL East", "1st in SEC")
+ *                            team.record.items[0].summary ("66-52")
+ *
+ * Why the id and not the abbreviation: the logo slug we store looks like a key
+ * but is not one. Texas A&M's logo is ".../ncaa/500/tam.png" while its ESPN
+ * abbreviation is "TA&M" — /teams/tam 404s, /teams/245 works.
  */
-export async function getEspnStandings(
+export interface TeamStanding {
+  standing: string | null;   // "2nd in AL East"
+  record: string | null;     // "66-52"
+}
+
+// League roster cache. 758 college teams is a big response and it changes about
+// once a year, so fetching it per question would be absurd. Cached for the life
+// of the isolate, with a day's TTL as a backstop.
+const ESPN_TEAM_CACHE = new Map<string, { at: number; ids: Map<string, string> }>();
+const TEAM_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function normalizeTeamKey(s: string): string {
+  return s.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]/g, "");
+}
+
+async function espnTeamIndex(
+  sport: string,
+  leaguePathName: string,
+): Promise<Map<string, string>> {
+  const cacheKey = `${sport}/${leaguePathName}`;
+  const hit = ESPN_TEAM_CACHE.get(cacheKey);
+  if (hit && Date.now() - hit.at < TEAM_CACHE_TTL_MS) return hit.ids;
+
+  const ids = new Map<string, string>();
+  try {
+    const res = await fetch(
+      `${ESPN_BASE}/${sport}/${leaguePathName}/teams?limit=1000`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!res.ok) return ids;
+    const data = await res.json();
+    const teams = data?.sports?.[0]?.leagues?.[0]?.teams ?? [];
+    for (const entry of teams as Record<string, unknown>[]) {
+      const t = entry.team as Record<string, unknown> | undefined;
+      if (!t?.id) continue;
+      const id = String(t.id);
+      // Index every spelling ESPN gives us. Our DB stores city + nickname
+      // ("Ohio State" + "Buckeyes"), which matches displayName exactly for most
+      // teams; slug and shortDisplayName cover the rest.
+      for (const field of ["displayName", "name", "slug", "shortDisplayName", "location"]) {
+        const v = t[field];
+        if (typeof v === "string" && v.trim()) {
+          const k = normalizeTeamKey(v);
+          if (k && !ids.has(k)) ids.set(k, id);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[coach.retrieve] espn team index failed", err);
+  }
+  ESPN_TEAM_CACHE.set(cacheKey, { at: Date.now(), ids });
+  return ids;
+}
+
+export async function getEspnStanding(
   league: string | null,
   teamName: string | null,
-): Promise<string | null> {
+): Promise<TeamStanding | null> {
   if (!league || !teamName) return null;
   const p = leaguePath(league);
   if (!p) return null;
 
   try {
+    const index = await espnTeamIndex(p.sport, p.league);
+    if (index.size === 0) return null;
+
+    const espnId = index.get(normalizeTeamKey(teamName));
+    if (!espnId) {
+      // Unresolved is a real outcome, not an error to paper over. Log it so a
+      // team that never matches shows up rather than silently answering "I
+      // don't have standings" forever.
+      console.warn(`[coach.retrieve] no ESPN id for "${teamName}" in ${league}`);
+      return null;
+    }
+
     const res = await fetch(
-      `${ESPN_BASE}/${p.sport}/${p.league}/standings`,
+      `${ESPN_BASE}/${p.sport}/${p.league}/teams/${espnId}`,
       { headers: { Accept: "application/json" } },
     );
     if (!res.ok) return null;
-    const data = await res.json();
+    const t = (await res.json())?.team ?? {};
 
-    // Walk whatever grouping shape came back looking for our team's entry.
-    const needle = teamName.toLowerCase();
-    const found = findStandingEntry(data, needle);
-    return found;
+    const items = (t?.record?.items ?? []) as Record<string, unknown>[];
+    const overall = items.find((i) =>
+      String(i.description ?? "").toLowerCase().includes("overall")
+    ) ?? items[0];
+
+    const standing = typeof t.standingSummary === "string" ? t.standingSummary : null;
+    const record = overall && typeof overall.summary === "string" ? overall.summary : null;
+    if (!standing && !record) return null;
+    return { standing, record };
   } catch (err) {
-    console.warn("[coach.retrieve] standings unavailable", err);
+    console.warn("[coach.retrieve] standing lookup failed", err);
     return null;
   }
-}
-
-// Depth-limited walk. ESPN nests standings differently per league and we would
-// rather return nothing than assert a wrong position.
-function findStandingEntry(node: unknown, needle: string, depth = 0): string | null {
-  if (depth > 8 || node == null || typeof node !== "object") return null;
-
-  const obj = node as Record<string, unknown>;
-  const team = obj.team as Record<string, unknown> | undefined;
-  if (team) {
-    const label = String(team.displayName ?? team.name ?? "").toLowerCase();
-    if (label && (label.includes(needle) || needle.includes(label))) {
-      const stats = (obj.stats ?? []) as Record<string, unknown>[];
-      const parts = stats
-        .filter((s) =>
-          ["wins", "losses", "playoffSeed", "winPercent", "gamesBehind"].includes(
-            String(s.name),
-          )
-        )
-        .map((s) => `${s.name}=${s.displayValue ?? s.value}`);
-      return parts.length > 0 ? parts.join(" ") : null;
-    }
-  }
-
-  for (const v of Object.values(obj)) {
-    if (Array.isArray(v)) {
-      for (const item of v) {
-        const hit = findStandingEntry(item, needle, depth + 1);
-        if (hit) return hit;
-      }
-    } else if (v && typeof v === "object") {
-      const hit = findStandingEntry(v, needle, depth + 1);
-      if (hit) return hit;
-    }
-  }
-  return null;
 }
 
 function leaguePath(league: string): { sport: string; league: string } | null {

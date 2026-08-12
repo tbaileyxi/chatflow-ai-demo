@@ -14,7 +14,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   getBoxScore,
-  getEspnStandings,
+  getEspnStanding,
   getGameBeats,
   getGameSnapshot,
   getHuddleContext,
@@ -172,7 +172,7 @@ serve(async (req) => {
     // but our own W-L (getTeamRecord, computed from our games rows) is the
     // reliable half and is always present. Best-effort, never throws.
     const standings = needsGame
-      ? await getEspnStandings(ctx.league, ctx.teamName).catch(() => null)
+      ? await getEspnStanding(ctx.league, ctx.teamName).catch(() => null)
       : null;
 
     // --- 6. Answer -----------------------------------------------------------

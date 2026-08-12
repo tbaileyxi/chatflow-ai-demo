@@ -13,6 +13,7 @@ import type {
   GameSnapshot,
   HuddleContext,
   LedgerRow,
+  TeamStanding,
   TranscriptLine,
 } from "./retrieve.ts";
 
@@ -135,7 +136,7 @@ function boxScoreBlock(b: BoxScore | null): string {
 function gameBlock(
   g: GameSnapshot | null,
   record: { wins: number; losses: number } | null,
-  standings: string | null,
+  standings: TeamStanding | null,
   nextGame?: string | null,
 ): string {
   const parts: string[] = [];
@@ -151,8 +152,11 @@ function gameBlock(
       parts.push(`GAME (UPCOMING): ${score}, starts ${g.startTime}`);
     }
   }
-  if (record) parts.push(`SEASON RECORD: ${record.wins}-${record.losses}`);
-  if (standings) parts.push(`STANDINGS: ${standings}`);
+  // ESPN's own record is authoritative when we have it; our computed W-L is the
+  // fallback so this line is never empty during a season.
+  if (standings?.record) parts.push(`SEASON RECORD: ${standings.record}`);
+  else if (record) parts.push(`SEASON RECORD: ${record.wins}-${record.losses}`);
+  if (standings?.standing) parts.push(`STANDINGS: ${standings.standing}`);
   if (nextGame) parts.push(`NEXT GAME: ${nextGame}`);
   return parts.length > 0 ? parts.join("\n") : "GAME: (no game data available)";
 }
@@ -194,7 +198,7 @@ export interface AnswerInput {
   ledger: LedgerRow[];
   game: GameSnapshot | null;
   record: { wins: number; losses: number } | null;
-  standings: string | null;
+  standings: TeamStanding | null;
   boxScore: BoxScore | null;
   seasonResults: string[];
   nextGame: string | null;
