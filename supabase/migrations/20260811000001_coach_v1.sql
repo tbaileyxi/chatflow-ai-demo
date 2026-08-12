@@ -113,7 +113,15 @@ begin
   if new.content ilike '%@coach%' or coalesce(is_reply_to_bot, false) then
     perform net.http_post(
       url := 'https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/coach-ask',
-      headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlanV3eWV5cGlnZ3ZseWZsaWFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5NjU4MDgsImV4cCI6MjA2OTU0MTgwOH0.XHylH6wJuJjSZxU904oCZ33N0swsoRm6Tr2VjwI1Lz0"}'::jsonb,
+      -- Read the key at call time instead of baking one into the SQL. The
+      -- hardcoded anon JWT here was rejected with UNAUTHORIZED_INVALID_JWT_FORMAT
+      -- in production 2026-08-12, so @coach silently never answered: the trigger
+      -- fired, the HTTP call 401'd, and nothing was logged. Every working cron in
+      -- this project already uses this pattern and returns 200.
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true)
+      ),
       body := jsonb_build_object(
         'message_id',  new.id,
         'huddle_id',   new.huddle_id,
