@@ -31,6 +31,7 @@ Deno.serve(async (req) => {
     }
 
     let totalSettled = 0;
+    let voided = 0;
 
     // Track settled markets per huddle for consolidated summaries
     const huddleResults: Map<string, {
@@ -41,7 +42,16 @@ Deno.serve(async (req) => {
     // Check each market against Kalshi
     for (const market of unresolvedMarkets) {
       try {
-        const url = `${KALSHI_BASE}/markets/${market.kalshi_ticker}`;
+        // SGO rows live in this table too but grade through odds-settle.
+        // Asking Kalshi about them is a guaranteed 404.
+        if (String(market.kalshi_ticker).startsWith('sgo:')) continue;
+
+        // Game-level totals fan out to both teams' rooms, and each row needs a
+        // unique kalshi_ticker, so they carry a ":<team-id-prefix>" suffix.
+        // Kalshi knows nothing about that suffix — looking it up 404s and the
+        // market never settles. Strip it before asking.
+        const realTicker = String(market.kalshi_ticker).replace(/:[0-9a-f]{8}$/i, '');
+        const url = `${KALSHI_BASE}/markets/${realTicker}`;
         const response = await fetch(url, {
           headers: { 'Accept': 'application/json' },
         });
@@ -52,15 +62,44 @@ Deno.serve(async (req) => {
         const kalshiMarket = data.market;
 
         // Kalshi marks resolved markets status 'finalized' (and sometimes
-        // 'settled'). The old code only accepted 'settled', so NOTHING ever
-        // settled — bets sat open forever. Accept either, and trust `result`.
-        const resolved =
-          kalshiMarket &&
-          (kalshiMarket.status === 'settled' || kalshiMarket.status === 'finalized') &&
-          (kalshiMarket.result === 'yes' || kalshiMarket.result === 'no');
-        if (!resolved) continue;
+        // 'settled'). Accept either.
+        //
+        // The outcome is NOT always yes/no. Game markets finalize with
+        // result:'scalar' and the payout in settlement_value_dollars, so the
+        // old yes/no-only check skipped every one and 72 markets sat open —
+        // the oldest for 59 days.
+        //
+        // The middle band is a VOID, not a loss: a cancelled or refunded
+        // market pays out at the prevailing price (SF $0.43 / ATL $0.57 on the
+        // same game). Grading those as losses would take chips from people
+        // whose market Kalshi simply cancelled.
+        if (!kalshiMarket) continue;
+        const statusOk =
+          kalshiMarket.status === 'settled' || kalshiMarket.status === 'finalized';
+        if (!statusOk) continue;
 
-        const resolution = kalshiMarket.result.toUpperCase();
+        let outcome: 'YES' | 'NO' | 'VOID' | null = null;
+        if (kalshiMarket.result === 'yes') outcome = 'YES';
+        else if (kalshiMarket.result === 'no') outcome = 'NO';
+        else if (kalshiMarket.result === 'scalar') {
+          const v = parseFloat(kalshiMarket.settlement_value_dollars ?? '');
+          if (Number.isFinite(v)) {
+            outcome = v >= 0.99 ? 'YES' : v <= 0.01 ? 'NO' : 'VOID';
+          }
+        }
+        if (!outcome) continue;
+
+        // A void closes the market so it stops showing, but grades nobody.
+        if (outcome === 'VOID') {
+          await supabase
+            .from('kalshi_markets')
+            .update({ is_resolved: true, resolution: null })
+            .eq('id', market.id);
+          voided++;
+          continue;
+        }
+
+        const resolution = outcome;
 
         // Settle bets
         const { data: settledCount } = await supabase.rpc('settle_shadow_bets', {
@@ -232,7 +271,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ settled: totalSettled, summariesPosted: huddleResults.size }), {
+    return new Response(JSON.stringify({ settled: totalSettled, voided, summariesPosted: huddleResults.size }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err: any) {
