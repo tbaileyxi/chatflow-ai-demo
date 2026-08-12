@@ -29,15 +29,38 @@ serve(async (req) => {
   }
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  const summary = { candidates: 0, nudged: 0, errors: [] as string[] };
+  // POST {"dry_run": true} to see exactly who WOULD be nudged without posting
+  // anything. Added after a bare invocation of this function — intended as a
+  // "did the migration land" check — nudged 50 rooms in one shot. Any function
+  // that writes to user-visible chat needs a way to be exercised safely.
+  let opts: { dry_run?: boolean } = {};
+  try { opts = await req.json(); } catch { /* cron sends no body */ }
+  const dryRun = opts.dry_run === true;
+
+  const summary = {
+    dry_run: dryRun,
+    candidates: 0,
+    nudged: 0,
+    would_nudge: [] as string[],
+    errors: [] as string[],
+  };
 
   try {
     const cutoff = new Date(Date.now() - AGE_HOURS * 3600 * 1000).toISOString();
 
+    // Official team huddles are EXCLUDED and this is load-bearing, not a nicety.
+    //
+    // The ~56 seeded "<Team> Community" rooms are content buffers, not rooms
+    // anyone reads: backfillTeamContent copies their last 24h of bot messages
+    // into every newly created room for that team. They also sit at one member
+    // forever, so they match this query's shape perfectly. Nudging them both
+    // wastes the message and poisons the buffer — every new room would open
+    // with "still just us in here" presented as team content.
     const { data: huddles } = await supabase
       .from("huddles")
-      .select("id, name, team_id, created_at")
+      .select("id, name, team_id, created_at, is_official_team_huddle")
       .lte("created_at", cutoff)
+      .or("is_official_team_huddle.is.null,is_official_team_huddle.eq.false")
       .order("created_at", { ascending: false })
       .limit(500);
     if (!huddles || huddles.length === 0) return json({ ok: true, ...summary });
@@ -61,6 +84,10 @@ serve(async (req) => {
       if ((count ?? 0) !== 1) continue;
 
       summary.candidates++;
+      if (dryRun) {
+        summary.would_nudge.push(`${huddle.id} (${huddle.name})`);
+        continue;
+      }
       try {
         await postNudge(supabase, huddle.id, huddle.team_id);
         summary.nudged++;
