@@ -43,6 +43,20 @@ create table if not exists public.coach_recap_log (
 create index if not exists idx_coach_recap_huddle_kind
   on public.coach_recap_log(huddle_id, kind, created_at desc);
 
+-- Backfill dedupe rows for any recap that was already posted before this table
+-- existed. coach-recap ran once during deployment smoke-testing while the
+-- dedupe lookup silently read a missing table as "nothing recapped yet"; those
+-- rooms have a recap message but no log row, so without this they would be
+-- recapped a second time (and pushed a second time) on the next tick.
+insert into public.coach_recap_log (huddle_id, kind, message_id, created_at)
+select m.huddle_id, 'postgame', m.id, m.created_at
+  from public.huddle_messages m
+ where m.message_type = 'coach_recap'
+   and m.created_at > now() - interval '24 hours'
+   and not exists (
+     select 1 from public.coach_recap_log l where l.message_id = m.id
+   );
+
 -- ============================================================
 -- 3. huddle_admin_nudge_log — dedupe for the "still just you" nudge.
 -- ============================================================

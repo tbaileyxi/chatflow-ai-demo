@@ -170,6 +170,16 @@ async function findDailyHuddles(supabase: SupabaseClient): Promise<string[]> {
   return active.filter((id) => !already.has(id));
 }
 
+/**
+ * Which of these huddles was already recapped inside the window.
+ *
+ * FAILS CLOSED. supabase-js returns {data: null, error} instead of throwing, so
+ * an earlier version of this treated a failed query — including the table not
+ * existing yet — as "nothing has been recapped", and cheerfully re-posted. That
+ * is the worst possible direction to fail in: a duplicate recap also fires a
+ * duplicate push, to every member of every room, on the biggest day of the
+ * year. If we cannot prove a room is safe to recap, we skip it.
+ */
 async function recentlyRecapped(
   supabase: SupabaseClient,
   huddleIds: string[],
@@ -178,13 +188,22 @@ async function recentlyRecapped(
 ): Promise<Set<string>> {
   if (huddleIds.length === 0) return new Set();
   const since = new Date(Date.now() - windowMs).toISOString();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("coach_recap_log")
     .select("huddle_id")
     .eq("kind", kind)
     .in("huddle_id", huddleIds)
     .gte("created_at", since);
-  return new Set((data ?? []).map((r) => r.huddle_id));
+
+  if (error || !data) {
+    console.error(
+      "[coach-recap] dedupe lookup failed — skipping every candidate rather " +
+      "than risking duplicate recaps and pushes",
+      error,
+    );
+    return new Set(huddleIds);
+  }
+  return new Set(data.map((r) => r.huddle_id));
 }
 
 // ---------------------------------------------------------------------------
@@ -222,6 +241,21 @@ async function recapOne(
   const { data: systemUserId } = await supabase.rpc("get_or_create_system_user");
   if (!systemUserId) return false;
 
+  // CLAIM BEFORE POSTING. The dedupe row goes in first, and a failure to write
+  // it aborts the recap. The other order — post, then log — means any failure
+  // on the log write leaves a recap that will be posted again on the next tick,
+  // with another push. Better to occasionally lose a recap than to double-send
+  // one to every member of the room.
+  const { data: claim, error: claimErr } = await supabase
+    .from("coach_recap_log")
+    .insert({ huddle_id: huddleId, kind })
+    .select("id")
+    .single();
+  if (claimErr || !claim) {
+    console.error("[coach-recap] could not claim recap slot, skipping", claimErr);
+    return false;
+  }
+
   const { data: inserted, error } = await supabase
     .from("huddle_messages")
     .insert({
@@ -235,14 +269,15 @@ async function recapOne(
     .single();
   if (error) {
     console.error("[coach-recap] insert failed", error);
+    // Release the claim so a later tick can retry this room.
+    await supabase.from("coach_recap_log").delete().eq("id", claim.id);
     return false;
   }
 
-  await supabase.from("coach_recap_log").insert({
-    huddle_id: huddleId,
-    kind,
-    message_id: inserted?.id ?? null,
-  });
+  await supabase
+    .from("coach_recap_log")
+    .update({ message_id: inserted?.id ?? null })
+    .eq("id", claim.id);
 
   // Postgame is genuinely push-worthy: the game ended, you weren't watching,
   // here is the whole thing in three lines. The daily one is not — it can wait
