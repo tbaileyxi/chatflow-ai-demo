@@ -45,6 +45,8 @@ serve(async (req) => {
     entries_new: 0,
     entries_survived: 0,
     posts: 0,
+    teams_with_audience: 0,
+    teams_eligible: 0,
     errors: [] as string[],
     debug: [] as Record<string, unknown>[],
   };
@@ -98,8 +100,38 @@ serve(async (req) => {
     // 150s timeout; even with TEAMS_PER_RUN=12 each team took ~50s.
     // Parallel across 6 teams = ~50s total. Order is randomized so no
     // team gets starved.
+    // KILL SWITCH. NEWS_ENABLED=false stops all news generation without a
+    // deploy — one secret change to turn it back on.
+    if ((Deno.env.get("NEWS_ENABLED") || "true").toLowerCase() === "false") {
+      return new Response(JSON.stringify({ ...summary, message: "news disabled (NEWS_ENABLED=false)" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ONLY spend on rooms with an audience.
+    //
+    // This polled all 195 teams while just 40 huddles have more than one
+    // member, so ~80% of the headline-judge calls scored news for rooms nobody
+    // is in. The judge is ~86% of the Anthropic bill (7,200 haiku calls/day),
+    // which made empty teams the single largest line item in the product.
+    const MIN_MEMBERS = Number(Deno.env.get("NEWS_MIN_MEMBERS") || 2);
+    const { data: liveHuddles } = await supabase
+      .from("huddles")
+      .select("team_id, member_count")
+      .gte("member_count", MIN_MEMBERS);
+    const audience = new Set(
+      (liveHuddles ?? []).map((h: any) => h.team_id).filter(Boolean),
+    );
+
     const TEAMS_PER_RUN = Number(Deno.env.get("NEWS_TEAMS_PER_RUN") || 6);
-    const allBundles = Array.from(byTeam.values());
+    const allBundlesRaw = Array.from(byTeam.values());
+    // If nothing qualifies yet (pre-launch), fall back to every team rather
+    // than going silent — an empty app is worse than a small bill.
+    const allBundles = audience.size > 0
+      ? allBundlesRaw.filter((b) => audience.has(b.teamId))
+      : allBundlesRaw;
+    summary.teams_with_audience = audience.size;
+    summary.teams_eligible = allBundles.length;
     const candidates = TEST_MODE && TEST_TEAM
       ? allBundles.filter((b) => b.teamName.toLowerCase().includes(TEST_TEAM))
       : shuffle(allBundles).slice(0, TEAMS_PER_RUN);
