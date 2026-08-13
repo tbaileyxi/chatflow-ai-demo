@@ -69,6 +69,57 @@ serve(async (req) => {
   } catch {
     return json({ error: "bad json" }, 400);
   }
+  // SCAN MODE — an empty body means "find anything unanswered and answer it".
+  //
+  // The on_coach_mention trigger calls this over pg_net and those calls have
+  // never landed: verified 2026-08-12/13, the function answers in ~5s when
+  // called directly, yet not one trigger-originated answer exists. Rather than
+  // keep chasing the HTTP layer, cron drives it — the same mechanism that runs
+  // bot-live-poller every minute without trouble. The trigger can stay; this
+  // is simply a net that catches whatever it drops.
+  if (!payload.huddle_id && !payload.content) {
+    const since = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const { data: asks } = await supabase
+      .from("huddle_messages")
+      .select("id, huddle_id, user_id, content, created_at")
+      .eq("is_bot_message", false)
+      .ilike("content", "%@coach%")
+      .gte("created_at", since)
+      .order("created_at", { ascending: true })
+      .limit(10);
+
+    // Skip anything already answered — the reply carries reply_to_id.
+    const ids = (asks ?? []).map((a: any) => a.id);
+    const answered = new Set<string>();
+    if (ids.length) {
+      const { data: replies } = await supabase
+        .from("huddle_messages")
+        .select("reply_to_id")
+        .in("reply_to_id", ids);
+      for (const r of replies ?? []) answered.add((r as any).reply_to_id);
+    }
+
+    const pending = (asks ?? []).filter((a: any) => !answered.has(a.id));
+    const handled: string[] = [];
+    for (const a of pending) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/coach-ask`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({
+            message_id: a.id, huddle_id: a.huddle_id,
+            user_id: a.user_id, content: a.content, reply_to_id: null,
+          }),
+        });
+        if (res.ok) handled.push(a.id);
+      } catch { /* next tick retries it */ }
+    }
+    return json({ mode: "scan", found: asks?.length ?? 0, pending: pending.length, answered: handled.length });
+  }
+
   if (!payload.huddle_id || !payload.content) {
     return json({ error: "huddle_id and content required" }, 400);
   }
