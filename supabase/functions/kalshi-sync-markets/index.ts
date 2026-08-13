@@ -496,11 +496,13 @@ Deno.serve(async (req) => {
             ? `Will the ${team ? team.name : side} win?`
             : (strike != null && sideText ? sideText : (m.title || m.subtitle || m.ticker));
 
-          // One Kalshi market can produce a row per room for game-level types.
-          // kalshi_ticker is the conflict key, so each row needs its own —
-          // suffix with the team when we fan out.
-          const targets: (TeamRecord | null)[] =
-            isGameLevel && team2 ? [team, team2] : [team ?? null];
+          // NO fan-out. This used to write one row per team for game-level
+          // totals so the card would reach both rooms — but fade-post-props
+          // already collects markets for BOTH teams in a game and posts to
+          // both teams' huddles, so the second row was redundant and every
+          // total showed up twice in the same room ("Total 8.5" from the
+          // Yankees row and again from the Mariners row). One row per market.
+          const targets: (TeamRecord | null)[] = [team ?? null];
 
           for (const tgt of targets) {
           const { error } = await supabase

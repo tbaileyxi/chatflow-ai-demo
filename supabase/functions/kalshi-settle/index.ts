@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
     // Find unresolved markets past their event time
     const { data: unresolvedMarkets } = await supabase
       .from('kalshi_markets')
-      .select('id, kalshi_ticker, huddle_id, question, current_yes_price')
+      .select('id, kalshi_ticker, huddle_id, question, current_yes_price, event_start_time')
       .eq('is_resolved', false)
       .lt('event_start_time', new Date().toISOString());
 
@@ -121,6 +121,19 @@ Deno.serve(async (req) => {
           if (!huddleResults.has(market.huddle_id)) {
             huddleResults.set(market.huddle_id, { markets: [], betsSettled: 0 });
           }
+          // Do NOT headline a "Post-Game Summary" while the game is still on.
+          // Kalshi finalizes a total the instant it is mathematically decided —
+          // "Over 2.5 runs" settles in the 3rd — so grading it immediately is
+          // correct, but announcing a post-game recap in the 5th is not. Hold
+          // the recap until the game has plausibly ended. Grading above is
+          // unaffected; only the summary waits.
+          const startedMs = market.event_start_time
+            ? Date.parse(market.event_start_time) : 0;
+          const GAME_OVER_AFTER_MS = 4 * 60 * 60 * 1000;
+          if (!startedMs || Date.now() - startedMs < GAME_OVER_AFTER_MS) {
+            continue;
+          }
+
           const entry = huddleResults.get(market.huddle_id)!;
           entry.markets.push({
             question: market.question,
