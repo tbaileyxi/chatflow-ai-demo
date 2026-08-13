@@ -253,10 +253,26 @@ export async function getGameSnapshot(
     : league === "NHL" ? "hockey"
     : league === "NBA" ? "basketball"
     : league === "NFL" ? "americanfootball"
-    : null;   // NCAA covers several sports — do not guess, just don't filter
+    : null;   // NCAA resolved below — one league value covers several sports
 
-  const data = family
-    ? (raw ?? []).filter((g: any) => String(g.sport_key ?? "").includes(family))
+  // NCAA teams are all filed under league 'NCAA' whether they play football or
+  // basketball, so the league alone cannot tell us the sport. Infer it from the
+  // team's own SCHEDULED game — that is the season they are actually in right
+  // now — and fall back to their most recent row. Without this, college teams
+  // got no sport filter at all, which is the same hole that let an NBA game
+  // answer for the Browns.
+  let effective = family;
+  if (!effective) {
+    const upcoming = (raw ?? []).find((g: any) => String(g.status) === "scheduled");
+    const anchor = upcoming ?? (raw ?? [])[0];
+    const sk = String((anchor as any)?.sport_key ?? "");
+    for (const f of ["americanfootball", "basketball", "baseball", "hockey"]) {
+      if (sk.includes(f)) { effective = f; break; }
+    }
+  }
+
+  const data = effective
+    ? (raw ?? []).filter((g: any) => String(g.sport_key ?? "").includes(effective))
     : (raw ?? []);
 
   if (!data || data.length === 0) return null;
