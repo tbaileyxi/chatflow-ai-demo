@@ -22,9 +22,8 @@ export function DiscoverySection() {
       />
       <TeamsBlock
         onHuddlePress={(id) => navigation.navigate("Huddle", { huddleId: id })}
-        // TeamFeed is gone. Tapping a team on Home now starts a room for it —
-        // which is the only thing you could usefully do with a team anyway now
-        // that a team's content lives in its room rather than a separate feed.
+        // A team's content lives in its room, so the only useful thing to do
+        // with a team you have no room for is make one.
         onTeamPress={(id) =>
           navigation.navigate("CreateSideHuddle", { teamId: id })
         }
@@ -117,7 +116,7 @@ function TeamsBlock({
 
   return (
     <View className="gap-3">
-      <Text className="text-lg font-bold text-foreground">Follow a Team</Text>
+      <Text className="text-lg font-bold text-foreground">Start a room</Text>
 
       {/* League tabs */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -161,7 +160,13 @@ function TeamsBlock({
               key={t.id}
               className="items-center gap-1 active:opacity-80"
               onPress={() =>
-                t.huddleId ? onHuddlePress(t.huddleId) : onTeamPress(t.id)
+                // ALWAYS create. t.huddleId points at the team's official
+                // "<Team> Community" room, and those are relics — content
+                // buffers that backfillTeamContent reads from, invisible in
+                // search, that no user should ever be dropped into. Seeding
+                // them for all 195 teams meant this branch fired almost every
+                // time, so tapping a team on Home opened a dead room.
+                onTeamPress(t.id)
               }
             >
               <View
