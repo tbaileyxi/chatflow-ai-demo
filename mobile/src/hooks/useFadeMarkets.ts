@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { marketSides } from "@/lib/marketSides";
 import type { GameContext } from "@/hooks/useLiveGameContext";
 
 // Real, per-game fade props sourced from the same SportsGameOdds markets that
@@ -29,69 +30,26 @@ export type FadeMarket = {
 // everyone picks the Giants and there is no argument to be had.
 const FADEABLE = ["player_prop", "total", "spread"];
 
+// The wording is not decided here. `marketSides` owns it, so the Fade sheet,
+// the Picks board and the bot's own fade cards all say the same sentence about
+// the same game — they used to say three different ones.
 function toFadeMarket(m: any): FadeMarket | null {
   const meta = (m.metadata ?? {}) as Record<string, any>;
   const type = m.market_type ?? "other";
   const line = meta.line ?? meta.spread ?? null;
-  const q: string = m.question ?? "";
+  if (line == null) return null; // no real number = nothing to argue about
 
-  if (type === "total" && line != null) {
-    return {
-      marketId: m.id,
-      marketType: type,
-      label: `Total ${line}`,
-      line: Number(line),
-      overLabel: `Over ${line}`,
-      underLabel: `Under ${line}`,
-      description: q,
-      startTime: m.event_start_time,
-    };
-  }
-  if (type === "spread" && line != null) {
-    const signed = Number(line) > 0 ? `+${line}` : `${line}`;
-    return {
-      marketId: m.id,
-      marketType: type,
-      label: `Spread ${signed}`,
-      line: Number(line),
-      overLabel: `Covers ${signed}`,
-      underLabel: `Doesn't cover ${signed}`,
-      description: q,
-      startTime: m.event_start_time,
-    };
-  }
-  // Player prop — the real workhorse. `question` reads "Nick Gonzales over 1.5
-  // hits?", so strip the "over N" tail to name the side cleanly on both chips.
-  if (type === "player_prop" && line != null) {
-    const who = meta.player ?? q.replace(/\s+over\s+[\d.]+.*$/i, "").trim();
-    const stat = String(meta.stat ?? "")
-      .replace(/^batting_|^pitching_/, "")
-      .replace(/_/g, " ");
-    const unit = stat || q.match(/over\s+[\d.]+\s+(.+?)\?/i)?.[1] || "";
-    return {
-      marketId: m.id,
-      marketType: type,
-      label: `${who} ${line} ${unit}`.trim(),
-      line: Number(line),
-      overLabel: `Over ${line}`,
-      underLabel: `Under ${line}`,
-      description: q,
-      startTime: m.event_start_time,
-    };
-  }
-  if (type === "winner") {
-    return {
-      marketId: m.id,
-      marketType: type,
-      label: "Moneyline",
-      line: null,
-      overLabel: q.replace(/\?$/, ""),
-      underLabel: "The other side",
-      description: q,
-      startTime: m.event_start_time,
-    };
-  }
-  return null;
+  const sides = marketSides(m);
+  return {
+    marketId: m.id,
+    marketType: type,
+    label: sides.headline,
+    line: Number(line),
+    overLabel: sides.yesLabel,
+    underLabel: sides.noLabel,
+    description: m.question ?? "",
+    startTime: m.event_start_time,
+  };
 }
 
 export function useFadeMarkets(game: GameContext | null) {

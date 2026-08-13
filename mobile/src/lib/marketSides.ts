@@ -1,0 +1,113 @@
+// How a market is worded on a card: the eyebrow, the neutral headline, and the
+// two sides you can take.
+//
+// WHY THIS EXISTS: this logic was written three times — in useFadeMarkets, in
+// the fade-post-props edge function, and not at all on the Picks board, which
+// fell back to raw "YES 30¢ / NO 70¢". So the same Pirates game read as
+// "Covers +4.5" in the Fade sheet and "YES" on the board. Moneyline survived
+// two separate removals for the same reason: N copies, N places to forget.
+//
+// One derivation, one dialect. The edge-function twin lives at
+// supabase/functions/_shared/markets/sides.ts — the runtimes can't share a
+// file, so change both or neither.
+//
+// The dialect: never YES/NO. A side is named by what happens in the game
+// ("Pirates by 5+", "Over 7.5"), because that is the sentence people already
+// say out loud. YES/NO is the exchange's word for it, not a fan's.
+
+export type MarketSides = {
+  eyebrow: string; // "SPREAD" — what kind of line this is
+  headline: string; // "Pirates 4.5 runs" — neutral; never repeats a side
+  yesLabel: string; // the YES side, in game words
+  noLabel: string; // the NO side, in game words
+};
+
+type MarketLike = {
+  question?: string | null;
+  market_type?: string | null;
+  metadata?: Record<string, any> | null;
+};
+
+// "Over 7.5 runs scored" / "Pirates wins by over 4.5 runs" -> "runs"
+function unitOf(question: string): string {
+  return question.match(/(?:over|under)\s+[\d.]+\s+([a-z]+)/i)?.[1] ?? "";
+}
+
+// Kalshi lines are half-points, so "over 4.5" is plainly "5 or more".
+function atLeast(line: number): number {
+  return Math.floor(line) + 1;
+}
+
+export function marketSides(m: MarketLike): MarketSides {
+  const q = (m.question ?? "").trim();
+  const meta = m.metadata ?? {};
+  const type = m.market_type ?? "other";
+  const raw = meta.line ?? meta.spread ?? null;
+  const line = raw == null ? null : Number(raw);
+  const unit = unitOf(q);
+  // A handful of Kalshi series are phrased downward ("under 4.5"). The YES side
+  // is whatever the series asks, so flip the words rather than the outcome.
+  const flipped = String(meta.strike_type ?? "").toLowerCase() === "less";
+  const over = line == null ? "Over" : `Over ${line}`;
+  const under = line == null ? "Under" : `Under ${line}`;
+
+  if (type === "total" && line != null) {
+    return {
+      eyebrow: "TOTAL",
+      headline: `Total ${line}${unit ? ` ${unit}` : ""}`,
+      yesLabel: flipped ? under : over,
+      noLabel: flipped ? over : under,
+    };
+  }
+
+  if (type === "spread" && line != null) {
+    // "Pirates wins by over 4.5 runs" -> the team is the subject of the clause.
+    const team =
+      q.match(/^(.+?)\s+wins?\s+by/i)?.[1]?.trim() ||
+      String(meta.side ?? "").match(/^(.+?)\s+wins?\s+by/i)?.[1]?.trim() ||
+      q.split(/\s+/)[0] ||
+      "Favorite";
+    const n = atLeast(line);
+    const by = `${team} by ${n}+${unit ? ` ${unit}` : ""}`;
+    return {
+      eyebrow: "SPREAD",
+      headline: `${team} ${line}${unit ? ` ${unit}` : ""}`,
+      yesLabel: by,
+      // Deliberately vague, because it is: the NO side wins on a smaller
+      // margin AND on a loss. "Doesn't cover" was accurate and meant nothing.
+      noLabel: "Anything less",
+    };
+  }
+
+  if (type === "player_prop" && line != null) {
+    const who = meta.player ?? q.replace(/\s+over\s+[\d.]+.*$/i, "").trim();
+    const stat = String(meta.stat ?? "")
+      .replace(/^batting_|^pitching_/, "")
+      .replace(/_/g, " ");
+    const noun = stat || unit || q.match(/over\s+[\d.]+\s+(.+?)\?/i)?.[1] || "";
+    return {
+      eyebrow: "PROP",
+      headline: `${who} ${line}${noun ? ` ${noun}` : ""}`.trim(),
+      yesLabel: flipped ? under : over,
+      noLabel: flipped ? over : under,
+    };
+  }
+
+  if (type === "winner") {
+    const team = q.match(/will\s+(?:the\s+)?(.+?)\s+win\??$/i)?.[1]?.trim();
+    return {
+      eyebrow: "MONEYLINE",
+      headline: team ? `${team} to win` : q.replace(/\?$/, ""),
+      yesLabel: team ? `${team} win` : "They win",
+      noLabel: team ? `${team} lose` : "They lose",
+    };
+  }
+
+  // Unknown series. Show the question as written rather than guessing at it.
+  return {
+    eyebrow: String(type).replace(/_/g, " ").toUpperCase(),
+    headline: q.replace(/\?$/, ""),
+    yesLabel: "Yes",
+    noLabel: "No",
+  };
+}

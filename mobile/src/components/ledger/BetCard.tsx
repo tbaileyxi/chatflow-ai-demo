@@ -1,6 +1,7 @@
 import { View, Text } from "react-native";
 import { Check, X, Clock, Target } from "lucide-react-native";
 import { cn } from "@/lib/utils";
+import { marketSides } from "@/lib/marketSides";
 import { Badge } from "@/components/ui/badge";
 import { colors } from "@/theme/colors";
 import type { ShadowBet } from "@/hooks/useShadowBets";
@@ -19,6 +20,15 @@ function timeUntil(dateStr: string): string {
 }
 
 export function BetCard({ bet }: Props) {
+  // Same wording as the board and the chat card, so a pick you made in a room
+  // is still recognisable when you find it on your ledger a day later.
+  const sides = marketSides({
+    question: bet.question,
+    market_type: bet.marketType,
+    metadata: bet.metadata,
+  });
+  const myLabel = bet.position.toLowerCase() === "yes" ? sides.yesLabel : sides.noLabel;
+
   const isOpen = !bet.isSettled && !bet.isResolved;
   const isPending = !bet.isSettled && bet.isResolved;
   const isWin = bet.isSettled && bet.won === true;
@@ -43,17 +53,13 @@ export function BetCard({ bet }: Props) {
   return (
     <View className={cn("gap-2 rounded-lg border p-3", borderColor, bgColor)}>
       <Text className="text-sm font-semibold text-foreground" numberOfLines={2}>
-        {bet.question}
+        {sides.headline}
       </Text>
 
       <View className="flex-row items-center gap-2">
-        <Badge
-          variant={bet.position === "yes" ? "default" : "destructive"}
-        >
-          {bet.position.toUpperCase()}
-        </Badge>
+        <Badge variant="default">{myLabel}</Badge>
         <Text className="text-xs text-muted-foreground">
-          {bet.chipsRisked} coins risked
+          {bet.chipsRisked} chips risked
         </Text>
 
         {/* Status */}

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { marketSides } from "../_shared/markets/sides.ts";
 
 // Drops a short slate of UNCLAIMED fade props into every room watching a game,
 // the way the original gameday flow worked: 3–4 props with a real line pop up in
@@ -22,8 +23,9 @@ const FADEABLE = ["player_prop", "total", "spread"];
 // partisan room actually splits.
 const MAX_PROPS_PER_GAME = Number(Deno.env.get("FADE_MAX_PER_GAME") || 2);
 
-// Turn a kalshi_markets row into the card's display fields. Mirrors the client's
-// useFadeMarkets so a bot card and a player-posted card read identically.
+// Turn a kalshi_markets row into the card's display fields. The wording comes
+// from the shared derivation, so a bot card, a player-posted card and the Picks
+// board all say the same sentence about the same line.
 function marketCard(m: any): {
   label: string;
   line: number | null;
@@ -32,44 +34,17 @@ function marketCard(m: any): {
   description: string;
 } | null {
   const meta = (m.metadata ?? {}) as Record<string, any>;
-  const type = m.market_type;
-  const q: string = m.question ?? "";
   const line = meta.line ?? meta.spread ?? null;
+  if (line == null) return null; // no real number = nothing to argue about
 
-  if (type === "player_prop" && line != null) {
-    const who = meta.player ?? q.replace(/\s+over\s+[\d.]+.*$/i, "").trim();
-    const stat = String(meta.stat ?? "")
-      .replace(/^batting_|^pitching_/, "")
-      .replace(/_/g, " ");
-    const unit = stat || q.match(/over\s+[\d.]+\s+(.+?)\?/i)?.[1] || "";
-    return {
-      label: `${who} ${line} ${unit}`.trim(),
-      line: Number(line),
-      over: `Over ${line}`,
-      under: `Under ${line}`,
-      description: q,
-    };
-  }
-  if (type === "total" && line != null) {
-    return {
-      label: `Total ${line}`,
-      line: Number(line),
-      over: `Over ${line}`,
-      under: `Under ${line}`,
-      description: q,
-    };
-  }
-  if (type === "spread" && line != null) {
-    const signed = Number(line) > 0 ? `+${line}` : `${line}`;
-    return {
-      label: `Spread ${signed}`,
-      line: Number(line),
-      over: `Covers ${signed}`,
-      under: `Doesn't cover ${signed}`,
-      description: q,
-    };
-  }
-  return null;
+  const sides = marketSides(m);
+  return {
+    label: sides.headline,
+    line: Number(line),
+    over: sides.yesLabel,
+    under: sides.noLabel,
+    description: m.question ?? "",
+  };
 }
 
 Deno.serve(async (req) => {
