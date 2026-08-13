@@ -234,12 +234,27 @@ serve(async (req) => {
     // beat-writer chatter — the class where the Coach previously had nothing
     // and either deflected or invented.
     const LIVE_X = (Deno.env.get("COACH_X_SEARCH") || "true").toLowerCase() !== "false";
-    const wantsLive = /\b(camp|practice|report|rumor|rumour|latest|today|news|hear|saying|buzz|injur|sign|trade|depth chart|starter)\b/i
-      .test(question);
-    // If we already have fresh team news in the room, we do not need to buy it.
-    const haveFreshNews = (newsBeats?.length ?? 0) > 0;
+    // Keyword lists fail on the obvious. "who's gonna start at quarterback"
+    // missed because the list had "starter" and \bstarter\b does not match
+    // "start" — so the Coach said the QB battle "hasn't been reported out to
+    // me yet" while four named contenders were being written about daily.
+    //
+    // Two ways in now: subject words (people, roles, roster movement) OR
+    // recency words (today, latest, camp). Either alone is enough, because
+    // the failure mode we care about is missing a real question, and a
+    // needless search costs ~2 cents while a wrong answer costs trust.
+    const SUBJECT = /\b(start(s|ed|ing|er|ers)?|qb|quarterback|lineup|line-?up|roster|depth|snap|rep(s)?|injur\w*|hurt|healthy|return|back|sign(s|ed|ing)?|trade(d|s)?|cut|waive\w*|draft|recruit\w*|commit\w*|transfer|portal|coach|coordinator|battle|competition|who'?s?)\b/i;
+    const RECENCY = /\b(camp|practice|today|tonight|yesterday|this week|latest|recent|news|report(s|ed|ing)?|hear(d|ing)?|saying|buzz|rumou?r|update|so far|right now|this year|this season)\b/i;
+    const wantsLive = SUBJECT.test(question) || RECENCY.test(question);
+    // NOTE: there used to be a "skip if the room already has fresh news" guard
+    // here. It was wrong. Tulane had news — uniform reveals — so a question
+    // about the QB battle skipped the search and answered "no name attached to
+    // who's taking snaps" while four contenders were being written about daily.
+    // Having SOME news is not having THE answer. The keyword gate is the cost
+    // control; at ~2 cents a call, a needless search is far cheaper than a
+    // wrong answer.
     let liveSearch = "";
-    if (LIVE_X && wantsLive && !haveFreshNews && ctx.teamName) {
+    if (LIVE_X && wantsLive && ctx.teamName) {
       const r = await searchX(`${ctx.teamName} ${question}`);
       if (r.ok && r.text) liveSearch = r.text.slice(0, 1200);
     }
