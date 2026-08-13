@@ -207,7 +207,7 @@ export function FadeCardInMessage({
         // Bot prop nobody has taken — both sides open, one tap to claim.
         <View className="mt-2">
           <Text className="mb-1.5 text-xs text-muted-foreground">
-            Take a side for {CLAIM_STAKE} chips — first come, first served.
+            Pick a side · {CLAIM_STAKE} chips
           </Text>
           <View className="flex-row gap-2">
             {(["over", "under"] as const).map((s) => (
@@ -251,9 +251,11 @@ export function FadeCardInMessage({
         // Claimed, still open — one side taken, the other is up for grabs.
         <View className="mt-2">
           <Text className="mb-1.5 text-xs text-muted-foreground">
+            {/* Name the EVENT, not the mechanic. "waiting for someone to fade
+                you" describes plumbing; "JOE took the Over" is what happened. */}
             {isPoster
-              ? `You're on ${posterSide === "over" ? overLabel : underLabel} — waiting for someone to fade you.`
-              : `${nameOf(fade!.poster_id)} is on ${posterSide === "over" ? overLabel : underLabel}`}
+              ? `You took ${posterSide === "over" ? overLabel : underLabel}. Nobody's taken the other side yet.`
+              : `${nameOf(fade!.poster_id)} took ${posterSide === "over" ? overLabel : underLabel}`}
           </Text>
           <Pressable
             disabled={isPoster || busy}
@@ -272,7 +274,7 @@ export function FadeCardInMessage({
                   isPoster ? "text-muted-foreground" : "text-success",
                 )}
               >
-                {isPoster ? "Waiting for a fader" : `Take ${openSideLabel} · ${stake} chips`}
+                {isPoster ? "Waiting on a taker" : `Take the other side · ${openSideLabel}`}
               </Text>
             )}
           </Pressable>

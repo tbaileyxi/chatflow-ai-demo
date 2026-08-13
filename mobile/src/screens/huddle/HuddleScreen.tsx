@@ -407,6 +407,23 @@ export function HuddleScreen() {
                 game={liveGame ?? null}
                 gameState={pingGameState}
               />
+              {/* The way OUT of the room and into your positions. Everything
+                  fade-shaped was previously a dead end: the button opened a
+                  post sheet, cards did nothing, and seeing what you were
+                  actually holding meant backing out to the tab bar and
+                  hunting for it. */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open your picks"
+                onPress={() =>
+                  (navigation as any).navigate("MainTabs", { screen: "Ledger" })
+                }
+                className="flex-row items-center gap-1 rounded-full border border-border bg-muted/40 px-2.5 py-1"
+              >
+                <Text className="text-xs font-black text-muted-foreground">
+                  My picks
+                </Text>
+              </Pressable>
               {pingGameState !== "none" ? (
                 <PingButton huddleId={huddleId} gameState={pingGameState} />
               ) : null}

@@ -162,12 +162,16 @@ async function postAdminWelcome(
     if (!systemUserId) return;
 
     const team = teamName ?? "your team";
+    // Say what it IS, then what to DO — with the actual button named. The
+    // 48-hour nudge is useless if nobody knew where anything was on day one.
     const content =
-      `🏟️ **You're the admin of ${huddleName}.**\n\n` +
-      `I've got the game covered — ${team} news as it breaks, and when they play, ` +
-      `I'm in here calling it with you live. Scores, big plays, all in this thread.\n\n` +
-      `You've got the other half: get your people in. A huddle of one is just me ` +
-      `talking to myself.\n\n` +
+      `🏟️ **${huddleName} is your room.**\n\n` +
+      `I've got ${team} covered — news as it breaks, and when they play I'm in ` +
+      `here calling it live. Scores, big plays, all in this thread.\n\n` +
+      `Your half: get your people in. Tap the **+** up top to invite them — ` +
+      `a huddle of one is just me talking to myself.\n\n` +
+      `Ask me anything with **@coach** — the score, who's starting, camp news.\n` +
+      `Going private or managing who's in? That's **Settings**, top right.\n\n` +
       `**→ Add your crew**`;
 
     const { error } = await supabase.from("huddle_messages").insert({
