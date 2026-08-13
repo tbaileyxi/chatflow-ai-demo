@@ -22,7 +22,9 @@ export type TeamMarket = {
   kalshi_ticker: string;
 };
 
-const GAME_MARKET_TYPES = ["spread", "total", "winner", "player_prop", "other"];
+// No moneyline. In a Browns room everybody picks the Browns, so "will they
+// win?" is not a debate — spreads and totals are where a partisan room splits.
+const GAME_MARKET_TYPES = ["spread", "total", "player_prop"];
 
 export function useFollowedTeamMarkets() {
   const { user } = useAuth();
@@ -100,6 +102,21 @@ export function useFollowedTeamMarkets() {
           kalshi_ticker: m.kalshi_ticker ?? "",
         });
         grouped.set(m.team_id, list);
+      }
+
+      // ONE line per game per type, closest to a coin flip. Kalshi publishes a
+      // ladder — Over 4.5, 5.5, 7.5, 8.5 — and showing all of it turned the
+      // board into the same wall of near-identical cards the chat had. The
+      // interesting line is the contested one; an 87c/13c card is nobody's bet.
+      for (const [teamId, list] of grouped.entries()) {
+        const best = new Map<string, TeamMarket>();
+        for (const m of list) {
+          const key = `${m.event_start_time}|${m.market_type}`;
+          const prev = best.get(key);
+          const dist = (x: TeamMarket) => Math.abs((x.current_yes_price ?? 50) - 50);
+          if (!prev || dist(m) < dist(prev)) best.set(key, m);
+        }
+        grouped.set(teamId, [...best.values()]);
       }
 
       const result: TeamMarketGroup[] = [];
