@@ -22,7 +22,12 @@ export type FadeMarket = {
 // Markets we let people fade head-to-head, best-first. Player props carry a real
 // line ("over 1.5 hits") and are naturally two-sided, so they're the primary
 // fade; totals and spreads join automatically once odds-sync-markets writes them.
-const FADEABLE = ["player_prop", "total", "spread", "winner"];
+// No "winner". This is the THIRD place markets get filtered — the poller has
+// its own FADEABLE, the Picks board has its own type list, and this drives the
+// Fade sheet. Moneyline was removed from the other two and survived here, so
+// the sheet kept offering "Will the Giants win?" in a Giants room, where
+// everyone picks the Giants and there is no argument to be had.
+const FADEABLE = ["player_prop", "total", "spread"];
 
 function toFadeMarket(m: any): FadeMarket | null {
   const meta = (m.metadata ?? {}) as Record<string, any>;

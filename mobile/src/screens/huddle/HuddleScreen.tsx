@@ -32,12 +32,11 @@ import { HuddleHeader } from "@/components/huddle/HuddleHeader";
 import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
 import { PresenceBar } from "@/components/huddle/PresenceBar";
 import { PingButton } from "@/components/huddle/PingButton";
-import { FadeButton } from "@/components/huddle/FadeButton";
 import { ChatMessage } from "@/components/huddle/ChatMessage";
 import { MessageInput } from "@/components/huddle/MessageInput";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { DEV_ROOMS_STORAGE_KEY, getDevTeamById } from "@/config/devData";
-import { LogOut, MoreVertical, Pin, UserPlus, User } from "lucide-react-native";
+import { LogOut, MoreVertical, Pin, UserPlus, User, Swords } from "lucide-react-native";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import {
   useLiveGameContext,
@@ -402,26 +401,21 @@ export function HuddleScreen() {
           entryBanner={entryBanner}
           rightSlot={
             <View className="flex-row items-center gap-2">
-              <FadeButton
-                huddleId={huddleId}
-                game={liveGame ?? null}
-                gameState={pingGameState}
-              />
-              {/* The way OUT of the room and into your positions. Everything
-                  fade-shaped was previously a dead end: the button opened a
-                  post sheet, cards did nothing, and seeing what you were
-                  actually holding meant backing out to the tab bar and
-                  hunting for it. */}
+              {/* ONE control, not two. "Fade" opened a post sheet and "My
+                  picks" went to the ledger — two buttons for one idea, in a
+                  row that already carries Rally. Picks is the single place
+                  props and positions live, so this just goes there. */}
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Open your picks"
+                accessibilityLabel="Open picks"
                 onPress={() =>
                   (navigation as any).navigate("MainTabs", { screen: "Ledger" })
                 }
-                className="flex-row items-center gap-1 rounded-full border border-border bg-muted/40 px-2.5 py-1"
+                className="flex-row items-center gap-1.5 rounded-full border border-border bg-muted/40 px-3 py-1"
               >
+                <Swords size={13} color={colors.mutedForeground} />
                 <Text className="text-xs font-black text-muted-foreground">
-                  My picks
+                  Picks
                 </Text>
               </Pressable>
               {pingGameState !== "none" ? (
