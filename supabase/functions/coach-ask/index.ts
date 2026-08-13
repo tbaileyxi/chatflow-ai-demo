@@ -11,6 +11,7 @@
 // user and logged, in the same spirit as bot_emit_log.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { searchX } from "../_shared/coach/xsearch.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   getBoxScore,
@@ -226,6 +227,23 @@ serve(async (req) => {
       ? await getEspnStanding(ctx.league, ctx.teamName).catch(() => null)
       : null;
 
+    // --- 5b. Live X, only when the database cannot possibly answer -----------
+    // Gated deliberately. Every call costs a tool fee plus ~8k tokens, and most
+    // questions ("what's the score", "who's up") are already answered by rows
+    // we hold. This is for the ones that are not: camp reports, practice notes,
+    // beat-writer chatter — the class where the Coach previously had nothing
+    // and either deflected or invented.
+    const LIVE_X = (Deno.env.get("COACH_X_SEARCH") || "true").toLowerCase() !== "false";
+    const wantsLive = /\b(camp|practice|report|rumor|rumour|latest|today|news|hear|saying|buzz|injur|sign|trade|depth chart|starter)\b/i
+      .test(question);
+    // If we already have fresh team news in the room, we do not need to buy it.
+    const haveFreshNews = (newsBeats?.length ?? 0) > 0;
+    let liveSearch = "";
+    if (LIVE_X && wantsLive && !haveFreshNews && ctx.teamName) {
+      const r = await searchX(`${ctx.teamName} ${question}`);
+      if (r.ok && r.text) liveSearch = r.text.slice(0, 1200);
+    }
+
     // --- 6. Answer -----------------------------------------------------------
     // "what did I miss" asked out loud is the SAME question the proactive recap
     // answers, so it gets the same two-lane shape. Without this the format
@@ -258,6 +276,7 @@ serve(async (req) => {
           boxScore,
           seasonResults,
           nextGame,
+          liveSearch,
         });
 
     if (!text.trim()) return json({ skipped: "empty answer" });

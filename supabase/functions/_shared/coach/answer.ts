@@ -189,6 +189,8 @@ export function isRecapQuestion(question: string): boolean {
 // ---------------------------------------------------------------------------
 
 export interface AnswerInput {
+  /** Live X search text, already fetched. Empty/absent = nothing found. */
+  liveSearch?: string;
   ctx: HuddleContext;
   question: string;
   asker: string;
@@ -209,6 +211,13 @@ export async function answerQuestion(input: AnswerInput): Promise<string> {
   const { ctx, lane } = input;
 
   const facts: string[] = [];
+  // Live X reporting, when the question needed something the database cannot
+  // hold. It goes in as FACTS like anything else — the "only say what is in
+  // FACTS" rule is what keeps this safe, and it is precisely why the search
+  // result is pasted in rather than the model being told to go look.
+  if (input.liveSearch && input.liveSearch.trim()) {
+    facts.push("LIVE FROM X (last 48h, reported — not your own knowledge):\n" + input.liveSearch.trim());
+  }
   if (lane === "room" || lane === "mixed") facts.push(transcriptBlock(input.transcript));
   if (lane === "ledger") {
     facts.push(ledgerBlock(input.ledger));
