@@ -16,7 +16,11 @@ const corsHeaders = {
 };
 
 const FADEABLE = ["player_prop", "total", "spread"];
-const MAX_PROPS_PER_GAME = 4;
+// TWO cards per game, not four: one spread, one total. Moneyline is
+// deliberately absent from FADEABLE — in a Browns room everybody picks the
+// Browns, so "will they win?" is not a debate. Spreads and totals are where a
+// partisan room actually splits.
+const MAX_PROPS_PER_GAME = Number(Deno.env.get("FADE_MAX_PER_GAME") || 2);
 
 // Turn a kalshi_markets row into the card's display fields. Mirrors the client's
 // useFadeMarkets so a bot card and a player-posted card read identically.
@@ -122,13 +126,25 @@ Deno.serve(async (req) => {
 
       // Markets for this game's teams, close to its start (so a team's next
       // series doesn't bleed into tonight's card), best-first, capped.
-      const gameMarkets = (markets ?? [])
-        .filter(
-          (m: any) =>
-            gTeams.includes(m.team_id) &&
-            Math.abs(new Date(m.event_start_time).getTime() - start) < 6 * 60 * 60 * 1000,
-        )
-        .slice(0, MAX_PROPS_PER_GAME);
+      const inWindow = (markets ?? []).filter(
+        (m: any) =>
+          gTeams.includes(m.team_id) &&
+          Math.abs(new Date(m.event_start_time).getTime() - start) < 6 * 60 * 60 * 1000,
+      );
+
+      // ONE card per market TYPE. Previously this took the first four rows,
+      // which on a busy game meant four totals at different strikes stacked in
+      // the room — the same clutter the ladder fix removed upstream, arriving
+      // by a different door. Prefer the line closest to a coin flip: that is
+      // the one worth arguing about.
+      const byType = new Map<string, any>();
+      for (const m of inWindow) {
+        const t = String(m.market_type);
+        const prev = byType.get(t);
+        const dist = (x: any) => Math.abs((x.current_yes_price ?? 50) - 50);
+        if (!prev || dist(m) < dist(prev)) byType.set(t, m);
+      }
+      const gameMarkets = [...byType.values()].slice(0, MAX_PROPS_PER_GAME);
 
       if (gameMarkets.length === 0) continue;
 
