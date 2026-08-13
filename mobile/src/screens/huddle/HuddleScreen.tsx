@@ -409,7 +409,13 @@ export function HuddleScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Open picks"
                 onPress={() =>
-                  (navigation as any).navigate("MainTabs", { screen: "Ledger" })
+                  // Carry the room through. Picks opens focused on THIS game
+                  // rather than a list of every team you're in a room with —
+                  // you tapped from a room, so that room is the context.
+                  (navigation as any).navigate("MainTabs", {
+                    screen: "Ledger",
+                    params: { huddleId, huddleName: huddle?.name ?? undefined },
+                  })
                 }
                 className="flex-row items-center gap-1.5 rounded-full border border-border bg-muted/40 px-3 py-1"
               >

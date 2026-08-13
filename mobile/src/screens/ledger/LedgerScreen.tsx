@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback } from "react";
-import { View, Text, ScrollView, RefreshControl, Image } from "react-native";
+import { View, Text, ScrollView, RefreshControl, Image, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRoute, useNavigation } from "@react-navigation/native";
 import { Coins, Target, Clock, Trophy, TrendingUp, Sparkles, Swords } from "lucide-react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,12 @@ import { Separator } from "@/components/ui/separator";
 import { colors } from "@/theme/colors";
 
 export function LedgerScreen() {
+  const route = useRoute<any>();
+  const navigation = useNavigation<any>();
+  // Set when you arrive from a room. Picks then leads with THAT game's props
+  // and offers a way back, instead of dumping every team you follow on you.
+  const fromHuddleId: string | undefined = route.params?.huddleId;
+  const fromHuddleName: string | undefined = route.params?.huddleName;
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: portfolio, isLoading: portfolioLoading } = usePortfolio();
@@ -106,15 +113,60 @@ export function LedgerScreen() {
             </View>
           ) : teamMarkets && teamMarkets.length > 0 ? (
             <View className="gap-4">
-              <View className="flex-row items-center gap-2">
-                <TrendingUp color={colors.primary} size={18} />
-                <Text className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                  Game Props
-                </Text>
-              </View>
-              {teamMarkets.map((group) => (
-                <TeamMarketsSection key={group.teamId} group={group} />
-              ))}
+              {(() => {
+                // Two sections when you came from a room: that room's props
+                // first under its own name, then the rest. One section when
+                // you opened Picks from the tab bar.
+                const here = fromHuddleId
+                  ? teamMarkets.filter((g) => g.huddleId === fromHuddleId)
+                  : [];
+                const rest = fromHuddleId
+                  ? teamMarkets.filter((g) => g.huddleId !== fromHuddleId)
+                  : teamMarkets;
+                return (
+                  <>
+                    {here.length > 0 ? (
+                      <View className="gap-4">
+                        <View className="flex-row items-center justify-between">
+                          <View className="flex-row items-center gap-2">
+                            <TrendingUp color={colors.primary} size={18} />
+                            <Text className="text-sm font-bold uppercase tracking-wider text-primary">
+                              {fromHuddleName ?? "This room"}
+                            </Text>
+                          </View>
+                          <Pressable
+                            onPress={() =>
+                              navigation.navigate("Huddle", { huddleId: fromHuddleId })
+                            }
+                            hitSlop={8}
+                          >
+                            <Text className="text-xs font-black text-muted-foreground">
+                              ← Back to room
+                            </Text>
+                          </Pressable>
+                        </View>
+                        {here.map((group) => (
+                          <TeamMarketsSection key={group.teamId} group={group} />
+                        ))}
+                      </View>
+                    ) : null}
+
+                    {rest.length > 0 ? (
+                      <View className="gap-4">
+                        <View className="flex-row items-center gap-2">
+                          <TrendingUp color={colors.mutedForeground} size={18} />
+                          <Text className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                            {here.length > 0 ? "Your other rooms" : "Game Props"}
+                          </Text>
+                        </View>
+                        {rest.map((group) => (
+                          <TeamMarketsSection key={group.teamId} group={group} />
+                        ))}
+                      </View>
+                    ) : null}
+                  </>
+                );
+              })()}
             </View>
           ) : null}
 

@@ -5,7 +5,7 @@ export type TabParamList = {
   Home: undefined;
   Teams: undefined;
   Search: undefined;
-  Ledger: undefined;
+  Ledger: { huddleId?: string; huddleName?: string } | undefined;
   Profile: undefined;
 };
 
