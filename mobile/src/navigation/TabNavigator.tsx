@@ -2,7 +2,6 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Home, Newspaper, Search, Target, User } from "lucide-react-native";
 import { colors } from "@/theme/colors";
 import { HomeScreen } from "@/screens/home/HomeScreen";
-import { TeamsScreen } from "@/screens/teams/TeamsScreen";
 import { HuddleSearchScreen } from "@/screens/huddle-search/HuddleSearchScreen";
 import { LedgerScreen } from "@/screens/ledger/LedgerScreen";
 import { ProfileScreen } from "@/screens/profile/ProfileScreen";
@@ -32,15 +31,11 @@ export function TabNavigator() {
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
-      <Tab.Screen
-        name="Teams"
-        component={TeamsScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Newspaper color={color} size={size} />
-          ),
-        }}
-      />
+      {/* Teams tab removed 2026-08-13: a second feed competing with the chat
+          rather than feeding it, and a team's content already arrives in that
+          team's room. Management moved to Profile / My Teams. TeamsScreen and
+          ManageTeams both still exist and are routable, so restoring the
+          Tab.Screen block here brings it back. */}
       <Tab.Screen
         name="Search"
         component={HuddleSearchScreen}
