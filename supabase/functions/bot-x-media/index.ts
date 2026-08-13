@@ -183,11 +183,12 @@ serve(async (req) => {
           embed_code: best.url,
           is_bot_message: true,
           message_type: "news",
-          // Video posts still land as their still frame: the app renders
-          // media_type "image" today and has no video branch yet. videoUrl is
-          // carried on the log so playback can light up without a re-fetch.
-          media_url: best.imageUrl,
-          media_type: "image",
+          // Clips play in-line; everything else is a still. pickBest already
+          // prefers photos, so video only lands when a photo wasn't on offer —
+          // which keeps this from breaking anyone on a build without the
+          // video branch (they see the text and the link, not a blank bubble).
+          media_url: best.videoUrl ?? best.imageUrl,
+          media_type: best.videoUrl ? "video" : "image",
         })),
       );
       if (insErr) {

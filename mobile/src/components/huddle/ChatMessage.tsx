@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback } from "react";
 import { View, Text, Image, Pressable, Share, Modal, Dimensions, Linking } from "react-native";
 import { MessageSquareReply, Share2, X, Play, Pause, Mic } from "lucide-react-native";
-import { Audio } from "expo-av";
+import { Audio, Video, ResizeMode } from "expo-av";
 import { cn } from "@/lib/utils";
 import { colors } from "@/theme/colors";
 import { PredictionCardInMessage } from "@/components/predictions/PredictionCardInMessage";
@@ -460,6 +460,23 @@ export function ChatMessage({
                     className="mt-1 rounded-xl"
                     style={{ width: 230, height: 230 }}
                     resizeMode="cover"
+                  />
+                </Pressable>
+              )}
+
+              {/* Video — X clips from the daily media drop. Same 230px box as
+                  a photo so a mixed feed doesn't jump around. Tap to play;
+                  muted by default because a highlight that starts shouting in
+                  a quiet room is a reason to close the app. */}
+              {message.mediaUrl && message.mediaType === "video" && (
+                <Pressable onLongPress={handleLongPress}>
+                  <Video
+                    source={{ uri: message.mediaUrl }}
+                    style={{ width: 230, height: 230, borderRadius: 12, marginTop: 4 }}
+                    resizeMode={ResizeMode.COVER}
+                    useNativeControls
+                    isLooping
+                    isMuted
                   />
                 </Pressable>
               )}
