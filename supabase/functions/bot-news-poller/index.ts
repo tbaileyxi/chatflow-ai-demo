@@ -115,11 +115,26 @@ serve(async (req) => {
     // member, so ~80% of the headline-judge calls scored news for rooms nobody
     // is in. The judge is ~86% of the Anthropic bill (7,200 haiku calls/day),
     // which made empty teams the single largest line item in the product.
-    const MIN_MEMBERS = Number(Deno.env.get("NEWS_MIN_MEMBERS") || 2);
+    // The member-count test was backwards. Auto-joining every signup to their
+    // team's Community room gave those seeded rooms 4-53 members each, so all
+    // 195 of them cleared a ">= 2 members" bar — while a room someone made
+    // themselves and sits in alone did not. We paid to write news into rooms
+    // nobody chose, and stayed silent in the ones people actually built.
+    //
+    // A room somebody created is the signal. One member is enough: they made
+    // it on purpose. Seeded rooms have to earn it with real conversation.
+    // Rooms people made themselves. Nothing else.
+    //
+    // Tempting alternative, rejected: "seeded rooms that have been active
+    // lately". last_message_at counts the BOT's own posts, so news kept 56
+    // seeded rooms alive on the strength of news — the gate would have been
+    // citing itself. The tell was 57, 56, 31 and 30 rooms sharing one exact
+    // date. People don't talk in synchronised batches; pollers do.
     const { data: liveHuddles } = await supabase
       .from("huddles")
-      .select("team_id, member_count")
-      .gte("member_count", MIN_MEMBERS);
+      .select("team_id, member_count, is_official_team_huddle")
+      .gte("member_count", 1)
+      .or("is_official_team_huddle.is.false,is_official_team_huddle.is.null");
     const audience = new Set(
       (liveHuddles ?? []).map((h: any) => h.team_id).filter(Boolean),
     );
