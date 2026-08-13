@@ -33,8 +33,6 @@ export type RootStackParamList = {
   JoinHuddle: { huddleId: string };
   HuddleSearch: undefined;
   CreateSideHuddle: { teamId?: string } | undefined;
-  ManageTeams: undefined;
-  TeamFeed: { teamId: string };
   Admin: undefined;
   Settings: undefined;
   FAQ: undefined;

@@ -33,9 +33,8 @@ export function TabNavigator() {
       />
       {/* Teams tab removed 2026-08-13: a second feed competing with the chat
           rather than feeding it, and a team's content already arrives in that
-          team's room. Management moved to Profile / My Teams. TeamsScreen and
-          ManageTeams both still exist and are routable, so restoring the
-          Tab.Screen block here brings it back. */}
+          team's room. Your Picks board now derives its teams from the rooms
+          you are in, so the separate follow list went with it. */}
       <Tab.Screen
         name="Search"
         component={HuddleSearchScreen}

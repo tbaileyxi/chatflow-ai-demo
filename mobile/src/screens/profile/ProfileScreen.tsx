@@ -503,21 +503,6 @@ export function ProfileScreen() {
             <CardTitle>Account</CardTitle>
           </CardHeader>
           <CardContent className="gap-3">
-            {/* The ONLY route to team management now that the Teams tab is
-                gone. ManageTeams was reachable exclusively from TeamsScreen,
-                so removing that tab without this would have stranded following
-                and unfollowing teams entirely. */}
-            <Button
-              variant="outline"
-              onPress={() => navigation.navigate("ManageTeams" as any)}
-            >
-              <View className="flex-row items-center gap-2">
-                <Shield color={colors.primary} size={16} />
-                <Text className="text-sm font-medium text-foreground">
-                  My Teams
-                </Text>
-              </View>
-            </Button>
             {hasAdminAccess && (
               <Button
                 variant="outline"

@@ -22,7 +22,12 @@ export function DiscoverySection() {
       />
       <TeamsBlock
         onHuddlePress={(id) => navigation.navigate("Huddle", { huddleId: id })}
-        onTeamPress={(id) => navigation.navigate("TeamFeed", { teamId: id })}
+        // TeamFeed is gone. Tapping a team on Home now starts a room for it —
+        // which is the only thing you could usefully do with a team anyway now
+        // that a team's content lives in its room rather than a separate feed.
+        onTeamPress={(id) =>
+          navigation.navigate("CreateSideHuddle", { teamId: id })
+        }
       />
     </View>
   );

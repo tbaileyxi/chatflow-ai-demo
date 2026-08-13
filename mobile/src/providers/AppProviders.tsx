@@ -50,7 +50,6 @@ const linking: LinkingOptions<RootStackParamList> = {
       HuddleSearch: "huddle-search",
       CreateSideHuddle: "create-side-huddle/:teamId?",
       Onboarding: "onboarding",
-      TeamFeed: "teams/:teamId",
       Admin: "admin",
       Settings: "settings",
       FAQ: "faq",

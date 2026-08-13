@@ -35,32 +35,39 @@ export function useFollowedTeamMarkets() {
     queryFn: async (): Promise<TeamMarketGroup[]> => {
       if (!user) return [];
 
-      // Get followed team IDs
-      const { data: follows } = await supabase
-        .from("user_follows")
-        .select("team_id")
+      // Your teams are the teams whose ROOMS you are in. There is no separate
+      // follow list any more: picking a team when you create a huddle already
+      // said "I care about this team", and maintaining a second list of the
+      // same fact meant a board that could be empty while you sat in five
+      // rooms. One concept, derived from where you actually are.
+      const { data: memberships } = await supabase
+        .from("huddle_members")
+        .select("huddle_id")
         .eq("user_id", user.id);
 
-      if (!follows || follows.length === 0) return [];
+      const huddleIds = (memberships ?? []).map((m) => m.huddle_id);
+      if (huddleIds.length === 0) return [];
 
-      const teamIds = follows.map((f) => f.team_id);
+      const { data: myHuddles } = await supabase
+        .from("huddles")
+        .select("id, team_id")
+        .in("id", huddleIds)
+        .not("team_id", "is", null);
 
-      // Fetch teams info
+      const teamIds = [...new Set((myHuddles ?? []).map((h) => h.team_id as string))];
+      if (teamIds.length === 0) return [];
+
       const { data: teams } = await supabase
         .from("teams")
         .select("id, name, city, logo_url")
         .in("id", teamIds);
 
-      // Fetch official huddles for these teams (needed for placing bets)
-      const { data: huddles } = await supabase
-        .from("huddles")
-        .select("id, team_id")
-        .in("team_id", teamIds)
-        .eq("is_official_team_huddle", true);
-
-      const huddleMap = new Map(
-        (huddles ?? []).map((h) => [h.team_id, h.id]),
-      );
+      // Bets are placed against a room. Prefer the room you are actually in
+      // over the invisible Community relic for that team.
+      const huddleMap = new Map<string, string>();
+      for (const h of myHuddles ?? []) {
+        if (h.team_id && !huddleMap.has(h.team_id)) huddleMap.set(h.team_id, h.id);
+      }
 
       // Date-specific: only markets for games inside the next 48h. Kalshi
       // doesn't list most per-game markets earlier than that anyway, and a
