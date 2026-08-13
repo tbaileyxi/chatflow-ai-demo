@@ -43,6 +43,7 @@ serve(async (req) => {
     teams_quieted: 0,
     entries_fetched: 0,
     entries_new: 0,
+    entries_out_of_window: 0, // stale, future-dated, or not an article at all
     entries_survived: 0,
     posts: 0,
     teams_with_audience: 0,
@@ -191,8 +192,33 @@ serve(async (req) => {
         .eq("team_id", bundle.teamId)
         .in("entry_id", ids);
       const seenIds = new Set((seen ?? []).map((r: any) => r.entry_id));
-      const freshAll = allEntries.filter((e) => !seenIds.has(e.entryId));
+      const unseen = allEntries.filter((e) => !seenIds.has(e.entryId));
+
+      // NEWS HAS TO BE NEW. publishedAt was only ever used to sort, never to
+      // filter, and the sort is descending — so a feed item dated in the FUTURE
+      // outranked every real article from today, permanently. Schedule feeds
+      // stamp entries with the GAME date, which is how a Knicks room in August
+      // got handed a Knicks-Mavs game page for 4 March 2027: it sorted first
+      // every single run. Bound the window at both ends.
+      const MAX_AGE_H = Number(Deno.env.get("NEWS_MAX_AGE_HOURS") || 72);
+      const now = Date.now();
+      const oldest = now - MAX_AGE_H * 3600_000;
+      const newest = now + 2 * 3600_000; // clock skew / timezone sloppiness only
+
+      // A schedule, box score or ticket page is not an article. It has no story
+      // in it, and tapping through lands on a fixture with 0-0 records.
+      const NOT_AN_ARTICLE =
+        /\/(game|gamecast|boxscore|scoreboard|schedule|standings|tickets|odds|matchup)(\/|\?|$)/i;
+
+      const freshAll = unseen.filter((e) => {
+        if (NOT_AN_ARTICLE.test(e.link)) return false;
+        if (!e.publishedAt) return true; // undated (Google News) — judged on merit
+        const t = Date.parse(e.publishedAt);
+        if (!Number.isFinite(t)) return true;
+        return t >= oldest && t <= newest;
+      });
       summary.entries_new += freshAll.length;
+      summary.entries_out_of_window += unseen.length - freshAll.length;
       if (freshAll.length === 0) return;
 
       // Cap per-run scoring work. Daily cap is small (5), so even on a large
