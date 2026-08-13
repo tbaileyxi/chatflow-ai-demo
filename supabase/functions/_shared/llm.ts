@@ -24,17 +24,23 @@ export type Provider = "anthropic" | "openai" | "xai";
 // Anthropic tiers (as of Aug 2026):
 //   claude-haiku-4-5  $1/$5  per Mtok — summarizing + classifying
 //   claude-sonnet-5   $2/$10 per Mtok (intro thru 2026-08-31, then $3/$15)
+//   grok-4.3          $1.25/$2.50 per Mtok — the cheap xAI tier
+//   grok-4.6          $2/$6 per Mtok — xAI flagship
+// xAI model ids verified live against /v1/models on 2026-08-13. The previous
+// entries all said "grok-2-latest", which no longer exists on the account —
+// so the documented "one env var to switch providers" would have 404'd the
+// moment anyone relied on it.
 //   claude-opus-5     $5/$25 per Mtok — reserved for the recap, see below
 //
 // The recap gets Opus because it is the one artifact that is pushed to everyone
 // and actually read: one call per room per game, versus hundreds of in-game
 // lines. Highest visibility per token spent in the whole product.
 const MODELS: Record<LlmJob, Record<Provider, string>> = {
-  news:    { anthropic: "claude-haiku-4-5", openai: "gpt-4o-mini", xai: "grok-2-latest" },
-  route:   { anthropic: "claude-haiku-4-5", openai: "gpt-4o-mini", xai: "grok-2-latest" },
-  in_game: { anthropic: "claude-sonnet-5",  openai: "gpt-4o",      xai: "grok-2-latest" },
-  answer:  { anthropic: "claude-sonnet-5",  openai: "gpt-4o",      xai: "grok-2-latest" },
-  recap:   { anthropic: "claude-opus-5",    openai: "gpt-4o",      xai: "grok-2-latest" },
+  news:    { anthropic: "claude-haiku-4-5", openai: "gpt-4o-mini", xai: "grok-4.3" },
+  route:   { anthropic: "claude-haiku-4-5", openai: "gpt-4o-mini", xai: "grok-4.3" },
+  in_game: { anthropic: "claude-sonnet-5",  openai: "gpt-4o",      xai: "grok-4.6" },
+  answer:  { anthropic: "claude-sonnet-5",  openai: "gpt-4o",      xai: "grok-4.6" },
+  recap:   { anthropic: "claude-opus-5",    openai: "gpt-4o",      xai: "grok-4.6" },
 };
 
 // First name that resolves wins. JUDGE_MODEL is listed for `route` so the
