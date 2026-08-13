@@ -229,14 +229,35 @@ export async function getGameSnapshot(
 ): Promise<GameSnapshot | null> {
   // Most recent game touching this team, in either direction: a live one if
   // there is one, otherwise the last final, otherwise the next scheduled.
-  const { data } = await supabase
+  const { data: raw } = await supabase
     .from("games")
     .select(
-      "status, start_time, home_score, away_score, period, clock, home_team_id, away_team_id",
+      "status, start_time, home_score, away_score, period, clock, home_team_id, away_team_id, sport_key",
     )
     .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
     .order("start_time", { ascending: false })
-    .limit(8);
+    .limit(20);
+
+  // The sport MUST match the team's own sport. Without this the Coach told a
+  // Browns room "preseason loss, Lions 114 - Browns 110" — a real row in the
+  // games table with sport_key basketball_nba and NFL teams attached, because
+  // whatever wrote it matched a Pistons/Cavaliers game on the shared city
+  // names "Detroit" and "Cleveland". The model reported it faithfully, which
+  // is exactly why an unfiltered read is dangerous: bad data becomes a
+  // confident, specific, completely invented result.
+  const { data: teamRow } = await supabase
+    .from("teams").select("league").eq("id", teamId).maybeSingle();
+  const league = String((teamRow as any)?.league ?? "").toUpperCase();
+  const family =
+    league === "MLB" ? "baseball"
+    : league === "NHL" ? "hockey"
+    : league === "NBA" ? "basketball"
+    : league === "NFL" ? "americanfootball"
+    : null;   // NCAA covers several sports — do not guess, just don't filter
+
+  const data = family
+    ? (raw ?? []).filter((g: any) => String(g.sport_key ?? "").includes(family))
+    : (raw ?? []);
 
   if (!data || data.length === 0) return null;
 
