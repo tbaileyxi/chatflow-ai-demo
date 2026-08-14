@@ -1,34 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import shLogo from '@/assets/sh-logo-updated.png';
-import { supabase } from '@/integrations/supabase/client';
 
 // ─── Placeholder store links — swap when live ───────────────────────────────
 const APP_STORE_URL = '#';
-const PLAY_STORE_URL = '#';
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
-  const [email, setEmail] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-
-  const [error, setError] = useState('');
-
-  const handleNotify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-    setError('');
-    const { error: dbError } = await supabase
-      .from('app_waitlist')
-      .insert({ email: email.trim().toLowerCase() });
-    if (dbError && dbError.code !== '23505') {
-      // 23505 = unique violation (already signed up) — treat as success
-      setError('Something went wrong. Please try again.');
-      return;
-    }
-    setSubmitted(true);
-    setEmail('');
-  };
-
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white overflow-x-hidden">
 
@@ -48,7 +25,7 @@ export default function LandingPage() {
         <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-4 py-1.5">
           <span className="h-2 w-2 rounded-full bg-[#FFD700] animate-pulse" />
           <span className="text-xs font-medium text-[#FFD700] tracking-widest uppercase">
-            Coming to App Store &amp; Google Play
+            Coming to the App Store
           </span>
         </div>
 
@@ -59,55 +36,20 @@ export default function LandingPage() {
         </h1>
 
         <p className="text-white/60 text-lg leading-relaxed max-w-lg mb-10">
-          Side Huddle pulls together every player tweet, coach update, and breaking
-          news into one live group chat — so you and your friends never miss a moment.
+          A room for you and your friends, with an AI Coach that brings the news,
+          the photos and the day's lines to you — so the group chat keeps up with the game.
         </p>
 
         {/* Store badges */}
-        <div className="flex flex-col sm:flex-row items-center gap-4 mb-8">
+        <div className="flex items-center justify-center mb-8">
           <StoreBadge
             href={APP_STORE_URL}
             icon={<AppleIcon />}
             label="Download on the"
             store="App Store"
           />
-          <StoreBadge
-            href={PLAY_STORE_URL}
-            icon={<PlayIcon />}
-            label="Get it on"
-            store="Google Play"
-          />
         </div>
 
-        {/* Email waitlist */}
-        {!submitted ? (
-          <form onSubmit={handleNotify} className="w-full max-w-sm">
-            <p className="text-xs text-white/40 mb-3">
-              Not live in your region yet? Get notified first.
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="email"
-                required
-                placeholder="your@email.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FFD700]/50 transition-colors"
-              />
-              <button
-                type="submit"
-                className="bg-[#FFD700] text-black font-semibold text-sm px-5 py-3 rounded-xl hover:bg-yellow-300 transition-colors whitespace-nowrap"
-              >
-                Notify me
-              </button>
-            </div>
-            {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
-          </form>
-        ) : (
-          <div className="text-sm text-[#FFD700] border border-[#FFD700]/30 bg-[#FFD700]/10 rounded-xl px-6 py-3">
-            ✓ You're on the list — we'll ping you when it drops.
-          </div>
-        )}
       </section>
 
       {/* ── Phone mockup + feature highlight ── */}
@@ -121,8 +63,8 @@ export default function LandingPage() {
         <div className="flex flex-col gap-8 text-left max-w-lg">
           <Feature
             emoji="📡"
-            title="All your team's socials, one feed"
-            desc="Players, coaches, beat reporters — every tweet and post, curated in real time for your team."
+            title="The Coach brings the news to you"
+            desc="Beat reports, roster moves and the photo everyone's sharing — dropped straight into your room, in your team's voice."
           />
           <Feature
             emoji="🏆"
@@ -131,8 +73,8 @@ export default function LandingPage() {
           />
           <Feature
             emoji="🎯"
-            title="Live prediction markets"
-            desc="Make friendly bets with your huddle using Chips. Who's starting? Who scores first? You decide."
+            title="Fade your friends"
+            desc="Real lines, named in plain English. Take a side, someone takes the other, and Chips settle it when the game does."
           />
           <Feature
             emoji="🔔"
@@ -153,9 +95,9 @@ export default function LandingPage() {
 
         <div className="max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-8">
           {[
-            { step: '01', title: 'Pick your teams', desc: 'NFL, NBA, MLB, EPL and more. Follow as many as you want.' },
-            { step: '02', title: 'Create a Huddle', desc: 'Start a private group for your friends — or join a public one for your team.' },
-            { step: '03', title: 'Chat live', desc: 'Your team feed drops straight into the chat during games.' },
+            { step: '01', title: 'Make a room', desc: 'Name it, pick the team it follows, and you are done.' },
+            { step: '02', title: 'Bring your crew', desc: 'Send one link. No account hoops before they can see the room.' },
+            { step: '03', title: 'Let it run', desc: 'News, photos and the day\'s lines show up on their own while the game is on.' },
           ].map(({ step, title, desc }) => (
             <div key={step} className="flex flex-col items-center text-center gap-3">
               <div className="font-orbitron text-3xl font-extrabold text-[#FFD700]/20">
@@ -194,9 +136,8 @@ export default function LandingPage() {
         <p className="text-white/50 text-sm mb-8 max-w-sm mx-auto">
           Download the app and bring your game-day crew together.
         </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="flex items-center justify-center">
           <StoreBadge href={APP_STORE_URL} icon={<AppleIcon />} label="Download on the" store="App Store" large />
-          <StoreBadge href={PLAY_STORE_URL} icon={<PlayIcon />} label="Get it on" store="Google Play" large />
         </div>
       </section>
 
@@ -298,45 +239,47 @@ function PhoneMockup() {
           </div>
         </div>
 
-        {/* App UI mockup */}
+        {/* App UI mockup — mirrors a real room: the Coach posts, the room
+            argues, and a fade card names both sides. Kept in sync with the
+            app on purpose; the old version showed a three-tab nav and a
+            generic group chat, neither of which exists any more. */}
         <div className="px-3 pb-3 flex flex-col gap-2">
-          {/* Header */}
+          {/* Room header */}
           <div className="flex items-center justify-between px-1 py-2">
-            <span className="font-orbitron text-xs font-bold text-[#FFD700]">SIDE HUDDLE</span>
-            <div className="h-5 w-5 rounded-full bg-[#FFD700]/20 flex items-center justify-center">
-              <span className="text-[8px]">🔔</span>
+            <span className="font-orbitron text-[10px] font-bold text-[#FFD700]">BROWNS IN CHS</span>
+            <span className="text-[8px] text-white/30">4 members</span>
+          </div>
+
+          {/* The Coach */}
+          <div className="rounded-2xl bg-white/[0.07] border-l-2 border-[#FFD700] px-2.5 py-2">
+            <div className="text-[8px] font-bold text-[#FFD700] mb-1">THE COACH</div>
+            <div className="text-[9px] leading-relaxed text-white/90">
+              Monken's going with Watson for Saturday's preseason opener.
             </div>
           </div>
 
-          {/* Live card */}
-          <div className="rounded-2xl bg-gradient-to-br from-[#FFD700]/20 to-[#00BFFF]/10 border border-[#FFD700]/20 p-3">
-            <div className="flex items-center gap-1 mb-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-[9px] text-red-400 font-semibold uppercase tracking-wider">Live</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <div className="text-center">
-                <div className="text-[10px] text-white/60">NYK</div>
-                <div className="text-base font-bold text-white">108</div>
+          {/* Fade card — the two sides, named the way people say them */}
+          <div className="rounded-2xl bg-gradient-to-br from-[#FFD700]/15 to-[#00BFFF]/10 border border-[#FFD700]/25 p-2.5">
+            <div className="text-[8px] font-bold text-white/40 tracking-wider mb-1">SPREAD</div>
+            <div className="text-[10px] font-bold text-white mb-2">Browns 3.5 points</div>
+            <div className="flex gap-1.5">
+              <div className="flex-1 rounded-lg border border-emerald-400/60 bg-emerald-400/10 py-1 text-center">
+                <div className="text-[8px] font-bold text-emerald-300">Browns by 4+</div>
               </div>
-              <div className="text-[9px] text-white/40">Q3 4:22</div>
-              <div className="text-center">
-                <div className="text-[10px] text-white/60">BOS</div>
-                <div className="text-base font-bold text-white">104</div>
+              <div className="flex-1 rounded-lg border border-emerald-400/60 bg-emerald-400/10 py-1 text-center">
+                <div className="text-[8px] font-bold text-emerald-300">Anything less</div>
               </div>
             </div>
           </div>
 
-          {/* Chat bubbles */}
+          {/* Chat */}
           {[
-            { side: 'left', msg: '🔥 Jalen dropping 30 tonight' },
-            { side: 'right', msg: 'Called it!! 🏀' },
-            { side: 'left', msg: 'Defense is elite rn' },
-            { side: 'right', msg: 'Let\'s gooo 🎉' },
+            { side: 'left', msg: 'took the under, book it' },
+            { side: 'right', msg: "you're fading ME? bold" },
           ].map(({ side, msg }, i) => (
             <div key={i} className={`flex ${side === 'right' ? 'justify-end' : 'justify-start'}`}>
               <div
-                className={`max-w-[70%] rounded-2xl px-2.5 py-1.5 text-[9px] leading-relaxed
+                className={`max-w-[75%] rounded-2xl px-2.5 py-1.5 text-[9px] leading-relaxed
                   ${side === 'right'
                     ? 'bg-[#FFD700]/90 text-black font-medium'
                     : 'bg-white/10 text-white'
@@ -350,7 +293,7 @@ function PhoneMockup() {
 
         {/* Bottom nav bar */}
         <div className="absolute bottom-0 left-0 right-0 flex justify-around items-center px-4 py-2 bg-[#0a0a0a]/90 border-t border-white/5">
-          {['🏠', '📊', '👤'].map((icon, i) => (
+          {['🏠', '🎯', '📊', '👤'].map((icon, i) => (
             <div key={i} className={`text-sm p-1 ${i === 0 ? 'opacity-100' : 'opacity-30'}`}>
               {icon}
             </div>
@@ -369,10 +312,3 @@ function AppleIcon() {
   );
 }
 
-function PlayIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M3.18 23.5a2 2 0 0 1-.98-.27 2 2 0 0 1-1-1.73V2.5a2 2 0 0 1 1-1.73 2 2 0 0 1 2 0l18 10a2 2 0 0 1 0 3.46l-18 10a2 2 0 0 1-1.02.27z" />
-    </svg>
-  );
-}
