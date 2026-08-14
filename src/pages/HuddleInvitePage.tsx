@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import shLogo from '@/assets/sh-logo-updated.png';
 
 const APP_STORE_URL = '#';
-const PLAY_STORE_URL = '#';
 const SITE_URL = 'https://sidehuddlesports.com';
 
 interface HuddleMember {
@@ -258,19 +257,7 @@ export default function HuddleInvitePage() {
               <span>Download on the App Store</span>
               {APP_STORE_URL === '#' && <span className="text-xs bg-[#FFD700]/20 text-[#FFD700] px-2 py-0.5 rounded-full ml-1">Soon</span>}
             </a>
-            <a
-              href={PLAY_STORE_URL}
-              onClick={PLAY_STORE_URL === '#' ? e => e.preventDefault() : undefined}
-              className={`flex items-center justify-center gap-3 rounded-2xl py-4 font-semibold text-base border transition-all
-                ${PLAY_STORE_URL === '#'
-                  ? 'border-white/10 bg-white/[0.03] text-white/40 cursor-not-allowed'
-                  : 'border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700]/20'
-                }`}
-            >
-              <PlayIcon />
-              <span>Get it on Google Play</span>
-              {PLAY_STORE_URL === '#' && <span className="text-xs bg-[#FFD700]/20 text-[#FFD700] px-2 py-0.5 rounded-full ml-1">Soon</span>}
-            </a>
+            
           </div>
 
           {/* Share this invite */}
@@ -317,10 +304,3 @@ function AppleIcon() {
   );
 }
 
-function PlayIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M3.18 23.5a2 2 0 0 1-.98-.27 2 2 0 0 1-1-1.73V2.5a2 2 0 0 1 1-1.73 2 2 0 0 1 2 0l18 10a2 2 0 0 1 0 3.46l-18 10a2 2 0 0 1-1.02.27z" />
-    </svg>
-  );
-}
