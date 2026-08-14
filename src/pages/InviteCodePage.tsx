@@ -11,7 +11,7 @@ import { APP_STORE_URL } from '@/lib/appStore';
 // page is the pitch + download CTA. Invite preview comes from the
 // get_invite_preview RPC when available and degrades to a generic invite.
 
-const APP_SCHEME_PREFIX = 'sidehuddle:
+const APP_SCHEME_PREFIX = 'sidehuddle://i/';
 type InvitePreview = {
   huddle_name: string | null;
   member_count: number | null;
