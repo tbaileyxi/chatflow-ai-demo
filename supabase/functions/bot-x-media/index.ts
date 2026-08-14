@@ -79,6 +79,7 @@ serve(async (req) => {
     teams_attempted: 0,
     already_posted_today: 0,
     searches_run: 0,
+    widened: 0, // teams where hard news was empty and we took the wider look
     citations_found: 0,
     x_posts_read: 0,
     posts_made: 0,
@@ -136,7 +137,12 @@ serve(async (req) => {
     const { data: systemUserId } = await supabase.rpc("get_or_create_system_user");
     if (!systemUserId && !dryRun) return json({ ...summary, message: "no system user" }, 500);
 
-    for (const [teamId, team] of [...byTeam.entries()].slice(0, PER_RUN)) {
+    // Teams run in PARALLEL. Each team costs one xAI search (~15s), two when
+    // the news search comes back empty and we widen. Serially that is 2-4
+    // minutes for eight teams, which overran the function's wall clock — the
+    // first full run returned nothing at all because it was killed mid-flight.
+    // Parallel, the whole slate finishes in about the time one team takes.
+    await Promise.all([...byTeam.entries()].slice(0, PER_RUN).map(async ([teamId, team]) => {
       // One per team per day. The cap is the cost control — without it a cron
       // misfire is a bill, not a bug.
       const { count } = await supabase
@@ -147,7 +153,7 @@ serve(async (req) => {
         .gte("created_at", midnight.toISOString());
       if ((count ?? 0) > 0) {
         summary.already_posted_today++;
-        continue;
+        return;
       }
       summary.teams_attempted++;
 
@@ -168,11 +174,27 @@ serve(async (req) => {
           `power rankings, and anniversary or throwback posts.`,
       );
       summary.searches_run++;
-      const ids = [...new Set(search.citations.map(postIdFromUrl).filter(Boolean))] as string[];
+      let ids = [...new Set(search.citations.map(postIdFromUrl).filter(Boolean))] as string[];
+
+      // Second look, wider. Asking only for hard news means an offseason team
+      // gets nothing for weeks — seven of eight rooms came back empty on an
+      // August morning. Camp photos, a training clip or a good fan shot are
+      // still worth seeing; a "should they" poll still isn't. News wins when
+      // it exists, this only runs when it doesn't.
+      if (ids.length === 0) {
+        const wider = await searchX(
+          `Show me the best photo or video posted about the ${team.name} in the last 2 days — ` +
+            `training camp, practice, players, the facility, fans, uniforms, or highlights. ` +
+            `Still ignore polls, debate prompts, "should they" questions and power rankings.`,
+        );
+        summary.searches_run++;
+        summary.widened++;
+        ids = [...new Set(wider.citations.map(postIdFromUrl).filter(Boolean))] as string[];
+      }
       summary.citations_found += ids.length;
       if (ids.length === 0) {
         summary.results.push({ team: team.name, skipped: "no citations" });
-        continue;
+        return;
       }
 
       // Cap the read count per team so one chatty search can't run up the bill.
@@ -184,7 +206,7 @@ serve(async (req) => {
       const best = pickBest(media);
       if (!best) {
         summary.results.push({ team: team.name, read: capped.length, skipped: "no media on those posts" });
-        continue;
+        return;
       }
 
       // Quote briefly and attribute. The post's own words, capped hard, with
@@ -204,7 +226,7 @@ serve(async (req) => {
         rooms: team.huddleIds.length,
       });
 
-      if (dryRun) continue;
+      if (dryRun) return;
 
       const { error: insErr } = await supabase.from("huddle_messages").insert(
         team.huddleIds.map((huddleId) => ({
@@ -224,7 +246,7 @@ serve(async (req) => {
       );
       if (insErr) {
         summary.errors.push(`${team.name}: ${insErr.message}`);
-        continue;
+        return;
       }
 
       await supabase.from("bot_emit_log").insert({
@@ -237,7 +259,7 @@ serve(async (req) => {
         pushed: false,
       });
       summary.posts_made++;
-    }
+    }));
 
     return json(summary);
   } catch (err) {
