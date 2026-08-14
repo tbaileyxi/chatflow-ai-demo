@@ -81,6 +81,10 @@ serve(async (req) => {
     games_with_followed_team: 0,
     plays_fetched: 0,
     plays_gated: 0,
+    covered_teams: 0,
+    plays_scoring: 0,      // plays the provider says put points on the board
+    gate_candidates: 0,    // what gateEvents returned, BEFORE dedupe
+    deduped_out: 0,        // dropped because that score state already posted
     posts: 0,
     pushes: 0,
     errors: [] as string[],
@@ -147,6 +151,18 @@ serve(async (req) => {
 
     summary.leagues = await resolveLeagues(supabase);
 
+    // Only cover teams somebody made a room for. This polled every team with
+    // any huddle, which meant 195 seeded Community rooms — 88 live plays in a
+    // day, none of them in a room a person had opened.
+    const { data: ownRooms } = await supabase
+      .from("huddles")
+      .select("team_id")
+      .not("team_id", "is", null)
+      .or("is_official_team_huddle.is.false,is_official_team_huddle.is.null");
+    const coveredTeams = new Set((ownRooms ?? []).map((r: any) => r.team_id));
+    summary.covered_teams = coveredTeams.size;
+
+
     for (const league of summary.leagues) {
       const games = await provider.liveGames(league);
       summary.games_seen += games.length;
@@ -176,14 +192,49 @@ serve(async (req) => {
           sa: { home: number; away: number } | undefined,
           side: string,
         ) => `${side}@${sa?.away ?? 0}-${sa?.home ?? 0}`;
-        const gated = gateEvents(plays).filter(
-          (g) => !emittedIds.has(scoreKey(g.play.scoreAfter, g.scoringSide)),
-        );
+        summary.plays_scoring += plays.filter((p) => (p.pointsScored ?? 0) > 0).length;
+        const candidates = gateEvents(plays);
+        summary.gate_candidates += candidates.length;
+        const gated = candidates;
         summary.plays_gated += gated.length;
 
         for (const g of gated) {
-          const dbTeam = lookupTeam(g.team.fullName, g.team.name, teamIndex, league);
-          if (!dbTeam) continue;
+          // BOTH SIDES. This used to publish only to the team that scored, so
+          // a room watching its team get shut out stayed silent — the Bucs
+          // room saw nothing at 0-10 because every score belonged to the Jets.
+          // Being scored on is the moment a room has the most to say.
+          const scorer = lookupTeam(g.team.fullName, g.team.name, teamIndex, league);
+          const conceder = lookupTeam(g.rival.fullName, g.rival.name, teamIndex, league);
+          const baseKey = scoreKey(g.play.scoreAfter, g.scoringSide);
+          const targets: {
+            team: NonNullable<ReturnType<typeof lookupTeam>>;
+            opponent: string;
+            conceded: boolean;
+            key: string;
+          }[] = [];
+          if (scorer) {
+            targets.push({
+              team: scorer,
+              opponent: g.rival.fullName || g.rival.name,
+              conceded: false,
+              key: baseKey, // unchanged, so nothing already posted re-posts
+            });
+          }
+          if (conceder) {
+            targets.push({
+              team: conceder,
+              opponent: g.team.fullName || g.team.name,
+              conceded: true,
+              key: `against:${baseKey}`,
+            });
+          }
+
+          for (const t of targets) {
+          const dbTeam = t.team;
+          // Skip teams nobody has a room for, and plays already emitted for
+          // THIS side — the two sides carry different keys.
+          if (!coveredTeams.has(dbTeam.id)) continue;
+          if (emittedIds.has(t.key)) { summary.deduped_out += 1; continue; }
           // TEST_MODE: also constrain emission to the test team.
           if (TEST_MODE && TEST_TEAM && !dbTeam.name.toLowerCase().includes(TEST_TEAM)) continue;
 
@@ -191,7 +242,11 @@ serve(async (req) => {
             // Surgical Highlightly enrichment (basketball only for now).
             // Cheap: 1 match lookup + 1 stats call per poll cycle per team, both
             // in-process cached. Skips silently when key/data missing.
-            const enrichedFacts = { ...g.facts };
+            const enrichedFacts: Record<string, unknown> = {
+              ...g.facts,
+              // The voice must know whether this went FOR or AGAINST the room.
+              scoredAgainstUs: t.conceded,
+            };
 
             // Real box-score stat leaders for ALL sports (ESPN). This is the
             // smart-bot fuel: "Brunson 31 PTS, 7 AST" / "Soto 3 H, 2 RBI".
@@ -286,7 +341,7 @@ serve(async (req) => {
             const voice = await generateMessage({
               mode: "in_game",
               team: dbTeam.name,
-              rival: g.rival.fullName || g.rival.name,
+              rival: t.opponent,
               persona,
               facts: enrichedFacts,
             });
@@ -296,7 +351,7 @@ serve(async (req) => {
               .from("seen_events")
               .insert({
                 game_id: game.providerId,
-                event_id: scoreKey(g.play.scoreAfter, g.scoringSide),
+                event_id: t.key,
                 team_id: dbTeam.id,
                 excitement_score: g.facts.excitementScore,
                 emitted: true,
@@ -324,6 +379,7 @@ serve(async (req) => {
             if (result.pushed) summary.pushes += 1;
           } catch (err) {
             summary.errors.push(`emit ${game.providerId}/${g.play.providerId}: ${(err as Error).message}`);
+          }
           }
         }
       }
