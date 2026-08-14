@@ -1,8 +1,7 @@
 import React from 'react';
 import shLogo from '@/assets/sh-logo-updated.png';
+import { APP_STORE_URL } from '@/lib/appStore';
 
-// ─── Placeholder store links — swap when live ───────────────────────────────
-const APP_STORE_URL = '#';
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
@@ -25,7 +24,7 @@ export default function LandingPage() {
         <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-4 py-1.5">
           <span className="h-2 w-2 rounded-full bg-[#FFD700] animate-pulse" />
           <span className="text-xs font-medium text-[#FFD700] tracking-widest uppercase">
-            Coming to the App Store
+            Now on the App Store
           </span>
         </div>
 

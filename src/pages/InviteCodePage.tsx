@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { supabase } from '@/integrations/supabase/client';
 import shLogo from '@/assets/sh-logo-updated.png';
+import { APP_STORE_URL } from '@/lib/appStore';
 
 // Smart invite landing for https://www.sidehuddlesports.com/i/{code}.
 // Mobile shares mint these links (room_invites.invite_code). If the app is
@@ -10,10 +11,7 @@ import shLogo from '@/assets/sh-logo-updated.png';
 // page is the pitch + download CTA. Invite preview comes from the
 // get_invite_preview RPC when available and degrades to a generic invite.
 
-const APP_SCHEME_PREFIX = 'sidehuddle://i/';
-// TODO: replace with the real App Store URL once the listing is live.
-const APP_STORE_URL = 'https://www.sidehuddlesports.com';
-
+const APP_SCHEME_PREFIX = 'sidehuddle:
 type InvitePreview = {
   huddle_name: string | null;
   member_count: number | null;

@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { supabase } from '@/integrations/supabase/client';
 import shLogo from '@/assets/sh-logo-updated.png';
+import { APP_STORE_URL } from '@/lib/appStore';
 
-const APP_STORE_URL = '#';
 const SITE_URL = 'https://sidehuddlesports.com';
 
 interface PickData {
