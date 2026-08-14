@@ -80,6 +80,7 @@ serve(async (req) => {
     already_posted_today: 0,
     searches_run: 0,
     widened: 0, // teams where hard news was empty and we took the wider look
+    deferred_out_of_time: 0, // ran out of wall clock; first in line next run
     citations_found: 0,
     x_posts_read: 0,
     posts_made: 0,
@@ -129,27 +130,71 @@ serve(async (req) => {
     }
     summary.teams_eligible = byTeam.size;
 
-    // body.limit lets a test run cost one team instead of ten.
-    const PER_RUN = Number(body?.limit ?? Deno.env.get("XMEDIA_TEAMS_PER_RUN") ?? 10);
     const midnight = new Date();
     midnight.setUTCHours(0, 0, 0, 0);
 
     const { data: systemUserId } = await supabase.rpc("get_or_create_system_user");
     if (!systemUserId && !dryRun) return json({ ...summary, message: "no system user" }, 500);
 
+    // SCALE WITHOUT BEING MANAGED.
+    //
+    // A fixed "first N teams" cap silently starves everyone past position N as
+    // rooms are created, and the failure is invisible: the run reports success
+    // and those rooms just stay empty forever. Instead:
+    //
+    //   - order by who has waited longest (never served first), so growth
+    //     changes WHO goes first, never WHETHER a room is reachable;
+    //   - work in small concurrent batches, and stop starting new ones when
+    //     the wall clock runs down, so a big slate degrades into "served in
+    //     turn over the next few runs" rather than a killed invocation.
+    //
+    // Nothing to raise as rooms are added.
+    const { data: lastRuns } = await supabase
+      .from("huddle_messages")
+      .select("huddle_id, created_at")
+      .eq("is_bot_message", true)
+      .like("embed_code", "https://x.com/%")
+      .order("created_at", { ascending: false })
+      .limit(2000);
+    const teamOfHuddle = new Map<string, string>();
+    for (const [tid, t] of byTeam) for (const h of t.huddleIds) teamOfHuddle.set(h, tid);
+    const lastServed = new Map<string, string>();
+    for (const r of (lastRuns ?? []) as any[]) {
+      const tid = teamOfHuddle.get(r.huddle_id);
+      if (tid && !lastServed.has(tid)) lastServed.set(tid, r.created_at);
+    }
+    const queue = [...byTeam.entries()].sort(
+      ([a], [b]) => (lastServed.get(a) ?? "").localeCompare(lastServed.get(b) ?? ""),
+    );
+    // body.limit is for testing a single team; it is NOT the coverage cap.
+    const testLimit = body?.limit ? Number(body.limit) : null;
+    const slate = testLimit ? queue.slice(0, testLimit) : queue;
+
+    const CONCURRENCY = Number(Deno.env.get("XMEDIA_CONCURRENCY") || 8);
+    const BUDGET_MS = Number(Deno.env.get("XMEDIA_BUDGET_MS") || 110_000);
+    const startedAt = Date.now();
+
     // Teams run in PARALLEL. Each team costs one xAI search (~15s), two when
     // the news search comes back empty and we widen. Serially that is 2-4
     // minutes for eight teams, which overran the function's wall clock — the
     // first full run returned nothing at all because it was killed mid-flight.
     // Parallel, the whole slate finishes in about the time one team takes.
-    await Promise.all([...byTeam.entries()].slice(0, PER_RUN).map(async ([teamId, team]) => {
+    const runTeam = async ([teamId, team]: [string, { name: string; league: string; huddleIds: string[] }]) => {
       // One per team per day. The cap is the cost control — without it a cron
       // misfire is a bill, not a bug.
+      //
+      // Counted from the POSTS, not from an audit log. bot_emit_log has
+      // `check (mode in ('in_game','news'))`, so every x_media row was being
+      // rejected — silently, because the insert error went unchecked. The cap
+      // read 0 every time and the same rooms would have been served on every
+      // run, all day. The message is the fact; the log was only ever a story
+      // about the fact.
       const { count } = await supabase
-        .from("bot_emit_log")
+        .from("huddle_messages")
         .select("id", { count: "exact", head: true })
-        .eq("team_id", teamId)
-        .eq("mode", "x_media")
+        .in("huddle_id", team.huddleIds)
+        .eq("is_bot_message", true)
+        .like("embed_code", "https://x.com/%")
         .gte("created_at", midnight.toISOString());
       if ((count ?? 0) > 0) {
         summary.already_posted_today++;
@@ -249,17 +294,18 @@ serve(async (req) => {
         return;
       }
 
-      await supabase.from("bot_emit_log").insert({
-        team_id: teamId,
-        huddle_id: team.huddleIds[0],
-        mode: "x_media",
-        source_ref: best.url,
-        facts: { post_id: best.postId, type: best.type, video_url: best.videoUrl },
-        message_text: content,
-        pushed: false,
-      });
       summary.posts_made++;
-    }));
+    };
+
+    for (let i = 0; i < slate.length; i += CONCURRENCY) {
+      if (Date.now() - startedAt > BUDGET_MS) {
+        // Out of time. The rest keep their place at the front of the queue,
+        // because they still have the oldest last-served timestamps.
+        summary.deferred_out_of_time = slate.length - i;
+        break;
+      }
+      await Promise.all(slate.slice(i, i + CONCURRENCY).map(runTeam));
+    }
 
     return json(summary);
   } catch (err) {
