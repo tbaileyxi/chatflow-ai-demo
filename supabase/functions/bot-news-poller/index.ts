@@ -23,6 +23,46 @@ const corsHeaders = {
 
 const NEWS_SCORE_THRESHOLD = Number(Deno.env.get("NEWS_SCORE_THRESHOLD") || 55);
 
+// One sentence telling the model whether this team is actually playing.
+//
+// Without it the bot inferred game state from the headline, and a headline
+// naming two teams looks identical whether the game is on now or in March.
+// That produced "Game's live right now against the Cavs — tune in" in August,
+// when the Knicks' last game was two months earlier and the next is in October.
+// The model cannot be trusted to know the date; it can be trusted to read a
+// sentence that starts with "NO GAME".
+async function gameStateFor(
+  supabase: ReturnType<typeof createClient>,
+  teamId: string,
+): Promise<string> {
+  const nowIso = new Date().toISOString();
+  const { data: rows } = await supabase
+    .from("games")
+    .select("status, start_time, home_team_id, away_team_id")
+    .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+    .order("start_time", { ascending: false })
+    .limit(60);
+  if (!rows || rows.length === 0) return "NO GAME. No scheduled games on record for this team.";
+
+  const live = rows.find((g: any) => g.status === "in_progress");
+  if (live) return "LIVE. A game is in progress right now.";
+
+  const day = (s: string) => new Date(s).toISOString().slice(0, 10);
+  const today = nowIso.slice(0, 10);
+  const todays = rows.find((g: any) => day(g.start_time) === today);
+  if (todays) {
+    return todays.status === "final"
+      ? `NO GAME IN PROGRESS. Today's game already finished.`
+      : `NO GAME IN PROGRESS. There is a game scheduled later today.`;
+  }
+
+  const past = rows.filter((g: any) => g.start_time < nowIso);
+  const future = rows.filter((g: any) => g.start_time > nowIso).reverse();
+  const last = past[0] ? `Last game was ${day(past[0].start_time)}.` : "";
+  const next = future[0] ? `Next game is ${day(future[0].start_time)}.` : "No next game scheduled.";
+  return `NO GAME. Not playing today. ${last} ${next}`.trim();
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -357,6 +397,7 @@ serve(async (req) => {
           }
 
           const persona = defaultPersona(bundle.teamName, bundle.league);
+          const gameState = await gameStateFor(supabase, bundle.teamId);
           const voice = await generateMessage({
             mode: "news",
             team: bundle.teamName,
@@ -372,6 +413,8 @@ serve(async (req) => {
               // Anchors tense: old game recaps must read as past, not live.
               published_at: s.publishedAt ?? undefined,
               now: new Date().toISOString(),
+              // The only authority on whether a game is happening.
+              game_state: gameState,
             },
           });
 

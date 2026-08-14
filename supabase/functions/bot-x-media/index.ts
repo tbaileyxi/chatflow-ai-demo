@@ -52,6 +52,27 @@ serve(async (req) => {
     });
   }
 
+  // Read-only look at what the bot has actually been saying in a room. Exists
+  // because "which function wrote this?" was otherwise a guessing game — the
+  // logs don't carry message_type and the tables aren't readable from outside.
+  // Service-role only. The publishable key reaches this function, so without
+  // this check anyone holding the key shipped in the app could read any room's
+  // messages through it.
+  if (typeof body?.debug_room === "string") {
+    const auth = req.headers.get("Authorization") ?? "";
+    const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    if (!svc || auth !== `Bearer ${svc}`) {
+      return json({ error: "debug_room requires the service role key" }, 403);
+    }
+    const { data: msgs } = await supabase
+      .from("huddle_messages")
+      .select("created_at, content, message_type, media_type, embed_code")
+      .eq("huddle_id", body.debug_room)
+      .order("created_at", { ascending: false })
+      .limit(Number(body?.n ?? 10));
+    return json({ mode: "debug_room", messages: msgs });
+  }
+
   const summary = {
     started_at: new Date().toISOString(),
     teams_eligible: 0,
@@ -132,9 +153,19 @@ serve(async (req) => {
 
       // xAI does the finding. Ask for posts that CARRY media, since a text-only
       // citation costs an X read and returns nothing to show.
+      // Ask for the STORY, not for engagement.
+      //
+      // "Best photos and viral posts" reliably returned debate bait — a Knicks
+      // room got "SHOULD THE KNICKS RAISE AN NBA CUP BANNER?" on a day whose
+      // actual news was Deuce McBride not signing. Virality and newsworthiness
+      // are different axes, and asking for the first gets you a poll.
       const search = await searchX(
-        `Best photos, highlights and viral posts about the ${team.name} from the last day. ` +
-          `Prefer posts that include a photo or video.`,
+        `What is the single biggest ${team.name} news story right now? ` +
+          `Find posts from the last 24 hours that REPORT something that happened — ` +
+          `a signing, injury, trade, roster move, depth chart change, or game result — ` +
+          `and that include a photo or video. ` +
+          `Ignore opinion takes, debate prompts, polls, "should they" questions, ` +
+          `power rankings, and anniversary or throwback posts.`,
       );
       summary.searches_run++;
       const ids = [...new Set(search.citations.map(postIdFromUrl).filter(Boolean))] as string[];
