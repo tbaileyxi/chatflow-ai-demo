@@ -285,13 +285,16 @@ ${facts.join("\n\n")}`;
 
 export interface RecapInput {
   ctx: HuddleContext;
-  kind: "postgame" | "daily";
+  kind: "postgame" | "daily" | "halftime";
   transcript: TranscriptLine[];
   gameBeats: GameBeat[];
   newsBeats: GameBeat[];
   ledger: LedgerRow[];
   game: GameSnapshot | null;
   record: { wins: number; losses: number } | null;
+  // Box-score leaders, already formatted ("Jones 14/21, 187 yds, 2 TD").
+  // A recap without numbers reads like a vibe; the numbers are the recap.
+  statLines?: string[];
 }
 
 /**
@@ -328,11 +331,16 @@ RULES SPECIFIC TO THIS POST:
 - Names make this work. Use them — accurately.
 - Keep the whole thing under 90 words. This is a catch-up, not a column.
 - If somebody floated a plan (a bar, a time, a watch party), mention it AS a floated plan and say who raised it.
-- Do not list the chip standings unless something notable moved.`;
+- Do not list the chip standings unless something notable moved.
+- LEADERS are the spine of a game recap. Lead with who actually did it and their line, not with adjectives. "Barkley 18 carries, 96 yards" beats "the run game showed up".
+- A HALFTIME recap is written at the break, with the game UNFINISHED. Never call it a result, never say who won, and never write it in the past tense as though it ended. Say where it stands and what has to happen after the break.`;
 
   const parts = [
     gameBlock(input.game, input.record, null),
     beatsBlock("GAME BEATS", input.gameBeats),
+    input.statLines?.length
+      ? `LEADERS\n${input.statLines.map((l) => `- ${l}`).join("\n")}`
+      : "",
     beatsBlock("TEAM NEWS", input.newsBeats),
     transcriptBlock(input.transcript),
     ledgerBlock(input.ledger),
@@ -342,7 +350,7 @@ RULES SPECIFIC TO THIS POST:
 Recap type: ${input.kind}
 
 FACTS — the only things you may reference:
-${parts.join("\n\n")}`;
+${parts.filter(Boolean).join("\n\n")}`;
 
   const res = await callLlm({ job: "recap", system, user });
   return res.text;

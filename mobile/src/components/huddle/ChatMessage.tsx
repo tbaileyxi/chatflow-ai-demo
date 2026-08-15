@@ -245,10 +245,22 @@ export function ChatMessage({
     const text = body
       ? `${displayName}: "${body}"`
       : `${displayName} shared a moment`;
+    // Share a link to the ROOM, not the picture. `url` used to be
+    // message.mediaUrl, so a shared Giants post arrived as a bare JPEG on
+    // pbs.twimg.com — the recipient got the image and no way back to the app
+    // or the room it came from. /h/:huddleId deep-links installed users
+    // straight to the room and sends everyone else to the App Store.
+    const roomUrl = huddleId
+      ? `https://www.sidehuddlesports.com/h/${huddleId}`
+      : undefined;
     setTimeout(() => {
       Share.share({
-        message: `${text}${huddleName ? ` — in ${huddleName} on Side Huddle Sports` : ""}`,
-        ...(message.mediaUrl ? { url: message.mediaUrl } : {}),
+        message: [
+          text,
+          huddleName ? `— in ${huddleName} on Side Huddle Sports` : "",
+          roomUrl ?? "",
+        ].filter(Boolean).join("\n"),
+        ...(roomUrl ? { url: roomUrl } : {}),
       }).catch(() => {});
     }, 350);
   };

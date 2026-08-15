@@ -139,7 +139,7 @@ export default function HuddleInvitePage() {
         <meta name="twitter:description" content={ogDesc} />
         <meta name="twitter:image" content={`${SITE_URL}/og-invite.svg`} />
         {/* Deep link for app — when app is installed it opens directly */}
-        <meta name="apple-itunes-app" content={`app-id=YOURAPPID, app-argument=sidehuddle://huddle/${huddle?.id}`} />
+        <meta name="apple-itunes-app" content={`app-id=6777524558, app-argument=sidehuddle://huddle/${huddle?.id}`} />
       </Helmet>
 
       <div className="min-h-screen bg-[#0a0a0a] text-white overflow-x-hidden">

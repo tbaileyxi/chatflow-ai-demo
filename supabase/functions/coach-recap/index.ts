@@ -22,10 +22,12 @@ import {
   getGameSnapshot,
   getHuddleContext,
   getLedger,
+  getBoxScore,
   getRoomTranscript,
   getTeamRecord,
 } from "../_shared/coach/retrieve.ts";
 import { composeRecap } from "../_shared/coach/answer.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,6 +69,7 @@ serve(async (req) => {
 
   const summary = {
     postgame_candidates: 0,
+    halftime_candidates: 0,
     daily_candidates: 0,
     posted: 0,
     skipped_no_content: 0,
@@ -74,7 +77,7 @@ serve(async (req) => {
   };
 
   try {
-    const jobs: { huddleId: string; kind: "postgame" | "daily" }[] = [];
+    const jobs: { huddleId: string; kind: "postgame" | "daily" | "halftime" }[] = [];
 
     if (force.huddle_id) {
       jobs.push({
@@ -82,6 +85,10 @@ serve(async (req) => {
         kind: force.kind === "daily" ? "daily" : "postgame",
       });
     } else {
+      const halftime = await findHalftimeHuddles(supabase);
+      summary.halftime_candidates = halftime.length;
+      jobs.push(...halftime.map((h) => ({ huddleId: h, kind: "halftime" as const })));
+
       const postgame = await findPostgameHuddles(supabase);
       summary.postgame_candidates = postgame.length;
       jobs.push(...postgame.map((h) => ({ huddleId: h, kind: "postgame" as const })));
@@ -143,6 +150,52 @@ async function findPostgameHuddles(supabase: SupabaseClient): Promise<string[]> 
 
   const ids = huddles.map((h) => h.id);
   const already = await recentlyRecapped(supabase, ids, "postgame", POSTGAME_WINDOW_MIN * 60 * 1000);
+  return ids.filter((id) => !already.has(id));
+}
+
+/**
+ * Football games sitting at the half, in rooms somebody made.
+ *
+ * There is no 'halftime' status to key off — ESPN reports the break as
+ * state 'in', so sync-live-scores stores it as in_progress like any other
+ * live minute. What identifies it is the clock: second period, expired. That
+ * is halftime in football and nothing else looks like it.
+ */
+async function findHalftimeHuddles(supabase: SupabaseClient): Promise<string[]> {
+  const { data: games } = await supabase
+    .from("games")
+    .select("home_team_id, away_team_id, period, clock, sport_key")
+    .eq("status", "in_progress")
+    .like("sport_key", "americanfootball%");
+  if (!games || games.length === 0) return [];
+
+  const atHalf = games.filter((g: any) => {
+    const p = String(g.period ?? "").toUpperCase();
+    const c = String(g.clock ?? "").trim();
+    const secondPeriod = p === "Q2" || p === "2" || p.includes("HALF");
+    const expired = c === "0:00" || c === "0.0" || c === "0" || c === "";
+    return secondPeriod && expired;
+  });
+  if (atHalf.length === 0) return [];
+
+  const teamIds = [...new Set(
+    atHalf.flatMap((g: any) => [g.home_team_id, g.away_team_id]).filter(Boolean),
+  )] as string[];
+  if (teamIds.length === 0) return [];
+
+  // Rooms people made. A halftime post into 195 seeded Community rooms is the
+  // same spend mistake news and the live poller both had to be pulled back from.
+  const { data: huddles } = await supabase
+    .from("huddles")
+    .select("id")
+    .in("team_id", teamIds)
+    .or("is_official_team_huddle.is.false,is_official_team_huddle.is.null");
+  if (!huddles || huddles.length === 0) return [];
+
+  const ids = huddles.map((h: any) => h.id);
+  // One per game, not one per half-hour: the break is ~13 minutes but the
+  // clock reads 0:00 across several polls.
+  const already = await recentlyRecapped(supabase, ids, "halftime", 6 * 3600 * 1000);
   return ids.filter((id) => !already.has(id));
 }
 
@@ -213,13 +266,14 @@ async function recentlyRecapped(
 async function recapOne(
   supabase: SupabaseClient,
   huddleId: string,
-  kind: "postgame" | "daily",
+  kind: "postgame" | "daily" | "halftime",
 ): Promise<boolean> {
   const ctx = await getHuddleContext(supabase, huddleId);
   if (!ctx) return false;
 
   // A postgame recap looks back over the game; a daily one over the day.
-  const hours = kind === "postgame" ? 8 : 24;
+  // Halftime looks back only at this game, not at yesterday's.
+  const hours = kind === "daily" ? 24 : kind === "halftime" ? 4 : 8;
   const sinceIso = new Date(Date.now() - hours * 3600 * 1000).toISOString();
 
   const [transcript, gameBeats, newsBeats, ledger, game, record] = await Promise.all([
@@ -231,8 +285,22 @@ async function recapOne(
     ctx.teamId ? getTeamRecord(supabase, ctx.teamId) : Promise.resolve(null),
   ]);
 
+  // Leaders. A game recap without numbers is a vibe; the numbers are the
+  // recap. Skipped for 'daily', which is about the room rather than a game.
+  let statLines: string[] | undefined;
+  if (kind !== "daily" && ctx.teamId) {
+    try {
+      const box = await getBoxScore(supabase, ctx.teamId, ctx.league ?? null);
+      if (box) {
+        statLines = [...(box.teamLines ?? []), ...(box.leaderLines ?? [])].slice(0, 8);
+      }
+    } catch (err) {
+      console.warn("[coach-recap] box score skipped", err);
+    }
+  }
+
   const text = await composeRecap({
-    ctx, kind, transcript, gameBeats, newsBeats, ledger, game, record,
+    ctx, kind, transcript, gameBeats, newsBeats, ledger, game, record, statLines,
   });
   // composeRecap returns null when every lane is empty — post nothing rather
   // than "it was quiet in here", which trains people to ignore the Coach.
@@ -282,7 +350,7 @@ async function recapOne(
   // Postgame is genuinely push-worthy: the game ended, you weren't watching,
   // here is the whole thing in three lines. The daily one is not — it can wait
   // for the next app open.
-  if (kind === "postgame") {
+  if (kind === "postgame" || kind === "halftime") {
     await triggerPush(ctx.teamName ?? ctx.huddleName, [huddleId], text.slice(0, 140));
   }
 

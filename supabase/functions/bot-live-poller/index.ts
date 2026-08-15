@@ -86,6 +86,9 @@ serve(async (req) => {
     x_moment_reads: 0,   // billed X post reads spent doing it
     x_clips_24h: 0,      // in-game clips that landed in the last day
     excitement_seen: [] as number[], // scores of plays we emitted, to sanity-check the clip bar
+    targets_built: 0,
+    skipped_not_covered: 0,
+    covered_targets: 0,
     plays_scoring: 0,      // plays the provider says put points on the board
     gate_candidates: 0,    // what gateEvents returned, BEFORE dedupe
     deduped_out: 0,        // dropped because that score state already posted
@@ -249,11 +252,13 @@ serve(async (req) => {
             });
           }
 
+          summary.targets_built += targets.length;
           for (const t of targets) {
           const dbTeam = t.team;
           // Skip teams nobody has a room for, and plays already emitted for
           // THIS side — the two sides carry different keys.
-          if (!coveredTeams.has(dbTeam.id)) continue;
+          if (!coveredTeams.has(dbTeam.id)) { summary.skipped_not_covered += 1; continue; }
+          summary.covered_targets += 1;
           if (emittedIds.has(t.key)) { summary.deduped_out += 1; continue; }
           // TEST_MODE: also constrain emission to the test team.
           if (TEST_MODE && TEST_TEAM && !dbTeam.name.toLowerCase().includes(TEST_TEAM)) continue;
@@ -407,7 +412,7 @@ serve(async (req) => {
             // late-game leverage, so a Q2 preseason touchdown scores low by
             // design and August would never produce a clip. The per-game cap
             // is what bounds the spend; this only decides WHICH plays get one.
-            const XLIVE_MIN = Number(Deno.env.get("XLIVE_MIN_EXCITEMENT") || 65);
+            const XLIVE_MIN = Number(Deno.env.get("XLIVE_MIN_EXCITEMENT") || 0);
             const XLIVE_PER_GAME = Number(Deno.env.get("XLIVE_PER_GAME") || 3);
             const XLIVE_PER_RUN = Number(Deno.env.get("XLIVE_PER_RUN") || 1);
             const XLIVE_MAX_READS = Number(Deno.env.get("XLIVE_MAX_READS") || 3);
