@@ -652,8 +652,17 @@ async function postFinals(
     } catch { /* leaders optional */ }
 
     for (const team of [home, away]) {
+      // Rooms that get a real recap don't need this line as well. The Coach's
+      // postgame recap already opens with the score and now carries the
+      // leaders and the true season record, so this arrived underneath it
+      // saying the same thing in fewer words — two posts, one fact.
+      //
+      // It stays for rooms the recap doesn't serve, where a bare final is
+      // better than a game that just stops.
       const { data: huddles } = await supabase
-        .from("huddles").select("id").eq("team_id", team.id);
+        .from("huddles").select("id, is_official_team_huddle").eq("team_id", team.id);
+      const willGetRecap = (huddles ?? []).some((h: any) => !h.is_official_team_huddle);
+      if (willGetRecap) continue;
       const won = team.id === home.id ? hs > as : as > hs;
       const body = `🏁 Final: ${away.name} ${as}, ${home.name} ${hs}.${leaderLine} ${won ? "Big one in the books." : "On to the next."}`;
       for (const h of huddles ?? []) {
