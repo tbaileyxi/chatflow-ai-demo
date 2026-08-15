@@ -464,11 +464,19 @@ serve(async (req) => {
                   // 12 empty. Nobody posts video of a third-inning single
                   // within 20 minutes. The play is a good REASON to go looking
                   // and a terrible search term.
-                  const who = g.facts.scorer ? ` Look for ${g.facts.scorer}.` : "";
+                  // The room has a side. Asking for "best clip from the
+                  // Yankees vs Blue Jays game" got a Blue Jays highlight
+                  // dropped into a Yankees room — technically responsive,
+                  // completely wrong. Same allegiance rule the voice already
+                  // follows: this room's team, or the moment that happened TO
+                  // them. Never a celebration of the other side.
+                  const who = g.facts.scorer ? ` Especially ${g.facts.scorer}.` : "";
                   const found = await searchX(
-                    `Best video or photo posted in the last two hours from the ` +
-                      `${dbTeam.name} vs ${t.opponent} game being played today.` +
-                      `${who} Highlights, big plays, or reaction from the game itself. ` +
+                    `Find a video or photo of the ${dbTeam.name} posted in the last two hours, ` +
+                      `from their game against the ${t.opponent} being played today.${who} ` +
+                      `It must feature the ${dbTeam.name} — their players, their bench, their fans, ` +
+                      `or a play that happened to them. ` +
+                      `Do NOT return ${t.opponent} highlights or posts celebrating the ${t.opponent}. ` +
                       `Ignore previews, predictions, betting picks and old highlights.`,
                   );
                   const ids = [...new Set(
