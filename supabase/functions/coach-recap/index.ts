@@ -142,10 +142,17 @@ async function findPostgameHuddles(supabase: SupabaseClient): Promise<string[]> 
   )] as string[];
   if (teamIds.length === 0) return [];
 
+  // Rooms people made. The recap runs on Opus — the most expensive call in
+  // the product, chosen because it is the one artifact that gets pushed to
+  // everyone — and it was fanning out to all 195 seeded Community rooms. A
+  // normal day finals ~60 team-sides, so that was tens of dollars a month of
+  // the best model writing into rooms nobody can open. Same gate as news,
+  // live plays, X media and the halftime recap.
   const { data: huddles } = await supabase
     .from("huddles")
     .select("id")
-    .in("team_id", teamIds);
+    .in("team_id", teamIds)
+    .or("is_official_team_huddle.is.false,is_official_team_huddle.is.null");
   if (!huddles) return [];
 
   const ids = huddles.map((h) => h.id);
