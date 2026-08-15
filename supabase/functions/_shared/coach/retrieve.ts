@@ -65,6 +65,15 @@ export interface BoxScore {
   teamLines: string[];
   /** "Judge 2-4, HR, 3 RBI" — best performer per side. */
   leaderLines: string[];
+  /**
+   * The team's ACTUAL season record, straight from ESPN.
+   *
+   * getTeamRecord() derives W-L from our own games table, which only holds
+   * what we have synced — it told a Yankees room "drops us to 28-29" on a
+   * night the real record was 68-55. Same endpoint we already call for the
+   * box score knows the truth, so there is no reason to compute a worse one.
+   */
+  record: { wins: number; losses: number } | null;
 }
 
 export interface HuddleContext {
@@ -348,7 +357,7 @@ export async function getBoxScore(
 
   const { data: game } = await supabase
     .from("games")
-    .select("odds_game_id, status, start_time")
+    .select("odds_game_id, status, start_time, home_team_id")
     .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
     .in("status", ["live", "in_progress", "halftime", "final"])
     .order("start_time", { ascending: false })
@@ -398,8 +407,21 @@ export async function getBoxScore(
       if (name && who && val) leaderLines.push(`${name}: ${who} — ${val}`);
     }
 
-    if (teamLines.length === 0 && leaderLines.length === 0) return null;
-    return { teamLines, leaderLines };
+    // Season record for OUR side, as ESPN has it. Identify ourselves by
+    // home/away rather than by name matching, which is where team resolution
+    // has gone wrong before.
+    let record: { wins: number; losses: number } | null = null;
+    try {
+      const isHome = game.home_team_id === teamId;
+      const comps = (data?.header?.competitions?.[0]?.competitors ?? []) as any[];
+      const mine = comps.find((c) => c?.homeAway === (isHome ? "home" : "away"));
+      const total = (mine?.record ?? []).find((r: any) => r?.type === "total");
+      const m = /^(\d+)-(\d+)/.exec(String(total?.summary ?? ""));
+      if (m) record = { wins: Number(m[1]), losses: Number(m[2]) };
+    } catch { /* record is a nicety; never fail the box score over it */ }
+
+    if (teamLines.length === 0 && leaderLines.length === 0 && !record) return null;
+    return { teamLines, leaderLines, record };
   } catch (err) {
     console.warn("[coach.retrieve] boxscore unavailable", err);
     return null;

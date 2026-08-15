@@ -295,23 +295,39 @@ async function recapOne(
   // Leaders. A game recap without numbers is a vibe; the numbers are the
   // recap. Skipped for 'daily', which is about the room rather than a game.
   let statLines: string[] | undefined;
+  let boxRecord: { wins: number; losses: number } | null = null;
   if (kind !== "daily" && ctx.teamId) {
     try {
       const box = await getBoxScore(supabase, ctx.teamId, ctx.league ?? null);
       if (box) {
         statLines = [...(box.teamLines ?? []), ...(box.leaderLines ?? [])].slice(0, 8);
+        boxRecord = box.record;
       }
     } catch (err) {
       console.warn("[coach-recap] box score skipped", err);
     }
   }
 
+  // ESPN's record beats ours. getTeamRecord derives W-L from the games table,
+  // which holds only what we have synced — it put "drops us to 28-29" in a
+  // Yankees room whose actual record was 68-55.
+  const trueRecord = boxRecord ?? record;
+
   const text = await composeRecap({
-    ctx, kind, transcript, gameBeats, newsBeats, ledger, game, record, statLines,
+    ctx, kind, transcript, gameBeats, newsBeats, ledger, game,
+    record: trueRecord, statLines,
   });
   // composeRecap returns null when every lane is empty — post nothing rather
   // than "it was quiet in here", which trains people to ignore the Coach.
   if (!text) return false;
+
+  // Belt and braces on the markdown rule: models reach for ** even when told
+  // not to, and the bubble renders it literally.
+  const clean = text
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/(^|\n)#{1,6}\s*/g, "$1")
+    .replace(/(^|\n)[-*]\s+/g, "$1")
+    .trim();
 
   const { data: systemUserId } = await supabase.rpc("get_or_create_system_user");
   if (!systemUserId) return false;
@@ -336,7 +352,7 @@ async function recapOne(
     .insert({
       huddle_id: huddleId,
       user_id: systemUserId,
-      content: text,
+      content: clean,
       is_bot_message: true,
       message_type: "coach_recap",
     })
@@ -358,7 +374,7 @@ async function recapOne(
   // here is the whole thing in three lines. The daily one is not — it can wait
   // for the next app open.
   if (kind === "postgame" || kind === "halftime") {
-    await triggerPush(ctx.teamName ?? ctx.huddleName, [huddleId], text.slice(0, 140));
+    await triggerPush(ctx.teamName ?? ctx.huddleName, [huddleId], clean.slice(0, 140));
   }
 
   return true;

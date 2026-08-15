@@ -332,6 +332,8 @@ RULES SPECIFIC TO THIS POST:
 - Keep the whole thing under 90 words. This is a catch-up, not a column.
 - If somebody floated a plan (a bar, a time, a watch party), mention it AS a floated plan and say who raised it.
 - Do not list the chip standings unless something notable moved.
+- PLAIN TEXT ONLY. No markdown, no **bold**, no headers, no bullet characters. The chat bubble renders exactly what you write, so "**The game**" appears on screen with the asterisks showing.
+- The record in the facts is the team's real season record. Use it as given or not at all. Never compute, adjust or guess a record.
 - LEADERS are the spine of a game recap. Lead with who actually did it and their line, not with adjectives. "Barkley 18 carries, 96 yards" beats "the run game showed up".
 - A HALFTIME recap is written at the break, with the game UNFINISHED. Never call it a result, never say who won, and never write it in the past tense as though it ended. Say where it stands and what has to happen after the break.`;
 
