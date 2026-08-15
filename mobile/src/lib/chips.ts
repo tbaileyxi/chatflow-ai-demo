@@ -12,10 +12,20 @@ export function isOutOfChips(err: unknown): boolean {
   return /OUT_OF_CHIPS/i.test(String((err as Error)?.message ?? err ?? ""));
 }
 
-/** Strips the "OUT_OF_CHIPS:" marker the RPCs prefix onto the message. */
+/**
+ * Strips the "OUT_OF_CHIPS:" marker the RPCs prefix onto the message, and the
+ * Premium pitch on the end of it.
+ *
+ * Five separate Postgres functions end this error with "Upgrade to Premium to
+ * keep playing!" — a tier this build does not sell. Rewriting all five in SQL
+ * meant a DO block re-executing pg_get_functiondef, which is a lot of blast
+ * radius for a sentence. Cheaper and safer to drop it on the way to the screen;
+ * the number in the message is the only part worth keeping.
+ */
 export function chipErrorText(err: unknown): string {
   return String((err as Error)?.message ?? err ?? "")
     .replace(/^.*OUT_OF_CHIPS:\s*/i, "")
+    .replace(/\s*Upgrade to Premium[^.!]*[.!]?/i, "")
     .trim() || "You're out of chips.";
 }
 
