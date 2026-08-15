@@ -14,6 +14,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getProvider, fetchEspnLeaders, fetchEspnBoxScoreLines } from "../_shared/bot/providers.ts";
 import { gateEvents } from "../_shared/bot/brain.ts";
+import { searchX } from "../_shared/coach/xsearch.ts";
+import { fetchPostMedia, pickBest, postIdFromUrl } from "../_shared/x/media.ts";
 import { generateMessage, defaultPersona } from "../_shared/bot/voice.ts";
 import { publish } from "../_shared/bot/publisher.ts";
 import { findNbaMatchForTeam, fetchGameStats, pickSide, shootingLine } from "../_shared/bot/highlightly.ts";
@@ -62,6 +64,9 @@ async function resolveLeagues(
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  }
+
+
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -85,6 +90,11 @@ serve(async (req) => {
     x_moments: 0,        // clips pulled from X for a big play
     x_moment_reads: 0,   // billed X post reads spent doing it
     x_clips_24h: 0,      // in-game clips that landed in the last day
+    x_claims_total: 0,   // clip attempts ever made, across every run
+    x_attempts: 0,       // times we entered the clip block
+    x_claim_failed: 0,   // seen_events claim rejected (another runner, or a constraint)
+    x_citations: 0,      // post URLs xAI came back with
+    x_no_media: 0,       // read the posts, none carried a photo or video
     excitement_seen: [] as number[], // scores of plays we emitted, to sanity-check the clip bar
     targets_built: 0,
     skipped_not_covered: 0,
@@ -180,6 +190,16 @@ serve(async (req) => {
         .like("embed_code", "https://x.com/%")
         .gte("created_at", since);
       summary.x_clips_24h = count ?? 0;
+      // Persistent evidence. Every clip attempt writes an 'xlive:' row into
+      // seen_events BEFORE searching, so this counts attempts across all runs —
+      // including the cron runs I never see. Attempts > 0 with clips at 0 means
+      // the search or the media fetch is coming back empty, not that the block
+      // never fires.
+      const { count: claims } = await supabase
+        .from("seen_events")
+        .select("id", { count: "exact", head: true })
+        .like("event_id", "xlive:%");
+      summary.x_claims_total = claims ?? 0;
     }
 
 
@@ -434,21 +454,33 @@ serve(async (req) => {
                 emitted: true,
                 emitted_at: new Date().toISOString(),
               });
+              summary.x_attempts += 1;
+              if (claim.error) summary.x_claim_failed += 1;
               if (!claim.error) {
                 clipsThisGame += 1;
                 try {
-                  const who = g.facts.scorer ? `${g.facts.scorer} ` : "";
-                  const what = String(g.facts.event ?? "score").replace(/_/g, " ");
+                  // Ask about the GAME, not the single play.
+                  //
+                  // The first version named the exact play and demanded a post
+                  // from the last 20 minutes. searchX answers "NOTHING RECENT"
+                  // when it cannot match that, and it never could: 12 attempts,
+                  // 12 empty. Nobody posts video of a third-inning single
+                  // within 20 minutes. The play is a good REASON to go looking
+                  // and a terrible search term.
+                  const who = g.facts.scorer ? ` Look for ${g.facts.scorer}.` : "";
                   const found = await searchX(
-                    `${who}${what} for the ${dbTeam.name} against the ${t.opponent}, ` +
-                      `in the game happening right now. Find a post from the last 20 minutes ` +
-                      `with video or a photo of that play. Ignore previews, predictions and old highlights.`,
+                    `Best video or photo posted in the last two hours from the ` +
+                      `${dbTeam.name} vs ${t.opponent} game being played today.` +
+                      `${who} Highlights, big plays, or reaction from the game itself. ` +
+                      `Ignore previews, predictions, betting picks and old highlights.`,
                   );
                   const ids = [...new Set(
                     found.citations.map(postIdFromUrl).filter(Boolean) as string[],
                   )].slice(0, XLIVE_MAX_READS);
+                  summary.x_citations += ids.length;
                   summary.x_moment_reads += ids.length;
                   const best = pickBest(await fetchPostMedia(ids));
+                  if (!best) summary.x_no_media += 1;
                   if (best) {
                     const quote = best.text
                       .replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 140);
