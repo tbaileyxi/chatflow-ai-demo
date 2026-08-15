@@ -14,6 +14,7 @@ import { colors } from "@/theme/colors";
 import type { GameContext } from "@/hooks/useLiveGameContext";
 import { useFadeMarkets, type FadeMarket } from "@/hooks/useFadeMarkets";
 import { postFade } from "@/hooks/useFades";
+import { isOutOfChips, offerFreeChips } from "@/lib/chips";
 
 const STAKES = [50, 100, 200] as const;
 
@@ -61,7 +62,8 @@ export function PostFadeSheet({
     });
     setSubmitting(false);
     if (!res.ok) {
-      Alert.alert("Couldn't post that fade", res.error ?? "Please try again.");
+      if (isOutOfChips(res.error)) await offerFreeChips(res.error);
+      else Alert.alert("Couldn't post that fade", res.error ?? "Please try again.");
       return;
     }
     onPosted();

@@ -6,6 +6,7 @@ import { marketSides } from "@/lib/marketSides";
 import { colors } from "@/theme/colors";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { isOutOfChips, offerFreeChips } from "@/lib/chips";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface Market {
@@ -148,7 +149,13 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
         queryClient.invalidateQueries({ queryKey: ["portfolio"] });
         queryClient.invalidateQueries({ queryKey: ["shadow-bets"] });
       } catch (err: any) {
-        Alert.alert("Error", err.message || "Couldn't make that pick");
+        // Out of chips is not an error to apologise for — it's a top-up prompt.
+        if (isOutOfChips(err)) {
+          const topped = await offerFreeChips(err);
+          if (topped) queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+        } else {
+          Alert.alert("Error", err.message || "Couldn't make that pick");
+        }
       } finally {
         setPlacing(false);
       }
