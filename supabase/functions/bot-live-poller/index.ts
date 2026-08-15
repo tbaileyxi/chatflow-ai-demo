@@ -82,6 +82,10 @@ serve(async (req) => {
     plays_fetched: 0,
     plays_gated: 0,
     covered_teams: 0,
+    x_moments: 0,        // clips pulled from X for a big play
+    x_moment_reads: 0,   // billed X post reads spent doing it
+    x_clips_24h: 0,      // in-game clips that landed in the last day
+    excitement_seen: [] as number[], // scores of plays we emitted, to sanity-check the clip bar
     plays_scoring: 0,      // plays the provider says put points on the board
     gate_candidates: 0,    // what gateEvents returned, BEFORE dedupe
     deduped_out: 0,        // dropped because that score state already posted
@@ -161,6 +165,19 @@ serve(async (req) => {
       .or("is_official_team_huddle.is.false,is_official_team_huddle.is.null");
     const coveredTeams = new Set((ownRooms ?? []).map((r: any) => r.team_id));
     summary.covered_teams = coveredTeams.size;
+    // The clip posts as the same bot that narrated the play.
+    const { data: botUserId } = await supabase.rpc("get_or_create_system_user");
+    // Ops counter, not a reader: how many in-game clips have landed today.
+    {
+      const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+      const { count } = await supabase
+        .from("huddle_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("message_type", "live_play")
+        .like("embed_code", "https://x.com/%")
+        .gte("created_at", since);
+      summary.x_clips_24h = count ?? 0;
+    }
 
 
     for (const league of summary.leagues) {
@@ -184,6 +201,9 @@ serve(async (req) => {
           .eq("game_id", game.providerId)
           .eq("emitted", true);
         const emittedIds = new Set((seen ?? []).map((r) => r.event_id));
+        // Clips already pulled for this game, so a wild fourth quarter can't
+        // run the bill up on its own.
+        let clipsThisGame = [...emittedIds].filter((k) => String(k).startsWith("xlive:")).length;
 
         // Dedupe by SCORE STATE, not ESPN play id (which can shift between
         // polls and caused the same "1-1 in the 1st" to post 3 times). One
@@ -377,6 +397,77 @@ serve(async (req) => {
             });
             summary.posts += result.huddleIdsPosted.length;
             if (result.pushed) summary.pushes += 1;
+            summary.excitement_seen.push(g.facts.excitementScore ?? 0);
+
+            // THE CLIP. The box score says a touchdown happened; X has the
+            // video of it. Only for plays already big enough to be worth a
+            // push notification — tying spend to the moments people would
+            // screenshot, not to every field goal.
+            // 65, not the push bar of 80. Excitement weights closeness and
+            // late-game leverage, so a Q2 preseason touchdown scores low by
+            // design and August would never produce a clip. The per-game cap
+            // is what bounds the spend; this only decides WHICH plays get one.
+            const XLIVE_MIN = Number(Deno.env.get("XLIVE_MIN_EXCITEMENT") || 65);
+            const XLIVE_PER_GAME = Number(Deno.env.get("XLIVE_PER_GAME") || 3);
+            const XLIVE_PER_RUN = Number(Deno.env.get("XLIVE_PER_RUN") || 1);
+            const XLIVE_MAX_READS = Number(Deno.env.get("XLIVE_MAX_READS") || 3);
+            if (
+              Deno.env.get("X_API_BEARER_TOKEN") &&
+              (g.facts.excitementScore ?? 0) >= XLIVE_MIN &&
+              result.huddleIdsPosted.length > 0 &&
+              clipsThisGame < XLIVE_PER_GAME &&
+              summary.x_moments < XLIVE_PER_RUN
+            ) {
+              // Claim the play BEFORE searching. A unique violation means a
+              // parallel run already took it; searching first would pay xAI
+              // twice for one touchdown.
+              const claim = await supabase.from("seen_events").insert({
+                game_id: game.providerId,
+                event_id: `xlive:${t.key}`,
+                team_id: dbTeam.id,
+                excitement_score: g.facts.excitementScore,
+                emitted: true,
+                emitted_at: new Date().toISOString(),
+              });
+              if (!claim.error) {
+                clipsThisGame += 1;
+                try {
+                  const who = g.facts.scorer ? `${g.facts.scorer} ` : "";
+                  const what = String(g.facts.event ?? "score").replace(/_/g, " ");
+                  const found = await searchX(
+                    `${who}${what} for the ${dbTeam.name} against the ${t.opponent}, ` +
+                      `in the game happening right now. Find a post from the last 20 minutes ` +
+                      `with video or a photo of that play. Ignore previews, predictions and old highlights.`,
+                  );
+                  const ids = [...new Set(
+                    found.citations.map(postIdFromUrl).filter(Boolean) as string[],
+                  )].slice(0, XLIVE_MAX_READS);
+                  summary.x_moment_reads += ids.length;
+                  const best = pickBest(await fetchPostMedia(ids));
+                  if (best) {
+                    const quote = best.text
+                      .replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 140);
+                    await supabase.from("huddle_messages").insert(
+                      result.huddleIdsPosted.map((hid: string) => ({
+                        huddle_id: hid,
+                        user_id: botUserId,
+                        content: [quote && `"${quote}"`, best.authorHandle && `— @${best.authorHandle}`]
+                          .filter(Boolean).join("\n") || `via @${best.authorHandle ?? "X"}`,
+                        embed_code: best.url,
+                        is_bot_message: true,
+                        is_team_agent_message: true,
+                        message_type: "live_play",
+                        media_url: best.videoUrl ?? best.imageUrl,
+                        media_type: best.videoUrl ? "video" : "image",
+                      })),
+                    );
+                    summary.x_moments += 1;
+                  }
+                } catch (err) {
+                  console.warn("[live-poller] x moment skipped", err);
+                }
+              }
+            }
           } catch (err) {
             summary.errors.push(`emit ${game.providerId}/${g.play.providerId}: ${(err as Error).message}`);
           }
