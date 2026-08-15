@@ -20,6 +20,7 @@ type SearchHuddle = {
   teamLogoUrl: string | null;
   ownerName: string | null;
   isMember: boolean;
+  isPrivate: boolean;
 };
 
 function useHuddleSearch(search: string, userId: string | undefined) {
@@ -30,12 +31,23 @@ function useHuddleSearch(search: string, userId: string | undefined) {
         .from("huddles")
         .select(
           `
-          id, name, bio, member_count, owner_id,
+          id, name, bio, member_count, owner_id, is_private,
           teams!team_id (name, logo_url)
         `,
         )
-        .eq("is_private", false)
-        .eq("is_verified", true)
+        // WAS: .eq("is_private", false).eq("is_verified", true)
+        //
+        // is_verified is true on ZERO of the 206 rooms, so this screen
+        // returned an empty list every single time — discovery was dead, not
+        // sparse. The flag came from a "verified rooms only" idea that was
+        // never filled in.
+        //
+        // Private rooms are listed now too, locked. Hiding them meant the
+        // request-to-join flow only ever fired for someone who already had
+        // your invite link, which is the one case that doesn't need it.
+        // Name, team and member count are all that shows; huddle_messages has
+        // its own policy keyed on is_private, so not a word of the room leaks.
+        .or("is_official_team_huddle.is.false,is_official_team_huddle.is.null")
         .order("member_count", { ascending: false })
         .limit(30);
 
@@ -82,6 +94,7 @@ function useHuddleSearch(search: string, userId: string | undefined) {
           teamLogoUrl: team?.logo_url ?? null,
           ownerName: ownerMap.get(h.owner_id) ?? null,
           isMember: memberSet.has(h.id),
+          isPrivate: (h as any).is_private ?? false,
         };
       });
     },
@@ -155,7 +168,7 @@ export function HuddleSearchScreen() {
           size="xs"
           onPress={() => navigation.navigate("JoinHuddle", { huddleId: item.id })}
         >
-          Join
+          {item.isPrivate ? "Request" : "Join"}
         </Button>
       )}
     </Pressable>
