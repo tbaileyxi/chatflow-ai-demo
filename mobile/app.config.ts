@@ -5,7 +5,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "Side Huddle Sports",
   slug: "side-huddle-sports",
   scheme: "sidehuddle",
-  version: "1.0.2",
+  version: "1.0.3",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "dark",
