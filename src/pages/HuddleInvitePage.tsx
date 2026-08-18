@@ -39,12 +39,18 @@ export default function HuddleInvitePage() {
 
   const loadHuddle = async (id: string) => {
     try {
-      // Try to load by invite code first, then by id
+      // Columns that actually exist.
+      //
+      // This selected `description`, `sport` and `invite_code`, none of which
+      // are columns on huddles — the table has `bio` and a `team_id`, and
+      // there is no invite_code at all. PostgREST rejects the whole query on
+      // the first unknown column, so every share link ever opened landed on
+      // "Huddle not found", for every room, since the page was written.
       const { data: huddleRow, error } = await supabase
         .from('huddles')
-        .select('id, name, description, sport, is_private')
-        .or(`id.eq.${id},invite_code.eq.${id}`)
-        .single();
+        .select('id, name, bio, is_private, teams:team_id (name, city)')
+        .eq('id', id)
+        .maybeSingle();
 
       if (error || !huddleRow) {
         setNotFound(true);
@@ -76,8 +82,11 @@ export default function HuddleInvitePage() {
       setHuddle({
         id: huddleRow.id,
         name: huddleRow.name,
-        description: huddleRow.description,
-        sport: huddleRow.sport,
+        description: huddleRow.bio ?? undefined,
+        // No sport column; the team is the useful thing to name anyway.
+        sport: (huddleRow as any).teams
+          ? [(huddleRow as any).teams.city, (huddleRow as any).teams.name].filter(Boolean).join(' ')
+          : undefined,
         is_private: huddleRow.is_private,
         member_count: count ?? 0,
         members,

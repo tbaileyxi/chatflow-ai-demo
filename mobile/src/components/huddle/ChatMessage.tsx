@@ -255,10 +255,12 @@ export function ChatMessage({
       : undefined;
     setTimeout(() => {
       Share.share({
+        // The link goes in `url` ONLY. Putting it in the message as well made
+        // iOS send both, so a shared moment arrived with the same URL printed
+        // twice under it.
         message: [
           text,
           huddleName ? `— in ${huddleName} on Side Huddle Sports` : "",
-          roomUrl ?? "",
         ].filter(Boolean).join("\n"),
         ...(roomUrl ? { url: roomUrl } : {}),
       }).catch(() => {});
