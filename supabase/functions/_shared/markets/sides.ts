@@ -68,7 +68,9 @@ export function marketSides(m: MarketLike): MarketSides {
       q.split(/\s+/)[0] ||
       "Favorite";
     const n = atLeast(line);
-    const by = `${team} by ${n}+${unit ? ` ${unit}` : ""}`;
+    // No unit on the button — the headline above already carries it, and the
+    // longer label broke mid-word inside the fade card's button.
+    const by = `${team} by ${n}+`;
     return {
       eyebrow: "SPREAD",
       headline: `${team} ${line}${unit ? ` ${unit}` : ""}`,

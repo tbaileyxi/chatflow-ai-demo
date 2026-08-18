@@ -273,7 +273,13 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
                   <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
                   <>
-                    <Text className="text-sm font-black text-success" numberOfLines={1}>
+                    <Text
+                      className="text-sm font-black text-success"
+                      numberOfLines={2}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.7}
+                      style={{ textAlign: "center" }}
+                    >
                       {s.label}
                     </Text>
                     <Text className="text-[11px] font-medium text-muted-foreground">

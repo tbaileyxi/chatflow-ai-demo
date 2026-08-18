@@ -68,7 +68,11 @@ export function marketSides(m: MarketLike): MarketSides {
       q.split(/\s+/)[0] ||
       "Favorite";
     const n = atLeast(line);
-    const by = `${team} by ${n}+${unit ? ` ${unit}` : ""}`;
+    // No unit on the button. The headline directly above already says
+    // "Padres 1.5 runs", and repeating it pushed the label past the button
+    // width — React Native then broke it mid-word, so a Padres card read
+    // "Padres by 2+ ru ns" next to "Anythi ng less".
+    const by = `${team} by ${n}+`;
     return {
       eyebrow: "SPREAD",
       headline: `${team} ${line}${unit ? ` ${unit}` : ""}`,

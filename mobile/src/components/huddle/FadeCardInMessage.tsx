@@ -225,7 +225,13 @@ export function FadeCardInMessage({
                 {busy ? (
                   <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
-                  <Text className="text-sm font-black text-success">
+                  <Text
+                    className="text-sm font-black text-success"
+                    numberOfLines={2}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                    style={{ textAlign: "center" }}
+                  >
                     {s === "over" ? overLabel : underLabel}
                   </Text>
                 )}
