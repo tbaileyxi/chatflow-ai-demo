@@ -660,7 +660,7 @@ function ROISection() {
             A single local radio spot runs <strong>$500–1,500/week</strong>. One local TV placement: <strong>$2,000–5,000</strong>. A Side Huddle founding sponsorship comes in <strong>below the average local-sponsorship spend</strong> — exclusive, always-on, inside the conversation when fans are most engaged.
           </p>
           <p style={{ fontSize: 18, lineHeight: 1.65, color: '#ddd', marginTop: 16 }}>
-            Own an entire fanbase on Side Huddle. <strong style={{ color: G.gold }}>$250/month for one team, with lower per-team founding rates for bundles.</strong>
+            Every huddle for your team. <strong style={{ color: G.gold }}>$250/month for one team, with lower per-team founding rates for bundles.</strong>
           </p>
         </div>
       </div>
