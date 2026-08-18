@@ -54,12 +54,23 @@ const EXISTING_TAKEN_CLAIMS: Record<string, ClaimStatus> = {
 const LEAGUE_LABELS: Record<string, string> = { NCAA: 'CFB', NFL: 'NFL', NBA: 'NBA', MLB: 'MLB', NHL: 'NHL' };
 function displayLeague(l: string) { return LEAGUE_LABELS[l] || l; }
 
+// Flat, per team, per season. No bundle tiers.
+//
+// The old ladder discounted to $180/team at ten teams — real complexity for a
+// product with no closed deals, and at a four-figure season price the discount
+// is not what decides anything. One number is easier to quote, easier to hold
+// in a conversation, and impossible to get wrong in an email.
+//
+// Season, not month: local sponsorship is budgeted by season, and monthly
+// billing invites a cancellation in month two. Each sport carries its own dates
+// rather than a single made-up calendar.
+const SEASON_PRICE = 1000;
+const DEPOSIT = 500;
+
 function bundlePrice(count: number): { total: number; label: string } {
-  if (count >= 10) return { total: 1800, label: '$180/team' };
-  if (count >= 6)  return { total: 1200, label: '$200/team' };
-  if (count >= 3)  return { total: 650,  label: '~$217/team' };
-  return { total: count * 250, label: '$250/team' };
+  return { total: count * SEASON_PRICE, label: `$${SEASON_PRICE.toLocaleString()}/team per season` };
 }
+
 
 // ─── All teams — no Supabase needed ──────────────────────────────────────────
 const ALL_TEAMS: StaticTeam[] = [
@@ -660,7 +671,7 @@ function ROISection() {
             A single local radio spot runs <strong>$500–1,500/week</strong>. One local TV placement: <strong>$2,000–5,000</strong>. A Side Huddle founding sponsorship comes in <strong>below the average local-sponsorship spend</strong> — exclusive, always-on, inside the conversation when fans are most engaged.
           </p>
           <p style={{ fontSize: 18, lineHeight: 1.65, color: '#ddd', marginTop: 16 }}>
-            Every huddle for your team. <strong style={{ color: G.gold }}>$250/month for one team, with lower per-team founding rates for bundles.</strong>
+            Every huddle for your team. <strong style={{ color: G.gold }}>$1,000 for the season. $500 holds it.</strong>
           </p>
         </div>
       </div>
@@ -671,17 +682,16 @@ function ROISection() {
 // ─── Section 5: Rate Card ─────────────────────────────────────────────────────
 function RateCard() {
   const urgency = [
-    { when: 'Single team', detail: '$250/month', sub: 'Exclusive placement for one team', active: true },
-    { when: '3-team bundle', detail: '$650/month', sub: '~$217/team', active: false },
-    { when: '6-team bundle', detail: '$1,200/month', sub: '$200/team', active: false },
-    { when: '10+ teams', detail: '$1,800/month', sub: '$180/team', active: false },
+    { when: 'Football',   detail: 'Aug – Jan', sub: '$1,000 per team', active: true },
+    { when: 'Basketball', detail: 'Oct – Apr', sub: '$1,000 per team', active: true },
+    { when: 'Hockey',     detail: 'Oct – Apr', sub: '$1,000 per team', active: true },
+    { when: 'Baseball',   detail: 'Apr – Oct', sub: '$1,000 per team', active: true },
   ];
   const infoCards = [
-    { title: 'BILLING',     body: 'Month-to-month. No annual contract. Your first monthly charge is paid at checkout and recurring billing continues monthly.' },
-    { title: 'RATE LOCK',   body: 'Your founding monthly rate is protected for the first year.' },
-    { title: 'EXCLUSIVITY', body: 'One active sponsor per team. No competing brand shares your team placement while your sponsorship is active.' },
-    { title: 'FOUNDING BONUS', body: 'Founding sponsors receive two bonus months of placement plus sponsor drops inside the chat experience.' },
-    { title: 'BUNDLES',     body: '3 teams: $650/month. 6 teams: $1,200/month. 10 or more: $1,800/month.' },
+    { title: 'BILLING',     body: '$500 holds your team. The balance is due at the season opener.' },
+    { title: 'RATE LOCK',   body: 'Founding rate, held for as long as you stay a sponsor.' },
+    { title: 'EXCLUSIVITY', body: 'One sponsor per team. No competing brand in your team\u2019s huddles.' },
+    { title: 'OUR SIDE',    body: 'If your team\u2019s huddles don\u2019t reach 250 members this season, the next one is on us.' },
   ];
   return (
     <section className="sh-section" id="rate-card" style={{ borderTop: `1px solid ${G.border}` }}>
@@ -713,20 +723,19 @@ function RateCard() {
           <div style={{ position: 'absolute', top: -12, left: 20, background: G.gold, color: '#000', fontSize: 10, fontWeight: 800, padding: '3px 10px', borderRadius: 999, letterSpacing: '0.1em' }}>BEST VALUE</div>
           <div className="sh-label" style={{ color: G.gold }}>BUNDLE · MULTIPLE TEAMS</div>
           <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(28px,4vw,44px)', color: G.gold, lineHeight: 1.05, marginTop: 8 }}>Own your market</div>
-          <div style={{ marginTop: 14, fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>Bundle a conference or a whole market — best per-team founding rate. Ask us for a bundle quote.</div>
+          <div style={{ marginTop: 14, fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>Take every team in your market. Same $1,000 each — no haggling, no tiers.</div>
         </div>
       </div>
 
       <div style={{ marginTop: 24, border: `1px solid ${G.gold}`, borderRadius: 8, padding: 'clamp(20px,3vw,32px)', background: 'rgba(255,215,0,.04)', textAlign: 'center' }}>
         <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(20px,2.6vw,30px)', textTransform: 'uppercase' }}>
-          One team: <span style={{ color: G.gold }}>$250/month</span>
+          One team, one season: <span style={{ color: G.gold }}>$1,000</span>
         </div>
         <p style={{ color: '#ddd', marginTop: 12, fontSize: 16, lineHeight: 1.6, maxWidth: 620, margin: '12px auto 0' }}>
-          Pay the first monthly charge today to claim your team.
-          Founding sponsors receive <strong style={{ color: G.white }}>two bonus months of placement</strong> plus sponsor drops inside the chat experience.
-          Bundle pricing is applied automatically when you select multiple teams.
+          <strong style={{ color: G.white }}>$500 holds your team</strong>; the balance is due at the opener. Founding rate held for
+          as long as you stay. If your huddles don\u2019t reach 250 members this season, the next season is on us.
         </p>
-        <p style={{ color: G.muted, marginTop: 14, fontSize: 13 }}>Take several at once. Conference and market packages on request.</p>
+        <p style={{ color: G.muted, marginTop: 14, fontSize: 13 }}>Same price per team, however many you take.</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px,1fr))', gap: 14, marginTop: 28 }}>
@@ -784,9 +793,6 @@ function TeamPicker({ filtered, claims, selected, toggle, selectMany, search, se
         <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 22, color: G.gold }}>
           {taken} claimed · {open} founding slots open
         </div>
-        <span style={{ fontSize: 13, color: G.muted2, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-          Founding window closes August 29, 2026
-        </span>
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 28, alignItems: 'center' }}>
@@ -903,7 +909,7 @@ function CartBar({ teams, onCheckout, onClear }: { teams: StaticTeam[]; onChecko
       <div style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 22, color: G.gold }}>{teams.length} team{teams.length !== 1 ? 's' : ''} selected</span>
-          <span style={{ color: G.muted2, fontSize: 14, marginLeft: 12 }}>${price.total}/month · {price.label}</span>
+          <span style={{ color: G.muted2, fontSize: 14, marginLeft: 12 }}>${price.total.toLocaleString()} per season · ${(teams.length * DEPOSIT).toLocaleString()} to hold</span>
           <button onClick={onClear} style={{ marginLeft: 14, background: 'none', border: 'none', color: G.muted, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>clear</button>
         </div>
         <button className="btn-gold" onClick={onCheckout} style={{ fontSize: 14, padding: '13px 26px' }}>Review &amp; checkout →</button>
@@ -952,24 +958,26 @@ function CheckoutModal({ teams, onClose }: { teams: StaticTeam[]; onClose: () =>
         </div>
 
         <div style={{ marginTop: 16, padding: '15px 16px', background: 'rgba(255,215,0,.07)', border: `1px solid ${G.gold}`, borderRadius: 8 }}>
-          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 19, color: G.gold }}>MONTH-TO-MONTH FOUNDING SPONSORSHIP</div>
+          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 19, color: G.gold }}>FOUNDING SEASON SPONSORSHIP</div>
           <div style={{ fontSize: 13, color: '#ccc', marginTop: 5, lineHeight: 1.55 }}>
-            First monthly charge today. First recurring charge begins September 1. No annual contract.
+            $500 per team holds it today. The balance is due at the season opener. No recurring charge.
           </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 18, paddingTop: 14, borderTop: `1px solid ${G.gold}44` }}>
-          <span className="sh-label">TOTAL TODAY</span>
-          <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 30, color: G.gold }}>${price.total.toLocaleString()}</span>
+          <span className="sh-label">DEPOSIT TODAY</span>
+          <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 30, color: G.gold }}>
+            ${(teams.length * DEPOSIT).toLocaleString()}
+          </span>
         </div>
 
         {error && <p style={{ color: '#ff6b6b', fontSize: 13, marginTop: 12 }}>{error}</p>}
 
         <button className="btn-gold" onClick={go} disabled={loading} style={{ marginTop: 16, width: '100%', fontSize: 15, padding: '15px 28px' }}>
-          {loading ? 'Starting Square checkout…' : `Checkout ${teams.length} team${teams.length !== 1 ? 's' : ''} — $${price.total.toLocaleString()} →`}
+          {loading ? 'Starting Square checkout…' : `Hold ${teams.length} team${teams.length !== 1 ? 's' : ''} — $${(teams.length * DEPOSIT).toLocaleString()} →`}
         </button>
         <p style={{ fontSize: 11, color: G.muted, textAlign: 'center', marginTop: 10, lineHeight: 1.5 }}>
-          Secure checkout powered by Square. This payment claims the selected team sponsorship(s).
+          Secure checkout powered by Square. This deposit holds your team; season total ${'$'}{(teams.length * SEASON_PRICE).toLocaleString()}.
         </p>
       </div>
     </div>

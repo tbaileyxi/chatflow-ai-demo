@@ -2,9 +2,16 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 // Founding-sponsor checkout via Square Payment Links (Online Checkout).
-// Builds ONE hosted Square checkout for the first monthly sponsorship charge.
-// Founding tiers: $250 for 1-2 teams, $650 for 3-5, $1,200 for 6-9,
-// and $1,800 for 10+.
+//
+// SEASON, NOT MONTH. $1,000 per team per season, and what Square collects here
+// is the $500 deposit that holds the team — the balance is due at the opener.
+// The old tier ladder ($250/$650/$1,200/$1,800) is gone: at a four-figure
+// season price a volume discount decides nothing and cost more to explain than
+// it earned.
+//
+// This number must match the page. It is computed here, not sent by the client,
+// so the two are edited together or a sponsor is charged something other than
+// what they were shown.
 //
 // Required edge-function secrets (set in Supabase → Edge Functions → Secrets):
 //   SQUARE_ACCESS_TOKEN  – Square access token (Production or Sandbox)
@@ -18,11 +25,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function monthlyPriceCents(count: number) {
-  if (count >= 10) return 180000;
-  if (count >= 6) return 120000;
-  if (count >= 3) return 65000;
-  return count * 25000;
+const SEASON_PRICE_CENTS = 100000; // $1,000 per team per season
+const DEPOSIT_CENTS = 50000;       // $500 holds a team
+
+function depositCents(count: number) {
+  return count * DEPOSIT_CENTS;
 }
 
 serve(async (req) => {
@@ -85,13 +92,13 @@ serve(async (req) => {
     }
 
     const count = cleanTeams.length;
-    const total = monthlyPriceCents(count);
+    const total = depositCents(count);
 
     const teamNames: string[] = cleanTeams.map((team) => team.teamName);
     const teamList = teamNames.join(", ");
     const productName = count === 1
-      ? `Side Huddle Founding Sponsor — ${teamNames[0]} (first monthly charge)`
-      : `Side Huddle Founding Sponsor — ${count} teams (first monthly charge)`;
+      ? `Side Huddle Founding Sponsor — ${teamNames[0]} (season deposit)`
+      : `Side Huddle Founding Sponsor — ${count} teams (season deposit)`;
 
     const origin = req.headers.get("origin") || "https://sidehuddlesports.com";
 
@@ -114,7 +121,7 @@ serve(async (req) => {
           ask_for_shipping_address: false,
         },
         // Team list is recorded on the order note so you can see what was bought.
-        payment_note: `monthly · ${teamList}`.slice(0, 500),
+        payment_note: `season deposit · ${teamList}`.slice(0, 500),
       }),
     });
 
