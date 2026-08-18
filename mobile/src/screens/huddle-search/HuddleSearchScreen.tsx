@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { colors } from "@/theme/colors";
+import { pluralize } from "@/lib/plural";
 
 type SearchHuddle = {
   id: string;
@@ -149,7 +150,7 @@ export function HuddleSearchScreen() {
         <View className="flex-row items-center gap-1">
           <Users color={colors.mutedForeground} size={12} />
           <Text className="text-xs text-muted-foreground">
-            {item.memberCount} members
+            {pluralize(item.memberCount, "member")}
           </Text>
         </View>
       </View>

@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
+import { pluralize } from "@/lib/plural";
 
 type Route = RouteProp<RootStackParamList, "JoinHuddle">;
 
@@ -119,7 +120,7 @@ export function JoinHuddleScreen() {
               <View className="flex-row items-center gap-1">
                 <Users color={colors.mutedForeground} size={14} />
                 <Text className="text-sm text-muted-foreground">
-                  {huddle.memberCount} members
+                  {pluralize(huddle.memberCount, "member")}
                 </Text>
               </View>
               <View className="flex-row items-center gap-1">

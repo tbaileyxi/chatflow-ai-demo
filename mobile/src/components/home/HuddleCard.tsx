@@ -3,6 +3,7 @@ import { Crown, Users } from "lucide-react-native";
 import { cn } from "@/lib/utils";
 import { colors } from "@/theme/colors";
 import type { UserHuddle } from "@/hooks/useUserHuddles";
+import { pluralize } from "@/lib/plural";
 
 type Props = {
   huddle: UserHuddle;
@@ -60,7 +61,7 @@ export function HuddleCard({ huddle, onPress }: Props) {
         <View className="flex-row items-center gap-1">
           <Users color={colors.mutedForeground} size={11} />
           <Text className="text-xs text-muted-foreground">
-            {huddle.memberCount} people
+            {pluralize(huddle.memberCount, "person", "people")}
           </Text>
         </View>
       </View>
