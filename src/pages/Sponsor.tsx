@@ -394,8 +394,7 @@ function Hero({ onCta }: { onCta: () => void }) {
           <span style={{ color: G.gold }}>When the game is on the line.</span>
         </h1>
         <p style={{ fontSize: 'clamp(15px, 1.6vw, 19px)', lineHeight: 1.6, color: '#aaa', maxWidth: 760, marginTop: 36, fontWeight: 400 }}>
-          We're opening Side Huddle Founding Team Sponsorships for a limited time. Own a team's entire fanbase —
-          exclusive, always-on, inside the conversation. <strong style={{ color: G.white }}>Your founding rate is
+          Founding sponsorships are open. One brand per team, inside the conversation all season. <strong style={{ color: G.white }}>Your founding rate is
           protected for the first year, and your team stays exclusive while your sponsorship is active.</strong> Select your team and check out securely below.
         </p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 28 }}>
@@ -434,20 +433,20 @@ const HUDDLE_BUBBLES = [
 function Moment({ featured }: { featured: StaticTeam }) {
   return (
     <section className="sh-section" style={{ borderTop: `1px solid ${G.border}` }}>
-      <div className="sh-label">01 — WHY THIS IS DIFFERENT</div>
+      <div className="sh-label">01 — WHAT YOU GET</div>
+      {/* The diagram IS the pitch. It used to sit under a headline and a
+          ninety-word paragraph, so the one asset that explains the model in a
+          glance was the last thing anyone reached.
+          The old copy also promised "hundreds of live huddles" and "hundreds of
+          simultaneous moments" — a claim a buyer can disprove by opening the
+          app. The founding-rate story is true and stronger; this sells that. */}
       <h2 style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(36px, 5vw, 60px)', lineHeight: 1.0, marginTop: 16, maxWidth: 960, textTransform: 'uppercase' }}>
-        It's not one chatroom.<br />
-        It's <span style={{ color: G.gold }}>hundreds of live huddles</span> — all powered by your brand.
+        One sponsor.<br />
+        <span style={{ color: G.gold }}>Every huddle for your team.</span>
       </h2>
-      <p style={{ fontSize: 17, lineHeight: 1.65, color: '#aaa', maxWidth: 860, marginTop: 24 }}>
-        On game day, dozens of separate fan huddles are happening simultaneously around your team. Friends jumping between
-        rooms. Debates, predictions, live reactions. The Side Huddle AI bot is active in every single one — surfacing stats,
-        highlights, and real-time updates. Your brand is on every message.{' '}
-        <strong style={{ color: G.white }}>Not one impression. Hundreds of simultaneous moments, all game long.</strong>
-      </p>
       <HuddleMultiplier />
       <p style={{ textAlign: 'center', marginTop: 32, fontSize: 13, color: G.muted, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-        One team. One sponsor. Everywhere at once.
+        Fans don't gather in one room. You're in all of them.
       </p>
     </section>
   );
@@ -549,7 +548,7 @@ function PlatformPreview() {
         Three placements. <span style={{ color: G.gold }}>One sponsor.</span> Always on.
       </h2>
       <p style={{ color: '#999', marginTop: 16, maxWidth: 720, fontSize: 16, lineHeight: 1.6 }}>
-        Your brand is embedded across three distinct surfaces — not one banner, not one impression. Always on, all game long.
+        Three surfaces, not one banner. On all game.
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px,1fr))', gap: 20, marginTop: 48 }}>
         {PLACEMENT_CARDS.map(c => (
@@ -569,7 +568,7 @@ function PlatformPreview() {
           </h3>
         </div>
         <p style={{ color: '#999', fontSize: 14, lineHeight: 1.55, maxWidth: 390, margin: 0 }}>
-          Gold callouts mark the sponsor inventory fans see in-room: the room-level Presented By line and the bot-card sponsor attribution.
+          Gold marks what fans actually see.
         </p>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1.1fr) repeat(3, minmax(190px, .75fr))', gap: 22, marginTop: 26, alignItems: 'start' }} className="sponsor-shot-grid">
@@ -692,7 +691,7 @@ function RateCard() {
         <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(20px,2.8vw,30px)', color: G.gold, textTransform: 'uppercase' }}>
           🏈 Claim your exclusive team sponsorship.
         </div>
-        <p style={{ color: '#ddd', marginTop: 10, fontSize: 16 }}>Lock in one team or bundle multiple teams at the founding sponsor rate. One active sponsor per team.</p>
+        <p style={{ color: '#ddd', marginTop: 10, fontSize: 16 }}>One active sponsor per team. Bundle for a lower rate.</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px,1fr))', gap: 10, marginTop: 20 }}>
           {urgency.map(u => (
             <div key={u.when} style={{ padding: 14, border: `1px solid ${u.active ? G.gold : G.border}`, borderRadius: 6, background: u.active ? 'rgba(255,215,0,.08)' : G.bg }}>
@@ -727,7 +726,7 @@ function RateCard() {
           Founding sponsors receive <strong style={{ color: G.white }}>two bonus months of placement</strong> plus sponsor drops inside the chat experience.
           Bundle pricing is applied automatically when you select multiple teams.
         </p>
-        <p style={{ color: G.muted, marginTop: 14, fontSize: 13 }}>Pick one or more teams below and check out once. Custom conference or market packages can still be arranged through partnerships.</p>
+        <p style={{ color: G.muted, marginTop: 14, fontSize: 13 }}>Take several at once. Conference and market packages on request.</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px,1fr))', gap: 14, marginTop: 28 }}>
@@ -777,8 +776,7 @@ function TeamPicker({ filtered, claims, selected, toggle, selectMany, search, se
         First in <span style={{ color: G.gold }}>owns the team.</span>
       </h2>
       <p style={{ color: '#aaa', marginTop: 16, maxWidth: 720, fontSize: 17, lineHeight: 1.6 }}>
-        Tap the team(s) you want — one active sponsor per team, across every huddle that follows them.
-        Your founding monthly price is calculated automatically, and multiple teams check out together.
+        Pick your market or your team. One active sponsor each — take several and the founding rate drops.
       </p>
 
       {/* Honest scarcity — live counts from real DB rows. */}
