@@ -713,27 +713,16 @@ function RateCard() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 32 }}>
-        <div style={{ border: `1px solid ${G.border}`, borderRadius: 8, padding: 24, background: G.surface }}>
-          <div className="sh-label" style={{ color: G.muted }}>SINGLE TEAM</div>
-          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(28px,4vw,44px)', color: G.white, lineHeight: 1.05, marginTop: 8 }}>Own one team</div>
-          <div style={{ marginTop: 14, fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>Exclusive placement across every huddle for your team — zero competitors in that community.</div>
-        </div>
-        <div style={{ border: `2px solid ${G.gold}`, borderRadius: 8, padding: 24, background: 'rgba(255,215,0,.04)', position: 'relative' }}>
-          <div style={{ position: 'absolute', top: -12, left: 20, background: G.gold, color: '#000', fontSize: 10, fontWeight: 800, padding: '3px 10px', borderRadius: 999, letterSpacing: '0.1em' }}>BEST VALUE</div>
-          <div className="sh-label" style={{ color: G.gold }}>BUNDLE · MULTIPLE TEAMS</div>
-          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(28px,4vw,44px)', color: G.gold, lineHeight: 1.05, marginTop: 8 }}>Own your market</div>
-          <div style={{ marginTop: 14, fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>Take every team in your market. Same $1,000 each — no haggling, no tiers.</div>
-        </div>
-      </div>
-
+      {/* One price panel, not three. The two-up grid here said the same thing
+          as the block below it and still wore a "BEST VALUE" badge for a bundle
+          discount that no longer exists. */}
       <div style={{ marginTop: 24, border: `1px solid ${G.gold}`, borderRadius: 8, padding: 'clamp(20px,3vw,32px)', background: 'rgba(255,215,0,.04)', textAlign: 'center' }}>
         <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(20px,2.6vw,30px)', textTransform: 'uppercase' }}>
           One team, one season: <span style={{ color: G.gold }}>$1,000</span>
         </div>
         <p style={{ color: '#ddd', marginTop: 12, fontSize: 16, lineHeight: 1.6, maxWidth: 620, margin: '12px auto 0' }}>
           <strong style={{ color: G.white }}>$500 holds your team</strong>; the balance is due at the opener. Founding rate held for
-          as long as you stay. If your huddles don\u2019t reach 250 members this season, the next season is on us.
+          as long as you stay. If your huddles don't reach 250 members this season, the next season is on us.
         </p>
         <p style={{ color: G.muted, marginTop: 14, fontSize: 13 }}>Same price per team, however many you take.</p>
       </div>
@@ -762,10 +751,6 @@ const STATE_NAMES: Record<string, string> = {
   TN:'Tennessee', TX:'Texas', UT:'Utah', VA:'Virginia', WA:'Washington', WI:'Wisconsin',
   WV:'West Virginia', AB:'Alberta', BC:'British Columbia', MB:'Manitoba', ON:'Ontario', QC:'Quebec',
 };
-
-// The markets worth surfacing as one-tap chips: states carrying several teams,
-// which is where a local sponsor's money actually goes.
-const TOP_MARKETS = ['SC','NC','GA','FL','TX','TN','LA','OH','PA','CA','NY'];
 
 const LEAGUES: LeagueFilter[] = ['ALL', 'NCAA', 'NFL', 'NBA', 'MLB', 'NHL'];
 const LEAGUE_DISPLAY: Record<LeagueFilter, string> = { ALL: 'ALL', NCAA: 'CFB', NFL: 'NFL', NBA: 'NBA', MLB: 'MLB', NHL: 'NHL' };
@@ -802,26 +787,8 @@ function TeamPicker({ filtered, claims, selected, toggle, selectMany, search, se
             {LEAGUE_DISPLAY[l]}
           </button>
         ))}
-        <input className="sh-input" placeholder="Search teams…" value={search} onChange={e => setSearch(e.target.value)}
-          style={{ marginLeft: 8, maxWidth: 280, height: 40 }} />
-      </div>
-
-      {/* Markets. A sponsor buys where their customers are, so the fastest path
-          is their own state — not a 188-team wall sorted by league. */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16, alignItems: 'center' }}>
-        <span className="sh-label" style={{ fontSize: 11, color: G.muted2 }}>MARKETS</span>
-        {TOP_MARKETS.map(st => (
-          <button key={st} onClick={() => setSearch(STATE_NAMES[st] ?? st)} className="sh-label"
-            style={{ padding: '7px 14px', borderRadius: 4, border: `1px solid ${G.border}`, background: G.surface, color: G.muted, cursor: 'pointer', fontSize: 11 }}>
-            {STATE_NAMES[st] ?? st}
-          </button>
-        ))}
-        {search && (
-          <button onClick={() => setSearch('')} className="sh-label"
-            style={{ padding: '7px 14px', borderRadius: 4, border: `1px solid ${G.border}`, background: 'transparent', color: G.muted2, cursor: 'pointer', fontSize: 11 }}>
-            CLEAR
-          </button>
-        )}
+        <input className="sh-input" placeholder="Team, city or state…" value={search} onChange={e => setSearch(e.target.value)}
+          style={{ marginLeft: 8, maxWidth: 340, height: 40 }} />
       </div>
 
       {/* One tap for the whole shortlist, once it is small enough to mean something. */}
