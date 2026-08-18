@@ -21,6 +21,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // Apple demanded 13" iPad screenshots we have no honest way to produce).
     supportsTablet: false,
     bundleIdentifier: "com.sidehuddle.sports",
+    // Universal Links. Without this the app never claims the domain, so a
+    // shared https link always lands on the web page even when the app is
+    // installed — which is exactly what was happening: tap a room link, get a
+    // "Download on the App Store" button you already have.
+    //
+    // Pairs with public/.well-known/apple-app-site-association, which must be
+    // served from the same host as JSON. Both halves or neither works.
+    associatedDomains: [
+      "applinks:sidehuddlesports.com",
+      "applinks:www.sidehuddlesports.com",
+    ],
     buildNumber: "40",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,

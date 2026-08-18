@@ -3,6 +3,7 @@ import {
   NavigationContainer,
   DefaultTheme,
   LinkingOptions,
+  getStateFromPath as getStateFromPathDefault,
 } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -30,14 +31,31 @@ const navTheme = {
 };
 
 const linking: LinkingOptions<RootStackParamList> = {
-  prefixes: [Linking.createURL("/"), "sidehuddle://"],
+  // https prefixes are what make Universal Links land in the app. Without them
+  // iOS opens Safari even when the AASA file and the entitlement are both
+  // correct, which is the state this was in: a shared room link showed a
+  // "Download on the App Store" button to someone who already had the app.
+  prefixes: [
+    Linking.createURL("/"),
+    "sidehuddle://",
+    "https://www.sidehuddlesports.com",
+    "https://sidehuddlesports.com",
+  ],
+  // The web uses short paths (/h/:id for a room, /i/:code for an invite) while
+  // the screens are registered under longer ones. Normalise before the default
+  // parser runs, so both the website links and the custom scheme keep working.
+  getStateFromPath: (path, options) => {
+    const rewritten = path
+      .replace(/^\/h\//, "/huddle/")
+      .replace(/^\/picks\//, "/message/");
+    return getStateFromPathDefault(rewritten, options);
+  },
   config: {
     screens: {
       MainTabs: {
         screens: {
           Home: "",
-          Teams: "teams",
-          Ledger: "ledger",
+              Ledger: "ledger",
           Profile: "profile",
         },
       },
