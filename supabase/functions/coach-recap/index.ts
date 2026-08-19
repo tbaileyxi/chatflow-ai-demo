@@ -128,12 +128,20 @@ async function findPostgameHuddles(supabase: SupabaseClient): Promise<string[]> 
   const windowStart = new Date(Date.now() - POSTGAME_WINDOW_MIN * 60 * 1000).toISOString();
   const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
 
+  // Look at games that FINISHED recently, not games that were SYNCED recently.
+  //
+  // last_synced_at stops moving the moment a game goes final, so keying the
+  // window on it gave every game a single ~2 hour chance: one missed cron tick,
+  // one function error, and the recap never happens. A Yankees game that ended
+  // 3-1 was 12 hours past its only window with no recap and no way to notice.
+  //
+  // recentlyRecapped is what prevents duplicates — the window does not need to
+  // do that job as well, so it can be generous.
   const { data: games } = await supabase
     .from("games")
     .select("id, home_team_id, away_team_id, last_synced_at, start_time")
     .eq("status", "final")
-    .gte("start_time", dayAgo)
-    .gte("last_synced_at", windowStart);
+    .gte("start_time", dayAgo);
 
   if (!games || games.length === 0) return [];
 
@@ -156,7 +164,9 @@ async function findPostgameHuddles(supabase: SupabaseClient): Promise<string[]> 
   if (!huddles) return [];
 
   const ids = huddles.map((h) => h.id);
-  const already = await recentlyRecapped(supabase, ids, "postgame", POSTGAME_WINDOW_MIN * 60 * 1000);
+  // Dedupe over a full day, matching the candidate window above. A shorter
+  // memory here would re-recap yesterday's game every time the cron ran.
+  const already = await recentlyRecapped(supabase, ids, "postgame", 24 * 3600 * 1000);
   return ids.filter((id) => !already.has(id));
 }
 

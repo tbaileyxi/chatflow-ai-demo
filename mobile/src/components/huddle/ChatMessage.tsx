@@ -491,6 +491,13 @@ export function ChatMessage({
                     useNativeControls
                     isLooping
                     isMuted
+                    // Autoplay, muted. Without shouldPlay the view renders a
+                    // black rectangle until someone taps it — the URL was
+                    // always fine, the player was simply paused on frame zero
+                    // with no poster behind it. Muted autoplay is what every
+                    // social feed does and it is why they never show a black
+                    // box.
+                    shouldPlay
                   />
                 </Pressable>
               )}

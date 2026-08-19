@@ -197,6 +197,22 @@ serve(async (req) => {
         .select("id", { count: "exact", head: true })
         .like("event_id", "xlive:%");
       summary.x_claims_total = claims ?? 0;
+      // Ops readout of the clips themselves — public X links and media URLs,
+      // no room names and no message text. Needed because "a clip landed" and
+      // "a clip played" are different claims and only one of them was checked.
+      const { data: clipRows } = await supabase
+        .from("huddle_messages")
+        .select("created_at, media_url, media_type, embed_code")
+        .eq("message_type", "live_play")
+        .like("embed_code", "https://x.com/%")
+        .order("created_at", { ascending: false })
+        .limit(10);
+      (summary as any).clips = (clipRows ?? []).map((r: any) => ({
+        at: r.created_at?.slice(11, 16),
+        type: r.media_type,
+        media: r.media_url,
+        post: r.embed_code,
+      }));
     }
 
 
