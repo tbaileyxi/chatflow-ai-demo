@@ -202,7 +202,16 @@ serve(async (req) => {
 
     const [transcript, gameBeats, newsBeats, ledger, game, record, boxScore, seasonResults, nextGame] =
       await Promise.all([
-        needsRoom ? getRoomTranscript(supabase, payload.huddle_id, sinceIso) : Promise.resolve([]),
+        // ALWAYS fetch the recent turns, whatever lane the router picked.
+        //
+        // "@coach pull up his bio" is unanswerable without the message two
+        // above it that said Richard Young — and that question does not look
+        // like a "room" question, so the router sent it down a lane that
+        // dropped the transcript. The Coach then asked who "he" was, in a
+        // thread where it had just been told. A follow-up is the most natural
+        // thing a person types; losing the thread is the worst thing to do
+        // with it.
+        getRoomTranscript(supabase, payload.huddle_id, sinceIso),
         needsGame && teamId ? getGameBeats(supabase, teamId, sinceIso, "in_game") : Promise.resolve([]),
         needsGame && teamId ? getGameBeats(supabase, teamId, sinceIso, "news") : Promise.resolve([]),
         needsLedger ? getLedger(supabase, payload.huddle_id) : Promise.resolve([]),

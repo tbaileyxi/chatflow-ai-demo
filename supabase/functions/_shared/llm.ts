@@ -36,7 +36,13 @@ export type Provider = "anthropic" | "openai" | "xai";
 // and actually read: one call per room per game, versus hundreds of in-game
 // lines. Highest visibility per token spent in the whole product.
 const MODELS: Record<LlmJob, Record<Provider, string>> = {
-  news:    { anthropic: "claude-haiku-4-5", openai: "gpt-4o-mini", xai: "grok-4.3" },
+  // Sonnet, not Haiku. The complaint was never phrasing — it was judgment:
+  // which detail in the article is the news. Haiku wrote "tough start but
+  // we'll bounce back" where the story was a ranking with a number in it.
+  // News is gated to rooms people made now, so the volume this runs at is a
+  // fraction of what it was when Haiku was chosen. The headline JUDGE below
+  // stays on Haiku — that one is high volume and only has to score.
+  news:    { anthropic: "claude-sonnet-5",  openai: "gpt-4o",      xai: "grok-4.6" },
   route:   { anthropic: "claude-haiku-4-5", openai: "gpt-4o-mini", xai: "grok-4.3" },
   in_game: { anthropic: "claude-sonnet-5",  openai: "gpt-4o",      xai: "grok-4.6" },
   answer:  { anthropic: "claude-sonnet-5",  openai: "gpt-4o",      xai: "grok-4.6" },

@@ -218,7 +218,19 @@ export async function answerQuestion(input: AnswerInput): Promise<string> {
   if (input.liveSearch && input.liveSearch.trim()) {
     facts.push("LIVE FROM X (last 48h, reported — not your own knowledge):\n" + input.liveSearch.trim());
   }
-  if (lane === "room" || lane === "mixed") facts.push(transcriptBlock(input.transcript));
+  // The last turns go in for EVERY lane. The full room transcript is still a
+  // room-lane thing, but a handful of recent lines is what makes "his", "that
+  // guy" and "pull it up" resolvable — those are follow-ups, not room questions.
+  if (lane === "room" || lane === "mixed") {
+    facts.push(transcriptBlock(input.transcript));
+  } else if (input.transcript.length > 0) {
+    const recent = input.transcript.slice(-6);
+    facts.push(
+      "JUST SAID IN THIS ROOM (newest last) — use it to resolve who or what " +
+      "the question refers to:\n" +
+      recent.map((l) => `${l.speaker}: ${l.text}`).join("\n"),
+    );
+  }
   if (lane === "ledger") {
     facts.push(ledgerBlock(input.ledger));
     // A ledger question in a live room usually wants the game as texture too.

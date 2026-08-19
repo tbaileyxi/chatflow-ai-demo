@@ -46,6 +46,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
+import { CoachThinking } from "@/components/huddle/CoachThinking";
 
 type Route = RouteProp<RootStackParamList, "Huddle">;
 
@@ -224,6 +225,25 @@ export function HuddleScreen() {
 
   // Invite modal — the room's one invite surface (link + in-app friends).
   const [showInvite, setShowInvite] = useState(false);
+  // Cleared when a coach_answer actually lands, or after 90s so a failed ask
+  // doesn't leave the dots spinning forever.
+  const [coachThinking, setCoachThinking] = useState(false);
+
+  // Stop the dots the moment the Coach speaks.
+  useEffect(() => {
+    if (!coachThinking) return;
+    const answered = (messages ?? []).some(
+      (m) => m.messageType === "coach_answer" &&
+             Date.now() - new Date(m.createdAt).getTime() < 120_000,
+    );
+    if (answered) setCoachThinking(false);
+  }, [messages, coachThinking]);
+
+  useEffect(() => {
+    if (!coachThinking) return;
+    const t = setTimeout(() => setCoachThinking(false), 90_000);
+    return () => clearTimeout(t);
+  }, [coachThinking]);
 
   // Reactions
   const messageIds = useMemo(
@@ -328,6 +348,11 @@ export function HuddleScreen() {
     if (!user) return { error: new Error("Not authenticated") };
     const senderName = profile?.displayName ?? profile?.username ?? "Someone";
     const huddleName = huddle?.name ?? "";
+    // Asking @coach takes time — the scan runs on a cron and the answer needs
+    // a model call behind it. Without a sign that anything is happening the
+    // room looks broken, and people ask again, which is how a thread ends up
+    // with the same question three times.
+    if (/@coach\b/i.test(content)) setCoachThinking(true);
     const result = await sendMessage(content, user.id, replyToId, media, {
       senderName,
       huddleName,
@@ -561,6 +586,7 @@ export function HuddleScreen() {
                 {typingUsers.length === 1 ? " is" : " are"} typing...
               </Text>
             )}
+            {coachThinking && <CoachThinking />}
           <MessageInput
             onSend={handleSend}
             replyTo={replyTo}

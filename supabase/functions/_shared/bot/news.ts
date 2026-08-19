@@ -81,7 +81,21 @@ const POP = [
   "signing day", "top target", "prospect",
 ];
 
+// A Yankees room does not want Triple-A Syracuse walk-offs or a 2028 high
+// school right-hander's commitment, and it was getting both — the team feeds
+// carry affiliate and recruiting wire copy alongside the major league club.
+// College rooms DO want recruiting, so this only fires on the minor league
+// vocabulary that has no college equivalent.
+const FARM_DROP = [
+  "triple-a", "double-a", "high-a", "single-a", "milb", "minor league",
+  "rookie ball", "instructional league", "class of 20",
+];
+
 export function categoryGate(title: string): "HIGH" | "POP" | "MED" | "LOW" | "DROP" {
+  {
+    const t0 = title.toLowerCase();
+    for (const k of FARM_DROP) if (t0.includes(k)) return "DROP";
+  }
   const t = title.toLowerCase();
   // Ads are always out — a shopping listing is never news.
   for (const k of RETAIL_DROP) {
