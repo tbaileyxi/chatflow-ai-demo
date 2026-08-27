@@ -34,8 +34,21 @@ function unitOf(question: string): string {
 }
 
 // Kalshi lines are half-points, so "over 4.5" is plainly "5 or more".
+/**
+ * Smallest whole margin that COVERS `line`.
+ *
+ * The magnitude is what matters, and only the magnitude. A spread reaches us
+ * signed from the sportsbook's point of view — the favourite lays -2.5, the
+ * underdog takes +2.5 — but both describe the same 2.5-point gap, and the team
+ * named in the market is the one that has to beat it either way.
+ *
+ * Taking `Math.floor` of a negative line produced a label that means nothing:
+ * a Patriots room-mate looking at "Patriots -2.5" was offered "Patriots by -2+".
+ * Covering -2.5 is winning by 3, so the answer is 3 whichever sign it arrives
+ * with.
+ */
 function atLeast(line: number): number {
-  return Math.floor(line) + 1;
+  return Math.floor(Math.abs(line)) + 1;
 }
 
 export function marketSides(m: MarketLike): MarketSides {
