@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { supabase } from '@/integrations/supabase/client';
 import shLogo from '@/assets/sh-logo-updated.png';
-import { APP_STORE_URL } from '@/lib/appStore';
+import { APP_STORE_URL, appStoreUrl, STORE_CAMPAIGN } from '@/lib/appStore';
 
 // Smart invite landing for https://www.sidehuddlesports.com/i/{code}.
 // Mobile shares mint these links (room_invites.invite_code). If the app is
@@ -85,7 +85,7 @@ export default function InviteCodePage() {
           Open in the app
         </button>
         <a
-          href={APP_STORE_URL}
+          href={appStoreUrl(STORE_CAMPAIGN.inviteCode)}
           className="rounded-full border border-border px-6 py-3 font-bold text-foreground"
         >
           Get Side Huddle

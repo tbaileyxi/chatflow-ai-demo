@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { supabase } from '@/integrations/supabase/client';
 import shLogo from '@/assets/sh-logo-updated.png';
-import { APP_STORE_URL } from '@/lib/appStore';
+import { APP_STORE_URL, appStoreUrl, STORE_CAMPAIGN } from '@/lib/appStore';
 
 const SITE_URL = 'https://sidehuddlesports.com';
 
@@ -254,7 +254,7 @@ export default function HuddleInvitePage() {
               Download the app to join this huddle
             </p>
             <a
-              href={APP_STORE_URL}
+              href={appStoreUrl(STORE_CAMPAIGN.invite)}
               onClick={APP_STORE_URL === '#' ? e => e.preventDefault() : undefined}
               className={`flex items-center justify-center gap-3 rounded-2xl py-4 font-semibold text-base transition-all
                 ${APP_STORE_URL === '#'

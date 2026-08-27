@@ -1,26 +1,31 @@
 import React from 'react';
-import shLogo from '@/assets/sh-logo-updated.png';
-import { APP_STORE_URL } from '@/lib/appStore';
+import { SiteNav, SiteFooter } from '@/components/site/SiteChrome';
+import {
+  StoreButton,
+  WhatHappens,
+  Screenshots,
+  SUBTAGLINE,
+} from '@/components/site/AppSections';
+import { STORE_CAMPAIGN } from '@/lib/appStore';
 
-// ────────────────────────────────────────────────────────────────────────────
+/**
+ * App-download landing page.
+ *
+ * A conversion page, not a brochure: one job, getting the App Store tapped.
+ * Most traffic arrives from an outreach email on a phone, so the CTA is above
+ * the fold, repeats at the end, and nothing competes with it.
+ *
+ * The body lives in AppSections so the /t/<slug> team pages render the exact
+ * same pitch. Improving it here improves all of them.
+ */
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white overflow-x-hidden">
-
-      {/* ── Nav ── */}
-      <nav className="flex items-center justify-between px-6 py-4 max-w-5xl mx-auto">
-        <div className="flex items-center gap-2">
-          <img src={shLogo} alt="Side Huddle Sports" className="h-8 w-8 object-contain rounded-full" />
-          <span className="font-orbitron font-bold text-base text-[#FFD700] tracking-wide">
-            SIDE HUDDLE
-          </span>
-        </div>
-      </nav>
+      <SiteNav />
 
       {/* ── Hero ── */}
-      <section className="flex flex-col items-center text-center px-6 pt-12 pb-16 max-w-2xl mx-auto">
-        {/* Pill badge */}
+      <section className="flex flex-col items-center text-center px-6 pt-10 pb-14 max-w-2xl mx-auto">
         <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-4 py-1.5">
           <span className="h-2 w-2 rounded-full bg-[#FFD700] animate-pulse" />
           <span className="text-xs font-medium text-[#FFD700] tracking-widest uppercase">
@@ -28,97 +33,31 @@ export default function LandingPage() {
           </span>
         </div>
 
-        <h1 className="font-orbitron text-4xl sm:text-5xl font-extrabold leading-tight tracking-tight mb-4">
-          Follow Your Teams.{' '}
-          <br />
-          <span className="text-[#FFD700]">Chat With Your Crew.</span>
+        <h1 className="font-orbitron text-5xl sm:text-6xl font-extrabold leading-[1.05] tracking-tight mb-5">
+          The <span className="text-[#FFD700]">digital tailgate</span>
         </h1>
 
-        <p className="text-white/60 text-lg leading-relaxed max-w-lg mb-10">
-          A room for you and your friends, with an AI Coach that brings the news,
-          the photos and the day's lines to you — so the group chat keeps up with the game.
+        <p className="text-white/70 text-xl leading-snug max-w-md mb-9">{SUBTAGLINE}</p>
+
+        <StoreButton large campaign={STORE_CAMPAIGN.landing} />
+        <p className="text-white/35 text-xs mt-4">
+          Free · iPhone · no ads inside your huddle
         </p>
-
-        {/* Store badges */}
-        <div className="flex items-center justify-center mb-8">
-          <StoreBadge
-            href={APP_STORE_URL}
-            icon={<AppleIcon />}
-            label="Download on the"
-            store="App Store"
-          />
-        </div>
-
       </section>
 
-      {/* ── Phone mockup + feature highlight ── */}
-      <section className="flex flex-col lg:flex-row items-center gap-12 max-w-5xl mx-auto px-6 py-16">
-        {/* Mockup */}
-        <div className="flex-shrink-0">
-          <PhoneMockup />
-        </div>
+      <WhatHappens />
+      <Screenshots />
 
-        {/* Feature list */}
-        <div className="flex flex-col gap-8 text-left max-w-lg">
-          <Feature
-            emoji="📡"
-            title="The Coach brings the news to you"
-            desc="Beat reports, roster moves and the photo everyone's sharing — dropped straight into your room, in your team's voice."
-          />
-          <Feature
-            emoji="🏆"
-            title="Huddle up with your crew"
-            desc="Private group chats that light up during games. React, predict, trash-talk — all in one place."
-          />
-          <Feature
-            emoji="🎯"
-            title="Fade your friends"
-            desc="Real lines, named in plain English. Take a side, someone takes the other, and Chips settle it when the game does."
-          />
-          <Feature
-            emoji="🔔"
-            title="Game-time alerts that matter"
-            desc="Push notifications tied to real scores, roster moves, and breaking news — nothing you don't care about."
-          />
-        </div>
-      </section>
-
-      {/* ── How it works ── */}
-      <section className="bg-white/[0.02] border-y border-white/5 py-16 px-6">
-        <div className="max-w-4xl mx-auto text-center mb-12">
-          <h2 className="font-orbitron text-2xl sm:text-3xl font-bold text-[#FFD700]">
-            How It Works
-          </h2>
-          <p className="text-white/50 mt-2 text-sm">Get set up in under 60 seconds.</p>
-        </div>
-
-        <div className="max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-8">
-          {[
-            { step: '01', title: 'Make a room', desc: 'Name it, pick the team it follows, and you are done.' },
-            { step: '02', title: 'Bring your crew', desc: 'Send one link. No account hoops before they can see the room.' },
-            { step: '03', title: 'Let it run', desc: 'News, photos and the day\'s lines show up on their own while the game is on.' },
-          ].map(({ step, title, desc }) => (
-            <div key={step} className="flex flex-col items-center text-center gap-3">
-              <div className="font-orbitron text-3xl font-extrabold text-[#FFD700]/20">
-                {step}
-              </div>
-              <h3 className="font-semibold text-white text-base">{title}</h3>
-              <p className="text-white/50 text-sm leading-relaxed">{desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Social proof strip ── */}
-      <section className="py-10 px-6 text-center">
-        <p className="text-white/30 text-xs uppercase tracking-widest font-medium mb-6">
+      {/* ── Leagues ── */}
+      <section className="pb-14 px-6 text-center">
+        <p className="text-white/25 text-xs uppercase tracking-widest font-medium mb-5">
           Built for fans of
         </p>
-        <div className="flex flex-wrap justify-center gap-3 max-w-2xl mx-auto">
-          {['NFL', 'NBA', 'MLB', 'NHL', 'EPL', 'La Liga', 'UFC', 'College Football', 'March Madness'].map(league => (
+        <div className="flex flex-wrap justify-center gap-2.5 max-w-2xl mx-auto">
+          {['NFL', 'College Football', 'NBA', 'MLB', 'NHL'].map((league) => (
             <span
               key={league}
-              className="text-xs font-medium text-white/60 border border-white/10 rounded-full px-3 py-1"
+              className="text-xs font-medium text-white/50 border border-white/10 rounded-full px-3 py-1"
             >
               {league}
             </span>
@@ -128,186 +67,13 @@ export default function LandingPage() {
 
       {/* ── Bottom CTA ── */}
       <section className="py-16 px-6 text-center border-t border-white/5">
-        <h2 className="font-orbitron text-2xl sm:text-3xl font-bold mb-4">
-          Ready to{' '}
-          <span className="text-[#FFD700]">huddle up?</span>
+        <h2 className="font-orbitron text-2xl sm:text-3xl font-bold mb-6">
+          Get your crew <span className="text-[#FFD700]">in the room.</span>
         </h2>
-        <p className="text-white/50 text-sm mb-8 max-w-sm mx-auto">
-          Download the app and bring your game-day crew together.
-        </p>
-        <div className="flex items-center justify-center">
-          <StoreBadge href={APP_STORE_URL} icon={<AppleIcon />} label="Download on the" store="App Store" large />
-        </div>
+        <StoreButton large campaign={STORE_CAMPAIGN.landing} />
       </section>
 
-      {/* ── Footer ── */}
-      <footer className="border-t border-white/5 px-6 py-8">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <img src={shLogo} alt="Side Huddle" className="h-5 w-5 object-contain rounded-full opacity-60" />
-            <span className="text-xs text-white/30 font-orbitron">SIDE HUDDLE SPORTS</span>
-          </div>
-          <div className="flex items-center gap-6 text-xs text-white/30">
-            <a href="/faq" className="hover:text-white/60 transition-colors">FAQ</a>
-            <a href="#" className="hover:text-white/60 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-white/60 transition-colors">Terms</a>
-            <a href="https://x.com/sidehuddlesports" target="_blank" rel="noopener noreferrer" className="hover:text-white/60 transition-colors">
-              𝕏 @sidehuddlesports
-            </a>
-          </div>
-        </div>
-      </footer>
-
+      <SiteFooter />
     </div>
   );
 }
-
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-function Feature({ emoji, title, desc }: { emoji: string; title: string; desc: string }) {
-  return (
-    <div className="flex gap-4">
-      <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-[#FFD700]/10 flex items-center justify-center text-xl">
-        {emoji}
-      </div>
-      <div>
-        <h3 className="font-semibold text-white mb-1">{title}</h3>
-        <p className="text-white/50 text-sm leading-relaxed">{desc}</p>
-      </div>
-    </div>
-  );
-}
-
-function StoreBadge({
-  href,
-  icon,
-  label,
-  store,
-  large,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  label: string;
-  store: string;
-  large?: boolean;
-}) {
-  const isPlaceholder = href === '#';
-  return (
-    <a
-      href={href}
-      onClick={isPlaceholder ? e => e.preventDefault() : undefined}
-      className={`relative flex items-center gap-3 border rounded-xl transition-all
-        ${large ? 'px-6 py-3.5' : 'px-5 py-3'}
-        ${isPlaceholder
-          ? 'border-white/10 bg-white/5 opacity-60 cursor-not-allowed'
-          : 'border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 cursor-pointer'
-        }`}
-    >
-      <div className="text-white">{icon}</div>
-      <div className="text-left">
-        <div className={`text-white/50 leading-none ${large ? 'text-xs' : 'text-[10px]'}`}>{label}</div>
-        <div className={`font-semibold text-white leading-tight mt-0.5 ${large ? 'text-base' : 'text-sm'}`}>
-          {store}
-        </div>
-      </div>
-      {isPlaceholder && (
-        <span className="absolute -top-2 -right-2 bg-[#FFD700] text-black text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider">
-          Soon
-        </span>
-      )}
-    </a>
-  );
-}
-
-function PhoneMockup() {
-  return (
-    <div className="relative mx-auto" style={{ width: 240 }}>
-      {/* Glow behind phone */}
-      <div className="absolute inset-0 rounded-[48px] bg-[#FFD700]/10 blur-3xl scale-110" />
-
-      {/* Phone shell */}
-      <div className="relative rounded-[42px] border-2 border-white/10 bg-[#111] overflow-hidden shadow-2xl"
-        style={{ width: 240, height: 500 }}>
-
-        {/* Status bar */}
-        <div className="flex justify-between items-center px-6 pt-4 pb-2">
-          <span className="text-[10px] text-white/40">9:41</span>
-          <div className="w-16 h-4 bg-black rounded-full mx-auto" />
-          <div className="flex gap-1">
-            <div className="w-3 h-2 border border-white/30 rounded-sm" />
-          </div>
-        </div>
-
-        {/* App UI mockup — mirrors a real room: the Coach posts, the room
-            argues, and a fade card names both sides. Kept in sync with the
-            app on purpose; the old version showed a three-tab nav and a
-            generic group chat, neither of which exists any more. */}
-        <div className="px-3 pb-3 flex flex-col gap-2">
-          {/* Room header */}
-          <div className="flex items-center justify-between px-1 py-2">
-            <span className="font-orbitron text-[10px] font-bold text-[#FFD700]">BROWNS IN CHS</span>
-            <span className="text-[8px] text-white/30">4 members</span>
-          </div>
-
-          {/* The Coach */}
-          <div className="rounded-2xl bg-white/[0.07] border-l-2 border-[#FFD700] px-2.5 py-2">
-            <div className="text-[8px] font-bold text-[#FFD700] mb-1">THE COACH</div>
-            <div className="text-[9px] leading-relaxed text-white/90">
-              Monken's going with Watson for Saturday's preseason opener.
-            </div>
-          </div>
-
-          {/* Fade card — the two sides, named the way people say them */}
-          <div className="rounded-2xl bg-gradient-to-br from-[#FFD700]/15 to-[#00BFFF]/10 border border-[#FFD700]/25 p-2.5">
-            <div className="text-[8px] font-bold text-white/40 tracking-wider mb-1">SPREAD</div>
-            <div className="text-[10px] font-bold text-white mb-2">Browns 3.5 points</div>
-            <div className="flex gap-1.5">
-              <div className="flex-1 rounded-lg border border-emerald-400/60 bg-emerald-400/10 py-1 text-center">
-                <div className="text-[8px] font-bold text-emerald-300">Browns by 4+</div>
-              </div>
-              <div className="flex-1 rounded-lg border border-emerald-400/60 bg-emerald-400/10 py-1 text-center">
-                <div className="text-[8px] font-bold text-emerald-300">Anything less</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Chat */}
-          {[
-            { side: 'left', msg: 'took the under, book it' },
-            { side: 'right', msg: "you're fading ME? bold" },
-          ].map(({ side, msg }, i) => (
-            <div key={i} className={`flex ${side === 'right' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`max-w-[75%] rounded-2xl px-2.5 py-1.5 text-[9px] leading-relaxed
-                  ${side === 'right'
-                    ? 'bg-[#FFD700]/90 text-black font-medium'
-                    : 'bg-white/10 text-white'
-                  }`}
-              >
-                {msg}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Bottom nav bar */}
-        <div className="absolute bottom-0 left-0 right-0 flex justify-around items-center px-4 py-2 bg-[#0a0a0a]/90 border-t border-white/5">
-          {['🏠', '🎯', '📊', '👤'].map((icon, i) => (
-            <div key={i} className={`text-sm p-1 ${i === 0 ? 'opacity-100' : 'opacity-30'}`}>
-              {icon}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AppleIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
-    </svg>
-  );
-}
-
