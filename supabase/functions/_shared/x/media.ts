@@ -18,6 +18,9 @@ export interface XMedia {
   text: string;
   likes: number;
   type: "photo" | "video" | "animated_gif";
+  /** Position within its own post, in the order the author attached it.
+   *  0 is the cover — the one the caption is written about. */
+  index: number;
   imageUrl: string; // always populated: the photo, or a video's still frame
   videoUrl: string | null; // direct mp4 for video/gif, else null
   url: string; // canonical x.com permalink, for attribution
@@ -76,8 +79,9 @@ export async function fetchPostMedia(postIds: string[]): Promise<XMedia[]> {
 
   const out: XMedia[] = [];
   for (const post of json?.data ?? []) {
-    for (const key of post?.attachments?.media_keys ?? []) {
-      const m = mediaByKey.get(key);
+    const keys = post?.attachments?.media_keys ?? [];
+    for (let i = 0; i < keys.length; i++) {
+      const m = mediaByKey.get(keys[i]);
       if (!m) continue;
       // A video's `url` is absent — its still frame is preview_image_url. Taking
       // whichever exists means the chat bubble always has something to render,
@@ -91,6 +95,7 @@ export async function fetchPostMedia(postIds: string[]): Promise<XMedia[]> {
         text: post.text ?? "",
         likes: post.public_metrics?.like_count ?? 0,
         type: m.type,
+        index: i,
         imageUrl: image,
         videoUrl: m.type === "photo" ? null : bestMp4(m.variants),
         url: `https://x.com/${handle ?? "i"}/status/${post.id}`,
@@ -100,13 +105,44 @@ export async function fetchPostMedia(postIds: string[]): Promise<XMedia[]> {
   return out;
 }
 
-// Best single item to show a room. Photos first: the app renders them today,
-// and a still beats a video the client can only show a thumbnail of. Within a
-// type, the post the room would already have seen going around — likes.
+// Best single item to show a room: the cover of the post the room would already
+// have seen going around.
+//
+// It used to rank every candidate photo above every candidate video, then break
+// ties on likes. Two things went wrong with that, and a Bucs room showed both
+// on the same message.
+//
+// Ordering is information. X returns `attachments.media_keys` in the order the
+// author attached them, and the first one is what the caption is about — the
+// play, the shot they led with. Sorting the whole pile by type discards that and
+// can surface any frame from any of the five posts we read. @Buccaneers posted
+// a clip of their defence breaking up passes, captioned "Picks & PBUs across the
+// board"; the tweet also carried stills from the same joint practice, so the old
+// sort dropped the clip and picked a photo of TREVOR LAWRENCE — the opposing
+// quarterback — into a Buccaneers room. Nothing here can see what is in a
+// picture, so the author's own ordering is the only signal we have about which
+// attachment the words refer to, and it is a good one.
+//
+// The photos-over-video preference was a compatibility guard from before the app
+// could play clips. It shipped on 2026-08-19, so the guard now only costs us the
+// better artifact: a still frame where the source had the actual highlight.
+//
+// So: pick the POST on engagement, then take that post's cover.
 export function pickBest(items: XMedia[]): XMedia | null {
   if (items.length === 0) return null;
-  const rank = (i: XMedia) => (i.type === "photo" ? 2 : 1);
-  return [...items].sort(
-    (a, b) => rank(b) - rank(a) || b.likes - a.likes,
+
+  const byPost = new Map<string, XMedia[]>();
+  for (const i of items) {
+    const list = byPost.get(i.postId);
+    if (list) list.push(i);
+    else byPost.set(i.postId, [i]);
+  }
+
+  // Most-liked post wins; postId as a stable tiebreak so a re-run of the same
+  // slate cannot pick a different message and post a near-duplicate.
+  const best = [...byPost.values()].sort(
+    (a, b) => b[0].likes - a[0].likes || a[0].postId.localeCompare(b[0].postId),
   )[0];
+
+  return [...best].sort((a, b) => a.index - b.index)[0];
 }
