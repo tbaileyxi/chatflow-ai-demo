@@ -17,16 +17,62 @@ const corsHeaders = {
 };
 
 const FADEABLE = ["player_prop", "total", "spread"];
+
+// ONE market source. kalshi_markets is fed by two syncs — kalshi-sync-markets
+// (KX* tickers) and odds-sync-markets (sgo: tickers) — and they disagree: they
+// carry different lines for the same game, Kalshi's college slate is FCS
+// schools we have no rooms for, and the series we subscribe to on Kalshi have
+// no player props at all. Mixing them meant one game could produce two cards
+// quoting two different numbers. SGO alone covers MLB, NFL and college with
+// spreads, totals AND props, so it is the standard. Flip with FADE_SOURCE=any
+// if SGO is ever down and Kalshi has to carry a night.
+const FADE_SOURCE = Deno.env.get("FADE_SOURCE") || "sgo";
+const isSourceAllowed = (ticker: string | null | undefined) =>
+  FADE_SOURCE === "any" || String(ticker ?? "").startsWith("sgo:");
 // TWO cards per game, not four: one spread, one total. Moneyline is
 // deliberately absent from FADEABLE — in a Browns room everybody picks the
 // Browns, so "will they win?" is not a debate. Spreads and totals are where a
 // partisan room actually splits.
 const MAX_PROPS_PER_GAME = Number(Deno.env.get("FADE_MAX_PER_GAME") || 2);
 
+// Every market for one game shares the middle segment of its Kalshi ticker:
+//   KXMLBTOTAL-26AUG251905HOUNYY-9    -> 26AUG251905HOUNYY
+//   KXMLBSPREAD-26AUG251905HOUNYY-NYY -> 26AUG251905HOUNYY
+//   KXMLBGAME-26AUG251905HOUNYY-HOU   -> 26AUG251905HOUNYY
+// That shared key is what lets a TOTAL find the teams it belongs to. Totals
+// arrive from the feed with team_id NULL — a total belongs to both sides, so
+// there is no single team to hang it on — and the old code filtered markets
+// with .in("team_id", ...), which NULL never matches. Result: every total was
+// silently dropped and only spreads ("Rays win by over 1.5") ever posted, the
+// one shape a partisan room will not argue about. Grouping by ticker fixes it.
+//
+// Season futures (KXMLB-26-MIL, KXNBA-26-DEN) also have three segments but a
+// purely numeric middle. Left in, they would collapse every league's futures
+// into one bogus "game" keyed "26", so they are rejected here.
+const GAME_KEY = /^\d{2}[A-Z]{3}\d/;
+
+// Two market sources, two ticker shapes:
+//   Kalshi  KXMLBTOTAL-26AUG251905HOUNYY-9      -> middle segment is the game
+//   SGO     sgo:{eventID}:{oddID}               -> eventID, held in
+//                                                  kalshi_event_ticker
+// Splitting an SGO ticker on "-" yields a player name, so a single rule would
+// silently exclude every SGO market — which is all of college football and the
+// NFL. Kalshi's own kalshi_event_ticker cannot be used instead: it carries the
+// series prefix (KXMLBTOTAL- vs KXMLBSPREAD-) and so differs per market type
+// for the same game, which is the very thing being grouped away.
+function gameKey(m: { kalshi_ticker?: string | null; kalshi_event_ticker?: string | null }): string | null {
+  const ticker = m.kalshi_ticker ?? "";
+  if (ticker.startsWith("sgo:")) return m.kalshi_event_ticker || null;
+  const parts = ticker.split("-");
+  if (parts.length < 2) return null;
+  const key = parts[1];
+  return GAME_KEY.test(key) ? key : null;
+}
+
 // Turn a kalshi_markets row into the card's display fields. The wording comes
 // from the shared derivation, so a bot card, a player-posted card and the Picks
 // board all say the same sentence about the same line.
-function marketCard(m: any): {
+function marketCard(m: any, teams: string[]): {
   label: string;
   line: number | null;
   over: string;
@@ -37,7 +83,7 @@ function marketCard(m: any): {
   const line = meta.line ?? meta.spread ?? null;
   if (line == null) return null; // no real number = nothing to argue about
 
-  const sides = marketSides(m);
+  const sides = marketSides(m, teams);
   return {
     label: sides.headline,
     line: Number(line),
@@ -82,12 +128,37 @@ Deno.serve(async (req) => {
       supabase.from("teams").select("id, name").in("id", teamIds),
       supabase
         .from("kalshi_markets")
-        .select("id, question, market_type, team_id, event_start_time, metadata, is_resolved")
-        .in("team_id", teamIds)
+        .select(
+          "id, question, market_type, team_id, event_start_time, metadata, is_resolved, kalshi_ticker, kalshi_event_ticker, current_yes_price",
+        )
         .eq("is_resolved", false)
-        .in("market_type", FADEABLE),
+        .gt("event_start_time", new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString())
+        .lt("event_start_time", new Date(windowEnd.getTime() + 6 * 60 * 60 * 1000).toISOString())
+        // Dropping the team filter widens this to every league in the window.
+        // PostgREST caps an unbounded select at 1000 rows and says nothing when
+        // it truncates, which on a full slate would quietly starve whichever
+        // games sorted last. Ask for more than a day can hold.
+        .limit(5000),
     ]);
     const teamName = new Map((teams ?? []).map((t: any) => [t.id, t.name]));
+
+    // 2b) Group every market by its game, then let the group's teams stand in
+    // for the members that have none. A total inherits the teams named by the
+    // spread and winner markets sitting on the same ticker, so it can finally
+    // be matched to a game — and to the rooms watching it.
+    const groups = new Map<string, { teams: Set<string>; markets: any[] }>();
+    for (const m of markets ?? []) {
+      if (!isSourceAllowed(m.kalshi_ticker)) continue;
+      const key = gameKey(m);
+      if (!key) continue;
+      let g = groups.get(key);
+      if (!g) {
+        g = { teams: new Set<string>(), markets: [] };
+        groups.set(key, g);
+      }
+      if (m.team_id) g.teams.add(m.team_id);
+      if (FADEABLE.includes(String(m.market_type))) g.markets.push(m);
+    }
 
     // 3) The system (bot) user that authors the cards.
     const { data: systemUserId } = await supabase.rpc("get_or_create_system_user");
@@ -99,13 +170,17 @@ Deno.serve(async (req) => {
       const gTeams = [game.home_team_id, game.away_team_id].filter(Boolean) as string[];
       const start = new Date(game.start_time).getTime();
 
-      // Markets for this game's teams, close to its start (so a team's next
-      // series doesn't bleed into tonight's card), best-first, capped.
-      const inWindow = (markets ?? []).filter(
-        (m: any) =>
-          gTeams.includes(m.team_id) &&
-          Math.abs(new Date(m.event_start_time).getTime() - start) < 6 * 60 * 60 * 1000,
-      );
+      // Groups whose teams overlap this game and whose markets sit close to
+      // its start (so a team's next series doesn't bleed into tonight's card).
+      const inWindow: any[] = [];
+      for (const g of groups.values()) {
+        if (!gTeams.some((t) => g.teams.has(t))) continue;
+        for (const m of g.markets) {
+          if (Math.abs(new Date(m.event_start_time).getTime() - start) < 6 * 60 * 60 * 1000) {
+            inWindow.push(m);
+          }
+        }
+      }
 
       // ONE card per market TYPE. Previously this took the first four rows,
       // which on a busy game meant four totals at different strikes stacked in
@@ -162,7 +237,7 @@ Deno.serve(async (req) => {
         const rows = gameMarkets
           .filter((m: any) => !already.has(m.id))
           .map((m: any) => {
-            const card = marketCard(m);
+            const card = marketCard(m, [home, away]);
             if (!card) return null;
             return {
               huddle_id: h.id,

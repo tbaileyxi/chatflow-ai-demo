@@ -141,8 +141,8 @@ Deno.serve(async (req) => {
     }
 
     // Fetch NCAA football games
-    const espnUrl = 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard';
-    const espnResponse = await fetch(espnUrl);
+    const espnUrl = 'https://site.web.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard';
+    const espnResponse = await fetch(espnUrl, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" } });
     
     if (!espnResponse.ok) {
       throw new Error(`ESPN API error: ${espnResponse.status}`);

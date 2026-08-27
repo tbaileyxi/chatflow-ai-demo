@@ -129,6 +129,47 @@ export function subjectGate(title: string, teamNameTokens: string[]): boolean {
 }
 
 // ---------------------------------------------------------------
+// Gate 2b: the big club, not the farm system.
+//
+// Team blogs (SB Nation and friends) cover affiliates in the same feed as the
+// parent club, so a room for the Yankees got a Triple-A Scranton box score. The
+// naive fix — listing every team's affiliates — is 30 lists per league that go
+// stale every time an affiliation changes. These are LEVEL markers instead:
+// they name the tier, not the team, so one list covers every club in the sport.
+//
+// A story only clears this gate if it mentions no minor-league level at all, OR
+// it is a roster move that IS major-club news. A call-up is the big club's news
+// even though the sentence says Triple-A, and dropping those would lose real
+// stories.
+// ---------------------------------------------------------------
+
+const MINOR_LEVEL = [
+  // baseball tiers + the minor leagues themselves
+  "triple-a", "triple a", "double-a", "double a", "single-a", "single a",
+  "high-a", "low-a", "class a", "rookie ball", "rookie league",
+  "minor league", "minor-league", "the minors", "farm system", "farmhand",
+  "international league", "pacific coast league", "eastern league",
+  "southern league", "texas league", "midwest league", "california league",
+  "carolina league", "florida state league", "south atlantic league",
+  "northwest league", "arizona fall league", "complex league",
+  // other sports
+  "g league", "g-league", "ahl", "echl", "juniors", "reserve team",
+];
+
+// Roster moves that mention the minors but are unambiguously big-club news.
+const MAJOR_MOVE = [
+  "call-up", "called up", "calls up", "recalled", "promoted",
+  "rehab assignment", "optioned", "designated for assignment", "dfa",
+  "sent down", "demoted", "roster move", "activated",
+];
+
+export function bigClubGate(title: string, summary?: string | null): boolean {
+  const text = `${title} ${summary ?? ""}`.toLowerCase();
+  if (!MINOR_LEVEL.some((m) => text.includes(m))) return true;
+  return MAJOR_MOVE.some((m) => text.includes(m));
+}
+
+// ---------------------------------------------------------------
 // Gate 3: dedupe + cluster. Cluster by normalized title prefix across
 // today's already-seen entries for this team. Cluster size is a signal,
 // not a reason to drop.
@@ -185,6 +226,11 @@ export async function scoreEntries(
     const category = categoryGate(e.title);
     if (category === "DROP") continue;
     if (!subjectGate(e.title, opts.tokens)) continue;
+    // Free, and it runs BEFORE the judge on purpose: HIGH-category headlines
+    // skip the judge entirely, and a minor-league recap reads as HIGH because
+    // it contains "beats"/"wins". That bypass is how a Scranton box score
+    // reached a Yankees room.
+    if (!bigClubGate(e.title, e.summary)) continue;
     const clusterSize = await computeCluster(client, teamId, e.title);
 
     // Cheap signals: HIGH category OR cluster_size >= 3 bypass the LLM judge.

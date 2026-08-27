@@ -262,8 +262,19 @@ serve(async (req) => {
     // Having SOME news is not having THE answer. The keyword gate is the cost
     // control; at ~2 cents a call, a needless search is far cheaper than a
     // wrong answer.
+    // The keyword gate above catches the questions we THOUGHT of. It cannot
+    // catch the long tail, and the long tail is most of what people ask:
+    // "who is number 34", "who's their best reliever", "is he any good".
+    //
+    // Building a retrieval function per question shape is a losing game — a
+    // roster endpoint answers exactly one of those three. So any question in a
+    // CURRENT-facts lane searches, whether or not a keyword matched. The lanes
+    // that are answered entirely from our own data (room chatter, the group's
+    // ledger) still skip it, and the per-huddle/per-user caps still bound the
+    // spend. A needless search costs ~2 cents; "I don't have that" costs a user.
+    const currentLane = lane === "game" || lane === "mixed" || lane === "knowledge";
     let liveSearch = "";
-    if (LIVE_X && wantsLive && ctx.teamName) {
+    if (LIVE_X && (wantsLive || currentLane) && ctx.teamName) {
       const r = await searchX(`${ctx.teamName} ${question}`);
       if (r.ok && r.text) liveSearch = r.text.slice(0, 1200);
     }

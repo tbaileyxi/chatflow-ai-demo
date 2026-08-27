@@ -209,14 +209,25 @@ export function FadeCardInMessage({
           <Text className="mb-1.5 text-xs text-muted-foreground">
             Pick a side · {CLAIM_STAKE} chips
           </Text>
-          <View className="flex-row gap-2">
+          {/* STACKED, not side by side.
+              The card sits in a chat bubble capped at 75% of screen width, so
+              two buttons in a row got roughly 120px each — less than "Anything
+              less" needs at this weight. React Native then breaks mid-WORD
+              rather than mid-line, producing "Anythi / ng less".
+              A previous fix added adjustsFontSizeToFit with numberOfLines={2}.
+              That cannot work: RN only shrinks text to fit the width when
+              numberOfLines is 1, so with 2 it wraps first and the shrink never
+              engages — which is why the bug survived a commit named after it.
+              Stacking gives each label the card's full width, so there is
+              nothing to break. numberOfLines={1} keeps it honest. */}
+          <View className="gap-2">
             {(["over", "under"] as const).map((s) => (
               <Pressable
                 key={s}
                 disabled={busy || !payload.game}
                 onPress={() => claim(s)}
                 className={cn(
-                  "flex-1 items-center rounded-xl border px-3 py-2.5",
+                  "w-full items-center rounded-xl border px-3 py-2.5",
                   busy || !payload.game
                     ? "border-border bg-muted/40"
                     : "border-success bg-success/15",
@@ -227,9 +238,7 @@ export function FadeCardInMessage({
                 ) : (
                   <Text
                     className="text-sm font-black text-success"
-                    numberOfLines={2}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.7}
+                    numberOfLines={1}
                     style={{ textAlign: "center" }}
                   >
                     {s === "over" ? overLabel : underLabel}

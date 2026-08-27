@@ -4,7 +4,6 @@ import { MessageSquareReply, Share2, X, Play, Pause, Mic } from "lucide-react-na
 import { Audio, Video, ResizeMode } from "expo-av";
 import { cn } from "@/lib/utils";
 import { colors } from "@/theme/colors";
-import { PredictionCardInMessage } from "@/components/predictions/PredictionCardInMessage";
 import { FadeCardInMessage } from "@/components/huddle/FadeCardInMessage";
 import { PulseBubble } from "@/components/huddle/PulseBubble";
 import { AdminWelcomeCard } from "@/components/huddle/AdminWelcomeCard";
@@ -177,7 +176,16 @@ export function ChatMessage({
   const [showPicker, setShowPicker] = useState(false);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
 
-  const isPredictionCard = message.messageType === "prediction_card";
+  // Hooks above, early return below — legacy prediction cards render nothing.
+  if (message.messageType === "prediction_card") return null;
+
+  // Retired. The yes/no market card asked a room of Yankees fans whether the
+  // Yankees would win — everyone taps YES, nobody argues, and the card sat
+  // there being a worse version of the fade prop below it. New ones stopped
+  // posting when the kalshi-post-predictions cron was unscheduled; the
+  // thousands already in message history are hidden here rather than deleted,
+  // so nobody's room gains a hole where a card used to be. Without this branch
+  // they fall through to the plain text renderer and print raw JSON.
   const isFadeProp = message.messageType === "fade_prop";
   const youTubeId =
     message.messageType === "youtube_highlight" && message.embedCode
@@ -205,7 +213,7 @@ export function ChatMessage({
     (message.isPulseMoment ||
       message.messageType === "pulse" ||
       message.messageType === "highlight" ||
-      (message.embedCode != null && !isPredictionCard));
+      message.embedCode != null);
 
   // Pulse bot messages show source, not "@coach"
   const displayName =
@@ -366,8 +374,6 @@ export function ChatMessage({
                 />
               ) : isPulse ? (
                 <PulseBubble message={message} />
-              ) : isPredictionCard ? (
-                <PredictionCardInMessage content={message.content} huddleId={huddleId} />
               ) : isFadeProp ? (
                 <FadeCardInMessage
                   content={message.content}

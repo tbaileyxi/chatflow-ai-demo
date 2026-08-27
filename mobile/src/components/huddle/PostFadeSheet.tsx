@@ -9,6 +9,7 @@ import {
   ScrollView,
 } from "react-native";
 import { X, Swords } from "lucide-react-native";
+import { useNavigation } from "@react-navigation/native";
 import { cn } from "@/lib/utils";
 import { colors } from "@/theme/colors";
 import type { GameContext } from "@/hooks/useLiveGameContext";
@@ -38,6 +39,7 @@ export function PostFadeSheet({
   posterName: string;
   onPosted: () => void;
 }) {
+  const navigation = useNavigation<any>();
   const { data: markets, isLoading } = useFadeMarkets(game);
   const [selected, setSelected] = useState<FadeMarket | null>(null);
   const [side, setSide] = useState<"over" | "under">("over");
@@ -204,6 +206,25 @@ export function PostFadeSheet({
                       Post {sideLabel(side)} · {stake} chips
                     </Text>
                   )}
+                </Pressable>
+
+                {/* The way back to what you already have riding. Posting debits
+                    the chips immediately, and there is no other route from here
+                    to that list — which is how someone ends up posting the same
+                    line twice because they cannot see the first one. */}
+                <Pressable
+                  onPress={() => {
+                    onClose();
+                    // The sheet lives inside a stack screen, and Ledger is a tab under
+                    // MainTabs — a bare navigate("Ledger") does not cross that
+                    // boundary. HuddleSettingsScreen already reaches Home this way.
+                    navigation.navigate("MainTabs", { screen: "Ledger" });
+                  }}
+                  className="mt-3 items-center rounded-xl border border-border px-4 py-3"
+                >
+                  <Text className="text-sm font-bold text-foreground">
+                    See all picks
+                  </Text>
                 </Pressable>
               </>
             )}

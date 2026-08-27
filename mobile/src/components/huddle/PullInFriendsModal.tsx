@@ -1,9 +1,12 @@
-// Pull-in picker.  Co-huddler graph multi-select for inviting people who are
-// already on the app to this room.  Backed by RPCs:
-//   co_huddlers()                  → ranked list of who you share rooms with
-//   accept_room_invite(code)       → recipients consume the code we generate
-// We mint one invite_code via create_room_invite_code and send a push to each
-// selected user using send-push-notification.
+// Pull-in picker. Multi-select over the people you know who are NOT already in
+// this room, for inviting them into it. Backed by RPCs:
+//   known_people()                 → your persistent graph (contacts, invites)
+//   create_room_invite_code(id)    → the code the invite link/push carries
+//   accept_room_invite(code)       → recipients consume it
+//
+// Also serves as the second half of Rally: PingButton pings the room, then
+// opens this with rallied=true so one tap covers both the people who are here
+// and the people who should be.
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -27,7 +30,6 @@ type CoHuddler = {
   display_name: string | null;
   username: string | null;
   avatar_url: string | null;
-  shared_huddles: number;
 };
 
 type Props = {
@@ -35,6 +37,9 @@ type Props = {
   huddleId: string;
   huddleName: string;
   onClose: () => void;
+  // Set when the sheet opens straight off a rally, so the copy reflects that
+  // the room was just pinged and these are the people who missed it.
+  rallied?: boolean;
 };
 
 export function PullInFriendsModal({
@@ -42,6 +47,7 @@ export function PullInFriendsModal({
   huddleId,
   huddleName,
   onClose,
+  rallied = false,
 }: Props) {
   const [people, setPeople] = useState<CoHuddler[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -56,35 +62,38 @@ export function PullInFriendsModal({
       setLoading(true);
       setSelected(new Set());
       try {
-        // RPC returns user_id + shared_huddles. Hydrate profiles in a 2nd call.
-        const { data: rpcRows, error: rpcErr } = await (supabase.rpc as any)(
-          "co_huddlers",
-          { p_limit: 50 },
+        // WAS: co_huddlers(), which ranked people by rooms already shared with
+        // you — so the pull-in list could only ever show people you were
+        // already in rooms with. known_people() is the persistent graph, which
+        // includes contact matches and invite accepts.
+        const [peopleRes, membersRes] = await Promise.all([
+          (supabase.rpc as any)("known_people"),
+          supabase
+            .from("huddle_members")
+            .select("user_id")
+            .eq("huddle_id", huddleId),
+        ]);
+
+        if (peopleRes.error) throw peopleRes.error;
+
+        // Anyone already in the room is not someone to pull in.
+        const alreadyHere = new Set(
+          (membersRes.data ?? []).map((m: any) => m.user_id),
         );
-        if (rpcErr) throw rpcErr;
-        const rows = (rpcRows ?? []) as { user_id: string; shared_huddles: number }[];
-        if (rows.length === 0) {
-          if (!cancelled) setPeople([]);
-          return;
-        }
-        const ids = rows.map((r) => r.user_id);
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("user_id, display_name, username, avatar_url")
-          .in("user_id", ids);
-        const pmap = new Map((profiles ?? []).map((p) => [p.user_id, p as any]));
+
         if (cancelled) return;
         setPeople(
-          rows.map((r) => ({
-            user_id: r.user_id,
-            shared_huddles: r.shared_huddles,
-            display_name: pmap.get(r.user_id)?.display_name ?? null,
-            username: pmap.get(r.user_id)?.username ?? null,
-            avatar_url: pmap.get(r.user_id)?.avatar_url ?? null,
-          })),
+          ((peopleRes.data ?? []) as any[])
+            .filter((r) => !alreadyHere.has(r.user_id))
+            .map((r) => ({
+              user_id: r.user_id,
+              display_name: r.display_name ?? null,
+              username: r.username ?? null,
+              avatar_url: r.avatar_url ?? null,
+            })),
         );
       } catch (err) {
-        console.warn("[pull-in] co_huddlers failed", err);
+        console.warn("[pull-in] known_people failed", err);
         if (!cancelled) setPeople([]);
       } finally {
         if (!cancelled) setLoading(false);
@@ -93,7 +102,7 @@ export function PullInFriendsModal({
     return () => {
       cancelled = true;
     };
-  }, [visible]);
+  }, [visible, huddleId]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return people;
@@ -209,9 +218,15 @@ export function PullInFriendsModal({
               </Pressable>
             </View>
 
-            <Text className="mb-3 text-xl font-black text-foreground">
-              Invite to {huddleName}
+            <Text className="mb-1 text-xl font-black text-foreground">
+              {rallied ? `Room rallied ✓` : `Invite to ${huddleName}`}
             </Text>
+            {rallied ? (
+              <Text className="mb-3 text-sm leading-5 text-muted-foreground">
+                Everyone in {huddleName} just got pinged. These people aren't in
+                the room yet — pull them in.
+              </Text>
+            ) : null}
 
             {/* Share link — the universal path, works for anyone anywhere. */}
             <Pressable
@@ -281,10 +296,11 @@ export function PullInFriendsModal({
                         <Text className="text-sm font-bold text-foreground">
                           {name}
                         </Text>
-                        <Text className="text-xs text-muted-foreground">
-                          {p.shared_huddles} mutual{" "}
-                          {p.shared_huddles === 1 ? "huddle" : "huddles"}
-                        </Text>
+                        {p.username ? (
+                          <Text className="text-xs text-muted-foreground">
+                            @{p.username}
+                          </Text>
+                        ) : null}
                       </View>
                       <View
                         className={`h-6 w-6 items-center justify-center rounded-full border-2 ${

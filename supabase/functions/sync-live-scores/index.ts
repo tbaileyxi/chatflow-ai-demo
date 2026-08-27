@@ -8,12 +8,12 @@ const corsHeaders = {
 
 // ESPN API endpoints — all free, no API key required
 const ESPN_ENDPOINTS: Record<string, string> = {
-  nfl: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',
-  ncaaf: 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard',
-  nba: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
-  ncaab: 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard',
-  nhl: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard',
-  mlb: 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard',
+  nfl: 'https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',
+  ncaaf: 'https://site.web.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard',
+  nba: 'https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
+  ncaab: 'https://site.web.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard',
+  nhl: 'https://site.web.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard',
+  mlb: 'https://site.web.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard',
 };
 
 // Map ESPN sport keys to Odds API sport_key values used in the games table
@@ -58,7 +58,7 @@ async function fetchESPNScores(sport: string): Promise<ESPNGame[]> {
   if (!endpoint) return [];
 
   try {
-    const response = await fetch(endpoint);
+    const response = await fetch(endpoint, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" } });
     if (!response.ok) {
       console.error(`ESPN API error for ${sport}: ${response.status}`);
       return [];

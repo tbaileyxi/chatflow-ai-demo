@@ -17,8 +17,9 @@
 //      answer.ts.
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ESPN_HEADERS } from "../espnFetch.ts";
 
-const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports";
+const ESPN_BASE = "https://site.web.api.espn.com/apis/site/v2/sports";
 
 // ---------------------------------------------------------------------------
 // Types — these ARE the payload contract. If a field isn't here, the model
@@ -374,7 +375,7 @@ export async function getBoxScore(
   try {
     const res = await fetch(
       `${ESPN_BASE}/${p.sport}/${p.league}/summary?event=${idMatch[1]}`,
-      { headers: { Accept: "application/json" } },
+      { headers: ESPN_HEADERS },
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -595,7 +596,7 @@ async function espnTeamIndex(
   try {
     const res = await fetch(
       `${ESPN_BASE}/${sport}/${leaguePathName}/teams?limit=1000`,
-      { headers: { Accept: "application/json" } },
+      { headers: ESPN_HEADERS },
     );
     if (!res.ok) return ids;
     const data = await res.json();
@@ -645,7 +646,7 @@ export async function getEspnStanding(
 
     const res = await fetch(
       `${ESPN_BASE}/${p.sport}/${p.league}/teams/${espnId}`,
-      { headers: { Accept: "application/json" } },
+      { headers: ESPN_HEADERS },
     );
     if (!res.ok) return null;
     const t = (await res.json())?.team ?? {};

@@ -2,6 +2,7 @@
 // ESPN is the live spine for beta. Highlightly slots in later by env var.
 // Both implement SportsDataProvider so nothing downstream knows which is active.
 
+import { ESPN_HEADERS } from "../espnFetch.ts";
 import type {
   Game,
   League,
@@ -15,7 +16,7 @@ import type {
 // Treat as unofficial: every call try/except, never crash the loop.
 // ---------------------------------------------------------------
 
-const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports";
+const ESPN_BASE = "https://site.web.api.espn.com/apis/site/v2/sports";
 
 // Pull real box-score stat leaders from the ESPN summary so the smart in-game
 // bot can cite actual numbers ("Brunson 31 PTS, 7 AST"). Returns a map of
@@ -223,7 +224,10 @@ function mapEspnStatus(state: string | undefined): Game["status"] {
 
 async function safeJson(url: string): Promise<any | null> {
   try {
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    // ESPN 403s without a User-Agent. This sent none, so every scoreboard call
+    // came back null and the poller reported games_seen: 0 through entire slates
+    // of live games — silently, because a null here reads as "no games".
+    const res = await fetch(url, { headers: ESPN_HEADERS });
     if (!res.ok) {
       console.warn(`[espn] ${res.status} ${url}`);
       return null;

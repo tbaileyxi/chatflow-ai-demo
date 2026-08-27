@@ -55,6 +55,30 @@ export function JoinHuddleScreen() {
         return;
       }
 
+      // Tell the owner. Without this the request just sat in a table nobody
+      // looks at — the approve/deny screen only gets opened by someone who
+      // already knows to go there.
+      const requesterName =
+        profile?.displayName ?? profile?.username ?? "Someone";
+      const { data: ownerRow } = await supabase
+        .from("huddles")
+        .select("owner_id")
+        .eq("id", huddleId)
+        .maybeSingle();
+
+      if (ownerRow?.owner_id) {
+        supabase.functions
+          .invoke("send-push-notification", {
+            body: {
+              user_ids: [ownerRow.owner_id],
+              notification_type: "join_request",
+              title: `${requesterName} wants in`,
+              body: `Tap to approve or deny for ${huddle.name}.`,
+            },
+          })
+          .catch(() => {});
+      }
+
       Alert.alert(
         "Request sent",
         "The huddle admins will see your request and can approve you.",

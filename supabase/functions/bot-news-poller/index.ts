@@ -10,6 +10,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { searchX } from "../_shared/coach/xsearch.ts";
 import { fetchOgMeta, isNewsQuietWindow, parseRss, scoreEntries } from "../_shared/bot/news.ts";
 import { generateMessage, defaultPersona } from "../_shared/bot/voice.ts";
 import { newsCapRemaining, publish } from "../_shared/bot/publisher.ts";
@@ -31,6 +32,89 @@ const NEWS_SCORE_THRESHOLD = Number(Deno.env.get("NEWS_SCORE_THRESHOLD") || 55);
 // when the Knicks' last game was two months earlier and the next is in October.
 // The model cannot be trusted to know the date; it can be trusted to read a
 // sentence that starts with "NO GAME".
+// ---------------------------------------------------------------------------
+// SOURCE: X instead of RSS.
+//
+// Set NEWS_SOURCE=x to switch. Everything downstream is untouched — seen_news
+// dedupe, the daily cap, the persona voice, the off-character guards and
+// publish() all run exactly as they do for a feed item. X only replaces where
+// the FACTS come from; it does not get to write in the room's voice.
+//
+// Why keep two models in series: Grok finds and summarises, generateMessage
+// puts it in the team's persona. Letting Grok's prose go straight to the room
+// would drop the persona, the game-state guard, and the "broke character"
+// checks in one step, to save a cheap call.
+//
+// Reversible by env var on purpose. RSS is a publisher; X is publishers plus
+// everyone else, and a confident wrong take reads exactly like a scoop.
+const NEWS_SOURCE = (Deno.env.get("NEWS_SOURCE") || "rss").toLowerCase();
+
+// Stable id per citation so seen_news dedupe works the same as an RSS guid.
+function xEntryId(url: string): string {
+  let h = 0;
+  for (let i = 0; i < url.length; i++) h = (h * 31 + url.charCodeAt(i)) | 0;
+  return `x:${Math.abs(h).toString(36)}`;
+}
+
+async function fetchXNews(
+  teamName: string,
+  lookbackHours: number,
+): Promise<Array<{
+  entryId: string; title: string; link: string; source: string;
+  publishedAt: string | null; imageUrl: string | null; summary: string | null;
+}>> {
+  const res = await searchX(
+    `What has actually happened with the ${teamName} in the last ${lookbackHours} hours?\n\n` +
+      `Report the news itself, not the conversation about it. Rank by what ` +
+      `changes the team: a trade, a signing, an injury, a suspension, a firing, ` +
+      `a starter or depth-chart change, a result that matters.\n\n` +
+      `Ignore polls, "should they" questions, debate prompts, power rankings, ` +
+      `hot takes, anniversary and throwback posts, and minor-league ` +
+      `transactions nobody outside the front office cares about.\n\n` +
+      `Prefer beat writers, the team's own account and established reporters ` +
+      `over anonymous accounts. If a claim comes from a single unverified ` +
+      `account, say so plainly rather than stating it as fact. If nothing ` +
+      `real has happened in this window, say exactly that and stop.`,
+  );
+  // SECOND LOOK, WIDER — the same shape the clip bot already needed.
+  // The question above asks only for news that CHANGES the team, and in late
+  // August most teams have none, so Grok correctly answers "nothing" and
+  // returns no citations. Strict-only meant six of ten teams got silence while
+  // the clip bot, which has this fallback, filled the same rooms eight times.
+  // Real news wins when it exists; this runs only when it does not.
+  let out = res;
+  if (!out.ok || !out.citations[0]) {
+    out = await searchX(
+      `What are ${teamName} fans talking about in the last ${lookbackHours * 2} hours?\n\n` +
+        `Camp and practice notes, a player performance, a lineup or depth-chart ` +
+        `note, a quote from a coach or player, a preview of the next game, ` +
+        `something a beat writer reported. Anything a fan would want to know.\n\n` +
+        `Still ignore polls, "should they" questions, debate prompts, power ` +
+        `rankings, throwback posts and minor-league transactions. Prefer beat ` +
+        `writers and the team's own account. If genuinely nothing has been ` +
+        `posted about this team, say so and stop.`,
+    );
+  }
+
+  if (!out.ok || !out.text.trim()) return [];
+
+  // A citation is the source post; the synthesis is the summary. One entry —
+  // the daily cap and MAX_PER_RUN already decide how much of it reaches a room.
+  const link = out.citations[0];
+  if (!link) return [];
+
+  const firstLine = out.text.split(/(?<=[.!?])\s+/)[0]?.trim() || out.text.trim();
+  return [{
+    entryId: xEntryId(link),
+    title: firstLine.slice(0, 180),
+    link,
+    source: "X",
+    publishedAt: new Date().toISOString(),
+    imageUrl: null,
+    summary: out.text.trim(),
+  }];
+}
+
 async function gameStateFor(
   supabase: ReturnType<typeof createClient>,
   teamId: string,
@@ -66,6 +150,13 @@ async function gameStateFor(
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // {"source":"x"} overrides NEWS_SOURCE for ONE run. Flipping the secret
+  // switches every room at once with no way to look first; this lets the new
+  // source be watched on a real slate before it becomes the default.
+  let body: any = null;
+  try { body = await req.json(); } catch { /* cron sends {} or nothing */ }
+  const sourceForRun = String(body?.source || NEWS_SOURCE).toLowerCase();
+
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -78,6 +169,7 @@ serve(async (req) => {
   const provider = getProvider();
 
   const summary = {
+    source: sourceForRun,
     started_at: new Date().toISOString(),
     teams_considered: 0,
     teams_quieted: 0,
@@ -210,8 +302,25 @@ serve(async (req) => {
       dbg.capRemaining = remaining;
       if (remaining <= 0) return;
 
-      // Fetch every feed.
+      // Fetch the news. X or the feeds, decided by NEWS_SOURCE.
       const allEntries: ReturnType<typeof parseRss> = [];
+
+      if (sourceForRun === "x") {
+        // One search per team per run. This is the whole reason the cadence
+        // matters: X search bills per call, so 48 runs a day across ten teams
+        // is the line item that makes this unaffordable. At a handful of runs
+        // it is rounding.
+        try {
+          // 24h, not 12. Football plays once a week; a 12-hour window on a
+          // Wednesday sees an empty room and reports it as no news.
+          const hours = Number(Deno.env.get("NEWS_X_LOOKBACK_HOURS") || 24);
+          const found = await fetchXNews(bundle.teamName, hours);
+          allEntries.push(...found);
+          dbg.xFound = found.length;
+        } catch (err) {
+          summary.errors.push(`xsearch ${bundle.teamName}: ${(err as Error).message}`);
+        }
+      } else
       for (const f of bundle.feeds) {
         try {
           const res = await fetch(f.url, {

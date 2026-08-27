@@ -36,6 +36,18 @@ const SGO_BASE = "https://api.sportsgameodds.com/v2";
 // the 4-hourly cron, costs ~12 calls/day.
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 
+// ...but football is a WEEKLY sport, and a 24h window means a college game on
+// Saturday has no line until Friday. Fans argue about Saturday's spread on
+// Tuesday, and fade cards can only be built from lines that exist, so football
+// gets a longer look-ahead. This costs nothing extra on quiet days: `pages` is
+// a maximum and the paging loop breaks as soon as SGO stops returning a cursor,
+// so a league with no games in the window still costs exactly one call.
+const LEAGUE_WINDOW_MS: Record<string, number> = {
+  MLB: WINDOW_MS,                        // daily sport, big slate — keep it tight
+  NFL: 7 * 24 * 60 * 60 * 1000,          // one slate a week
+  NCAAF: 7 * 24 * 60 * 60 * 1000,        // Saturdays
+};
+
 // Leagues to sync. Env-overridable so the slate can be widened or cut back
 // without a deploy — useful because SGO bills per request and college football
 // Saturdays are far bigger than an MLB night.
@@ -127,16 +139,49 @@ Deno.serve(async (req) => {
       .from("teams").select("id, name, city, league")
       .in("league", dbLeagues).eq("status", "active");
     const byLeague = new Map<string, Map<string, TeamRecord>>();
+
+    // SGO names PRO teams "Tampa Bay Rays" but COLLEGE teams by school alone:
+    // "North Carolina", "TCU", "Virginia". Matching only on `city + name`
+    // ("north carolina tar heels") therefore missed every single college event
+    // — 8 events in, 0 rows out, including UNC@TCU and NC State@Virginia, both
+    // of which have rooms. So each team is also indexed under its school/city
+    // on its own.
+    //
+    // That short key is only safe where it is UNAMBIGUOUS. All 71 college
+    // cities are distinct, but the pro leagues are not: "new york" is two NFL
+    // teams and two MLB teams, "chicago" two MLB teams. A key that would
+    // resolve to more than one team in its league is poisoned rather than left
+    // pointing at whichever row happened to load first — a wrong team is worse
+    // than no team, because it silently posts a card into the wrong room.
+    const poisoned = new Map<string, Set<string>>();
+    const shortByLeague = new Map<string, Map<string, TeamRecord>>();
+
+    // Fold accents and punctuation so "San José State" and "Hawai'i" compare
+    // as their plain-ASCII spellings.
+    const norm = (v: string) =>
+      v.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+
     for (const t of (teams ?? []) as (TeamRecord & { league: string })[]) {
       if (!byLeague.has(t.league)) byLeague.set(t.league, new Map());
-      byLeague.get(t.league)!.set(`${t.city} ${t.name}`.toLowerCase(), t);
+      byLeague.get(t.league)!.set(norm(`${t.city} ${t.name}`), t);
+
+      if (!shortByLeague.has(t.league)) shortByLeague.set(t.league, new Map());
+      if (!poisoned.has(t.league)) poisoned.set(t.league, new Set());
+      const shortMap = shortByLeague.get(t.league)!;
+      const bad = poisoned.get(t.league)!;
+      const key = norm(t.city ?? "");
+      if (!key) continue;
+      if (bad.has(key)) continue;
+      if (shortMap.has(key)) { shortMap.delete(key); bad.add(key); continue; }
+      shortMap.set(key, t);
     }
 
     const now = Date.now();
     const startsAfter = new Date(now).toISOString();
-    const startsBefore = new Date(now + WINDOW_MS).toISOString();
 
     const rows: any[] = [];
+    const unmatched: string[] = [];
     let skippedNoTeam = 0;
     let apiCalls = 0;
     const leagueErrors: string[] = [];
@@ -150,7 +195,19 @@ Deno.serve(async (req) => {
       const spec = LEAGUE_SPEC[league];
       if (!spec) { leagueErrors.push(`${league}: no spec`); continue; }
       const byFullName = byLeague.get(spec.dbLeague) ?? new Map<string, TeamRecord>();
+      const byShortName = shortByLeague.get(spec.dbLeague) ?? new Map<string, TeamRecord>();
       if (byFullName.size === 0) { leagueErrors.push(`${league}: no teams in DB`); continue; }
+      // Full name first so a pro "New York Yankees" can never fall through to
+      // an ambiguous short key.
+      const lookup = (n: unknown): TeamRecord | undefined => {
+        if (!n) return undefined;
+        const k = norm(String(n));
+        return byFullName.get(k) ?? byShortName.get(k);
+      };
+
+      const startsBefore = new Date(
+        now + (LEAGUE_WINDOW_MS[league] ?? WINDOW_MS),
+      ).toISOString();
 
       const events: any[] = [];
       let cursor = "";
@@ -180,9 +237,20 @@ Deno.serve(async (req) => {
       if (!startsAt || Date.parse(startsAt) <= now) continue;
 
       const home = ev.teams?.home, away = ev.teams?.away;
-      const ourHome = home?.names?.long ? byFullName.get(String(home.names.long).toLowerCase()) : undefined;
-      const ourAway = away?.names?.long ? byFullName.get(String(away.names.long).toLowerCase()) : undefined;
-      if (!ourHome && !ourAway) { skippedNoTeam++; continue; }
+      const ourHome = lookup(home?.names?.long);
+      const ourAway = lookup(away?.names?.long);
+      if (!ourHome && !ourAway) {
+        skippedNoTeam++;
+        // Knowing the COUNT of unmatched events tells you nothing actionable —
+        // "8 events, 0 rows" could be a name-format mismatch or simply a slate
+        // of schools we don't carry. Recording the matchup distinguishes them.
+        if (unmatched.length < 40) {
+          unmatched.push(
+            `${league}: ${away?.names?.long ?? "?"} @ ${home?.names?.long ?? "?"}`,
+          );
+        }
+        continue;
+      }
 
       // SGO teamID -> our team (for routing props via players[pid].teamID).
       const sgoTeamToOur = new Map<string, TeamRecord>();
@@ -316,6 +384,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       leagues: LEAGUES,
+      unmatched_events: unmatched,
       per_league: perLeague,
       api_calls: apiCalls,
       markets_built: rows.length,

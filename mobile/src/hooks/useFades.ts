@@ -78,6 +78,33 @@ export async function postFade(params: {
   stake: number;
 }): Promise<{ ok: boolean; error?: string }> {
   const { market } = params;
+
+  // One open fade per person, per market, per room.
+  //
+  // post_fade only refuses a duplicate when the card came from the bot
+  // (origin_message_id is already taken); nothing stops the Fade sheet opening a
+  // second identical one. A user who had already taken "Anything less" on the
+  // bot's Patriots -2.5 card opened the sheet to get the OTHER side, posted from
+  // there, and ended up with two open fades on the same side — 200 chips locked
+  // against nobody, because you cannot take your own fade.
+  //
+  // Belt and braces: this is the client, so it is a race away from being
+  // bypassed. The durable guard belongs in post_fade itself.
+  const { data: dupe } = await supabase
+    .from("fades")
+    .select("id")
+    .eq("huddle_id", params.huddleId)
+    .eq("poster_id", params.userId)
+    .eq("market_id", market.marketId)
+    .eq("status", "open")
+    .limit(1);
+  if (dupe && dupe.length > 0) {
+    return {
+      ok: false,
+      error: "You already have this one up and nobody's taken it yet. Check Picks.",
+    };
+  }
+
   const { data, error } = await (supabase.rpc as any)("post_fade", {
     p_huddle_id: params.huddleId,
     p_game_id: params.game.id,
@@ -170,7 +197,11 @@ export async function acceptFade(params: {
   await supabase.from("huddle_messages").insert({
     huddle_id: fade.huddle_id,
     user_id: params.userId,
-    content: `🔒 I faded ${params.posterName} — ${fade.line_description} (${posterSide} ${fade.line_value}) is LIVE. ${fade.stake * 2} chip pot.`,
+    // Third person, not "I faded". The room reads this in a scroll of other
+    // people's messages, where a first-person line forces you to check the
+    // avatar to work out who "I" is. Naming both sides makes the matchup
+    // legible at a glance and is what a scoreboard would say.
+    content: `${params.accepterName} faded ${params.posterName} — ${fade.line_description} (${posterSide} ${fade.line_value}) is LIVE. ${fade.stake * 2} chip pot.`,
     message_type: "fade",
   });
   return { ok: true };

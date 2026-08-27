@@ -31,12 +31,13 @@ import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { HuddleHeader } from "@/components/huddle/HuddleHeader";
 import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
 import { PresenceBar } from "@/components/huddle/PresenceBar";
+import { FadeButton } from "@/components/huddle/FadeButton";
 import { PingButton } from "@/components/huddle/PingButton";
 import { ChatMessage } from "@/components/huddle/ChatMessage";
 import { MessageInput } from "@/components/huddle/MessageInput";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { DEV_ROOMS_STORAGE_KEY, getDevTeamById } from "@/config/devData";
-import { LogOut, MoreVertical, Pin, UserPlus, User, Swords } from "lucide-react-native";
+import { LogOut, MoreVertical, Pin, UserPlus, User } from "lucide-react-native";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import {
   useLiveGameContext,
@@ -225,6 +226,8 @@ export function HuddleScreen() {
 
   // Invite modal — the room's one invite surface (link + in-app friends).
   const [showInvite, setShowInvite] = useState(false);
+  // Tracks whether the invite sheet was opened by a rally, so it can say so.
+  const [invitedViaRally, setInvitedViaRally] = useState(false);
   // Cleared when a coach_answer actually lands, or after 90s so a failed ask
   // doesn't leave the dots spinning forever.
   const [coachThinking, setCoachThinking] = useState(false);
@@ -426,31 +429,28 @@ export function HuddleScreen() {
           entryBanner={entryBanner}
           rightSlot={
             <View className="flex-row items-center gap-2">
-              {/* ONE control, not two. "Fade" opened a post sheet and "My
-                  picks" went to the ledger — two buttons for one idea, in a
-                  row that already carries Rally. Picks is the single place
-                  props and positions live, so this just goes there. */}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Open picks"
-                onPress={() =>
-                  // Carry the room through. Picks opens focused on THIS game
-                  // rather than a list of every team you're in a room with —
-                  // you tapped from a room, so that room is the context.
-                  (navigation as any).navigate("MainTabs", {
-                    screen: "Ledger",
-                    params: { huddleId, huddleName: huddle?.name ?? undefined },
-                  })
-                }
-                className="flex-row items-center gap-1.5 rounded-full border border-border bg-muted/40 px-3 py-1"
-              >
-                <Swords size={13} color={colors.mutedForeground} />
-                <Text className="text-xs font-black text-muted-foreground">
-                  Picks
-                </Text>
-              </Pressable>
+              {/* ONE control, still not two — but it has to be the one that
+                  DOES something. This slot used to hold a link to the Picks
+                  tab, which left no way anywhere in the app to *start* a fade:
+                  FadeButton and PostFadeSheet were written, then orphaned, and
+                  the mechanic survived only on bot-posted cards. FadeButton is
+                  the better chip anyway — it badges the props still waiting on
+                  a taker, so the room can see there is something to take. The
+                  Picks tab is still one tap away in the tab bar. */}
+              <FadeButton
+                huddleId={huddleId}
+                game={liveGame ?? null}
+                gameState={pingGameState}
+              />
               {pingGameState !== "none" ? (
-                <PingButton huddleId={huddleId} gameState={pingGameState} />
+                <PingButton
+                  huddleId={huddleId}
+                  gameState={pingGameState}
+                  onRallied={() => {
+                    setInvitedViaRally(true);
+                    setShowInvite(true);
+                  }}
+                />
               ) : null}
             </View>
           }
@@ -603,7 +603,11 @@ export function HuddleScreen() {
         visible={showInvite}
         huddleId={huddleId}
         huddleName={huddle.name}
-        onClose={() => setShowInvite(false)}
+        rallied={invitedViaRally}
+        onClose={() => {
+          setShowInvite(false);
+          setInvitedViaRally(false);
+        }}
       />
     </SafeAreaView>
   );

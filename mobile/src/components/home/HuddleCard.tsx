@@ -1,5 +1,5 @@
 import { Pressable, View, Text, Image } from "react-native";
-import { Crown, Users } from "lucide-react-native";
+import { Crown, Lock, Users } from "lucide-react-native";
 import { cn } from "@/lib/utils";
 import { colors } from "@/theme/colors";
 import type { UserHuddle } from "@/hooks/useUserHuddles";
@@ -58,11 +58,25 @@ export function HuddleCard({ huddle, onPress }: Props) {
           ) : null}
         </View>
 
-        <View className="flex-row items-center gap-1">
-          <Users color={colors.mutedForeground} size={11} />
-          <Text className="text-xs text-muted-foreground">
-            {pluralize(huddle.memberCount, "person", "people")}
-          </Text>
+        <View className="flex-row items-center gap-2">
+          <View className="flex-row items-center gap-1">
+            <Users color={colors.mutedForeground} size={11} />
+            <Text className="text-xs text-muted-foreground">
+              {pluralize(huddle.memberCount, "person", "people")}
+            </Text>
+          </View>
+
+          {/* Whether the door is locked is a property of the room, and the
+              owner needs to see it without opening settings — especially right
+              after flipping it. */}
+          {huddle.isPrivate ? (
+            <View className="flex-row items-center gap-1">
+              <Lock color={colors.primary} size={10} />
+              <Text className="text-xs font-bold text-primary">
+                Ask to join
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
 

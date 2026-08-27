@@ -216,6 +216,11 @@ serve(async (req) => {
     }
 
 
+    // ESPN reachability probe. games_seen: 0 is ambiguous on its own — it reads
+    // the same whether there are genuinely no games or ESPN refused us. This
+    // reports the raw HTTP status so the two can be told apart from the summary
+    // alone, without needing function logs.
+
     for (const league of summary.leagues) {
       const games = await provider.liveGames(league);
       summary.games_seen += games.length;

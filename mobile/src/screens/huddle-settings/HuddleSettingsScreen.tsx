@@ -192,17 +192,10 @@ export function HuddleSettingsScreen() {
 
   const togglePrivate = async () => {
     if (!isRoomAdmin) return;
-    // Private mode is an Official Huddle feature — gate behind the upgrade.
-    // With Official Huddles off for 1.0 there's no purchase to offer, so tell
-    // the owner it's coming rather than opening a paywall that can't complete.
-    if (!isOfficial && !huddle.isPrivate) {
-      if (OFFICIAL_HUDDLES_ENABLED) {
-        setShowPaywall(true);
-      } else {
-        Alert.alert("Coming soon", "Private, approval-only huddles arrive in a future update.");
-      }
-      return;
-    }
+    // WAS: gated behind the Official Huddle upgrade, so a regular owner got a
+    // paywall or a "coming soon" alert and could never lock their own room.
+    // Controlling who is in your room is not a premium feature — it is the
+    // baseline for a room being yours. Free for every owner now.
     const next = !huddle.isPrivate;
     await supabase
       .from("huddles")
@@ -540,16 +533,26 @@ export function HuddleSettingsScreen() {
                 )}
                 <View className="flex-1">
                   <Text className="font-bold text-foreground">
-                    {huddle.isPrivate ? "Private / Approval" : "Open by Invite"}
+                    {huddle.isPrivate ? "Ask to join" : "Open"}
                   </Text>
+                  {/* WAS: "Open by Invite", which wasn't true — an open room can
+                      be joined by anyone who finds it, invite or not. */}
                   <Text className="text-sm leading-5 text-muted-foreground">
-                    Private huddles require approval before someone can enter.
+                    {huddle.isPrivate
+                      ? "People request access and you approve them."
+                      : "Anyone who finds this room can walk in."}
                   </Text>
                 </View>
                 <Button variant="outline" size="sm" onPress={togglePrivate}>
                   {huddle.isPrivate ? "Make Open" : "Make Private"}
                 </Button>
               </View>
+
+              {huddle.isPrivate && joinRequests.length === 0 ? (
+                <Text className="text-sm text-muted-foreground">
+                  No requests waiting.
+                </Text>
+              ) : null}
 
               {huddle.isPrivate && joinRequests.length > 0 ? (
                 <View className="gap-2">

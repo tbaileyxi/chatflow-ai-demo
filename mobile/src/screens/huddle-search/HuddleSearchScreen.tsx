@@ -5,7 +5,6 @@ import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Users, ShieldCheck } from "lucide-react-native";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,99 +18,81 @@ type SearchHuddle = {
   memberCount: number;
   teamName: string | null;
   teamLogoUrl: string | null;
-  ownerName: string | null;
   isMember: boolean;
   isPrivate: boolean;
+  isOfficial: boolean;
+  knownNames: string[];
+  knownCount: number;
 };
 
-function useHuddleSearch(search: string, userId: string | undefined) {
+// "Mike and Sara are in" reads like a reason to tap. "3 members" does not.
+function knownLine(names: string[], count: number): string | null {
+  if (count === 0) return null;
+  if (count === 1) return `${names[0]} is in here`;
+  if (count === 2) return `${names[0]} and ${names[1]} are in here`;
+  const rest = count - 2;
+  return `${names[0]}, ${names[1]} and ${rest} more you know`;
+}
+
+// WAS: a direct select over huddles that listed EVERY non-official room
+// ordered by member count — 206 rooms of strangers, fully browsable by anyone.
+// That is the opposite of how the product is meant to work: rooms are public
+// by default, but you should only ever SEE one if somebody you know is inside.
+//
+// discoverable_huddles() applies that rule server-side (it needs the friend
+// graph plus other people's memberships, neither of which RLS lets the client
+// read). Official team rooms always come through, so someone with no
+// connections yet still lands somewhere.
+function useHuddleSearch(search: string) {
   return useQuery({
     queryKey: ["huddle-search", search],
     queryFn: async (): Promise<SearchHuddle[]> => {
-      let query = supabase
-        .from("huddles")
-        .select(
-          `
-          id, name, bio, member_count, owner_id, is_private,
-          teams!team_id (name, logo_url)
-        `,
-        )
-        // WAS: .eq("is_private", false).eq("is_verified", true)
-        //
-        // is_verified is true on ZERO of the 206 rooms, so this screen
-        // returned an empty list every single time — discovery was dead, not
-        // sparse. The flag came from a "verified rooms only" idea that was
-        // never filled in.
-        //
-        // Private rooms are listed now too, locked. Hiding them meant the
-        // request-to-join flow only ever fired for someone who already had
-        // your invite link, which is the one case that doesn't need it.
-        // Name, team and member count are all that shows; huddle_messages has
-        // its own policy keyed on is_private, so not a word of the room leaks.
-        .or("is_official_team_huddle.is.false,is_official_team_huddle.is.null")
-        .order("member_count", { ascending: false })
-        .limit(30);
-
-      if (search.trim()) {
-        query = query.ilike("name", `%${search}%`);
-      }
-
-      const { data, error } = await query;
-      if (error || !data) return [];
-
-      // Get owner profiles
-      const ownerIds = [...new Set(data.map((h) => h.owner_id))];
-      const { data: owners } = await supabase
-        .from("profiles")
-        .select("user_id, display_name, username")
-        .in("user_id", ownerIds);
-      const ownerMap = new Map(
-        (owners ?? []).map((o) => [
-          o.user_id,
-          o.display_name ?? o.username ?? null,
-        ]),
+      const { data, error } = await (supabase.rpc as any)(
+        "discoverable_huddles",
+        { p_search: search.trim() || null, p_limit: 40 },
       );
 
-      // Check membership
-      let memberSet = new Set<string>();
-      if (userId) {
-        const huddleIds = data.map((h) => h.id);
-        const { data: memberships } = await supabase
-          .from("huddle_members")
-          .select("huddle_id")
-          .eq("user_id", userId)
-          .in("huddle_id", huddleIds);
-        memberSet = new Set((memberships ?? []).map((m) => m.huddle_id));
+      if (error) {
+        console.warn("[search] discoverable_huddles failed", error);
+        return [];
       }
 
-      return data.map((h) => {
-        const team = (h as any).teams;
-        return {
-          id: h.id,
-          name: h.name,
-          bio: h.bio,
-          memberCount: h.member_count ?? 0,
-          teamName: team?.name ?? null,
-          teamLogoUrl: team?.logo_url ?? null,
-          ownerName: ownerMap.get(h.owner_id) ?? null,
-          isMember: memberSet.has(h.id),
-          isPrivate: (h as any).is_private ?? false,
-        };
-      });
+      return ((data ?? []) as any[]).map((h) => ({
+        id: h.id,
+        name: h.name,
+        bio: h.bio ?? null,
+        memberCount: h.member_count ?? 0,
+        teamName: h.team_name ?? null,
+        teamLogoUrl: h.team_logo_url ?? null,
+        isMember: !!h.is_member,
+        isPrivate: !!h.is_private,
+        isOfficial: !!h.is_official,
+        knownNames: (h.known_names ?? []) as string[],
+        knownCount: h.known_count ?? 0,
+      }));
     },
   });
 }
 
 export function HuddleSearchScreen() {
   const navigation = useNavigation();
-  const { user } = useAuth();
   const [search, setSearch] = useState("");
-  const { data: huddles, isLoading } = useHuddleSearch(search, user?.id);
+  const { data: huddles, isLoading } = useHuddleSearch(search);
+
+  // Tapping the row does what the row's own button says. It used to open
+  // HuddleSettings — the admin editor — which is neither entering nor joining,
+  // and is a strange place to land from a discovery screen. That went unnoticed
+  // because search returned an empty list every time until the friend-scoped
+  // rewrite, so no row was ever tappable.
+  const openHuddle = (item: SearchHuddle) =>
+    item.isMember
+      ? navigation.navigate("Huddle", { huddleId: item.id })
+      : navigation.navigate("JoinHuddle", { huddleId: item.id });
 
   const renderHuddle = ({ item }: { item: SearchHuddle }) => (
     <Pressable
       className="flex-row items-center gap-3 rounded-lg border border-border bg-card p-3 active:opacity-80"
-      onPress={() => navigation.navigate("HuddleSettings", { huddleId: item.id })}
+      onPress={() => openHuddle(item)}
     >
       <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted">
         {item.teamLogoUrl ? (
@@ -129,7 +110,9 @@ export function HuddleSearchScreen() {
 
       <View className="flex-1 gap-0.5">
         <View className="flex-row items-center gap-1.5">
-          <ShieldCheck color={colors.verified.primary} size={14} />
+          {item.isOfficial ? (
+            <ShieldCheck color={colors.verified.primary} size={14} />
+          ) : null}
           <Text
             className="flex-1 text-base font-semibold text-foreground"
             numberOfLines={1}
@@ -137,11 +120,17 @@ export function HuddleSearchScreen() {
             {item.name}
           </Text>
         </View>
-        {item.ownerName && (
-          <Text className="text-xs text-muted-foreground">
-            by {item.ownerName}
+
+        {/* The reason this room is on your screen at all. */}
+        {knownLine(item.knownNames, item.knownCount) ? (
+          <Text
+            className="text-xs font-bold text-primary"
+            numberOfLines={1}
+          >
+            {knownLine(item.knownNames, item.knownCount)}
           </Text>
-        )}
+        ) : null}
+
         {item.bio ? (
           <Text className="text-xs text-muted-foreground" numberOfLines={2}>
             {item.bio}
@@ -155,23 +144,9 @@ export function HuddleSearchScreen() {
         </View>
       </View>
 
-      {item.isMember ? (
-        <Button
-          variant="outline"
-          size="xs"
-          onPress={() => navigation.navigate("Huddle", { huddleId: item.id })}
-        >
-          Enter
-        </Button>
-      ) : (
-        <Button
-          variant="outline"
-          size="xs"
-          onPress={() => navigation.navigate("JoinHuddle", { huddleId: item.id })}
-        >
-          {item.isPrivate ? "Request" : "Join"}
-        </Button>
-      )}
+      <Button variant="outline" size="xs" onPress={() => openHuddle(item)}>
+        {item.isMember ? "Enter" : item.isPrivate ? "Request" : "Join"}
+      </Button>
     </Pressable>
   );
 
@@ -185,13 +160,13 @@ export function HuddleSearchScreen() {
           </Text>
         </View>
         <Text className="mt-1 text-sm text-muted-foreground">
-          Find verified Official Huddles listed by team.
+          Rooms with people you know, and the team rooms.
         </Text>
       </View>
 
       <View className="px-4 pb-3">
         <Input
-          placeholder="Search official huddles..."
+          placeholder="Search rooms and teams..."
           value={search}
           onChangeText={setSearch}
         />
@@ -210,9 +185,19 @@ export function HuddleSearchScreen() {
           renderItem={renderHuddle}
           contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingBottom: 32 }}
           ListEmptyComponent={
-            <Text className="py-8 text-center text-muted-foreground">
-              No official huddles found
-            </Text>
+            // Deliberately not "no results". With friend-scoped discovery an
+            // empty list usually means no connections yet, not a bad query —
+            // so point at the fix instead of the failure.
+            <View className="py-10 px-2">
+              <Text className="text-center text-base font-black text-foreground">
+                {search.trim() ? "Nothing matches that." : "Nothing here yet."}
+              </Text>
+              <Text className="mt-2 text-center text-sm leading-5 text-muted-foreground">
+                {search.trim()
+                  ? "You see rooms where you know somebody, plus the team rooms."
+                  : "Rooms show up here once someone you know is in one. Find your people from your profile, or start a room and invite someone."}
+              </Text>
+            </View>
           }
         />
       )}

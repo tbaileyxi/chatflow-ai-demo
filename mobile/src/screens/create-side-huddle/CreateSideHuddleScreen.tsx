@@ -7,6 +7,7 @@ import {
   Image,
   ScrollView,
   Share,
+  Switch,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -202,6 +203,9 @@ export function CreateSideHuddleScreen() {
   const [filterLeague, setFilterLeague] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // Off by default: an open room is the norm, and discovery is already scoped
+  // to people you know. This is for someone who wants the door locked too.
+  const [askToJoin, setAskToJoin] = useState(false);
 
   const filtered = teams?.filter((t) => {
     if (filterLeague && t.league.toUpperCase() !== filterLeague) return false;
@@ -257,7 +261,10 @@ export function CreateSideHuddleScreen() {
           name: name.trim(),
           owner_id: user.id,
           team_id: selectedTeamId,
-          is_private: false,
+          // WAS: hardcoded false, which meant no room could ever be private —
+          // so the request-to-join flow and its whole approve/deny admin UI
+          // were unreachable dead code.
+          is_private: askToJoin,
           is_official_team_huddle: false,
           is_verified: false,
           member_count: 1,
@@ -535,6 +542,23 @@ export function CreateSideHuddleScreen() {
 
       {/* Bottom CTA */}
       <View className="absolute bottom-0 left-0 right-0 border-t border-border bg-background px-4 pb-8 pt-4">
+        <View className="mb-3 flex-row items-center justify-between">
+          <View className="flex-1 pr-3">
+            <Text className="text-sm font-bold text-foreground">
+              Ask to join
+            </Text>
+            <Text className="text-xs leading-4 text-muted-foreground">
+              People request access and you approve them. Off means anyone who
+              finds the room can walk in.
+            </Text>
+          </View>
+          <Switch
+            value={askToJoin}
+            onValueChange={setAskToJoin}
+            trackColor={{ true: colors.success, false: colors.muted }}
+          />
+        </View>
+
         <Button
           size="lg"
           onPress={handleCreate}
