@@ -598,25 +598,30 @@ export function HuddleSettingsScreen() {
                   <Unlock color={colors.mutedForeground} size={18} />
                 )}
                 <View className="flex-1">
+                  {/* A setting is a STATE the room is in, not an instruction to
+                      the person reading it. "Ask to join" told the owner to do
+                      something he isn't the one doing — it is the visitor who
+                      asks. It stays as the visitor's button on the join screen,
+                      where it is the right words for the right person. */}
                   <Text className="font-bold text-foreground">
-                    {huddle.isPrivate ? "Ask to join" : "Open"}
+                    {huddle.isPrivate ? "Private" : "Open"}
                   </Text>
                   {/* WAS: "Open by Invite", which wasn't true — an open room can
                       be joined by anyone who finds it, invite or not. */}
                   <Text className="text-sm leading-5 text-muted-foreground">
                     {huddle.isPrivate
-                      ? "People request access and you approve them."
+                      ? "You decide who comes in."
                       : "Anyone who finds this room can walk in."}
                   </Text>
                 </View>
                 <Button variant="outline" size="sm" onPress={togglePrivate}>
-                  {huddle.isPrivate ? "Make Open" : "Make Private"}
+                  {huddle.isPrivate ? "Make it open" : "Make it private"}
                 </Button>
               </View>
 
               {huddle.isPrivate && joinRequests.length === 0 ? (
                 <Text className="text-sm text-muted-foreground">
-                  No requests waiting.
+                  Nobody's waiting to get in.
                 </Text>
               ) : null}
 

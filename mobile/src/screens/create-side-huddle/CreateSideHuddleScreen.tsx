@@ -545,11 +545,11 @@ export function CreateSideHuddleScreen() {
         <View className="mb-3 flex-row items-center justify-between">
           <View className="flex-1 pr-3">
             <Text className="text-sm font-bold text-foreground">
-              Ask to join
+              Private
             </Text>
             <Text className="text-xs leading-4 text-muted-foreground">
-              People request access and you approve them. Off means anyone who
-              finds the room can walk in.
+              You decide who comes in. Off means anyone who finds the room can
+              walk in.
             </Text>
           </View>
           <Switch

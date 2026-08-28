@@ -165,21 +165,21 @@ export function JoinHuddleScreen() {
                     navigation.navigate("Huddle", { huddleId })
                   }
                 >
-                  Go to Side Huddle
+                  Open the room
                 </Button>
               </View>
             ) : huddle.isPrivate ? (
               <View className="w-full gap-2">
                 <Text className="text-center text-sm text-muted-foreground">
-                  This Official Huddle uses approval membership.
+                  This room is private. The owner lets people in.
                 </Text>
                 <Button size="lg" className="w-full" onPress={handleJoin}>
-                  Request Access
+                  Ask to join
                 </Button>
               </View>
             ) : (
               <Button size="lg" className="w-full" onPress={handleJoin}>
-                Join Side Huddle
+                Join the room
               </Button>
             )}
 
@@ -187,7 +187,7 @@ export function JoinHuddleScreen() {
               variant="ghost"
               onPress={() => navigation.goBack()}
             >
-              Maybe Later
+              Not now
             </Button>
           </CardContent>
         </Card>
