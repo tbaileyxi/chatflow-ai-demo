@@ -355,6 +355,34 @@ serve(async (req) => {
         rooms: team.huddleIds.length,
       });
 
+      // ALREADY SAID THIS ONE.
+      //
+      // The cap above is a RATE limit — one clip per team per day — not a
+      // content check, so nothing stopped the same tweet being chosen again on
+      // a later day. A Tulane room got the identical @GreenWaveFB post two days
+      // running, which reads as the bot having nothing to say and saying it
+      // anyway.
+      //
+      // Keyed on the permalink, which is the post's identity. Thirty days is
+      // well past the point where a repeat would land as "seen this" rather
+      // than déjà vu, and it is cheap: one indexed lookup per team per run.
+      const repeatSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: alreadySaid } = await supabase
+        .from("huddle_messages")
+        .select("id")
+        .in("huddle_id", team.huddleIds)
+        .eq("embed_code", best.url)
+        .gte("created_at", repeatSince)
+        .limit(1);
+      if (alreadySaid && alreadySaid.length > 0) {
+        summary.results.push({
+          team: team.name,
+          read: capped.length,
+          skipped: `already posted ${best.url}`,
+        });
+        return;
+      }
+
       if (dryRun) return;
 
       if (live) summary.in_game_posts++;
