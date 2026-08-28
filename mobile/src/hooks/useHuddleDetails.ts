@@ -97,7 +97,7 @@ export function useHuddleDetails(huddleId: string) {
         teamName: team?.name ?? null,
         teamCity: team?.city ?? null,
         teamLogoUrl: team?.logo_url ?? null,
-        photoUrl: (row as any).photo_url ?? null,
+        photoUrl: (data as any).photo_url ?? null,
         isMember,
       };
     },

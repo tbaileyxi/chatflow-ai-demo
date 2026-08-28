@@ -16,6 +16,8 @@ import { useState } from "react";
 import { Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
+// `supabase as any` on the writes: photo_url is newer than the generated
+// Database types, the same lag useHuddleDetails works around on the read side.
 import { supabase } from "@/integrations/supabase/client";
 
 function base64ToUint8Array(base64: string) {
@@ -82,7 +84,7 @@ export function useRoomPhoto(huddleId: string | null | undefined) {
       if (upErr) throw upErr;
 
       const { data } = supabase.storage.from("room-photos").getPublicUrl(path);
-      const { error: rowErr } = await supabase
+      const { error: rowErr } = await (supabase as any)
         .from("huddles")
         .update({ photo_url: data.publicUrl })
         .eq("id", huddleId);
@@ -110,7 +112,7 @@ export function useRoomPhoto(huddleId: string | null | undefined) {
 
   const clear = async (): Promise<boolean> => {
     if (!huddleId) return false;
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("huddles")
       .update({ photo_url: null })
       .eq("id", huddleId);

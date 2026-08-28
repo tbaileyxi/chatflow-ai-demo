@@ -39,7 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // Unique within its version train, so 1.0.5 could start at 1 — kept
     // climbing instead so a number is never reused anywhere and `eas
     // build:list` reads in order.
-    buildNumber: "63",
+    buildNumber: "64",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       // Contacts are hashed on this device and only the hashes are sent, so we
