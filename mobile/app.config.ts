@@ -39,7 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // Unique within its version train, so 1.0.5 could start at 1 — kept
     // climbing instead so a number is never reused anywhere and `eas
     // build:list` reads in order.
-    buildNumber: "66",
+    buildNumber: "67",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       // Contacts are hashed on this device and only the hashes are sent, so we
@@ -70,7 +70,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       NSCameraUsageDescription:
         "Side Huddle uses your camera so you can take a photo and post it straight into a huddle chat — for example, snapping the view from your seat at the game and sending it to your room.",
       NSPhotoLibraryUsageDescription:
-        "Side Huddle uses your photo library so you can pick an existing photo to post in a huddle chat or set as your profile picture — for example, choosing a tailgate photo from your camera roll to share with your room.",
+        "Side Huddle uses your photo library so you can pick an existing photo to post in a huddle chat, set as your profile picture, or set as the background of a huddle you run — for example, choosing a tailgate photo from your camera roll to share with your room, or putting your chapter's bar photo behind your huddle's chat.",
       NSMicrophoneUsageDescription:
         "Side Huddle uses your microphone to record voice messages you send in a huddle chat — for example, recording a quick reaction to a touchdown and sending it to your room instead of typing it.",
     },

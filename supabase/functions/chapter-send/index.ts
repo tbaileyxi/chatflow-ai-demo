@@ -54,6 +54,8 @@ type Chapter = {
   email: string;
   member_count: number | null;
   sequence_step: number;
+  /** The six characters that turn this email into their room. */
+  claim_code: string | null;
 };
 
 // ── copy helpers ──────────────────────────────────────────────────────────────
@@ -166,6 +168,22 @@ ${inner}
 }
 
 
+/**
+ * The code, made impossible to miss.
+ *
+ * This is the one thing in the email that has to survive being read on a phone
+ * and typed into a different screen a minute later. Big, wide-tracked, and real
+ * TEXT — an image of a code cannot be copied, and half of these will be read in
+ * a mail client that blocks images by default.
+ */
+function codeBlock(code: string): string {
+  return `<table cellpadding="0" cellspacing="0" width="100%" style="margin:6px 0 20px 0;"><tr>
+    <td align="center" style="background-color:#faf7ea;border:2px dashed #d8cfa4;border-radius:10px;padding:18px 12px;">
+      <p style="margin:0 0 6px 0;font-size:12px;letter-spacing:1.5px;color:#8a7f55;text-transform:uppercase;font-weight:bold;">Your code</p>
+      <p style="margin:0;font-size:34px;font-weight:bold;letter-spacing:8px;color:#1a1a1a;font-family:'Courier New',Courier,monospace;">${code}</p>
+    </td></tr></table>`;
+}
+
 function cta(label: string, href: string): string {
   return `<table cellpadding="0" cellspacing="0" style="margin:4px 0 18px 0;"><tr>
     <td style="background-color:#FFD700;border-radius:6px;">
@@ -185,30 +203,37 @@ function subject(step: number, c: Chapter): string {
     // The old version was `${name}'s group chat`, which produced "Sarasota
     // Browns Backers's group chat" — a double possessive on any chapter name
     // ending in s, which most of them do.
-    default: return `${short} season — a room for ${name}`;
+    default: return `A ${short} room for ${name}`;
   }
 }
 
 function body(step: number, c: Chapter): string {
   const who = chapterRef(c);
   const org = c.org || "your team";
-  // `short` for the sentence a fan would say, `full` where it has to match the
-  // team page the button opens.
-  const { full: orgFull, short: orgShort } = orgNames(org);
+  const { short: orgShort } = orgNames(org);
   const room = seedRoom(org);
+  const code = (c.claim_code || "").trim();
 
-  // Each step is shorter than the last. A follow-up that restates the whole
-  // pitch reads as a form letter; a short one reads as a person.
+  // WHAT CHANGED AND WHY. This used to pitch an app and hope they went and
+  // found it. It now hands them something specific that already exists with
+  // their chapter's name on it, and asks for one action instead of a decision.
   //
-  // The plaintext download line is gone from every step. It competed with the
-  // button for the same click, and the team page it links to already handles
-  // the download.
+  // The code carries in EVERY step, not just the first. A president who reads
+  // step one on a phone in a car park and gets to it a week later should not
+  // have to go digging for the email that had the code in it.
+  //
+  // The code exists because Apple does not carry a link through an App Store
+  // install — see claim_chapter_huddle. So the ask is deliberately two-part and
+  // says so plainly: get the app, then type six characters. Pretending it is
+  // one tap would just surprise them at the second step.
+
   if (step === 2) {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${greeting(c)},</p>
-      <p style="margin:0 0 18px 0;">Quick follow-up on ${who}.</p>
+      <p style="margin:0 0 18px 0;">Quick follow-up — the room for ${who} is still held.</p>
       <p style="margin:0 0 18px 0;">The part chapter admins tend to like: you stop having to think up reasons to post. The ${orgShort} news shows up in the room on its own, and your members do the rest.</p>
-      ${cta(`Start your ${orgShort} room`, room)}
+      ${code ? codeBlock(code) : ""}
+      ${cta(`Get the app`, APP_STORE_URL)}
       <p style="font-size:13px;color:#999;margin:0;">Free for chapters. If it's not for your group, say so and I'll leave you alone.</p>`);
   }
 
@@ -216,38 +241,25 @@ function body(step: number, c: Chapter): string {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${greeting(c)},</p>
       <p style="margin:0 0 18px 0;">Last note from me — not trying to clutter your inbox.</p>
-      <p style="margin:0 0 18px 0;">Link's below if you ever want a look. If it fits, you can have a room going for ${who} in about a minute.</p>
+      <p style="margin:0 0 18px 0;">Your code is below if you ever want it. It doesn't expire, and nobody else can use it — it only opens ${who}.</p>
+      ${code ? codeBlock(code) : ""}
       <p style="margin:0 0 18px 0;">Either way, good luck this season.</p>
-      ${cta(`Start your ${orgShort} room`, room)}`);
+      ${cta(`Get the app`, APP_STORE_URL)}`);
   }
 
-  // SEASON-BOUND: "${orgShort} season is almost here" and "before kickoff" are
-  // only true from roughly July through the start of the season. Written
-  // 2026-08-21 for a late-August send. If this sequence is still running in
-  // November, change both lines — a chapter president reading "season is almost
-  // here" at Thanksgiving learns immediately that nobody wrote this to them.
-  //
-  // Opens on RECOGNITION, not on a problem we invented. Every one of these
-  // chapters already has a group text or a Facebook group, and already knows
-  // it's bad — starting there means the first line is something they'd nod at
-  // rather than a stranger describing their own chapter back to them.
-  //
-  // What this deliberately does NOT do: lead with features (scores, news,
-  // clips). They already have Twitter, Reddit and ESPN — pitched as a feed,
-  // this is a fifth one. Pitched as "your group chat, but good", it's a
-  // category they're short of rather than oversupplied in.
-  //
-  // It also never calls being admin a benefit. It's a chore; it's mentioned
-  // once, at the end, as evidence that setup is cheap.
+  // SEASON-BOUND: "${orgShort} season is almost here" is only true from roughly
+  // July through the start of the season. If this is still running in November,
+  // change it — a chapter president reading "season is almost here" at
+  // Thanksgiving learns immediately that nobody wrote this to them.
   return shell(`
     <p style="margin:0 0 18px 0;">Hi ${greeting(c)},</p>
-    <p style="margin:0 0 18px 0;">${orgShort} season is almost here.</p>
-    <p style="margin:0 0 18px 0;">Side Huddle is a better way to keep ${who} involved — engage the members you have, grow the ones you don't, and keep everybody in it whether they make it${missedOut(c)} or not.</p>
-    <p style="margin:0 0 18px 0;">It's your own ${orgShort} room: the score, the ${orgShort} news, the clip everyone's passing around — all of it landing while your members talk over it.</p>
-    <p style="margin:0 0 18px 0;">Free, and you can have it going before kickoff.</p>
-    ${cta(`Start your ${orgShort} room`, room)}`);
+    <p style="margin:0 0 18px 0;">${orgShort} season is almost here, and I've put a room aside for ${who}.</p>
+    <p style="margin:0 0 18px 0;">It's a private room for your members: the score, the ${orgShort} news and the clip everyone's passing around all land in it while your people talk over the top. You own it — your name on it, your photo behind it.</p>
+    ${code ? codeBlock(code) : ""}
+    <p style="margin:0 0 18px 0;">Two steps: get the app, then enter that code when it asks. The room is built the moment you do, already named for your chapter.</p>
+    ${cta(`Get the app`, APP_STORE_URL)}
+    <p style="font-size:13px;color:#999;margin:0;">Free for chapters. Nobody else can claim this code — it only opens your room. <a href="${room}" style="color:#999;">More about ${orgShort} rooms</a>.</p>`);
 }
-
 
 // Strip the HTML shell so a test run shows the words that will actually land in
 // someone's inbox. Reading raw markup in a JSON preview is not a review.
@@ -284,7 +296,7 @@ async function brevoSend(apiKey: string, to: string, subj: string, html: string)
 }
 
 const COLS =
-  "id,chapter_name,org,org_type,city,state,venue,leader_name,first_name,email,member_count,sequence_step";
+  "id,chapter_name,org,org_type,city,state,venue,leader_name,first_name,email,member_count,sequence_step,claim_code";
 
 async function selectTargets(
   supabase: SupabaseClient,
@@ -376,6 +388,8 @@ serve(async (req) => {
         email: to,
         member_count: 140,
         sequence_step: step - 1,
+        // A realistic code so a self-test shows the block that matters most.
+        claim_code: "QBCKAK",
       };
 
       const subj = subject(step, sample);
