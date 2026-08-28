@@ -336,10 +336,32 @@ export function HuddleScreen() {
     [listItems],
   );
 
-  if (huddleLoading || !huddle) {
+  if (huddleLoading) {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <LoadingSpinner className="flex-1" />
+      </SafeAreaView>
+    );
+  }
+
+  // Loaded, and there is no room. This used to share the branch above, so a
+  // failed lookup rendered a spinner that never stopped — no error, no way back,
+  // and nothing on screen to report. Say so instead.
+  if (!huddle) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center gap-3 bg-background px-8">
+        <Text className="text-center text-lg font-bold text-foreground">
+          Couldn't open this room
+        </Text>
+        <Text className="text-center text-sm leading-5 text-muted-foreground">
+          It may have been deleted, or you may not have access to it.
+        </Text>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          className="mt-2 rounded-xl border border-border px-5 py-3"
+        >
+          <Text className="text-sm font-bold text-foreground">Go back</Text>
+        </Pressable>
       </SafeAreaView>
     );
   }
