@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -17,6 +17,7 @@ import { Bot, Radio, Users } from "lucide-react-native";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { FindYourPeople } from "@/components/profile/FindYourPeople";
+import { ClaimRoomBox } from "@/components/onboarding/ClaimRoomBox";
 import { TeamPicker } from "@/components/profile/TeamPicker";
 import { colors } from "@/theme/colors";
 
@@ -121,6 +122,10 @@ export function OnboardingScreen() {
     }
   };
 
+  // Set when a code was redeemed during onboarding, so the last step can drop
+  // them into their own room rather than the generic home tab.
+  const claimedRoom = useRef<{ huddleId: string; huddleName: string } | null>(null);
+
   const enterApp = async () => {
     if (!user) return;
 
@@ -135,9 +140,17 @@ export function OnboardingScreen() {
       await queryClient.invalidateQueries({ queryKey: ["known-people"] });
       await queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
       await queryClient.invalidateQueries({ queryKey: ["super-huddle-feed"] });
+      const claimed = claimedRoom.current;
       navigation.reset({
         index: 0,
-        routes: [{ name: "MainTabs" }],
+        routes: claimed
+          ? [
+              { name: "MainTabs" },
+              // The route takes huddleId only (see navigation/types.ts); the
+              // screen reads the name from useHuddleDetails.
+              { name: "Huddle", params: { huddleId: claimed.huddleId } },
+            ]
+          : [{ name: "MainTabs" }],
       });
     } finally {
       setSaving(false);
@@ -168,10 +181,23 @@ export function OnboardingScreen() {
                 {onContactsStep ? (
                   <FindYourPeople onDone={enterApp} />
                 ) : onTeamStep ? (
-                  <TeamPicker
-                    onJoined={() => setStep(contactsStep)}
-                    onSkip={() => setStep(contactsStep)}
-                  />
+                  <>
+                    <TeamPicker
+                      onJoined={() => setStep(contactsStep)}
+                      onSkip={() => setStep(contactsStep)}
+                    />
+                    {/* A president with a code does not want the generic team
+                        room — he wants his chapter's, which does not exist until
+                        he claims it. Sits under the team picker because that is
+                        the step where "which room am I in" is being decided, and
+                        stays collapsed because almost nobody has a code. */}
+                    <ClaimRoomBox
+                      onClaimed={(huddleId, huddleName) => {
+                        claimedRoom.current = { huddleId, huddleName };
+                        setStep(contactsStep);
+                      }}
+                    />
+                  </>
                 ) : onProfileStep ? (
                   <>
                     <Text className="text-4xl font-black leading-tight text-foreground">
