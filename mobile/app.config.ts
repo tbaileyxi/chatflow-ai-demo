@@ -5,7 +5,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "Side Huddle Sports",
   slug: "side-huddle-sports",
   scheme: "sidehuddle",
-  version: "1.0.4",
+  // A version is a "pre-release train", and Apple closes a train once that
+  // version has been through review. 1.0.4 is closed: Transporter rejects any
+  // build under it with "Invalid Pre-Release Train", no matter how high the
+  // build number goes. New work needs a new version, not a new build.
+  version: "1.0.5",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "dark",
@@ -32,11 +36,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "applinks:sidehuddlesports.com",
       "applinks:www.sidehuddlesports.com",
     ],
-    // Must exceed every build EAS has already produced, not just the last one
-    // anybody remembers. `eas build:list` on 2026-08-27 showed 1.0.4 builds 59,
-    // 60 and 61 (61 twice) — this file said 40. Check the list, don't trust a
-    // note.
-    buildNumber: "62",
+    // Unique within its version train, so 1.0.5 could start at 1 — kept
+    // climbing instead so a number is never reused anywhere and `eas
+    // build:list` reads in order.
+    buildNumber: "63",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       // Contacts are hashed on this device and only the hashes are sent, so we
