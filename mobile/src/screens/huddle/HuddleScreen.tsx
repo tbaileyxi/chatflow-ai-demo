@@ -592,6 +592,15 @@ export function HuddleScreen() {
               justifyContent: "flex-end",
             }}
             keyboardShouldPersistTaps="handled"
+            // Getting OUT of the composer. "Tap outside to dismiss" cannot work
+            // in a chat: nearly everything above the keyboard is a message
+            // bubble, and bubbles are pressable (reply, long-press), so
+            // keyboardShouldPersistTaps="handled" correctly treats those taps as
+            // handled and the keyboard stays up. Dragging is the gesture every
+            // messaging app actually uses — on iOS "interactive" follows your
+            // finger the way iMessage does, and Android has no equivalent so it
+            // dismisses on the drag instead.
+            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             onScrollToIndexFailed={(info) => {
               setTimeout(() => {
                 flatListRef.current?.scrollToIndex({
