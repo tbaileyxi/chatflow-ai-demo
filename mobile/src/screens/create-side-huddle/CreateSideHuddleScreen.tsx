@@ -323,8 +323,11 @@ export function CreateSideHuddleScreen() {
                 const inviteLink = code
                   ? `https://www.sidehuddlesports.com/i/${code}`
                   : `https://www.sidehuddlesports.com/h/${data.id}`;
+                // Same as PullInFriendsModal: the URL goes in `url`, never
+                // also in `message`, or iOS sends it twice and Messages drops
+                // the rich preview.
                 await Share.share({
-                  message: `Jump in: ${name.trim()} on Side Huddle. ${inviteLink}`,
+                  message: `Jump in: ${name.trim()} on Side Huddle.`,
                   url: inviteLink,
                 });
               } catch (err) {

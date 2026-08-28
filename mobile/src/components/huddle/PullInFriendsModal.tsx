@@ -138,8 +138,15 @@ export function PullInFriendsModal({
     try {
       const code = await mintInviteCode();
       const inviteLink = `https://www.sidehuddlesports.com/i/${code}`;
+      // MESSAGE WITHOUT THE URL, URL SEPARATELY.
+      //
+      // Passing both, with the link also inside the text, makes iOS put it in
+      // twice — the sent message reads "... https://…/i/abc https://…/i/abc" —
+      // and Messages will not build a rich preview for a message carrying two
+      // links. The room's photo and name were resolving correctly the whole
+      // time; nothing was ever asked to render them.
       await Share.share({
-        message: `Jump into ${huddleName} on Side Huddle. ${inviteLink}`,
+        message: `Jump into ${huddleName} on Side Huddle.`,
         url: inviteLink,
       });
     } catch (err) {

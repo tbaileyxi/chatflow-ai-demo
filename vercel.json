@@ -5,40 +5,7 @@
       "destination": "https://dejuwyeypiggvlyfliap.supabase.co/storage/v1/object/public/room-photos/:path*"
     },
     {
-      "source": "/t/:slug",
-      "has": [
-        {
-          "type": "header",
-          "key": "user-agent",
-          "value": ".*(facebookexternalhit|Facebot|Twitterbot|Slackbot|WhatsApp|Discordbot|LinkedInBot|TelegramBot|Applebot|redditbot|Iframely|SkypeUriPreview|Googlebot|bingbot|Pinterest|vkShare).*"
-        }
-      ],
-      "destination": "https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-preview?team=:slug"
-    },
-    {
-      "source": "/h/:huddleId",
-      "has": [
-        {
-          "type": "header",
-          "key": "user-agent",
-          "value": ".*(facebookexternalhit|Facebot|Twitterbot|Slackbot|WhatsApp|Discordbot|LinkedInBot|TelegramBot|Applebot|redditbot|Iframely|SkypeUriPreview|Googlebot|bingbot|Pinterest|vkShare).*"
-        }
-      ],
-      "destination": "https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-preview?room=:huddleId"
-    },
-    {
-      "source": "/i/:code",
-      "has": [
-        {
-          "type": "header",
-          "key": "user-agent",
-          "value": ".*(facebookexternalhit|Facebot|Twitterbot|Slackbot|WhatsApp|Discordbot|LinkedInBot|TelegramBot|Applebot|redditbot|Iframely|SkypeUriPreview|Googlebot|bingbot|Pinterest|vkShare).*"
-        }
-      ],
-      "destination": "https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-preview?invite=:code"
-    },
-    {
-      "source": "/((?!\\.well-known/).*)",
+      "source": "/((?!\\.well-known/|preview-test\\.html).*)",
       "destination": "/index.html"
     }
   ],
