@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bot, Radio, Users } from "lucide-react-native";
+import { Radio, Users } from "lucide-react-native";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { FindYourPeople } from "@/components/profile/FindYourPeople";
@@ -54,11 +54,6 @@ export function OnboardingScreen() {
       icon: Radio,
       title: "Start a room.",
       body: "Pick a team or event, invite people, and the room stays hidden from strangers.",
-    },
-    {
-      icon: Bot,
-      title: "Follow teams when you want.",
-      body: "Teams is your feed for scores, news, and prediction markets.",
     },
   ];
 

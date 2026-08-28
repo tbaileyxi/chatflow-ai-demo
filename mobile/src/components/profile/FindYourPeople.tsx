@@ -59,6 +59,16 @@ export function FindYourPeople({ onDone }: { onDone?: () => void }) {
             Check my contacts
           </Text>
         </Pressable>
+
+        {/* Only in onboarding, where onDone is the way forward. On the profile
+            there is nothing to skip TO — the screen is the destination. */}
+        {onDone ? (
+          <Pressable onPress={onDone} className="mt-4 py-3 active:opacity-70">
+            <Text className="text-center text-base font-semibold text-muted-foreground">
+              Not now
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     );
   }
