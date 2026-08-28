@@ -83,8 +83,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "expo-image-picker",
       {
+        // MUST MATCH ios.infoPlist above. The plugin wins: whatever is set here
+        // is what lands in Info.plist, so updating only ios.infoPlist changes
+        // nothing — verified by reading the string back out of a built .ipa.
         photosPermission:
-          "Side Huddle uses your photo library so you can pick an existing photo to post in a huddle chat or set as your profile picture — for example, choosing a tailgate photo from your camera roll to share with your room.",
+          "Side Huddle uses your photo library so you can pick an existing photo to post in a huddle chat, set as your profile picture, or set as the background of a huddle you run — for example, choosing a tailgate photo from your camera roll to share with your room, or putting your chapter's bar photo behind your huddle's chat.",
         cameraPermission:
           "Side Huddle uses your camera so you can take a photo and post it straight into a huddle chat — for example, snapping the view from your seat at the game and sending it to your room.",
       },
