@@ -626,7 +626,16 @@ async function postFinals(
 ): Promise<void> {
   summary.finals = 0;
   const now = Date.now();
-  const threeHoursAgo = new Date(now - 3 * 60 * 60 * 1000).toISOString();
+  // SIX hours from KICKOFF, not three, and that difference is why recaps went
+  // missing. An NFL game runs about three hours ten, so a game that started at
+  // 8pm was already outside a three-hour window by the time its row actually
+  // flipped to 'final'. The poller had stopped looking at it. Short games got a
+  // recap, long ones silently got nothing — which from inside a room reads as
+  // "the recaps stopped working".
+  //
+  // Six matches the dedupe guard below (sixHoursAgo on the posted message), so
+  // a wider search cannot post the same recap twice.
+  const sixHourWindow = new Date(now - 6 * 60 * 60 * 1000).toISOString();
   const { data: finals } = await supabase
     .from("games")
     .select(
@@ -635,10 +644,10 @@ async function postFinals(
         "away:teams!games_away_team_id_fkey(id, name, city)",
     )
     .eq("status", "final")
-    .gte("start_time", threeHoursAgo)
+    .gte("start_time", sixHourWindow)
     // A game that has not started cannot be final. Without this, a row with a
     // FUTURE start_time that got wrongly marked final is always inside the
-    // "gte threeHoursAgo" window, so it never ages out and re-posts a bogus
+    // "gte sixHourWindow" window, so it never ages out and re-posts a bogus
     // final every 6 hours forever. Seen in production 2026-08-07: two Week 2
     // September games carrying the Aug 6 Panthers/Cardinals score.
     .lte("start_time", new Date(now).toISOString());
@@ -711,8 +720,9 @@ async function postHighlights(
   if (!url || !key) return;
   summary.highlights = 0;
 
-  // Games that finished in the last 3 hours.
-  const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+  // Games that finished recently. Six hours from kickoff, for the same
+  // reason as the recap above: three is shorter than a football game.
+  const sixHourWindow = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
   const { data: finals } = await supabase
     .from("games")
     .select(
@@ -721,7 +731,7 @@ async function postHighlights(
         "away:teams!games_away_team_id_fkey(id, name, city)",
     )
     .eq("status", "final")
-    .gte("start_time", threeHoursAgo);
+    .gte("start_time", sixHourWindow);
 
   if (!finals || finals.length === 0) return;
   const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();

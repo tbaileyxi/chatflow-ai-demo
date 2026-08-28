@@ -84,6 +84,9 @@ function page(o: {
 <meta property="og:title" content="${esc(o.title)}">
 <meta property="og:description" content="${esc(o.description)}">
 <meta property="og:image" content="${esc(o.image)}">
+<meta property="og:image:secure_url" content="${esc(o.image)}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:alt" content="${esc(o.title)}">
 <meta property="og:url" content="${esc(o.canonical)}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:site" content="@sidehuddlesports">
@@ -92,7 +95,8 @@ function page(o: {
 <meta name="twitter:image" content="${esc(o.image)}">
 <link rel="canonical" href="${esc(o.canonical)}">
 </head>
-<body>
+<body style="font-family:-apple-system,system-ui,sans-serif;max-width:34rem;margin:3rem auto;padding:0 1.25rem;">
+<img src="${esc(o.image)}" alt="${esc(o.title)}" style="width:100%;border-radius:12px;">
 <h1>${esc(o.title)}</h1>
 <p>${esc(o.description)}</p>
 <p><a href="${esc(o.canonical)}">Open in Side Huddle</a></p>
