@@ -5,7 +5,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "Side Huddle Sports",
   slug: "side-huddle-sports",
   scheme: "sidehuddle",
-  version: "1.0.3",
+  version: "1.0.4",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "dark",
@@ -32,11 +32,68 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "applinks:sidehuddlesports.com",
       "applinks:www.sidehuddlesports.com",
     ],
-    buildNumber: "40",
+    // Must exceed every build EAS has already produced, not just the last one
+    // anybody remembers. `eas build:list` on 2026-08-27 showed 1.0.4 builds 59,
+    // 60 and 61 (61 twice) — this file said 40. Check the list, don't trust a
+    // note.
+    buildNumber: "62",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      // Contacts are hashed on this device and only the hashes are sent, so we
+      // can tell you which of your people are already here. The address book
+      // itself never leaves the phone and is never stored.
+      NSContactsUsageDescription:
+        "Side Huddle checks which of your contacts are already here so you can watch games with people you know. Your contacts stay on your device — we only send scrambled codes, never names or numbers.",
+
+      // Camera / photos / microphone.
+      //
+      // 1.0.4 build 59 was REJECTED under guideline 5.1.1(ii) because these
+      // three strings did not exist here at all. expo-image-picker and expo-av
+      // then supplied their own defaults — "Allow $(PRODUCT_NAME) to access
+      // your camera" — which is almost word for word the example Apple's own
+      // guidance gives of a purpose string that does NOT pass review. Contacts
+      // was written out properly above; these three were simply never added,
+      // so nobody noticed they were template text.
+      //
+      // Apple asks for two things in each string: what the app does with the
+      // resource, and a concrete example. Keep both, and keep them TRUE to
+      // what the code actually does — a string promising more than the app
+      // does is its own rejection.
+      //   camera      -> MessageInput.launchCameraAsync (photo into room chat)
+      //   photos      -> MessageInput.launchImageLibraryAsync (photo into room
+      //                  chat) and ProfileScreen.launchImageLibraryAsync
+      //                  (profile picture)
+      //   microphone  -> MessageInput Audio.Recording (voice message in chat)
+      NSCameraUsageDescription:
+        "Side Huddle uses your camera so you can take a photo and post it straight into a huddle chat — for example, snapping the view from your seat at the game and sending it to your room.",
+      NSPhotoLibraryUsageDescription:
+        "Side Huddle uses your photo library so you can pick an existing photo to post in a huddle chat or set as your profile picture — for example, choosing a tailgate photo from your camera roll to share with your room.",
+      NSMicrophoneUsageDescription:
+        "Side Huddle uses your microphone to record voice messages you send in a huddle chat — for example, recording a quick reaction to a touchdown and sending it to your room instead of typing it.",
     },
   },
+  // The rejected strings came from these two plugins' defaults. Setting them
+  // here fixes the value at its source instead of relying on ios.infoPlist
+  // winning the merge — belt and braces, because a second rejection on the
+  // same guideline is expensive.
+  plugins: [
+    [
+      "expo-image-picker",
+      {
+        photosPermission:
+          "Side Huddle uses your photo library so you can pick an existing photo to post in a huddle chat or set as your profile picture — for example, choosing a tailgate photo from your camera roll to share with your room.",
+        cameraPermission:
+          "Side Huddle uses your camera so you can take a photo and post it straight into a huddle chat — for example, snapping the view from your seat at the game and sending it to your room.",
+      },
+    ],
+    [
+      "expo-av",
+      {
+        microphonePermission:
+          "Side Huddle uses your microphone to record voice messages you send in a huddle chat — for example, recording a quick reaction to a touchdown and sending it to your room instead of typing it.",
+      },
+    ],
+  ],
   android: {
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
