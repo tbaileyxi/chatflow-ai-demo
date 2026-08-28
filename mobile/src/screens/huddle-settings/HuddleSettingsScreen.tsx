@@ -34,6 +34,7 @@ import { Separator } from "@/components/ui/separator";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ScreenWrapper } from "@/components/ui/screen-wrapper";
 import { colors } from "@/theme/colors";
+import { useRoomPhoto } from "@/hooks/useRoomPhoto";
 import type { RootStackParamList } from "@/navigation/types";
 
 type Route = RouteProp<RootStackParamList, "HuddleSettings">;
@@ -61,6 +62,7 @@ export function HuddleSettingsScreen() {
 
   const { data: profile } = useProfile();
   const isOwner = user?.id === huddle?.ownerId;
+  const roomPhoto = useRoomPhoto(huddleId);
   const isRoomAdmin =
     isOwner || admins.some((admin) => admin.user_id === user?.id);
   const isOfficial = !!huddle?.isOfficial;
@@ -383,6 +385,70 @@ export function HuddleSettingsScreen() {
       </View>
 
       <ScreenWrapper scroll className="gap-4 pt-2">
+        {/* THE ROOM'S PICTURE. Owner or admin only — the storage policy enforces
+            the same rule, so a member who gets here sees nothing rather than a
+            button that fails. */}
+        {isRoomAdmin && (
+          <Card>
+            <CardContent className="gap-3 pt-4">
+              <Text className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                Room photo
+              </Text>
+              <View className="h-40 w-full overflow-hidden rounded-xl bg-muted">
+                {huddle.photoUrl ? (
+                  <Image
+                    source={{ uri: huddle.photoUrl }}
+                    className="h-full w-full"
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View className="h-full w-full items-center justify-center">
+                    <Text className="px-8 text-center text-sm text-muted-foreground">
+                      Your bar, last year's tailgate, the chapter banner — it sits
+                      behind every message in here.
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View className="flex-row gap-2">
+                <Pressable
+                  disabled={roomPhoto.uploading}
+                  onPress={async () => {
+                    const res = await roomPhoto.pick();
+                    if (res.ok)
+                      queryClient.invalidateQueries({
+                        queryKey: ["huddle-details", huddleId],
+                      });
+                  }}
+                  className="flex-1 items-center rounded-xl bg-primary px-4 py-3"
+                >
+                  <Text className="text-sm font-black text-primary-foreground">
+                    {roomPhoto.uploading
+                      ? "Uploading..."
+                      : huddle.photoUrl
+                        ? "Change photo"
+                        : "Add a photo"}
+                  </Text>
+                </Pressable>
+                {huddle.photoUrl && (
+                  <Pressable
+                    disabled={roomPhoto.uploading}
+                    onPress={async () => {
+                      if (await roomPhoto.clear())
+                        queryClient.invalidateQueries({
+                          queryKey: ["huddle-details", huddleId],
+                        });
+                    }}
+                    className="items-center rounded-xl border border-border px-4 py-3"
+                  >
+                    <Text className="text-sm font-bold text-foreground">Remove</Text>
+                  </Pressable>
+                )}
+              </View>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardContent className="gap-3 pt-4">
             <View className="flex-row items-center gap-3">

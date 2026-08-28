@@ -18,6 +18,8 @@ export type HuddleDetails = {
   teamName: string | null;
   teamCity: string | null;
   teamLogoUrl: string | null;
+  /** Full-bleed picture behind the chat. Null = plain theme background. */
+  photoUrl: string | null;
   isMember: boolean;
 };
 
@@ -35,7 +37,7 @@ export function useHuddleDetails(huddleId: string) {
           `
           id, name, bio, member_count, is_private,
           is_official_team_huddle, is_verified, official_status, website_url,
-          owner_id, team_id,
+          owner_id, team_id, photo_url,
           teams!team_id (name, city, logo_url)
         `,
         )
@@ -76,6 +78,7 @@ export function useHuddleDetails(huddleId: string) {
         teamName: team?.name ?? null,
         teamCity: team?.city ?? null,
         teamLogoUrl: team?.logo_url ?? null,
+        photoUrl: (row as any).photo_url ?? null,
         isMember,
       };
     },

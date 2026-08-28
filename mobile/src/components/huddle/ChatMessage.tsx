@@ -65,7 +65,7 @@ function AudioBubble({ uri }: { uri: string }) {
   return (
     <Pressable
       onPress={togglePlayback}
-      className="flex-row items-center gap-2.5 rounded-2xl bg-primary/15 px-4 py-2.5"
+      className="flex-row items-center gap-2.5 rounded-2xl bg-card px-4 py-2.5"
       style={{ width: 230 }}
     >
       <View className="h-8 w-8 items-center justify-center rounded-full bg-primary">
@@ -346,7 +346,7 @@ export function ChatMessage({
               {/* Quoted reply context — hidden when the parent is the message
                   directly above (redundant). */}
               {replyTo && !hideReplyQuote && (
-                <View className="rounded-xl border-l-2 border-primary/50 bg-muted/50 px-3 py-1.5 mb-1">
+                <View className="rounded-xl border-l-2 border-primary/50 bg-muted px-3 py-1.5 mb-1">
                   <Text className="text-xs font-semibold text-primary" numberOfLines={1}>
                     {replyTo.displayName}
                   </Text>

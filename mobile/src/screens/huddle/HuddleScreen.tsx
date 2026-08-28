@@ -3,6 +3,7 @@ import {
   View,
   Text,
   Image,
+  StyleSheet,
   FlatList,
   ScrollView,
   Keyboard,
@@ -456,6 +457,31 @@ export function HuddleScreen() {
           }
         />
 
+        {/* THE ROOM'S OWN PICTURE, behind the conversation.
+            Header, jump row and composer stay opaque on purpose — a photo
+            running under the chrome makes the room name hard to read and the
+            screen feel like a poster instead of a chat.
+
+            The scrim is doing real work: message bubbles are already solid
+            (ChatMessage uses bg-card / bg-primary), but the day separators,
+            the empty state and the timestamps sit directly on the background,
+            and a bright tailgate photo turns those into nothing. */}
+        <View className="flex-1">
+          {huddle.photoUrl ? (
+            <>
+              <Image
+                source={{ uri: huddle.photoUrl }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+                accessible={false}
+              />
+              <View
+                style={StyleSheet.absoluteFill}
+                className="bg-background/[0.72]"
+              />
+            </>
+          ) : null}
+
         {messagesLoading ? (
           <LoadingSpinner className="flex-1" />
         ) : (
@@ -577,6 +603,7 @@ export function HuddleScreen() {
             }}
           />
         )}
+        </View>
 
         {user && huddle.isMember && (
           <>
