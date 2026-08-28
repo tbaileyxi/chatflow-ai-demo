@@ -22,14 +22,34 @@
       ],
       "destination": "https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-preview?room=:huddleId"
     },
-    { "source": "/((?!\\.well-known/).*)", "destination": "/index.html" }
+    {
+      "source": "/i/:code",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|Slackbot|WhatsApp|Discordbot|LinkedInBot|TelegramBot|Applebot|redditbot|Iframely|SkypeUriPreview|Googlebot|bingbot|Pinterest|vkShare).*"
+        }
+      ],
+      "destination": "https://dejuwyeypiggvlyfliap.supabase.co/functions/v1/og-preview?invite=:code"
+    },
+    {
+      "source": "/((?!\\.well-known/).*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
       "source": "/.well-known/apple-app-site-association",
       "headers": [
-        { "key": "Content-Type", "value": "application/json" },
-        { "key": "Cache-Control", "value": "public, max-age=3600" }
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
       ]
     }
   ]

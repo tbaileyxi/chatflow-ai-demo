@@ -122,6 +122,7 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const roomId = url.searchParams.get("room");
   const teamSlug = url.searchParams.get("team");
+  const inviteCode = url.searchParams.get("invite");
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -140,11 +141,25 @@ Deno.serve(async (req) => {
   };
 
   try {
-    if (roomId) {
+    // An invite link is what the app actually shares — PullInFriendsModal builds
+    // https://www.sidehuddlesports.com/i/<code>, not /h/<id>. Sharing a room and
+    // getting the generic Side Huddle logo is this route not being covered.
+    let resolvedRoom = roomId;
+    if (!resolvedRoom && inviteCode) {
+      const { data: invite } = await supabase
+        .from("room_invites")
+        .select("huddle_id")
+        .eq("invite_code", inviteCode)
+        .maybeSingle();
+      resolvedRoom = (invite as any)?.huddle_id ?? null;
+      if (!resolvedRoom) return page(fallback);
+    }
+
+    if (resolvedRoom) {
       const { data: room } = await supabase
         .from("huddles")
         .select("name, photo_url, member_count, teams:team_id (name)")
-        .eq("id", roomId)
+        .eq("id", resolvedRoom)
         .maybeSingle();
 
       if (!room) return page(fallback);
@@ -164,7 +179,9 @@ Deno.serve(async (req) => {
         // The room's own photo when it has one — a picture of their bar beats
         // any card we could generate, and it is why the photo shipped first.
         image: (room as any).photo_url || DEFAULT_IMAGE,
-        canonical: `${SITE}/h/${roomId}`,
+        // Point at the link that was actually shared, so the preview and the
+        // destination agree.
+        canonical: inviteCode ? `${SITE}/i/${inviteCode}` : `${SITE}/h/${resolvedRoom}`,
       });
     }
 
