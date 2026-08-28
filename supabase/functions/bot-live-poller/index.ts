@@ -235,6 +235,41 @@ serve(async (req) => {
         summary.plays_fetched += plays.length;
         if (plays.length === 0) continue;
 
+        // NARRATE ONLY THE GAME WE THINK WE ARE NARRATING.
+        //
+        // Every play carries the game ESPN built it from, out of the summary
+        // header. The outer `game` came from the scoreboard. Those are supposed
+        // to be the same fixture, and when they are not, the bot stitches one
+        // game's team names onto another game's score — brain.ts does exactly
+        // that in scoreLineText(game, play.scoreAfter).
+        //
+        // A Mets room got "8-2 Brewers but this is tagged as us taking the lead,
+        // which doesn't add up" — the model spotted the contradiction and said so
+        // out loud, in a room, to users. Chourio is a Brewer; the header said
+        // Padres at Mets.
+        //
+        // Cheap to check and it fails closed: say nothing rather than say
+        // something wrong about somebody else's game.
+        const playGame = plays[0]?.game;
+        if (playGame) {
+          const same = (a?: string, b?: string) =>
+            !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+          const matches =
+            (same(playGame.home?.name, game.home?.name) &&
+              same(playGame.away?.name, game.away?.name)) ||
+            (same(playGame.home?.fullName, game.home?.fullName) &&
+              same(playGame.away?.fullName, game.away?.fullName));
+          if (!matches) {
+            const msg =
+              `[live-poller] play/game mismatch for providerId ${game.providerId}: ` +
+              `scoreboard says ${game.away?.name} @ ${game.home?.name}, ` +
+              `plays say ${playGame.away?.name} @ ${playGame.home?.name} — skipping`;
+            console.error(msg);
+            summary.errors.push(msg);
+            continue;
+          }
+        }
+
         // Filter plays we've already emitted for this game.
         const { data: seen } = await supabase
           .from("seen_events")
