@@ -47,6 +47,8 @@ type Chapter = {
   bounced: boolean;
   unsubscribed: boolean;
   last_touch: string | null;
+  /** The six characters a president types to claim their room. */
+  claim_code: string | null;
 };
 
 type SendResult = {
@@ -132,7 +134,7 @@ export default function ChaptersPanel() {
         const { data, error } = await supabase
           .from("chapter_leads")
           .select(
-            "id,source,org,org_type,chapter_name,city,state,venue,leader_name,first_name,email,phone,facebook,member_count,contact_channel,score,status,emailed,sequence_step,bounced,unsubscribed,last_touch",
+            "id,source,org,org_type,chapter_name,city,state,venue,leader_name,first_name,email,phone,facebook,member_count,contact_channel,score,status,emailed,sequence_step,bounced,unsubscribed,last_touch,claim_code",
           )
           .order("score", { ascending: false })
           .range(from, from + page - 1);
@@ -290,7 +292,7 @@ export default function ChaptersPanel() {
   function downloadCsv() {
     const cols = [
       "first_name", "chapter_name", "org", "city", "state", "venue",
-      "email", "facebook", "contact_channel", "score", "status",
+      "email", "facebook", "contact_channel", "score", "status", "claim_code",
     ] as const;
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const csv = [
@@ -505,6 +507,7 @@ export default function ChaptersPanel() {
                 <TableHead>Chapter</TableHead>
                 <TableHead>Leader</TableHead>
                 <TableHead>Contact</TableHead>
+                <TableHead className="w-24">Code</TableHead>
                 <TableHead>Venue</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead className="w-20">Members</TableHead>
@@ -541,6 +544,23 @@ export default function ChaptersPanel() {
                     )}
                     {r.bounced && <Badge className="ml-1 border-0 bg-destructive/15 text-destructive">bounced</Badge>}
                     {r.unsubscribed && <Badge className="ml-1 border-0 bg-destructive/15 text-destructive">unsub</Badge>}
+                  </TableCell>
+                  <TableCell>
+                    {r.claim_code ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(r.claim_code!);
+                          toast({ title: `Copied ${r.claim_code}` });
+                        }}
+                        className="rounded border border-border px-2 py-0.5 font-mono text-xs tracking-widest hover:bg-muted"
+                        title="Copy this chapter's claim code"
+                      >
+                        {r.claim_code}
+                      </button>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm">
                     {r.venue || <span className="text-muted-foreground">—</span>}
