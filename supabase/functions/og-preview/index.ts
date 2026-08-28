@@ -58,6 +58,26 @@ const TEAM_NAMES: Record<string, string> = {
   "south-carolina": "South Carolina Gamecocks",
 };
 
+/**
+ * Serve a room photo from sidehuddlesports.com, not from supabase.co.
+ *
+ * Apple fetches og:image as a separate request, and it renders the "document"
+ * card — raw HTML in the bubble instead of a picture — when that fetch does not
+ * satisfy it. The previews that worked pointed at an image on this domain; the
+ * ones that broke pointed at Supabase storage, which sits behind Cloudflare bot
+ * management (it sets __cf_bm on every response). curl gets a 200 from there;
+ * Apple's fetcher is a different client and we cannot see what it gets.
+ *
+ * Same-origin removes the variable entirely. /room-photo/* is a plain Vercel
+ * rewrite onto the same bucket — no function, nothing new to fail.
+ */
+function sameOrigin(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const marker = "/storage/v1/object/public/room-photos/";
+  const i = url.indexOf(marker);
+  return i === -1 ? url : `${SITE}/room-photo/${url.slice(i + marker.length)}`;
+}
+
 const DEFAULT_IMAGE = `${SITE}/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png`;
 
 const esc = (s: string) =>
@@ -77,6 +97,8 @@ function page(o: {
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="${SITE}/favicon.png">
 <title>${esc(o.title)}</title>
 <meta name="description" content="${esc(o.description)}">
 <meta property="og:type" content="website">
@@ -182,7 +204,7 @@ Deno.serve(async (req) => {
           : `Talk through the game with the people in it.${crowd}`,
         // The room's own photo when it has one — a picture of their bar beats
         // any card we could generate, and it is why the photo shipped first.
-        image: (room as any).photo_url || DEFAULT_IMAGE,
+        image: sameOrigin((room as any).photo_url) || DEFAULT_IMAGE,
         // Point at the link that was actually shared, so the preview and the
         // destination agree.
         canonical: inviteCode ? `${SITE}/i/${inviteCode}` : `${SITE}/h/${resolvedRoom}`,
