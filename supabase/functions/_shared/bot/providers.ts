@@ -275,12 +275,34 @@ function normalizeEspnEvent(ev: any, league: League): Game | null {
 export class EspnProvider implements SportsDataProvider {
   name = "espn";
 
+  // ESPN's bare scoreboard answers with the current WEEK, not the current day.
+  // While UNC played TCU in Dublin it returned week 1 — Sep 4 through Sep 7 —
+  // and the game being played that afternoon was not in it. The bot had no game
+  // to narrate, so a live room stayed silent through an actual live game.
+  //
+  // Asking for an explicit date range as well fixes it. Yesterday through
+  // tomorrow rather than just today, because ESPN dates its scoreboard in
+  // Eastern time: a night kickoff is already tomorrow in UTC.
   async liveGames(league: League): Promise<Game[]> {
     const p = leaguePath(league);
     if (!p) return [];
-    const data = await safeJson(`${ESPN_BASE}/${p.sport}/${p.league}/scoreboard`);
-    const events = (data?.events ?? []) as any[];
-    return events
+
+    const day = (offset: number) =>
+      new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10).replace(/-/g, '');
+    const base = `${ESPN_BASE}/${p.sport}/${p.league}/scoreboard`;
+
+    const [week, days] = await Promise.all([
+      safeJson(base),
+      safeJson(`${base}?dates=${day(-1)}-${day(1)}&limit=200`),
+    ]);
+
+    // The same game comes back from both calls; ESPN's event id is the identity.
+    const byId = new Map<string, any>();
+    for (const e of [...(week?.events ?? []), ...(days?.events ?? [])]) {
+      if (e?.id) byId.set(e.id, e);
+    }
+
+    return [...byId.values()]
       .map((e) => normalizeEspnEvent(e, league))
       .filter((g): g is Game => g !== null);
   }
