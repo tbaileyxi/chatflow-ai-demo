@@ -88,7 +88,10 @@ serve(async (req) => {
     x_moment_reads: 0,   // billed X post reads spent doing it
     x_clips_24h: 0,      // in-game clips that landed in the last day
     x_claims_total: 0,   // clip attempts ever made, across every run
-    x_attempts: 0,       // times we entered the clip block
+    x_queued: 0,         // plays queued to look for a clip later
+    x_due: 0,            // queued plays whose wait was up this run
+    x_gave_up: 0,        // queued plays that ran out of retries
+    x_attempts: 0,       // searches actually made this run
     x_claim_failed: 0,   // seen_events claim rejected (another runner, or a constraint)
     x_citations: 0,      // post URLs xAI came back with
     x_no_media: 0,       // read the posts, none carried a photo or video
@@ -485,85 +488,46 @@ serve(async (req) => {
             // late-game leverage, so a Q2 preseason touchdown scores low by
             // design and August would never produce a clip. The per-game cap
             // is what bounds the spend; this only decides WHICH plays get one.
+            // No per-run cap here any more. Queueing is a row in a table; the
+            // money is spent later in processPendingClips, which takes
+            // XLIVE_PER_RUN off the queue per poll. Capping both ends meant a
+            // second game's touchdown was dropped on the floor rather than
+            // waiting its turn.
             const XLIVE_MIN = Number(Deno.env.get("XLIVE_MIN_EXCITEMENT") || 0);
             const XLIVE_PER_GAME = Number(Deno.env.get("XLIVE_PER_GAME") || 3);
-            const XLIVE_PER_RUN = Number(Deno.env.get("XLIVE_PER_RUN") || 1);
-            const XLIVE_MAX_READS = Number(Deno.env.get("XLIVE_MAX_READS") || 3);
             if (
               Deno.env.get("X_API_BEARER_TOKEN") &&
               (g.facts.excitementScore ?? 0) >= XLIVE_MIN &&
               result.huddleIdsPosted.length > 0 &&
-              clipsThisGame < XLIVE_PER_GAME &&
-              summary.x_moments < XLIVE_PER_RUN
+              clipsThisGame < XLIVE_PER_GAME
             ) {
-              // Claim the play BEFORE searching. A unique violation means a
-              // parallel run already took it; searching first would pay xAI
-              // twice for one touchdown.
-              const claim = await supabase.from("seen_events").insert({
-                game_id: game.providerId,
-                event_id: `xlive:${t.key}`,
+              // Queue the clip; do not search yet.
+              //
+              // The search used to run right here, about two minutes after the
+              // play. It found nothing, over and over — 93 attempts all-time
+              // against 7 clips — because a highlight of the play does not
+              // exist on X yet. Cutting and posting one takes five to fifteen
+              // minutes. We were asking before the answer existed, and because
+              // the play was claimed at the same moment, we never asked again.
+              //
+              // So record the play now and look for its video later, more than
+              // once. The unique constraint on (game, play, team) is what keeps
+              // overlapping runs from queueing the same touchdown twice.
+              const delayMin = Number(Deno.env.get("XLIVE_DELAY_MIN") || 5);
+              const { error: queueErr } = await supabase.from("pending_clips").insert({
+                game_provider_id: game.providerId,
+                play_key: t.key,
                 team_id: dbTeam.id,
-                excitement_score: g.facts.excitementScore,
-                emitted: true,
-                emitted_at: new Date().toISOString(),
+                team_name: dbTeam.name,
+                opponent: t.opponent,
+                scorer: g.facts.scorer ?? null,
+                play_text: g.facts.play ?? null,
+                huddle_ids: result.huddleIdsPosted,
+                search_after: new Date(Date.now() + delayMin * 60000).toISOString(),
               });
-              summary.x_attempts += 1;
-              if (claim.error) summary.x_claim_failed += 1;
-              if (!claim.error) {
+              if (!queueErr) {
                 clipsThisGame += 1;
-                try {
-                  // Ask about the GAME, not the single play.
-                  //
-                  // The first version named the exact play and demanded a post
-                  // from the last 20 minutes. searchX answers "NOTHING RECENT"
-                  // when it cannot match that, and it never could: 12 attempts,
-                  // 12 empty. Nobody posts video of a third-inning single
-                  // within 20 minutes. The play is a good REASON to go looking
-                  // and a terrible search term.
-                  // The room has a side. Asking for "best clip from the
-                  // Yankees vs Blue Jays game" got a Blue Jays highlight
-                  // dropped into a Yankees room — technically responsive,
-                  // completely wrong. Same allegiance rule the voice already
-                  // follows: this room's team, or the moment that happened TO
-                  // them. Never a celebration of the other side.
-                  const who = g.facts.scorer ? ` Especially ${g.facts.scorer}.` : "";
-                  const found = await searchX(
-                    `Find a video or photo of the ${dbTeam.name} posted in the last two hours, ` +
-                      `from their game against the ${t.opponent} being played today.${who} ` +
-                      `It must feature the ${dbTeam.name} — their players, their bench, their fans, ` +
-                      `or a play that happened to them. ` +
-                      `Do NOT return ${t.opponent} highlights or posts celebrating the ${t.opponent}. ` +
-                      `Ignore previews, predictions, betting picks and old highlights.`,
-                  );
-                  const ids = [...new Set(
-                    found.citations.map(postIdFromUrl).filter(Boolean) as string[],
-                  )].slice(0, XLIVE_MAX_READS);
-                  summary.x_citations += ids.length;
-                  summary.x_moment_reads += ids.length;
-                  const best = pickBest(await fetchPostMedia(ids));
-                  if (!best) summary.x_no_media += 1;
-                  if (best) {
-                    const quote = best.text
-                      .replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 140);
-                    await supabase.from("huddle_messages").insert(
-                      result.huddleIdsPosted.map((hid: string) => ({
-                        huddle_id: hid,
-                        user_id: botUserId,
-                        content: [quote && `"${quote}"`, best.authorHandle && `— @${best.authorHandle}`]
-                          .filter(Boolean).join("\n") || `via @${best.authorHandle ?? "X"}`,
-                        embed_code: best.url,
-                        is_bot_message: true,
-                        is_team_agent_message: true,
-                        message_type: "live_play",
-                        media_url: best.videoUrl ?? best.imageUrl,
-                        media_type: best.videoUrl ? "video" : "image",
-                      })),
-                    );
-                    summary.x_moments += 1;
-                  }
-                } catch (err) {
-                  console.warn("[live-poller] x moment skipped", err);
-                }
+                summary.x_queued += 1;
               }
             }
           } catch (err) {
@@ -579,6 +543,7 @@ serve(async (req) => {
     // ~every 10 min (the poller fires every minute) to protect YouTube
     // quota, and guarded per-room so we never double-post.
     // Sendoff recap runs every poll (guarded once per room).
+    await processPendingClips(supabase, summary);
     await postFinals(supabase, summary);
     // YouTube highlights REMOVED — the search returned junk (video-game sims,
     // betting shows, ad clips) and embeds threw Error 153. Pregame heads-up
@@ -594,6 +559,115 @@ serve(async (req) => {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
+
+// Work the clip queue.
+//
+// A big play is posted the moment it happens; its video shows up on X several
+// minutes later. This is the second half: come back for the plays whose wait is
+// up, search, and drop the clip into the same rooms that saw the play.
+//
+// Retries matter more than the first delay. A highlight might land in four
+// minutes or in twelve, and one look at a fixed offset will miss half of them.
+// So a miss pushes the next look out and costs one of a small number of tries.
+async function processPendingClips(supabase: any, summary: any) {
+  if (!Deno.env.get("X_API_BEARER_TOKEN")) return;
+
+  const PER_RUN     = Number(Deno.env.get("XLIVE_PER_RUN") || 1);
+  const MAX_READS   = Number(Deno.env.get("XLIVE_MAX_READS") || 3);
+  const MAX_TRIES   = Number(Deno.env.get("XLIVE_MAX_TRIES") || 3);
+  const RETRY_MIN   = Number(Deno.env.get("XLIVE_RETRY_MIN") || 5);
+
+  const { data: due } = await supabase
+    .from("pending_clips")
+    .select("*")
+    .eq("status", "pending")
+    .lte("search_after", new Date().toISOString())
+    .order("search_after", { ascending: true })
+    .limit(PER_RUN);
+
+  if (!due?.length) return;
+  summary.x_due = due.length;
+
+  const botUserId = (await supabase.rpc("get_or_create_system_user")).data;
+
+  for (const row of due) {
+    // Claim this attempt first. Two overlapping runs reading the same due row
+    // would otherwise both pay xAI for the same search.
+    const { data: claimed } = await supabase
+      .from("pending_clips")
+      .update({ attempts: row.attempts + 1 })
+      .eq("id", row.id)
+      .eq("attempts", row.attempts)
+      .select("id")
+      .maybeSingle();
+    if (!claimed) continue;
+
+    summary.x_attempts += 1;
+
+    try {
+      // Ask about the GAME, not the single play — naming the exact play was
+      // what returned nothing 12 times out of 12. The play is a good reason to
+      // go looking and a terrible search term.
+      //
+      // The room has a side. "Best clip from the game" once put a Blue Jays
+      // highlight in a Yankees room: technically responsive, completely wrong.
+      const who = row.scorer ? ` Especially ${row.scorer}.` : "";
+      const found = await searchX(
+        `Find a video or photo of the ${row.team_name} posted in the last two hours, ` +
+          `from their game against the ${row.opponent} being played today.${who} ` +
+          `It must feature the ${row.team_name} — their players, their bench, their fans, ` +
+          `or a play that happened to them. ` +
+          `Do NOT return ${row.opponent} highlights or posts celebrating the ${row.opponent}. ` +
+          `Ignore previews, predictions, betting picks and old highlights.`,
+      );
+
+      const ids = [...new Set(
+        found.citations.map(postIdFromUrl).filter(Boolean) as string[],
+      )].slice(0, MAX_READS);
+      summary.x_citations += ids.length;
+      summary.x_moment_reads += ids.length;
+
+      const best = ids.length ? pickBest(await fetchPostMedia(ids)) : null;
+
+      if (best) {
+        const quote = best.text
+          .replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 140);
+        await supabase.from("huddle_messages").insert(
+          (row.huddle_ids ?? []).map((hid: string) => ({
+            huddle_id: hid,
+            user_id: botUserId,
+            content: [quote && `"${quote}"`, best.authorHandle && `— @${best.authorHandle}`]
+              .filter(Boolean).join("\n") || `via @${best.authorHandle ?? "X"}`,
+            embed_code: best.url,
+            is_bot_message: true,
+            is_team_agent_message: true,
+            message_type: "live_play",
+            media_url: best.videoUrl ?? best.imageUrl,
+            media_type: best.videoUrl ? "video" : "image",
+          })),
+        );
+        await supabase.from("pending_clips").update({ status: "done" }).eq("id", row.id);
+        summary.x_moments += 1;
+        continue;
+      }
+
+      summary.x_no_media += 1;
+
+      // Nothing yet. Either come back, or stop — a play from half an hour ago
+      // is not worth posting a clip of even if one finally appears.
+      if (row.attempts + 1 >= MAX_TRIES) {
+        await supabase.from("pending_clips").update({ status: "gave_up" }).eq("id", row.id);
+        summary.x_gave_up += 1;
+      } else {
+        await supabase.from("pending_clips")
+          .update({ search_after: new Date(Date.now() + RETRY_MIN * 60000).toISOString() })
+          .eq("id", row.id);
+      }
+    } catch (err) {
+      console.warn("[live-poller] pending clip skipped", err);
+    }
+  }
+}
 
 // Pregame heads-up: when a followed team tips/first-pitches within the next
 // ~45 min, drop one "game coming up" message into each of its rooms. Templated
