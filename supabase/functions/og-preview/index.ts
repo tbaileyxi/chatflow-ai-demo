@@ -80,6 +80,27 @@ function sameOrigin(url: string | null | undefined): string | null {
 
 const DEFAULT_IMAGE = `${SITE}/lovable-uploads/4520766b-9c2a-467d-a68c-44031ab9f4ba.png`;
 
+/**
+ * The card for a team, or the one that covers everyone else.
+ *
+ * TEAM_NAMES only has the 19 teams we hand-curated colours for. The teams table
+ * carries hundreds across NFL, NCAA and MLB, so a per-team lookup alone leaves
+ * most rooms with nothing — which is exactly how a Georgia Tech room ended up
+ * on a plain background. The default is not a placeholder; it is the answer for
+ * every team we will never write a colour for.
+ */
+function teamCardImage(teamName: string | null | undefined): string {
+  const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (teamName) {
+    const wanted = key(teamName);
+    const slug = Object.keys(TEAM_NAMES).find(
+      (s) => key(TEAM_NAMES[s]) === wanted || key(TEAM_NAMES[s]).includes(wanted),
+    );
+    if (slug) return `${SITE}/og-teams/${slug}-card.png`;
+  }
+  return `${SITE}/og-teams/default-card.png`;
+}
+
 const esc = (s: string) =>
   String(s)
     .replace(/&/g, "&amp;")
@@ -204,7 +225,8 @@ Deno.serve(async (req) => {
           : `Talk through the game with the people in it.${crowd}`,
         // The room's own photo when it has one — a picture of their bar beats
         // any card we could generate, and it is why the photo shipped first.
-        image: sameOrigin((room as any).photo_url) || DEFAULT_IMAGE,
+        // Their own photo when they have set one; otherwise their team's card.
+        image: sameOrigin((room as any).photo_url) || teamCardImage(team),
         // Point at the link that was actually shared, so the preview and the
         // destination agree.
         canonical: inviteCode ? `${SITE}/i/${inviteCode}` : `${SITE}/h/${resolvedRoom}`,
@@ -222,7 +244,7 @@ Deno.serve(async (req) => {
       return page({
         title: `${label} · Side Huddle`,
         description: `Talk through the game with other ${label} fans. The score, the news and the clips land while you argue over them.`,
-        image: DEFAULT_IMAGE,
+        image: `${SITE}/og-teams/${TEAM_NAMES[teamSlug] ? teamSlug : "default"}-card.png`,
         canonical: `${SITE}/t/${teamSlug}`,
       });
     }
