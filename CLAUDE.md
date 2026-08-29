@@ -10,8 +10,16 @@ If the output is long, paste it all anyway. A long scrollable chat beats a burie
 
 Do NOT assume a specific outreach channel. Sponsors and community owners are different audiences reached different ways — local businesses are not reached the same way as alumni chapter officers. Each card should say which channel to use and give the exact link to open.
 
-## Sponsors tracker
+## Sponsor + chapter pipeline
 
-Single source of truth for the sponsor pipeline lives at `sponsors-tracker.md`. When the user asks status questions ("who haven't I followed up with?", "pipeline value?", "everyone in Drafted?"), read the tracker directly and answer.
+**`sponsor_leads` and `chapter_leads` in Supabase are the source of truth**, surfaced on
+the `/outreach` dashboard. Read those when the user asks status questions ("who haven't I
+followed up with?", "pipeline value?", "everyone in Drafted?"), and write status changes
+there.
 
-When the user reports outreach activity in plain English ("mark X as Sent", "Y replied — booking Thursday"), update the relevant row's `Status` and `Last Touch`, and append a dated entry under the company's heading in `## Prospect log`.
+`sponsors-tracker.md` is **archived and must not be trusted or updated**. It was the
+original tracker, maintained by editing markdown, and it has diverged from the table that
+`outreach-send` actually reads — statuses in the file do not reflect what has been sent.
+Two sources that silently disagree is worse than one that is occasionally stale, so the
+file stays only as history. If the user asks to update it, tell them it is archived and
+update the table instead.

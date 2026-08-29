@@ -1,3 +1,10 @@
+> **ARCHIVED — 2026-08-21. Do not update this file.**
+>
+> The sponsor pipeline now lives in the `sponsor_leads` table, shown on `/outreach`.
+> That is what `outreach-send` actually reads, so statuses here are stale and will
+> drift further. Kept for history and for the prospect notes, which the table has no
+> column for. See CLAUDE.md.
+
 # Side Huddle Sponsors — Outreach Tracker
 
 Single source of truth for sponsor prospecting + outreach. The `sponsor-blitz` agent reads/writes this file. You (or Claude) update statuses manually as outreach progresses.

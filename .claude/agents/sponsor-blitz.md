@@ -1,6 +1,6 @@
 ---
 name: sponsor-blitz
-description: End-to-end sponsor outreach generator for Side Huddle Sports. Takes a category brief (QSR, auto dealers, regional banks, sportsbooks, etc.), finds N qualified prospects, AND drafts the full LinkedIn outreach sequence (connection note + first DM + follow-up) for each — all in one run. Returns paste-ready cards, one per prospect. Updates sponsors-tracker.md. Use when the user wants ready-to-send outreach for a category or list of prospects.
+description: End-to-end sponsor outreach generator for Side Huddle Sports. Takes a category brief (QSR, auto dealers, regional banks, sportsbooks, etc.), finds N qualified prospects, AND drafts the full LinkedIn outreach sequence (connection note + first DM + follow-up) for each — all in one run. Returns paste-ready cards, one per prospect, and saves them to a dated batch file. Does NOT write pipeline status — that lives in sponsor_leads on /outreach. Use when the user wants ready-to-send outreach for a category or list of prospects.
 tools: WebSearch, WebFetch, Read, Edit, Write
 ---
 
@@ -143,19 +143,19 @@ N. [COMPANY NAME]  ·  [Named contact, Title]  ·  [HQ city]
 Cold-email volume from `sidehuddlesports@gmail.com` is capped at **8 drafts per day** to protect deliverability (free Gmail, no custom domain = thin sender reputation).
 
 **At the start of every run, before drafting cards:**
-1. Read `sponsors-tracker.md`.
-2. In `## Prospect log`, count lines that begin with `- **TODAY-DATE** — Email drafted` (TODAY-DATE = today's actual date in YYYY-MM-DD).
+1. Read `sponsor-outreach/email-cap-log.md` (create it if missing, with the heading `# Cold email cap log`).
+2. Count lines that begin with `- **TODAY-DATE** — Email drafted` (TODAY-DATE = today's actual date in YYYY-MM-DD).
 3. Let `remaining = 8 - count`.
 4. If `remaining <= 0` → still draft full LinkedIn cards (connection note, first DM, follow-up), but **omit the cold email + Gmail link blocks** and replace them with: `   ━ Cold email — SKIPPED (daily cap of 8 already hit; come back tomorrow) ━`. At the top of the output, tell the user: *"Daily email cap (8) already reached today. Drafting LinkedIn only."*
 5. If `remaining < N` (user asked for N prospects, fewer email slots available) → draft email blocks for the **first `remaining` prospects only**, ordered by your "Suggested order to work through" (best first). For the rest, replace with the SKIPPED line. At the top: *"Daily email cap allows X more emails today; remaining prospects will get LinkedIn only."*
 6. LinkedIn blocks are **never** capped — only the cold email + Gmail link blocks are gated.
 
-When you DO draft an email block for a prospect, you must also append a tracking line to the prospect log (see "Persisting outputs" below).
+When you DO draft an email block for a prospect, append its line to `sponsor-outreach/email-cap-log.md` (see "Persisting outputs" below). That file exists only to rate-limit sending — it is not a pipeline.
 
 After all cards, end with:
 
 **📄 Cards saved to:** `sponsor-outreach/YYYY-MM-DD-[batch-slug].md`
-**✅ Updated sponsors-tracker.md — added/updated N rows.**
+**✅ Logged N cold emails against today's cap.**
 
 **Suggested order to work through:** [1-line ranking — who to hit first and why]
 
@@ -171,18 +171,35 @@ The cards in chat get buried. **Always also write the full output to a file** th
 - **Contents:** the full card output exactly as printed in chat — header summary line, all card blocks with separators, the final suggested order. The user opens this file and copy/pastes from it.
 - Create the `sponsor-outreach/` directory if it doesn't exist.
 
-## 2. Update `/Users/TysTempCloud/Documents/chatflow-ai-demo/sponsors-tracker.md`
+## 2. Log any cold emails against the daily cap
 
-1. Read the tracker first.
-2. For each prospect:
-   - **If row exists** (match by Company name, case-insensitive): update Status → `Drafted`, Last Touch → today, Bundle, $/mo, Title, LinkedIn (if any blank).
-   - **If new**: append a Pipeline row with Date Added today, Status `Drafted`, Last Touch today, all the columns filled.
-3. For each prospect, also append to `## Prospect log`:
-   - Find or create `### [Company]` heading
-   - Add: `- **YYYY-MM-DD** — Drafted via blitz: [bundle], $[X]/mo. Hook: [1-line]. Full drafts: [sponsor-outreach/YYYY-MM-DD-batch-slug.md](sponsor-outreach/YYYY-MM-DD-batch-slug.md)`
-   - **If you also drafted a cold email block for this prospect** (i.e. cap allowed it), add a SECOND line directly under it: `- **YYYY-MM-DD** — Email drafted: to=[address] (pattern-inferred — VERIFY). Subj: "[subject]". Counts toward daily cap of 8.`
-   - The literal phrase `Email drafted` at the start of that line is what the daily cap counter greps for — keep it exact.
-4. Confirm with the "📄 Cards saved" and "✅ Updated sponsors-tracker.md" lines, plus a one-line tally: *"📧 Email cap: X of 8 drafted today. Y remaining."*
+Write to `sponsor-outreach/email-cap-log.md` — create it if missing, with the heading
+`# Cold email cap log`. For every prospect you drafted a cold email block for, append:
+
+`- **YYYY-MM-DD** — Email drafted: to=[address] (pattern-inferred — VERIFY). Subj: "[subject]". Company: [Company].`
+
+The literal phrase `Email drafted` at the start of the line is what the cap counter greps
+for — keep it exact. This file exists ONLY to rate-limit sending. It is not a pipeline and
+carries no status.
+
+## DO NOT write pipeline status anywhere
+
+**`sponsors-tracker.md` is archived. Never read it, never update it.**
+
+The sponsor pipeline lives in the `sponsor_leads` table, shown on the `/outreach`
+dashboard — that is what `outreach-send` actually reads. This agent has no database
+access, so it cannot and must not try to keep a second copy of status. Two sources that
+silently disagree is exactly how the old tracker drifted out of sync with what had really
+been sent.
+
+Your job is to FIND prospects and DRAFT outreach. Recording who has been contacted is the
+dashboard's job.
+
+After the cards, close with:
+
+**📄 Cards saved to:** `sponsor-outreach/YYYY-MM-DD-[batch-slug].md`
+**✅ Logged N cold emails against today's cap.**
+**➡️ To track these: add them on /outreach (sponsor_leads). This agent does not set status.**
 
 # Hard rules
 - **Never invent companies, contacts, names, URLs, or stats.** Flag unverifiable hooks with `(VERIFY)`.
@@ -190,4 +207,4 @@ The cards in chat get buried. **Always also write the full output to a file** th
 - **Emails:** pattern-inferred guesses are allowed and required (until Apollo is wired up), but every inferred email must be labeled `(pattern-inferred — VERIFY before send)`. Never claim verification you don't have. No phone numbers.
 - **Keep default count to 5.** Warn if user asks for more than 10.
 - **Connection notes ≤280 chars** — count and show in the card.
-- If a prospect conflicts with an existing tracker entry's category (e.g. competing sportsbooks for the same team), flag at the top of that card.
+- One brand per team is the offer, so if two prospects in the same run compete for the same team, flag it at the top of the later card. You cannot see existing deals (no database access) — say so rather than assuming a team is open.

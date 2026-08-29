@@ -53,14 +53,24 @@ interface ESPNGame {
   }>;
 }
 
-async function fetchESPNScores(sport: string): Promise<ESPNGame[]> {
-  const endpoint = ESPN_ENDPOINTS[sport];
-  if (!endpoint) return [];
-
+// ESPN's scoreboard, asked twice.
+//
+// The bare endpoint answers with the current WEEK, not the current DAY. In
+// college football that meant week 1 — Sep 4 through Sep 7 — while UNC was
+// playing TCU in Dublin that same afternoon. The game was simply absent from
+// the feed, so the sync could not score it, and the room kept showing next
+// week's fixture with the real game underway.
+//
+// So: the bare call for the week ahead, which is what puts upcoming fixtures in
+// the table, plus an explicit three-day range for what is actually happening
+// now. ESPN dates its scoreboard in Eastern time, so the range runs yesterday
+// through tomorrow rather than just today — a 20:00 ET kickoff is already
+// tomorrow in UTC, and asking only for "today" drops it.
+async function fetchOneScoreboard(url: string, sport: string): Promise<ESPNGame[]> {
   try {
-    const response = await fetch(endpoint, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" } });
+    const response = await fetch(url, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" } });
     if (!response.ok) {
-      console.error(`ESPN API error for ${sport}: ${response.status}`);
+      console.error(`ESPN API error for ${sport}: ${response.status} (${url})`);
       return [];
     }
     const data = await response.json();
@@ -69,6 +79,29 @@ async function fetchESPNScores(sport: string): Promise<ESPNGame[]> {
     console.error(`Error fetching ESPN ${sport}:`, error);
     return [];
   }
+}
+
+function espnDate(offsetDays: number): string {
+  const d = new Date(Date.now() + offsetDays * 86400000);
+  return d.toISOString().slice(0, 10).replace(/-/g, '');
+}
+
+async function fetchESPNScores(sport: string): Promise<ESPNGame[]> {
+  const endpoint = ESPN_ENDPOINTS[sport];
+  if (!endpoint) return [];
+
+  const range = `${espnDate(-1)}-${espnDate(1)}`;
+  const [thisWeek, theseDays] = await Promise.all([
+    fetchOneScoreboard(endpoint, sport),
+    fetchOneScoreboard(`${endpoint}?dates=${range}&limit=200`, sport),
+  ]);
+
+  // Same game can come back from both calls. ESPN's event id is the identity.
+  const byId = new Map<string, ESPNGame>();
+  for (const g of [...thisWeek, ...theseDays]) {
+    if (g?.id) byId.set(g.id, g);
+  }
+  return [...byId.values()];
 }
 
 function normalizeTeamName(name: string): string {
@@ -456,6 +489,31 @@ serve(async (req) => {
           .eq('odds_game_id', oddsGameId)
           .maybeSingle();
         if (existing) continue;
+
+        // The same game also arrives from the odds feed under ITS id — a 32-char
+        // hash, nothing like `espn-…` — so matching on odds_game_id alone let us
+        // insert a second row for a game already in the table. 146 of 1000 rows
+        // were twins. The odds row is the one to keep: markets hang off its id,
+        // so an ESPN twin is a game nobody can bet on. Enrichment below scores
+        // whichever row is there, so skipping loses nothing.
+        //
+        // Teams plus a same-day kickoff, not an exact timestamp: the two feeds
+        // disagree by a few minutes on when a game starts, which is exactly how
+        // the twins got in.
+        if (homeTeamId && awayTeamId) {
+          const dayStart = new Date(eg.date); dayStart.setUTCHours(0, 0, 0, 0);
+          const dayEnd = new Date(dayStart.getTime() + 36 * 60 * 60 * 1000);
+          const { data: twin } = await supabase
+            .from('games')
+            .select('id')
+            .eq('home_team_id', homeTeamId)
+            .eq('away_team_id', awayTeamId)
+            .gte('start_time', dayStart.toISOString())
+            .lt('start_time', dayEnd.toISOString())
+            .limit(1)
+            .maybeSingle();
+          if (twin) continue;
+        }
 
         const status = eg.status.type.completed
           ? 'final'

@@ -203,8 +203,26 @@ function subject(step: number, c: Chapter): string {
     // The old version was `${name}'s group chat`, which produced "Sarasota
     // Browns Backers's group chat" — a double possessive on any chapter name
     // ending in s, which most of them do.
-    default: return `A ${short} room for ${name}`;
+    default: return `Claim the ${name} room`;
   }
+}
+
+/**
+ * The opening line, and the only sentence most of these get.
+ *
+ * "Somewhere to be" was a place, not a reason — it described a venue and gave a
+ * chapter president nothing to want. The tension worth naming is the one every
+ * chapter actually has: the group is scattered, and on any given Sunday most of
+ * the roster is not at the bar. The room is where they are together anyway.
+ *
+ * The venue is the most personal thing we know, so it goes in the sentence when
+ * we have it. Without one the same idea still holds, just less pointed.
+ */
+function hook(c: Chapter, who: string): string {
+  if (c.venue) {
+    return `Side Huddle keeps ${who} together on game day — the ones at ${c.venue}, and the ones who couldn't make it.`;
+  }
+  return `Side Huddle keeps ${who} together on game day — the ones who show up, and the ones who couldn't make it.`;
 }
 
 function body(step: number, c: Chapter): string {
@@ -214,24 +232,38 @@ function body(step: number, c: Chapter): string {
   const room = seedRoom(org);
   const code = (c.claim_code || "").trim();
 
-  // WHAT CHANGED AND WHY. This used to pitch an app and hope they went and
-  // found it. It now hands them something specific that already exists with
-  // their chapter's name on it, and asks for one action instead of a decision.
+  // GAME DAY FIRST. An earlier line read "somewhere to be between game days",
+  // which quietly says the main event is handled elsewhere. It is not — game day
+  // is the whole point, and the days in between are the bonus. Getting that
+  // backwards tells a chapter president you do not know what their group is for.
   //
-  // The code carries in EVERY step, not just the first. A president who reads
-  // step one on a phone in a car park and gets to it a week later should not
-  // have to go digging for the email that had the code in it.
+  // LEAD WITH WHAT THE CHAPTER GETS. An earlier draft described what the
+  // product DOES — news lands, members talk — and never said what that is worth
+  // to the person reading. A chapter president is not shopping for an app; they
+  // want their group active between game days and more people in it. Say that
+  // first, then how.
   //
-  // The code exists because Apple does not carry a link through an App Store
-  // install — see claim_chapter_huddle. So the ask is deliberately two-part and
-  // says so plainly: get the app, then type six characters. Pretending it is
-  // one tap would just surprise them at the second step.
+  // "CLAIM", NOT "I'VE SET ASIDE". Set-aside is a favour that puts them in debt
+  // to a stranger. Claiming is theirs to take, and it is also literally what the
+  // code does — the room does not exist until they redeem it.
+  //
+  // AND IT IS NOT A PRIVATE ROOM. claim_chapter_huddle creates it with
+  // is_private = false and official_status = 'active', which means it is LISTED
+  // and anyone can walk in. An earlier draft called it "a private room for your
+  // members", which was plainly false and exactly the kind of thing a chapter
+  // president finds out about in front of their members. What it actually is:
+  // findable by their people, theirs to lock down whenever they want. That is a
+  // better pitch anyway, because being findable is how the room grows.
+  //
+  // The code carries in EVERY step. Someone who skims step one and comes back a
+  // week later should not have to work out which email had it.
 
   if (step === 2) {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${greeting(c)},</p>
-      <p style="margin:0 0 18px 0;">Quick follow-up — the room for ${who} is still held.</p>
-      <p style="margin:0 0 18px 0;">The part chapter admins tend to like: you stop having to think up reasons to post. The ${orgShort} news shows up in the room on its own, and your members do the rest.</p>
+      <p style="margin:0 0 18px 0;">Quick follow-up — ${who} room is still unclaimed.</p>
+      <p style="margin:0 0 18px 0;">${hook(c, who)}</p>
+      <p style="margin:0 0 18px 0;">The part chapter admins tend to like: it grows without you working at it. Members bring friends, the ${orgShort} news shows up on its own, and you stop having to think up reasons to post.</p>
       ${code ? codeBlock(code) : ""}
       ${cta(`Get the app`, APP_STORE_URL)}
       <p style="font-size:13px;color:#999;margin:0;">Free for chapters. If it's not for your group, say so and I'll leave you alone.</p>`);
@@ -241,24 +273,25 @@ function body(step: number, c: Chapter): string {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${greeting(c)},</p>
       <p style="margin:0 0 18px 0;">Last note from me — not trying to clutter your inbox.</p>
-      <p style="margin:0 0 18px 0;">Your code is below if you ever want it. It doesn't expire, and nobody else can use it — it only opens ${who}.</p>
+      <p style="margin:0 0 18px 0;">Your code is below if you ever want it. It doesn't expire and nobody else can use it — it only opens ${who}.</p>
       ${code ? codeBlock(code) : ""}
       <p style="margin:0 0 18px 0;">Either way, good luck this season.</p>
       ${cta(`Get the app`, APP_STORE_URL)}`);
   }
 
-  // SEASON-BOUND: "${orgShort} season is almost here" is only true from roughly
-  // July through the start of the season. If this is still running in November,
-  // change it — a chapter president reading "season is almost here" at
-  // Thanksgiving learns immediately that nobody wrote this to them.
+  // SEASON-BOUND: "season is almost here" is only true from roughly July to
+  // kickoff. Read at Thanksgiving it tells them immediately that nobody wrote
+  // this to them.
   return shell(`
     <p style="margin:0 0 18px 0;">Hi ${greeting(c)},</p>
-    <p style="margin:0 0 18px 0;">${orgShort} season is almost here, and I've put a room aside for ${who}.</p>
-    <p style="margin:0 0 18px 0;">It's a private room for your members: the score, the ${orgShort} news and the clip everyone's passing around all land in it while your people talk over the top. You own it — your name on it, your photo behind it.</p>
+    <p style="margin:0 0 18px 0;">${orgShort} season is almost here.</p>
+    <p style="margin:0 0 18px 0;">${hook(c, who)} They talk through every game together, their friends find the room and join, and you never have to write a post to keep it alive.</p>
+    <p style="margin:0 0 18px 0;">There's a room waiting under your chapter's name. Nobody else can take it.</p>
     ${code ? codeBlock(code) : ""}
-    <p style="margin:0 0 18px 0;">Two steps: get the app, then enter that code when it asks. The room is built the moment you do, already named for your chapter.</p>
+    <p style="margin:0 0 18px 0;">Two steps: get the app, then enter that code. The room is built the moment you do, named for your chapter, with you as the owner.</p>
+    <p style="margin:0 0 18px 0;">The score, the ${orgShort} news and the clip everyone's passing around land in there on their own, so there's always a reason to open it — even on a Tuesday.</p>
     ${cta(`Get the app`, APP_STORE_URL)}
-    <p style="font-size:13px;color:#999;margin:0;">Free for chapters. Nobody else can claim this code — it only opens your room. <a href="${room}" style="color:#999;">More about ${orgShort} rooms</a>.</p>`);
+    <p style="font-size:13px;color:#999;margin:0;">Free for chapters. Your room is listed so your members can find it — you can lock it to invite-only any time. <a href="${room}" style="color:#999;">More about ${orgShort} rooms</a>.</p>`);
 }
 
 // Strip the HTML shell so a test run shows the words that will actually land in

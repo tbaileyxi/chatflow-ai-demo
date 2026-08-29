@@ -61,7 +61,7 @@ type SendResult = {
   eligible: number;
   skipped_duplicate: number;
   errors: string[];
-  previews: Array<{ to: string; company: string; subject: string }>;
+  previews: Array<{ to: string; company: string; subject: string; text?: string }>;
 };
 
 type Campaign =
@@ -912,11 +912,20 @@ export default function Outreach() {
               {lastResult.errors.length > 0 && <p className="text-destructive">Errors: {lastResult.errors.length}</p>}
               {lastResult.previews.length > 0 && (
                 <details>
-                  <summary className="cursor-pointer text-muted-foreground">Preview recipients</summary>
-                  <ul className="mt-2 space-y-1">
+                  <summary className="cursor-pointer text-muted-foreground">
+                    Preview emails ({lastResult.previews.length}) — full text as the recipient sees it
+                  </summary>
+                  <ul className="mt-2 space-y-3">
                     {lastResult.previews.map((p, i) => (
-                      <li key={i} className="text-xs">
-                        {p.company} · {p.to} · {p.subject}
+                      <li key={i} className="rounded border border-border p-3 text-xs">
+                        <div className="font-medium">{p.company}</div>
+                        <div className="text-muted-foreground">To: {p.to}</div>
+                        <div className="text-muted-foreground">Subject: {p.subject}</div>
+                        {p.text && (
+                          <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap border-t border-border pt-2 font-sans leading-relaxed">
+                            {p.text}
+                          </pre>
+                        )}
                       </li>
                     ))}
                   </ul>
