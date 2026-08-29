@@ -414,11 +414,20 @@ serve(async (req) => {
       const short = String(t.name).toLowerCase();
       if (!teamIndex.has(short)) teamIndex.set(short, { id: t.id, league });
     }
+    // ESPN says NCAAF and NCAAB; our teams table says NCAA for both. Comparing
+    // them raw means 'NCAA' === 'NCAAF' is false for every college team, so NO
+    // college game was ever matched or created — a live UNC game in Dublin was
+    // simply absent from the database while the room showed next week's fixture
+    // and no updates at all. bot-live-poller already normalises this exact pair;
+    // this function did not.
+    const dbLeague = (l: string) => (l === 'NCAAF' || l === 'NCAAB' ? 'NCAA' : l);
+
     const resolveTeamId = (league: string, displayName?: string, shortName?: string): string | null => {
+      const want = dbLeague(league);
       for (const key of [displayName?.toLowerCase(), shortName?.toLowerCase()]) {
         if (!key) continue;
         const hit = teamIndex.get(key);
-        if (hit && hit.league === league) return hit.id;
+        if (hit && dbLeague(hit.league) === want) return hit.id;
       }
       return null;
     };
