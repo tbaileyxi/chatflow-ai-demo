@@ -112,7 +112,12 @@ serve(async (req) => {
     // Preload DB teams once. Match by canonical lowercased name OR fullName.
     const { data: teams } = await supabase
       .from("teams")
-      .select("id, name, city, league, highlightly_display_name");
+      // Active only. Opponent placeholders (status 'inactive') exist so a
+      // scoreboard can print "San Jose State" instead of the word "Away"; they
+      // are not teams we cover, and pulling them in here would have the bot
+      // fetching play-by-play for every game in the country to then discard it.
+      .select("id, name, city, league, highlightly_display_name")
+      .eq("status", "active");
     const teamIndex = new Map<string, { id: string; name: string; league: string }>();
 
     // Count how many teams share each bare nickname. College is full of these:

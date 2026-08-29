@@ -276,6 +276,47 @@ serve(async (req) => {
       }
     }
 
+    // Team lookup lives here, above BOTH the users of it: the enrichment pass
+    // below repairs games missing a side, and the insert pass further down
+    // resolves sides for new ones. It used to sit only above the insert, so
+    // the repair referenced it before initialization and took the whole sync
+    // down with it — scores stopped updating everywhere, not just the one game.
+    const SPORT_TO_LEAGUE: Record<string, string> = {
+      nfl: 'NFL', ncaaf: 'NCAAF', nba: 'NBA', ncaab: 'NCAAB', nhl: 'NHL', mlb: 'MLB',
+    };
+
+    const { data: allTeams } = await supabase
+      .from('teams')
+      .select('id, name, city, league');
+    // Exact-match index only (full "City Name" and bare "Name") with league
+    // verification — fuzzy matching across leagues misfires (Rangers, Giants…).
+    const teamIndex = new Map<string, { id: string; league: string }>();
+    for (const t of allTeams ?? []) {
+      const league = (t.league ?? '').toUpperCase();
+      const full = `${t.city ?? ''} ${t.name}`.trim().toLowerCase();
+      if (!teamIndex.has(full)) teamIndex.set(full, { id: t.id, league });
+      const short = String(t.name).toLowerCase();
+      if (!teamIndex.has(short)) teamIndex.set(short, { id: t.id, league });
+    }
+    // ESPN says NCAAF and NCAAB; our teams table says NCAA for both. Comparing
+    // them raw means 'NCAA' === 'NCAAF' is false for every college team, so NO
+    // college game was ever matched or created — a live UNC game in Dublin was
+    // simply absent from the database while the room showed next week's fixture
+    // and no updates at all. bot-live-poller already normalises this exact pair;
+    // this function did not.
+    const dbLeague = (l: string) => (l === 'NCAAF' || l === 'NCAAB' ? 'NCAA' : l);
+
+    const resolveTeamId = (league: string, displayName?: string, shortName?: string): string | null => {
+      const want = dbLeague(league);
+      for (const key of [displayName?.toLowerCase(), shortName?.toLowerCase()]) {
+        if (!key) continue;
+        const hit = teamIndex.get(key);
+        if (hit && dbLeague(hit.league) === want) return hit.id;
+      }
+      return null;
+    };
+
+
     // ──────────────────────────────────────────────────────
     // Part 3: Enrich games table with ESPN period + clock
     // ──────────────────────────────────────────────────────
@@ -333,6 +374,7 @@ serve(async (req) => {
     });
 
     let gamesEnriched = 0;
+    const repairErrors: string[] = [];
 
     for (const game of activeGames || []) {
       const homeName = (game as any).home_team?.name;
@@ -398,6 +440,49 @@ serve(async (req) => {
       // Build update payload — only include fields that changed
       const updates: Record<string, any> = {};
 
+      // Repair a game that only has one team.
+      //
+      // Games inserted before opponent placeholders existed carry a null on the
+      // side we did not recognise, and a USC room read "Away 0 — Trojans 21"
+      // because of it. Those rows are never re-inserted — the insert path skips
+      // anything already in the table — so the fix has to happen here, on the
+      // pass that already has the ESPN game in hand.
+      if (!game.home_team_id || !game.away_team_id) {
+        // We know which of our sides is filled; the ESPN competitor that is not
+        // its counterpart is the one we are missing.
+        const missingIsHome = !game.home_team_id;
+        const espnMissing = missingIsHome
+          ? (sameOrientation ? espnHome : espnAway)
+          : (sameOrientation ? espnAway : espnHome);
+
+        const nm = espnMissing.team.shortDisplayName || espnMissing.team.displayName;
+        const existingId = resolveTeamId(
+          SPORT_TO_LEAGUE[matchedSport],
+          espnMissing.team.displayName,
+          espnMissing.team.shortDisplayName,
+        );
+        let fillId = existingId;
+        if (!fillId) {
+          const { data: made, error: makeErr } = await supabase
+            .from('teams')
+            .insert({
+              name: nm,
+              city: espnMissing.team.location ?? null,
+              league: dbLeague(SPORT_TO_LEAGUE[matchedSport]),
+              logo_url: espnMissing.team.logo ?? null,
+              status: 'inactive',
+            })
+            .select('id')
+            .maybeSingle();
+          if (makeErr) repairErrors.push(`${nm}: ${makeErr.message}`);
+          fillId = made?.id ?? null;
+        }
+        if (fillId) {
+          updates[missingIsHome ? 'home_team_id' : 'away_team_id'] = fillId;
+          console.log(`🩹 Filled missing ${missingIsHome ? 'home' : 'away'} team: ${nm}`);
+        }
+      }
+
       if (espnClock !== game.clock) updates.clock = espnClock;
       if (espnPeriod !== game.period) updates.period = espnPeriod;
       if (finalHomeScore !== game.home_score) updates.home_score = finalHomeScore;
@@ -430,41 +515,6 @@ serve(async (req) => {
     // involve a team in our DB, keyed on odds_game_id = "espn-{sport}-{id}"
     // so reruns are idempotent. Parts 2–3 then keep them updated.
     // ──────────────────────────────────────────────────────
-    const SPORT_TO_LEAGUE: Record<string, string> = {
-      nfl: 'NFL', ncaaf: 'NCAAF', nba: 'NBA', ncaab: 'NCAAB', nhl: 'NHL', mlb: 'MLB',
-    };
-
-    const { data: allTeams } = await supabase
-      .from('teams')
-      .select('id, name, city, league');
-    // Exact-match index only (full "City Name" and bare "Name") with league
-    // verification — fuzzy matching across leagues misfires (Rangers, Giants…).
-    const teamIndex = new Map<string, { id: string; league: string }>();
-    for (const t of allTeams ?? []) {
-      const league = (t.league ?? '').toUpperCase();
-      const full = `${t.city ?? ''} ${t.name}`.trim().toLowerCase();
-      if (!teamIndex.has(full)) teamIndex.set(full, { id: t.id, league });
-      const short = String(t.name).toLowerCase();
-      if (!teamIndex.has(short)) teamIndex.set(short, { id: t.id, league });
-    }
-    // ESPN says NCAAF and NCAAB; our teams table says NCAA for both. Comparing
-    // them raw means 'NCAA' === 'NCAAF' is false for every college team, so NO
-    // college game was ever matched or created — a live UNC game in Dublin was
-    // simply absent from the database while the room showed next week's fixture
-    // and no updates at all. bot-live-poller already normalises this exact pair;
-    // this function did not.
-    const dbLeague = (l: string) => (l === 'NCAAF' || l === 'NCAAB' ? 'NCAA' : l);
-
-    const resolveTeamId = (league: string, displayName?: string, shortName?: string): string | null => {
-      const want = dbLeague(league);
-      for (const key of [displayName?.toLowerCase(), shortName?.toLowerCase()]) {
-        if (!key) continue;
-        const hit = teamIndex.get(key);
-        if (hit && dbLeague(hit.league) === want) return hit.id;
-      }
-      return null;
-    };
-
     let gamesInserted = 0;
     for (const [sport, espnGames] of allEspnGames.entries()) {
       const sportKey = SPORT_KEY_MAP[sport];
@@ -477,10 +527,41 @@ serve(async (req) => {
         const away = comps.find((c) => c.homeAway === 'away');
         if (!home || !away) continue;
 
-        const homeTeamId = resolveTeamId(league, home.team.displayName, home.team.shortDisplayName);
-        const awayTeamId = resolveTeamId(league, away.team.displayName, away.team.shortDisplayName);
+        let homeTeamId = resolveTeamId(league, home.team.displayName, home.team.shortDisplayName);
+        let awayTeamId = resolveTeamId(league, away.team.displayName, away.team.shortDisplayName);
         // Only track games at least one of our teams plays in.
         if (!homeTeamId && !awayTeamId) continue;
+
+        // The other side needs a name too.
+        //
+        // A USC room showed "Away 0 — Trojans 14". San Jose State is not one of
+        // our 71 college teams, so away_team_id was null and the scoreboard had
+        // nothing to print but the word "Away". Half a scoreboard is worse than
+        // no scoreboard: it reads like a bug, because it is one.
+        //
+        // So the opponent gets a row — marked 'inactive', not 'active'. Every
+        // team picker, discovery list and admin count filters on status
+        // 'active', so these stay invisible there, and the bot's own team index
+        // filters the same way so it does not start following the whole of
+        // college football. They exist for one purpose: the join that puts a
+        // name on the other half of the score.
+        if (!homeTeamId || !awayTeamId) {
+          const missing = homeTeamId ? away : home;
+          const { data: made } = await supabase
+            .from('teams')
+            .insert({
+              name: missing.team.shortDisplayName || missing.team.displayName,
+              city: missing.team.location ?? null,
+              league: dbLeague(league),
+              logo_url: missing.team.logo ?? null,
+              status: 'inactive',
+            })
+            .select('id')
+            .maybeSingle();
+          if (made?.id) {
+            if (homeTeamId) awayTeamId = made.id; else homeTeamId = made.id;
+          }
+        }
 
         const oddsGameId = `espn-${sport}-${eg.id}`;
         const { data: existing } = await supabase
@@ -550,6 +631,7 @@ serve(async (req) => {
       live_events_updated: liveEventsUpdated,
       games_enriched: gamesEnriched,
       games_inserted: gamesInserted,
+      repair_errors: repairErrors,
       sports_fetched: sportsToFetch.length,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
