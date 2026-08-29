@@ -71,6 +71,8 @@ serve(async (req) => {
     postgame_candidates: 0,
     halftime_candidates: 0,
     daily_candidates: 0,
+    queued: 0,
+    ran: 0,
     posted: 0,
     skipped_no_content: 0,
     errors: [] as string[],
@@ -100,7 +102,26 @@ serve(async (req) => {
       }
     }
 
-    for (const job of jobs) {
+    // A few rooms per invocation, not every room.
+    //
+    // Every job is an LLM call plus its retrieval, and the whole list ran inside
+    // one invocation. On a Saturday with a full slate that is far past what the
+    // worker has, and it died with WORKER_RESOURCE_LIMIT — killed partway, so
+    // some rooms got a recap, the rest got nothing, and which rooms depended on
+    // list order. Silence in a room is not obviously a crash, which is why this
+    // went unnoticed.
+    //
+    // The cron fires regularly and recentlyRecapped already stops repeats, so a
+    // capped run drains the backlog across a few minutes instead of failing all
+    // at once. Halftime and postgame sort first: they are the time-sensitive
+    // ones, and a daily wrap can wait for the next run.
+    const BATCH = Number(Deno.env.get("RECAP_BATCH") || 4);
+    const order = { halftime: 0, postgame: 1, daily: 2 } as const;
+    const batch = [...jobs].sort((a, b) => order[a.kind] - order[b.kind]).slice(0, BATCH);
+    summary.queued = jobs.length;
+    summary.ran = batch.length;
+
+    for (const job of batch) {
       if (HUDDLE_ALLOWLIST.length > 0 && !HUDDLE_ALLOWLIST.includes(job.huddleId)) continue;
       try {
         const posted = await recapOne(supabase, job.huddleId, job.kind);
@@ -293,13 +314,17 @@ async function recapOne(
   const hours = kind === "daily" ? 24 : kind === "halftime" ? 4 : 8;
   const sinceIso = new Date(Date.now() - hours * 3600 * 1000).toISOString();
 
-  const [transcript, gameBeats, newsBeats, ledger, game, record] = await Promise.all([
+  // The game comes first, on its own: its sport decides which season the record
+  // is drawn from. Fetched alongside the record, as it used to be, there was no
+  // sport to scope by and a football recap quoted a February basketball result.
+  const game = ctx.teamId ? await getGameSnapshot(supabase, ctx.teamId) : null;
+
+  const [transcript, gameBeats, newsBeats, ledger, record] = await Promise.all([
     getRoomTranscript(supabase, huddleId, sinceIso),
     ctx.teamId ? getGameBeats(supabase, ctx.teamId, sinceIso, "in_game") : Promise.resolve([]),
     ctx.teamId ? getGameBeats(supabase, ctx.teamId, sinceIso, "news") : Promise.resolve([]),
     getLedger(supabase, huddleId),
-    ctx.teamId ? getGameSnapshot(supabase, ctx.teamId) : Promise.resolve(null),
-    ctx.teamId ? getTeamRecord(supabase, ctx.teamId) : Promise.resolve(null),
+    ctx.teamId ? getTeamRecord(supabase, ctx.teamId, game?.sportKey) : Promise.resolve(null),
   ]);
 
   // Leaders. A game recap without numbers is a vibe; the numbers are the

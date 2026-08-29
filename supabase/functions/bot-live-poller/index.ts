@@ -566,6 +566,25 @@ serve(async (req) => {
   });
 });
 
+function decodeEntities(raw: string): string {
+  const named: Record<string, string> = {
+    amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'", "#x27": "'",
+  };
+  // &amp;amp; happens when a string is escaped twice upstream, so resolve until
+  // it stops changing rather than in a single pass.
+  let out = raw, prev = "";
+  while (out !== prev) {
+    prev = out;
+    out = out.replace(/&([a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);/g, (m, e) => {
+      if (named[e]) return named[e];
+      if (e.startsWith("#x")) return String.fromCodePoint(parseInt(e.slice(2), 16));
+      if (e.startsWith("#"))  return String.fromCodePoint(parseInt(e.slice(1), 10));
+      return m;
+    });
+  }
+  return out;
+}
+
 // Work the clip queue.
 //
 // A big play is posted the moment it happens; its video shows up on X several
@@ -643,7 +662,11 @@ async function processPendingClips(supabase: any, summary: any) {
       const best = ids.length ? pickBest(await fetchPostMedia(ids)) : null;
 
       if (best) {
-        const quote = best.text
+        // X serves post text HTML-escaped, so a caption arrived reading
+        // "4th &amp; 1". Decoded here rather than at display time because the
+        // string is stored, and a stored entity is wrong in every client that
+        // ever reads it.
+        const quote = decodeEntities(best.text)
           .replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 140);
         await supabase.from("huddle_messages").insert(
           (row.huddle_ids ?? []).map((hid: string) => ({
@@ -814,11 +837,19 @@ async function postFinals(
       // better than a game that just stops.
       const { data: huddles } = await supabase
         .from("huddles").select("id, is_official_team_huddle").eq("team_id", team.id);
-      const willGetRecap = (huddles ?? []).some((h: any) => !h.is_official_team_huddle);
-      if (willGetRecap) continue;
       const won = team.id === home.id ? hs > as : as > hs;
       const body = `🏁 Final: ${away.name} ${as}, ${home.name} ${hs}.${leaderLine} ${won ? "Big one in the books." : "On to the next."}`;
       for (const h of huddles ?? []) {
+        // Per ROOM, not per team. This asked whether ANY of the team's rooms
+        // would get the Coach's richer recap and, if so, skipped the bare final
+        // for ALL of them. UNC has two rooms — one official, one a chapter — so
+        // the chapter's existence silenced the official room, and the Tar Heels
+        // beat TCU with neither room ever being told the final score. TCU, with
+        // a single room, got its recap normally.
+        //
+        // coach-recap serves rooms where is_official_team_huddle is false or
+        // null; this serves the rest. Same split, decided one room at a time.
+        if (!h.is_official_team_huddle) continue;
         const { data: recent } = await supabase
           .from("huddle_messages").select("id")
           .eq("huddle_id", h.id).eq("message_type", "postgame")

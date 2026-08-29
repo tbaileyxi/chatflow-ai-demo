@@ -200,7 +200,13 @@ serve(async (req) => {
     const needsLedger = lane === "ledger" || lane === "mixed";
     const teamId = ctx.teamId;
 
-    const [transcript, gameBeats, newsBeats, ledger, game, record, boxScore, seasonResults, nextGame] =
+    // The game is fetched first, alone, because its sport scopes the record and
+    // the season results. One team row covers football and basketball alike, so
+    // without it a football question is answered with a basketball record.
+    const gameSnap = needsGame && teamId ? await getGameSnapshot(supabase, teamId) : null;
+    const game = gameSnap;
+
+    const [transcript, gameBeats, newsBeats, ledger, record, boxScore, seasonResults, nextGame] =
       await Promise.all([
         // ALWAYS fetch the recent turns, whatever lane the router picked.
         //
@@ -215,14 +221,13 @@ serve(async (req) => {
         needsGame && teamId ? getGameBeats(supabase, teamId, sinceIso, "in_game") : Promise.resolve([]),
         needsGame && teamId ? getGameBeats(supabase, teamId, sinceIso, "news") : Promise.resolve([]),
         needsLedger ? getLedger(supabase, payload.huddle_id) : Promise.resolve([]),
-        needsGame && teamId ? getGameSnapshot(supabase, teamId) : Promise.resolve(null),
-        needsGame && teamId ? getTeamRecord(supabase, teamId) : Promise.resolve(null),
+        needsGame && teamId ? getTeamRecord(supabase, teamId, gameSnap?.sportKey) : Promise.resolve(null),
         // Box score answers "how many hits do the Yankees have". Best-effort —
         // never let an ESPN hiccup fail the whole answer.
         needsGame && teamId
           ? getBoxScore(supabase, teamId, ctx.league).catch(() => null)
           : Promise.resolve(null),
-        needsGame && teamId ? getSeasonResults(supabase, teamId) : Promise.resolve([]),
+        needsGame && teamId ? getSeasonResults(supabase, teamId, 30, gameSnap?.sportKey) : Promise.resolve([]),
         // "What time is the next game" is one of the two most likely questions
         // in the whole product. It gets its own query rather than sharing the
         // snapshot, which prefers a just-finished game over an upcoming one.

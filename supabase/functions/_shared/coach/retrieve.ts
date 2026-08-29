@@ -59,6 +59,7 @@ export interface GameSnapshot {
   period: string | null;
   clock: string | null;
   startTime: string;
+  sportKey?: string | null;
 }
 
 export interface BoxScore {
@@ -315,6 +316,9 @@ export async function getGameSnapshot(
     period: g.period ?? null,
     clock: g.clock ?? null,
     startTime: g.start_time,
+    // Carried so callers can scope season queries to the sport actually being
+    // played. Without it a football room's record counts basketball wins.
+    sportKey: (g as any).sport_key ?? null,
   };
 }
 
@@ -437,19 +441,52 @@ export async function getBoxScore(
  * room can catch us on. Enrich with ESPN standings separately (below) —
  * that call is allowed to fail.
  */
+// When the season this sport is actually playing began.
+//
+// One team row covers every sport a school plays: the Tar Heels who played TCU
+// in football on Saturday are the same row as the Tar Heels who beat Virginia
+// Tech 89-82 at basketball in February. Season queries that looked back a flat
+// ten months therefore mixed the two, and a football room was told "We beat
+// Virginia Tech 89-82. We're 2-0" — a basketball score and a record counting one
+// win from each sport.
+//
+// Ten months was also long enough to reach back into the PREVIOUS season of the
+// same sport, so an August football record could include the previous autumn.
+// Both bugs are the same missing idea: a season has a start, and it depends on
+// the sport.
+export function seasonStartFor(sportKey?: string | null): Date {
+  const now = new Date();
+  const y = now.getFullYear();
+  // Month the season opens, 0-indexed.
+  const opens =
+    !sportKey ? 0
+    : sportKey.startsWith("americanfootball") ? 7   // August
+    : sportKey.startsWith("basketball")       ? 9   // October
+    : sportKey.startsWith("icehockey")        ? 9   // October
+    : sportKey.startsWith("baseball")         ? 2   // March
+    : 0;
+  const start = new Date(y, opens, 1);
+  // Before this year's opener, we are still in the season that began last year.
+  if (start > now) start.setFullYear(y - 1);
+  return start;
+}
+
 export async function getTeamRecord(
   supabase: SupabaseClient,
   teamId: string,
+  sportKey?: string | null,
 ): Promise<{ wins: number; losses: number } | null> {
-  const seasonStart = new Date();
-  seasonStart.setMonth(seasonStart.getMonth() - 10);
+  const seasonStart = seasonStartFor(sportKey);
 
-  const { data } = await supabase
+  let q = supabase
     .from("games")
     .select("home_team_id, away_team_id, home_score, away_score, status")
     .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
     .eq("status", "final")
     .gte("start_time", seasonStart.toISOString());
+  // Without this a football room counts basketball wins in its record.
+  if (sportKey) q = q.eq("sport_key", sportKey);
+  const { data } = await q;
 
   if (!data || data.length === 0) return null;
 
@@ -520,16 +557,19 @@ export async function getSeasonResults(
   supabase: SupabaseClient,
   teamId: string,
   limit = 30,
+  sportKey?: string | null,
 ): Promise<string[]> {
-  const seasonStart = new Date();
-  seasonStart.setMonth(seasonStart.getMonth() - 10);
+  const seasonStart = seasonStartFor(sportKey);
 
-  const { data } = await supabase
+  let sq = supabase
     .from("games")
     .select("home_team_id, away_team_id, home_score, away_score, start_time")
     .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
     .eq("status", "final")
-    .gte("start_time", seasonStart.toISOString())
+    .gte("start_time", seasonStart.toISOString());
+  // Same reason as the record: one team row, many sports.
+  if (sportKey) sq = sq.eq("sport_key", sportKey);
+  const { data } = await sq
     .order("start_time", { ascending: false })
     .limit(limit);
   if (!data || data.length === 0) return [];
