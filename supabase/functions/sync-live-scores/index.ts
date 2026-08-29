@@ -257,12 +257,47 @@ serve(async (req) => {
     // only consider rows starting within the next few hours.
     const sixHoursAhead = new Date(now.getTime() + 6 * 60 * 60 * 1000);
 
-    const { data: activeGames } = await supabase
+    const GAME_COLS =
+      '*, home_team:teams!games_home_team_id_fkey(id, name, city), away_team:teams!games_away_team_id_fkey(id, name, city)';
+
+    // TWO FETCHES, because the window is right for FINDING games and wrong for
+    // FINISHING them.
+    //
+    // This was one query bounded at six hours either side of now, which meant a
+    // game that started more than six hours ago was never looked at again. Miss
+    // one run, or have a game go long, and nothing would ever mark it final —
+    // it sat 'in_progress' forever. That is not hypothetical: a Mets room showed
+    // "Padres 1 — Mets 4, 9 · 0:00" with the live dot blinking, against a team
+    // they had not played in weeks, because useLiveGameContext takes the newest
+    // in_progress game for a team and that row outranked every real fixture.
+    //
+    // The upper bound stays: a game cannot be live before it kicks off, and
+    // without it one bad name match writes tonight's score onto a game weeks
+    // away. The lower bound only belongs on games we are still WAITING to start.
+    const { data: windowGames } = await supabase
       .from('games')
-      .select('*, home_team:teams!games_home_team_id_fkey(id, name, city), away_team:teams!games_away_team_id_fkey(id, name, city)')
-      .in('status', ['scheduled', 'in_progress', 'live'])
+      .select(GAME_COLS)
+      .eq('status', 'scheduled')
       .gte('start_time', sixHoursAgo.toISOString())
       .lte('start_time', sixHoursAhead.toISOString());
+
+    // Anything already marked live, however old. A game does not stop needing
+    // to be finished just because we stopped looking at it. Capped at two days
+    // so this cannot grow without limit if a whole season goes wrong.
+    const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+    const { data: stillLive } = await supabase
+      .from('games')
+      .select(GAME_COLS)
+      .in('status', ['in_progress', 'live'])
+      .gte('start_time', twoDaysAgo.toISOString())
+      .lte('start_time', sixHoursAhead.toISOString());
+
+    const seen = new Set<string>();
+    const activeGames = [...(windowGames || []), ...(stillLive || [])].filter((g: any) => {
+      if (seen.has(g.id)) return false;
+      seen.add(g.id);
+      return true;
+    });
 
     let gamesEnriched = 0;
 
