@@ -35,7 +35,7 @@ where status in ('in_progress', 'live', 'halftime')
 -- the top of a room blinking at everybody in it.
 update public.games
 set status = 'final',
-    updated_at = now()
+    last_synced_at = now()   -- this table has last_synced_at, not updated_at
 where status in ('in_progress', 'live', 'halftime')
   and start_time < now() - interval '9 hours';
 
@@ -51,7 +51,7 @@ declare
   v_count integer;
 begin
   update public.games
-  set status = 'final', updated_at = now()
+  set status = 'final', last_synced_at = now()
   where status in ('in_progress', 'live', 'halftime')
     and start_time < now() - interval '9 hours';
   get diagnostics v_count = row_count;
