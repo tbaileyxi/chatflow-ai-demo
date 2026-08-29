@@ -91,6 +91,7 @@ serve(async (req) => {
     x_queued: 0,         // plays queued to look for a clip later
     x_due: 0,            // queued plays whose wait was up this run
     x_gave_up: 0,        // queued plays that ran out of retries
+    x_search_failed: 0,  // xAI call itself failed — NOT the same as finding nothing
     x_attempts: 0,       // searches actually made this run
     x_claim_failed: 0,   // seen_events claim rejected (another runner, or a constraint)
     x_citations: 0,      // post URLs xAI came back with
@@ -620,6 +621,13 @@ async function processPendingClips(supabase: any, summary: any) {
           `Do NOT return ${row.opponent} highlights or posts celebrating the ${row.opponent}. ` +
           `Ignore previews, predictions, betting picks and old highlights.`,
       );
+
+      // Zero citations has two very different causes and they looked
+      // identical from the outside: xAI erroring (bad key, quota, 5xx) returns
+      // the same empty shape as xAI genuinely finding no clip. Weeks of "the
+      // search comes back empty" could have been either. found.ok separates
+      // them, so the next time this is quiet we know which thing to fix.
+      if (!found.ok) summary.x_search_failed += 1;
 
       const ids = [...new Set(
         found.citations.map(postIdFromUrl).filter(Boolean) as string[],
