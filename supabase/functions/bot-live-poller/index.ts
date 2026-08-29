@@ -91,6 +91,7 @@ serve(async (req) => {
     x_queued: 0,         // plays queued to look for a clip later
     x_due: 0,            // queued plays whose wait was up this run
     x_gave_up: 0,        // queued plays that ran out of retries
+    x_duplicate: 0,      // clip already in the room, skipped
     x_search_failed: 0,  // xAI call itself failed — NOT the same as finding nothing
     x_attempts: 0,       // searches actually made this run
     x_claim_failed: 0,   // seen_events claim rejected (another runner, or a constraint)
@@ -660,6 +661,32 @@ async function processPendingClips(supabase: any, summary: any) {
       summary.x_moment_reads += ids.length;
 
       const best = ids.length ? pickBest(await fetchPostMedia(ids)) : null;
+
+      // The same clip, twice.
+      //
+      // Each queued play searches on its own, and X only has so many posts
+      // about one game — so two touchdowns five minutes apart both came back
+      // with the SAME video, and the room got it twice. The play that found it
+      // is not the identity that matters here; the post is.
+      //
+      // Checked against the rooms this clip is bound for, not globally: the
+      // same highlight legitimately belongs in both teams' rooms.
+      if (best) {
+        const { data: dupe } = await supabase
+          .from("huddle_messages")
+          .select("id")
+          .eq("embed_code", best.url)
+          .in("huddle_id", row.huddle_ids ?? [])
+          .limit(1)
+          .maybeSingle();
+        if (dupe) {
+          // Not a failure and not worth a retry — this clip is already in the
+          // room. Close the play out and let the next one find something new.
+          await supabase.from("pending_clips").update({ status: "done" }).eq("id", row.id);
+          summary.x_duplicate = (summary.x_duplicate ?? 0) + 1;
+          continue;
+        }
+      }
 
       if (best) {
         // X serves post text HTML-escaped, so a caption arrived reading
