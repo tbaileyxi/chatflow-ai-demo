@@ -661,16 +661,15 @@ async function postFinals(
 ): Promise<void> {
   summary.finals = 0;
   const now = Date.now();
-  // SIX hours from KICKOFF, not three, and that difference is why recaps went
-  // missing. An NFL game runs about three hours ten, so a game that started at
-  // 8pm was already outside a three-hour window by the time its row actually
-  // flipped to 'final'. The poller had stopped looking at it. Short games got a
-  // recap, long ones silently got nothing — which from inside a room reads as
-  // "the recaps stopped working".
+  // BY STATE, NOT BY CLOCK.
   //
-  // Six matches the dedupe guard below (sixHoursAgo on the posted message), so
-  // a wider search cannot post the same recap twice.
-  const sixHourWindow = new Date(now - 6 * 60 * 60 * 1000).toISOString();
+  // This used to search for finals that started within N hours. Every value of
+  // N is wrong: you cannot predict when a game ENDS. Three hours was shorter
+  // than a football game. Six still loses one that runs seven. The window was
+  // never the right idea — a game has either had its recap or it has not, and
+  // that is a fact about the game, so it lives on the game.
+  //
+  // A delayed game now gets its recap late instead of never.
   const { data: finals } = await supabase
     .from("games")
     .select(
@@ -679,13 +678,15 @@ async function postFinals(
         "away:teams!games_away_team_id_fkey(id, name, city)",
     )
     .eq("status", "final")
-    .gte("start_time", sixHourWindow)
+    .is("recap_posted_at", null)
     // A game that has not started cannot be final. Without this, a row with a
-    // FUTURE start_time that got wrongly marked final is always inside the
-    // "gte sixHourWindow" window, so it never ages out and re-posts a bogus
-    // final every 6 hours forever. Seen in production 2026-08-07: two Week 2
-    // September games carrying the Aug 6 Panthers/Cardinals score.
-    .lte("start_time", new Date(now).toISOString());
+    // FUTURE start_time wrongly marked final would post a bogus recap. Seen in
+    // production 2026-08-07: two Week 2 September games carrying the Aug 6
+    // Panthers/Cardinals score.
+    .lte("start_time", new Date(now).toISOString())
+    // Belt and braces against a backfill going wrong: nothing older than two
+    // days should ever produce a recap, whatever the flag says.
+    .gte("start_time", new Date(now - 48 * 60 * 60 * 1000).toISOString());
   if (!finals || finals.length === 0) return;
 
   const { data: sysUser } = await supabase.rpc("get_or_create_system_user");
@@ -743,6 +744,14 @@ async function postFinals(
         if (!error) summary.finals = (summary.finals ?? 0) + 1;
       }
     }
+
+    // Served every room this game reaches, so it is done — whatever happens on
+    // the next run. This is what replaces the old six-hour dedupe window: the
+    // guard is now "has this game been recapped", which cannot expire.
+    await supabase
+      .from("games")
+      .update({ recap_posted_at: new Date().toISOString() })
+      .eq("id", g.id);
   }
 }
 
