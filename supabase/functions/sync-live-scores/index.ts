@@ -669,9 +669,22 @@ serve(async (req) => {
         // Teams plus a same-day kickoff, not an exact timestamp: the two feeds
         // disagree by a few minutes on when a game starts, which is exactly how
         // the twins got in.
+        // A TIGHT window, deliberately.
+        //
+        // This was "same UTC day, plus 36 hours", which is wrong for exactly the
+        // case baseball produces constantly: a 9:38pm ET night game is 01:38 UTC
+        // the NEXT day, and the following afternoon's game in the same series is
+        // 20:08 UTC that same day. Two real games, same teams, one UTC date —
+        // and the wide window would have called the second one a duplicate and
+        // never inserted it.
+        //
+        // The twins this is actually for differ by MINUTES: the two feeds
+        // disagree slightly on kickoff, nothing more. Six hours covers that with
+        // room to spare and cannot reach the next game in a series.
         if (homeTeamId && awayTeamId) {
-          const dayStart = new Date(eg.date); dayStart.setUTCHours(0, 0, 0, 0);
-          const dayEnd = new Date(dayStart.getTime() + 36 * 60 * 60 * 1000);
+          const around = new Date(eg.date).getTime();
+          const dayStart = new Date(around - 6 * 60 * 60 * 1000);
+          const dayEnd = new Date(around + 6 * 60 * 60 * 1000);
           const { data: twin } = await supabase
             .from('games')
             .select('id')
