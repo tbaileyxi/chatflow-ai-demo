@@ -60,7 +60,13 @@ type SendResult = {
   previews: Array<{ chapter: string; to: string; subject: string; text?: string }>;
 };
 
-function statusBadge(status: ChapterStatus) {
+// "sent" is three different facts wearing one label.
+//
+// A chapter that got the intro and one that has had all three emails both read
+// as "sent", so the only way to know which was which was to remember the order
+// the batches went out in. sequence_step has carried the answer all along; it
+// was simply never shown.
+function statusBadge(status: ChapterStatus, step?: number) {
   const tone: Record<ChapterStatus, string> = {
     new: "bg-muted text-muted-foreground",
     queued: "bg-blue-500/15 text-blue-600",
@@ -69,7 +75,11 @@ function statusBadge(status: ChapterStatus) {
     onboarded: "bg-emerald-600 text-white",
     dead: "bg-destructive/15 text-destructive",
   };
-  return <Badge className={`${tone[status] ?? tone.new} border-0`}>{status}</Badge>;
+  // Only "sent" gains the step. A replied or onboarded chapter is past the
+  // sequence, and which email finally landed is no longer the useful fact.
+  const label =
+    status === "sent" && step && step >= 1 ? `sent · email ${step}` : status;
+  return <Badge className={`${tone[status] ?? tone.new} border-0`}>{label}</Badge>;
 }
 
 function scoreBadge(score: number) {
@@ -570,7 +580,15 @@ export default function ChaptersPanel() {
                   </TableCell>
                   <TableCell className="text-sm tabular-nums">{r.member_count ?? ""}</TableCell>
                   <TableCell>
-                    <div className="mb-2">{statusBadge(r.status)}</div>
+                    <div className="mb-2">{statusBadge(r.status, r.sequence_step)}</div>
+                    {/* When, not just whether. Nothing in chapter-send enforces a
+                        gap between steps, so this is the only thing standing
+                        between a considered follow-up and two emails in a day. */}
+                    {r.last_touch && (
+                      <div className="mb-2 text-xs text-muted-foreground tabular-nums">
+                        {r.last_touch}
+                      </div>
+                    )}
                     <select
                       className="h-8 rounded-md border border-input bg-background px-2 text-xs"
                       value={r.status}
