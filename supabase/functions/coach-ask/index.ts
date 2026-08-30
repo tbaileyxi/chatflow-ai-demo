@@ -12,6 +12,8 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { searchX } from "../_shared/coach/xsearch.ts";
+import { sportFor, sportScopeLine } from "../_shared/sport.ts";
+import { getRoster, positionFromQuestion, formatRoster } from "../_shared/coach/retrieve.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   getBoxScore,
@@ -278,10 +280,67 @@ serve(async (req) => {
     // ledger) still skip it, and the per-huddle/per-user caps still bound the
     // spend. A needless search costs ~2 cents; "I don't have that" costs a user.
     const currentLane = lane === "game" || lane === "mixed" || lane === "knowledge";
+
+    // "Who is our starting running back" came back "No clue."
+    //
+    // Two things were wrong. The search was `${teamName} ${question}` — "Buffaloes
+    // who is our starting running back", with no sport, so an athletic
+    // department's twenty other programs were equally valid answers. And every
+    // search demanded something posted in the LAST 48 HOURS, which a depth chart
+    // settled in camp is not. The answer existed; we were asking for it in a
+    // window it could never appear in.
+    //
+    // Roster questions are the ones a fan assumes are free. Getting "no clue" to
+    // one is worse than getting nothing to a hard question, because it reads as
+    // the Coach not knowing its own team.
+    const rosterQ = /\b(start(er|ing)?|depth chart|backup|back-?up|who (is|are) (our|the)|qb1|rb1|wr1|lineup|roster|injur(y|ed|ies)|questionable|doubtful|out for|suspend)\b/i
+      .test(question);
+
+    // The roster, when the question is about who plays. ESPN publishes it for
+    // every team; the X search that was being asked instead does not reliably
+    // have it, which is how "who is our starting running back" became "no clue"
+    // about nine running backs who are plainly on the roster.
+    let rosterFacts = "";
+    if (rosterQ && ctx.teamName && ctx.league) {
+      const pos = positionFromQuestion(question);
+      const rows = await getRoster(ctx.league, ctx.teamName, pos);
+      rosterFacts = formatRoster(rows, pos);
+    }
+
     let liveSearch = "";
-    if (LIVE_X && (wantsLive || currentLane) && ctx.teamName) {
-      const r = await searchX(`${ctx.teamName} ${question}`);
-      if (r.ok && r.text) liveSearch = r.text.slice(0, 1200);
+    // Same blind spot the clip search had: an empty result could be a failed
+    // call or a genuine miss, and they looked identical from outside. Reported
+    // on the response so "the Coach says no clue" is a diagnosable sentence.
+    const xDiag: Record<string, unknown> = { attempted: false };
+    if (LIVE_X && (wantsLive || currentLane || rosterQ) && ctx.teamName) {
+      const sport = sportFor(ctx.league, (gameSnap as any)?.sportKey);
+      const scope = sportScopeLine(ctx.teamName, sport);
+
+      const q = rosterQ
+        ? `${question}\n\nThis is about the ${ctx.teamName} ${sport} team. ${scope}\n\n` +
+          `Answer with the depth chart as it actually stands: name the projected ` +
+          `starter, their class and last season's production, and the backup ` +
+          `behind them. If the staff has NOT named a starter, say that plainly ` +
+          `and give the consensus from beat writers and camp reports, making ` +
+          `clear it is consensus rather than an announcement. Prefer beat ` +
+          `writers who cover this team and the program's own releases.`
+        : `${ctx.teamName} ${sport} — ${question}\n\n${scope}`;
+
+      // A depth chart does not change daily, so a two-week window is the honest
+      // one for it. News keeps the tight window that makes it news.
+      const r = await searchX(q, {
+        mode: rosterQ ? "reference" : "news",
+        recencyHours: rosterQ ? 336 : 48,
+        maxTokens: rosterQ ? 900 : 700,
+      });
+      xDiag.attempted = true;
+      xDiag.roster = rosterQ;
+      xDiag.ok = r.ok;
+      xDiag.chars = r.text?.length ?? 0;
+      xDiag.citations = r.citations?.length ?? 0;
+      xDiag.tokens = r.tokens ?? 0;
+      xDiag.roster_chars = rosterFacts.length;
+      if (r.ok && r.text) liveSearch = r.text.slice(0, rosterQ ? 1800 : 1200);
     }
 
     // --- 6. Answer -----------------------------------------------------------
@@ -317,6 +376,7 @@ serve(async (req) => {
           seasonResults,
           nextGame,
           liveSearch,
+          roster: rosterFacts,
         });
 
     if (!text.trim()) return json({ skipped: "empty answer" });
@@ -352,7 +412,7 @@ serve(async (req) => {
       answer_message_id: inserted?.id ?? null,
     });
 
-    return json({ ok: true, lane, message_id: inserted?.id });
+    return json({ ok: true, lane, message_id: inserted?.id, x: xDiag });
   } catch (err) {
     console.error("[coach-ask] failed", err);
     return json({ error: String(err) }, 500);

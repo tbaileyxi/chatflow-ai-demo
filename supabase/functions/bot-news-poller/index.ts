@@ -11,6 +11,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { searchX } from "../_shared/coach/xsearch.ts";
+import { sportFor, sportScopeLine } from "../_shared/sport.ts";
 import { fetchOgMeta, isNewsQuietWindow, parseRss, scoreEntries } from "../_shared/bot/news.ts";
 import { generateMessage, defaultPersona } from "../_shared/bot/voice.ts";
 import { newsCapRemaining, publish } from "../_shared/bot/publisher.ts";
@@ -59,12 +60,19 @@ function xEntryId(url: string): string {
 async function fetchXNews(
   teamName: string,
   lookbackHours: number,
+  league: string | null,
 ): Promise<Array<{
   entryId: string; title: string; link: string; source: string;
   publishedAt: string | null; imageUrl: string | null; summary: string | null;
 }>> {
+  // Which team at the school. A Colorado football room was handed a women's
+  // volleyball result because the question only ever said "the Buffaloes".
+  const sport = sportFor(league);
+  const scope = sportScopeLine(teamName, sport);
+
   const res = await searchX(
-    `What has actually happened with the ${teamName} in the last ${lookbackHours} hours?\n\n` +
+    `What has actually happened with the ${teamName} ${sport} team in the last ${lookbackHours} hours?\n\n` +
+      `${scope}\n\n` +
       `Report the news itself, not the conversation about it. Rank by what ` +
       `changes the team: a trade, a signing, an injury, a suspension, a firing, ` +
       `a starter or depth-chart change, a result that matters.\n\n` +
@@ -85,7 +93,8 @@ async function fetchXNews(
   let out = res;
   if (!out.ok || !out.citations[0]) {
     out = await searchX(
-      `What are ${teamName} fans talking about in the last ${lookbackHours * 2} hours?\n\n` +
+      `What are ${teamName} ${sport} fans talking about in the last ${lookbackHours * 2} hours?\n\n` +
+        `${scope}\n\n` +
         `Camp and practice notes, a player performance, a lineup or depth-chart ` +
         `note, a quote from a coach or player, a preview of the next game, ` +
         `something a beat writer reported. Anything a fan would want to know.\n\n` +
@@ -314,7 +323,7 @@ serve(async (req) => {
           // 24h, not 12. Football plays once a week; a 12-hour window on a
           // Wednesday sees an empty room and reports it as no news.
           const hours = Number(Deno.env.get("NEWS_X_LOOKBACK_HOURS") || 24);
-          const found = await fetchXNews(bundle.teamName, hours);
+          const found = await fetchXNews(bundle.teamName, hours, bundle.league);
           allEntries.push(...found);
           dbg.xFound = found.length;
         } catch (err) {

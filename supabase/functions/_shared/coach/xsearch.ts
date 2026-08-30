@@ -46,7 +46,15 @@ function splitCitations(raw: string): { text: string; citations: string[] } {
 
 export async function searchX(
   query: string,
-  opts: { maxTokens?: number; model?: string } = {},
+  opts: {
+    maxTokens?: number;
+    model?: string;
+    recencyHours?: number;
+    // "news" wants what just happened. "reference" wants a standing fact —
+    // a depth chart, a roster, who plays where — which does not have a
+    // publication date in the way news does.
+    mode?: "news" | "reference";
+  } = {},
 ): Promise<XSearchResult> {
   const key = Deno.env.get("XAI_API_KEY");
   const empty: XSearchResult = { text: "", citations: [], ok: false, tokens: 0 };
@@ -60,10 +68,30 @@ export async function searchX(
         model: opts.model ?? Deno.env.get("XSEARCH_MODEL") ?? "grok-4.3",
         // Ask for reporting, not opinion. The Coach supplies the voice; this
         // call only needs to come back with what was actually said.
+        // 48 hours is right for news and wrong for everything else. "Who is our
+        // starting running back" was being asked of a 48-hour window, so a depth
+        // chart settled in camp two weeks ago counted as NOTHING RECENT and the
+        // Coach answered "no clue" about a fact any beat writer could give you.
+        // The tail decides what counts as an answer, and it was written for
+        // news only. Asked "who is our projected starting running back", the
+        // model searched, spent 6,341 tokens, and returned exactly "NOTHING
+        // RECENT" — because a depth chart settled in camp is not something
+        // POSTED in a window. It was answering the instruction correctly; the
+        // instruction was asking the wrong thing.
         input:
-          `${query}\n\nReport only what you can find posted in the last 48 hours. ` +
-          `Be specific: names, numbers, who said it. If you find nothing recent, ` +
-          `say exactly "NOTHING RECENT" and stop.`,
+          opts.mode === "reference"
+            ? `${query}\n\nUse X — beat writers who cover this team, the ` +
+              `program's own accounts, established reporters — to answer. ` +
+              `Recency is not the test here: a depth chart or roster note from ` +
+              `a few weeks ago still stands unless something has changed since, ` +
+              `and if it has changed, lead with the change. Be specific: names, ` +
+              `class, position, last season's numbers. Say plainly when ` +
+              `something is a beat-writer consensus rather than an official ` +
+              `announcement. Only if you can find nothing whatsoever about this, ` +
+              `say exactly "NOTHING RECENT" and stop.`
+            : `${query}\n\nReport only what you can find posted in the last ${opts.recencyHours ?? 48} hours. ` +
+              `Be specific: names, numbers, who said it. If you find nothing recent, ` +
+              `say exactly "NOTHING RECENT" and stop.`,
         tools: [{ type: "x_search" }],
         max_output_tokens: opts.maxTokens ?? 700,
       }),
@@ -81,7 +109,18 @@ export async function searchX(
 
     const { text, citations } = splitCitations(raw);
     // An explicit miss is a real answer — it stops the Coach filling the gap.
-    if (/NOTHING RECENT/i.test(text)) {
+    // ONLY when that is the whole answer.
+    //
+    // This was a substring test, so any reply that merely contained the phrase
+    // was discarded entire — and "Nothing recent has been announced, but beat
+    // writers expect Micah Welch to start" is exactly the shape a good answer
+    // to a depth-chart question takes. The useful half was being thrown away
+    // with the caveat, and the Coach said "no clue" while holding the answer.
+    const trimmed = text.trim();
+    const onlyTheMiss =
+      /^[\s"'*_-]*NOTHING RECENT[\s.!"'*_-]*$/i.test(trimmed) ||
+      (trimmed.length < 40 && /NOTHING RECENT/i.test(trimmed));
+    if (onlyTheMiss) {
       return { text: "", citations: [], ok: true, tokens: j?.usage?.total_tokens ?? 0 };
     }
     return { text, citations, ok: true, tokens: j?.usage?.total_tokens ?? 0 };

@@ -191,6 +191,8 @@ export function isRecapQuestion(question: string): boolean {
 export interface AnswerInput {
   /** Live X search text, already fetched. Empty/absent = nothing found. */
   liveSearch?: string;
+  /** ESPN roster line for the position asked about. Empty/absent = not fetched. */
+  roster?: string;
   ctx: HuddleContext;
   question: string;
   asker: string;
@@ -215,6 +217,13 @@ export async function answerQuestion(input: AnswerInput): Promise<string> {
   // hold. It goes in as FACTS like anything else — the "only say what is in
   // FACTS" rule is what keeps this safe, and it is precisely why the search
   // result is pasted in rather than the model being told to go look.
+  // Before the X block on purpose: the roster is the harder fact. X supplies
+  // who is EXPECTED to start; ESPN supplies who is actually on the team, and
+  // when the two disagree the roster is the one that is checkable.
+  if (input.roster && input.roster.trim()) {
+    facts.push(input.roster.trim());
+  }
+
   if (input.liveSearch && input.liveSearch.trim()) {
     facts.push("LIVE FROM X (last 48h, reported — not your own knowledge):\n" + input.liveSearch.trim());
   }
@@ -279,6 +288,14 @@ ${knowledgeRules}
 ANSWERING:
 - Answer the question directly, in 1-4 sentences. No preamble, no "great question".
 - If the FACTS do not contain the answer, say plainly what you do have instead. Never guess and never pad.
+
+- A ROSTER LINE IN THE FACTS IS AN ANSWER, NOT A CONSOLATION. Asked who starts
+  at a position with the roster in hand, do not open with "no clue" — that reads
+  as the Coach not knowing its own team while nine names sit in front of it.
+  Lead with what is true: nobody has been named the starter yet, then give the
+  candidates WITH their class and number, senior and junior first, because
+  experience is what a fan is weighing. Two or three names, not the whole list.
+  Say the staff has not declared one rather than implying you cannot find out.
 - Talk like you are texting the room, not writing a report. No headers, no bullet lists unless you are genuinely listing 3+ things.`;
 
   const user = `Asked by ${input.asker} in "${ctx.huddleName}":

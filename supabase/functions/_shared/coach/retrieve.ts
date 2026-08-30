@@ -762,3 +762,101 @@ export async function getHuddleContext(
     memberCount: count ?? 0,
   };
 }
+
+/**
+ * The roster, from ESPN.
+ *
+ * "Who is our starting running back" was answered "No clue." The Coach was
+ * asking X for it, and X search kept returning NOTHING RECENT — a depth chart
+ * is not a thing anyone tweets on a schedule. Meanwhile ESPN publishes the
+ * whole roster with position, class and number, for every one of 760 college
+ * teams, for free.
+ *
+ * This does not claim to know the STARTER — ESPN's college roster has no depth
+ * order. It gives the Coach the actual candidates so it can say "our backs are
+ * Micah Welch, a junior, and Damian Henderson, a senior" instead of nothing,
+ * and the X search alongside it supplies who is expected to start.
+ */
+export interface RosterEntry {
+  name: string;
+  position: string;
+  jersey: string | null;
+  experience: string | null;
+}
+
+export async function getRoster(
+  league: string,
+  teamName: string,
+  position?: string | null,
+): Promise<RosterEntry[]> {
+  const p = leaguePath(league);
+  if (!p) return [];
+
+  try {
+    const index = await espnTeamIndex(p.sport, p.league);
+    const espnId = index.get(normalizeTeamKey(teamName));
+    if (!espnId) return [];
+
+    const res = await fetch(
+      `${ESPN_BASE}/${p.sport}/${p.league}/teams/${espnId}/roster`,
+      { headers: ESPN_HEADERS },
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+
+    // ESPN returns either a flat list or one grouped by offense/defense/special.
+    const raw = (data?.athletes ?? []) as any[];
+    const flat = raw.length && raw[0]?.items
+      ? raw.flatMap((g: any) => g.items ?? [])
+      : raw;
+
+    const all: RosterEntry[] = flat.map((a: any) => ({
+      name: a?.displayName ?? "",
+      position: a?.position?.abbreviation ?? "",
+      jersey: a?.jersey ? String(a.jersey) : null,
+      experience: a?.experience?.displayValue ?? null,
+    })).filter((r: RosterEntry) => r.name);
+
+    if (!position) return all;
+    const want = position.toUpperCase();
+    return all.filter((r) => r.position.toUpperCase() === want);
+  } catch (err) {
+    console.warn("[coach.retrieve] roster fetch failed", err);
+    return [];
+  }
+}
+
+// What position a question is about. Deliberately small: these are the ones
+// people actually ask after, and a wrong guess here would filter the roster
+// down to nothing, which is worse than handing over the whole thing.
+const POSITION_WORDS: Array<[RegExp, string]> = [
+  [/\b(running ?back|rb\b|tail ?back|halfback)/i, "RB"],
+  [/\b(quarter ?back|qb\b)/i, "QB"],
+  [/\b(wide ?receiver|wr\b|receiver)/i, "WR"],
+  [/\b(tight ?end|te\b)/i, "TE"],
+  [/\b(line ?backer|lb\b)/i, "LB"],
+  [/\b(corner ?back|cb\b)/i, "CB"],
+  [/\b(safety|safeties)\b/i, "S"],
+  [/\b(kicker|place ?kicker|pk\b)/i, "PK"],
+  [/\b(punter)\b/i, "P"],
+  [/\b(defensive end|de\b)/i, "DE"],
+  [/\b(center)\b/i, "C"],
+  [/\b(catcher)\b/i, "C"],
+  [/\b(pitcher|starting rotation)\b/i, "P"],
+  [/\b(goalie|goaltender)\b/i, "G"],
+];
+
+export function positionFromQuestion(q: string): string | null {
+  for (const [re, pos] of POSITION_WORDS) if (re.test(q)) return pos;
+  return null;
+}
+
+export function formatRoster(rows: RosterEntry[], position?: string | null): string {
+  if (!rows.length) return "";
+  const head = position ? `${position}s on the roster` : "Roster";
+  const body = rows
+    .slice(0, 24)
+    .map((r) => `${r.jersey ? "#" + r.jersey + " " : ""}${r.name}${r.position && !position ? ` (${r.position})` : ""}${r.experience ? `, ${r.experience}` : ""}`)
+    .join("; ");
+  return `${head} (ESPN, current): ${body}`;
+}
