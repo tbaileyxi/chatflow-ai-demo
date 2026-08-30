@@ -375,6 +375,91 @@ serve(async (req) => {
 
     let gamesEnriched = 0;
     const repairErrors: string[] = [];
+    let upcomingRepaired = 0;
+
+    // ── Repair upcoming games that only have one team ────────────────────
+    //
+    // Yesterday's fix filled the missing side during enrichment, which only
+    // looks at games happening around NOW. A room whose next fixture is a week
+    // out still read "Away @ Aggies · Sat, Sep 5" — the scoreboard people see
+    // most of the time is the one for a game that has not started, and that was
+    // exactly the one left broken.
+    //
+    // Matched on the known team AND the same calendar day. Single-team matching
+    // is otherwise dangerous: A&M has fixtures on Sep 5 and Sep 6, and without
+    // the date this would happily fill one from the other.
+    try {
+      const twoDaysBack = new Date(now.getTime() - 2 * 86400000).toISOString();
+      const twoWeeksOn  = new Date(now.getTime() + 14 * 86400000).toISOString();
+      const { data: halfGames } = await supabase
+        .from('games')
+        .select('id, sport_key, start_time, home_team_id, away_team_id')
+        .or('home_team_id.is.null,away_team_id.is.null')
+        .gte('start_time', twoDaysBack)
+        .lte('start_time', twoWeeksOn);
+
+      for (const hg of halfGames ?? []) {
+        const knownId = hg.home_team_id ?? hg.away_team_id;
+        if (!knownId) continue;  // neither side known: nothing to match on
+        const known = allTeams?.find((t: any) => t.id === knownId);
+        if (!known) continue;
+
+        const sport = Object.entries(SPORT_KEY_MAP)
+          .find(([, key]) => key === hg.sport_key)?.[0];
+        if (!sport) continue;
+
+        const ourDay = hg.start_time.slice(0, 10);
+        const candidates = (allEspnGames.get(sport) ?? [])
+          .filter((e: any) => String(e.date ?? '').slice(0, 10) === ourDay);
+
+        const full = known.city ? `${known.city} ${known.name}` : known.name;
+        const match = findMatchingGame(candidates, full, null)
+          ?? findMatchingGame(candidates, known.name, null);
+        if (!match) continue;
+
+        const comps = match.competitions?.[0]?.competitors || [];
+        const eh = comps.find((c: any) => c.homeAway === 'home');
+        const ea = comps.find((c: any) => c.homeAway === 'away');
+        if (!eh || !ea) continue;
+
+        const knownNorm = normalizeTeamName(full);
+        const ehNorm = normalizeTeamName(eh.team.displayName);
+        const weAreHome = ehNorm.includes(knownNorm) || knownNorm.includes(ehNorm);
+        const missing = hg.home_team_id ? ea : eh;
+        // If our known team is the ESPN away side, the side we lack is home.
+        const theirs = weAreHome ? ea : eh;
+        const use = hg.home_team_id && hg.away_team_id ? missing : theirs;
+
+        const nm = use.team.shortDisplayName || use.team.displayName;
+        let fillId = resolveTeamId(SPORT_TO_LEAGUE[sport], use.team.displayName, use.team.shortDisplayName);
+        if (!fillId) {
+          const { data: made, error: mkErr } = await supabase
+            .from('teams')
+            .insert({
+              name: nm,
+              city: use.team.location ?? null,
+              league: dbLeague(SPORT_TO_LEAGUE[sport]),
+              logo_url: use.team.logo ?? null,
+              status: 'inactive',
+            })
+            .select('id')
+            .maybeSingle();
+          if (mkErr) repairErrors.push(`${nm}: ${mkErr.message}`);
+          fillId = made?.id ?? null;
+        }
+        if (!fillId) continue;
+
+        await supabase
+          .from('games')
+          .update(hg.home_team_id ? { away_team_id: fillId } : { home_team_id: fillId })
+          .eq('id', hg.id);
+        upcomingRepaired++;
+        console.log(`🩹 Upcoming game ${ourDay}: filled ${nm}`);
+      }
+    } catch (err) {
+      repairErrors.push(`upcoming repair: ${(err as Error).message}`);
+    }
+
 
     for (const game of activeGames || []) {
       const homeName = (game as any).home_team?.name;
@@ -632,6 +717,7 @@ serve(async (req) => {
       games_enriched: gamesEnriched,
       games_inserted: gamesInserted,
       repair_errors: repairErrors,
+      upcoming_repaired: upcomingRepaired,
       sports_fetched: sportsToFetch.length,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
