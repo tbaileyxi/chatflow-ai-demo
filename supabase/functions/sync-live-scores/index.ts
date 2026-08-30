@@ -430,7 +430,7 @@ serve(async (req) => {
         const theirs = weAreHome ? ea : eh;
         const use = hg.home_team_id && hg.away_team_id ? missing : theirs;
 
-        const nm = use.team.shortDisplayName || use.team.displayName;
+        const nm = use.team.name || use.team.shortDisplayName || use.team.displayName;
         let fillId = resolveTeamId(SPORT_TO_LEAGUE[sport], use.team.displayName, use.team.shortDisplayName);
         if (!fillId) {
           const { data: made, error: mkErr } = await supabase
@@ -540,7 +540,7 @@ serve(async (req) => {
           ? (sameOrientation ? espnHome : espnAway)
           : (sameOrientation ? espnAway : espnHome);
 
-        const nm = espnMissing.team.shortDisplayName || espnMissing.team.displayName;
+        const nm = espnMissing.team.name || espnMissing.team.shortDisplayName || espnMissing.team.displayName;
         const existingId = resolveTeamId(
           SPORT_TO_LEAGUE[matchedSport],
           espnMissing.team.displayName,
@@ -635,7 +635,10 @@ serve(async (req) => {
           const { data: made } = await supabase
             .from('teams')
             .insert({
-              name: missing.team.shortDisplayName || missing.team.displayName,
+              // ESPN's `name` is the nickname ('Aggies'); shortDisplayName is an
+              // abbreviated SCHOOL ('New Mexico St'), and using it as the nickname
+              // rendered "New Mexico State New Mexico St" once city was prepended.
+              name: missing.team.name || missing.team.shortDisplayName || missing.team.displayName,
               city: missing.team.location ?? null,
               league: dbLeague(league),
               logo_url: missing.team.logo ?? null,
