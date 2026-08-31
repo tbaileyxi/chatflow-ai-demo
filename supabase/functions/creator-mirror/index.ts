@@ -50,7 +50,7 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   );
 
-  let body: { handle?: string; huddle_id?: string; probe_lists?: string; list_members?: string; dry?: boolean; probe_search?: string; lookback_hours?: number; gap_minutes?: number; discover?: { query: string; hours?: number; min_followers?: number; max_followers?: number }; set_handle?: { huddle_id: string; handle: string }; purge_room?: string } = {};
+  let body: { handle?: string; huddle_id?: string; probe_lists?: string; list_members?: string; dry?: boolean; probe_search?: string; lookback_hours?: number; gap_minutes?: number; discover?: { query: string; hours?: number; min_followers?: number; max_followers?: number; pages?: number; sport?: string; save?: boolean; org?: string }; set_handle?: { huddle_id: string; handle: string }; purge_room?: string } = {};
   try { body = await req.json(); } catch { /* no body is the normal case */ }
 
   // ── Probe: can this API tier read Lists? ──────────────────────────────────
@@ -105,17 +105,21 @@ serve(async (req) => {
     const minF = body.discover.min_followers ?? 1000;
     const maxF = body.discover.max_followers ?? 250000;
 
-    const authors = new Map<string, { handle: string; name: string; followers: number; posts: number; likes: number; best: string; bestLikes: number }>();
+    const authors = new Map<string, { handle: string; name: string; followers: number; posts: number; likes: number; best: string; bestLikes: number; bio: string; email: string | null; website: string | null }>();
     let next: string | undefined;
 
     // Three pages is enough to rank a fanbase and keeps the read budget small.
-    for (let page = 0; page < 3; page++) {
+    for (let page = 0; page < (body.discover.pages ?? 5); page++) {
       const qs = new URLSearchParams({
-        query: `(${body.discover.query}) -is:reply -is:retweet -is:quote lang:en`,
+        // Quote tweets stay. Excluding them cut out most of how creators actually
+        // post — DaBearsBlog's best material is quote tweets, and the first run of
+        // this search returned newspapers because only newspapers post the way the
+        // query assumed.
+        query: `(${body.discover.query}) -is:reply -is:retweet lang:en`,
         max_results: "100",
         "tweet.fields": "public_metrics,created_at",
         expansions: "author_id",
-        "user.fields": "username,name,public_metrics",
+        "user.fields": "username,name,public_metrics,description,url,entities",
         start_time: new Date(Date.now() - hours * 3600 * 1000).toISOString(),
       });
       if (next) qs.set("next_token", next);
@@ -134,8 +138,22 @@ serve(async (req) => {
         if (!u) continue;
         const f = u?.public_metrics?.followers_count ?? 0;
         if (f < minF || f > maxF) continue;
+
+        // A school fields twenty teams and they all post under the same
+        // hashtags. @CUBuffsVB ranked on the first run — the same wrong-sport
+        // pollution that put a volleyball graphic in a football room, arriving
+        // through a different door.
+        const tag = `${u.username} ${u.name}`.toLowerCase();
+        if (/\b(vb|volleyball|soccer|softball|wbb|w?bball|lacrosse|hockey|rowing|golf|tennis|track|swim|xc|gymnastics)\b/.test(tag)) continue;
         const likes = d?.public_metrics?.like_count ?? 0;
-        const cur = authors.get(u.username) ?? { handle: u.username, name: u.name, followers: f, posts: 0, likes: 0, best: "", bestLikes: -1 };
+        const bio = u.description ?? "";
+        // The reachable ones put an address in the bio. That is the difference
+        // between a name and a lead, and it is the only channel here that
+        // automates — bulk DMs on X are how an account gets suspended.
+        const email = (bio.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/) ?? [])[0] ?? null;
+        const website = u?.entities?.url?.urls?.[0]?.expanded_url ?? u.url ?? null;
+
+        const cur = authors.get(u.username) ?? { handle: u.username, name: u.name, followers: f, posts: 0, likes: 0, best: "", bestLikes: -1, bio, email, website };
         cur.posts += 1;
         cur.likes += likes;
         // Keep their best line. Reading one real post tells you more about
@@ -153,7 +171,33 @@ serve(async (req) => {
       .sort((a, b) => b.likes - a.likes)
       .slice(0, 30);
 
-    return json({ query: body.discover.query, hours, found: ranked.length, creators: ranked });
+    let saved = 0;
+    if (body.discover.save) {
+      for (const c of ranked) {
+        const { error } = await supabase.from("creator_leads").upsert({
+          handle: c.handle,
+          display_name: c.name,
+          org: body.discover.org ?? null,
+          followers: c.followers,
+          posts_seen: c.posts,
+          likes_seen: c.likes,
+          avg_likes: c.avg,
+          best_post: c.best,
+          bio: c.bio,
+          email: c.email,
+          website: c.website,
+          last_seen: new Date().toISOString(),
+        }, { onConflict: "handle" });
+        if (!error) saved++;
+      }
+    }
+
+    return json({
+      query: body.discover.query, hours,
+      found: ranked.length, saved,
+      with_email: ranked.filter((c) => c.email).length,
+      creators: ranked,
+    });
   }
 
   // ── Clear mirrored posts from a room ──────────────────────────────────────

@@ -3,6 +3,7 @@ import { Download, Mail, MapPin, RefreshCw, Search, Trash2, Copy, AtSign, Upload
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import ChaptersPanel from "@/components/outreach/ChaptersPanel";
+import CreatorsPanel from "@/components/outreach/CreatorsPanel";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -307,7 +308,7 @@ export default function Outreach() {
   const [campaign, setCampaign] = useState<Campaign>("school_partner_batch_4");
   const [lastResult, setLastResult] = useState<SendResult | null>(null);
   const [view, setView] = useState<"school" | "priority" | "all" | "contacted" | "followup">("school");
-  const [audience, setAudience] = useState<"sponsors" | "chapters">("sponsors");
+  const [audience, setAudience] = useState<"sponsors" | "chapters" | "creators">("sponsors");
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -727,7 +728,7 @@ export default function Outreach() {
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
               <h1 className="text-3xl font-bold text-foreground">
-                {audience === "chapters" ? "Chapter Outreach" : "Sponsor Prospecting Engine"}
+                {audience === "creators" ? "Creator Outreach" : audience === "chapters" ? "Chapter Outreach" : "Sponsor Prospecting Engine"}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {audience === "chapters"
@@ -762,11 +763,18 @@ export default function Outreach() {
             >
               Chapters
             </Button>
+            <Button
+              variant={audience === "creators" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAudience("creators")}
+            >
+              Creators
+            </Button>
           </div>
         </div>
       </div>
 
-      {audience === "chapters" ? <ChaptersPanel /> : (
+      {audience === "creators" ? <CreatorsPanel /> : audience === "chapters" ? <ChaptersPanel /> : (
 
       <div className="container mx-auto grid gap-6 px-4 py-8 xl:grid-cols-[390px,1fr]">
         <div className="space-y-6">
