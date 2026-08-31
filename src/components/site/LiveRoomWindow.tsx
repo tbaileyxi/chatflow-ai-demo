@@ -34,6 +34,7 @@ export default function LiveRoomWindow({
   teamName, accent, ink,
 }: { teamName: string; accent: string; ink: string }) {
   const [roomName, setRoomName] = useState<string | null>(null);
+  const [members, setMembers] = useState<number | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [game, setGame] = useState<GameLine | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "empty">("loading");
@@ -67,6 +68,9 @@ export default function LiveRoomWindow({
       const room = rooms?.[0];
       if (!room || cancelled) { setState("empty"); return; }
       setRoomName(room.name);
+      const { count } = await supabase
+        .from("huddle_members").select("id", { count: "exact", head: true }).eq("huddle_id", room.id);
+      if (!cancelled) setMembers(count ?? 1);
 
       const { data: rows } = await supabase
         .from("huddle_messages")
@@ -78,16 +82,27 @@ export default function LiveRoomWindow({
       setMsgs((rows ?? []).reverse() as Msg[]);
       setState((rows ?? []).length ? "ready" : "empty");
 
-      const { data: g } = await supabase
-        .from("games")
-        .select("status, start_time, home_score, away_score, period, clock, home_team:home_team_id(name), away_team:away_team_id(name)")
-        .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
-        .order("start_time", { ascending: false })
-        .limit(6);
-      const live = (g ?? []).find((x: any) => x.status === "in_progress");
-      const next = [...(g ?? [])].reverse().find((x: any) =>
-        x.status === "scheduled" && Date.parse(x.start_time) > Date.now());
-      const pick: any = live ?? next ?? (g ?? [])[0];
+      // Two queries, because "the next game" and "the last game" are opposite
+      // sorts. Asking for the six latest fixtures and taking the first future
+      // one out of them put a December game on the Browns page in August — the
+      // whole season is in the table, so "latest" is January.
+      const cols = "status, start_time, home_score, away_score, period, clock, home_team:home_team_id(name), away_team:away_team_id(name)";
+      const mine = `home_team_id.eq.${team.id},away_team_id.eq.${team.id}`;
+
+      const { data: liveRows } = await supabase
+        .from("games").select(cols).or(mine)
+        .eq("status", "in_progress").limit(1);
+      const { data: nextRows } = await supabase
+        .from("games").select(cols).or(mine)
+        .eq("status", "scheduled")
+        .gt("start_time", new Date().toISOString())
+        .order("start_time", { ascending: true }).limit(1);
+      const { data: lastRows } = await supabase
+        .from("games").select(cols).or(mine)
+        .eq("status", "final")
+        .order("start_time", { ascending: false }).limit(1);
+
+      const pick: any = liveRows?.[0] ?? nextRows?.[0] ?? lastRows?.[0];
       if (pick && !cancelled) {
         setGame({
           home: pick.home_team?.name ?? "Home",
@@ -118,66 +133,117 @@ export default function LiveRoomWindow({
 
   return (
     <div className="mx-auto w-full max-w-[340px]">
-      {/* phone */}
+      {/* The app's chrome, not a generic phone. Someone who installs after
+          seeing this should recognise the screen they land on. */}
       <div
         className="rounded-[38px] border-[10px] border-[#1b1b1f] bg-[#0b0b0f] shadow-2xl overflow-hidden"
         style={{ boxShadow: `0 30px 80px ${accent}22, 0 20px 50px rgba(0,0,0,.6)` }}
       >
-        <div className="h-6 bg-[#0b0b0f] flex items-center justify-center">
-          <div className="h-1.5 w-20 rounded-full bg-[#26262e]" />
-        </div>
+        <div className="h-5 bg-[#0b0b0f]" />
 
-        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#1c1c24]">
+        {/* header */}
+        <div className="flex items-center gap-2.5 px-3 py-2.5">
+          <span className="text-white/40 text-lg leading-none">‹</span>
           <div
-            className="h-7 w-7 rounded-lg grid place-items-center text-[10px] font-extrabold"
+            className="h-8 w-8 rounded-full grid place-items-center text-[10px] font-extrabold flex-none"
             style={{ background: accent, color: ink }}
           >
             {teamName.split(" ").map((w) => w[0]).join("").slice(0, 3)}
           </div>
-          <div className="text-[13px] font-semibold truncate">{roomName ?? `${teamName} Community`}</div>
+          <div className="text-[14px] font-bold truncate flex-1">{roomName ?? `${teamName} Community`}</div>
+          <span className="text-[10px] text-white/45">👥 {members ?? 1}</span>
+          <div
+            className="h-7 w-7 rounded-full grid place-items-center text-[12px] font-bold flex-none"
+            style={{ background: "#F5C518", color: "#12100A" }}
+          >+</div>
         </div>
 
+        {/* scoreboard */}
         {game && (
-          <div className="px-3 py-2 border-b border-[#1c1c24] bg-[#101016]">
-            <div className="text-[12.5px] font-bold tracking-tight">
-              {game.away} {game.awayScore ?? ""} &nbsp;—&nbsp; {game.home} {game.homeScore ?? ""}
+          <div
+            className="px-3 py-2.5 text-center"
+            style={{ background: `${accent}14`, borderTop: "1px solid #1c1c24", borderBottom: "1px solid #1c1c24" }}
+          >
+            <div className="text-[14px] font-bold tracking-tight">
+              {game.live
+                ? `${game.away} ${game.awayScore ?? 0} — ${game.home} ${game.homeScore ?? 0}`
+                : `${game.away}  @  ${game.home}`}
             </div>
-            <div className="text-[10.5px] text-[#8b8b95] flex items-center gap-1.5 mt-0.5">
+            <div className="text-[11px] text-white/45 mt-0.5 flex items-center justify-center gap-1.5">
               {game.live && <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />}
-              {game.live ? `${game.period ?? ""} ${game.clock ?? ""}` : kickoff}
+              {game.live ? `${game.period ?? ""} · ${game.clock ?? ""}` : kickoff}
             </div>
           </div>
         )}
 
-        <div className="h-[370px] overflow-hidden px-3 py-3 flex flex-col justify-end gap-2">
-          {state === "loading" && <div className="text-[12px] text-[#6c6c76]">Loading the room…</div>}
+        {/* jump row */}
+        <div className="flex items-center gap-1.5 px-3 py-2 overflow-hidden border-b border-[#161620]">
+          <span className="text-[9.5px] tracking-widest text-white/35 font-semibold flex-none">JUMP</span>
+          {["Mets", "Bills 12", "G tech"].map((r) => (
+            <span key={r} className="rounded-full bg-[#17171e] border border-[#25252f] px-2.5 py-1 text-[10.5px] text-white/60 flex-none">
+              {r}
+            </span>
+          ))}
+        </div>
+
+        {/* action row */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-[#161620]">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          <span className="text-[10.5px] text-white/50">{members ?? 1}</span>
+          <div className="ml-auto flex gap-1.5">
+            <span className="rounded-full border border-[#2b2b35] px-2.5 py-1 text-[10.5px] text-white/70">⚔ Fade</span>
+            <span className="rounded-full px-2.5 py-1 text-[10.5px] font-semibold" style={{ background: "#14351f", color: "#4ADE80" }}>
+              📣 Rally the huddle
+            </span>
+          </div>
+        </div>
+
+        {/* thread, on the room background */}
+        <div
+          className="h-[330px] overflow-hidden px-3 py-3 flex flex-col justify-end gap-2"
+          style={{
+            backgroundColor: `${accent}0d`,
+            backgroundImage:
+              "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='118' height='118'%3E%3Ctext x='59' y='68' font-family='Arial Black, sans-serif' font-size='30' font-weight='900' fill='%23ffffff' fill-opacity='0.045' text-anchor='middle'%3ESH%3C/text%3E%3C/svg%3E\")",
+          }}
+        >
+          {state === "loading" && <div className="text-[12px] text-white/35">Loading the room…</div>}
           {state === "empty" && (
-            <div className="text-[12px] text-[#6c6c76]">
-              This room is quiet right now. It wakes up on game day.
-            </div>
+            <div className="text-[12px] text-white/35">This room wakes up on game day.</div>
           )}
           {msgs.map((m) => (
             <div key={m.id} className="flex gap-2 items-start">
               <div
-                className="h-5 w-5 rounded-full grid place-items-center text-[7.5px] font-extrabold flex-none mt-0.5"
+                className="h-6 w-6 rounded-full grid place-items-center text-[7.5px] font-extrabold flex-none mt-0.5"
                 style={
                   m.is_bot_message
-                    ? { background: "#23232b", color: accent, border: `1.5px solid ${accent}` }
+                    ? { background: "#1b1b21", color: "#F5C518", border: "1.5px solid #F5C518" }
                     : { background: "#2b2b34", color: "#c9c9d2" }
                 }
               >
                 {m.is_bot_message ? "SH" : "•"}
               </div>
-              <div className="rounded-xl bg-[#1b1b21] border border-[#26262e] px-2.5 py-1.5 text-[12px] leading-snug text-[#e9e9e6] max-w-[86%]">
-                {(m.content ?? "").slice(0, 220)}
+              <div
+                className="rounded-xl bg-[#1b1b21]/95 px-2.5 py-1.5 text-[12px] leading-snug text-[#e9e9e6] max-w-[86%]"
+                style={m.is_bot_message ? { borderLeft: "3px solid #F5C518" } : { border: "1px solid #2a2a33" }}
+              >
+                {(m.content ?? "").slice(0, 200)}
                 {m.media_type === "video" && (
-                  <div className="mt-1.5 rounded-md bg-[#101015] border border-[#26262e] h-16 grid place-items-center text-[10px] text-[#7b7b85]">
+                  <div className="mt-1.5 rounded-md bg-[#101015] border border-[#26262e] h-14 grid place-items-center text-[10px] text-white/35">
                     ▶ clip
                   </div>
                 )}
               </div>
             </div>
           ))}
+        </div>
+
+        {/* composer */}
+        <div className="flex items-center gap-2 px-3 py-2.5 border-t border-[#161620]">
+          <span className="text-white/30 text-[13px]">📷</span>
+          <span className="text-white/30 text-[13px]">🖼</span>
+          <div className="flex-1 rounded-full border border-[#F5C518]/45 px-3 py-1.5 text-[11.5px] text-white/30">Message…</div>
+          <div className="h-7 w-7 rounded-full grid place-items-center text-[11px]" style={{ background: "#8a6f16" }}>➤</div>
         </div>
       </div>
 
