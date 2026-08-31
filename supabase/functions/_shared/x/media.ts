@@ -166,6 +166,10 @@ export interface XPost {
   replies: number;
   isReply: boolean;
   isRepost: boolean;
+  /** The post this one quotes, if any. A quote tweet without it is nonsense:
+   *  "Has America ever spent two weeks talking about the Titans?" means nothing
+   *  until you can see what it is answering. */
+  quotedId: string | null;
   imageUrl: string | null;
   videoUrl: string | null;
   url: string;
@@ -229,6 +233,7 @@ export async function fetchPosts(postIds: string[]): Promise<XPost[]> {
       replies: post?.public_metrics?.reply_count ?? 0,
       isReply: refs.some((r: any) => r.type === "replied_to"),
       isRepost: refs.some((r: any) => r.type === "retweeted"),
+      quotedId: refs.find((r: any) => r.type === "quoted")?.id ?? null,
       imageUrl: m?.url ?? m?.preview_image_url ?? null,
       videoUrl,
       url: handle ? `https://x.com/${handle}/status/${post.id}` : `https://x.com/i/status/${post.id}`,

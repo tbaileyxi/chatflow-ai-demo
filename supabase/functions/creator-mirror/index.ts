@@ -31,7 +31,7 @@ const json = (b: unknown, status = 200) =>
 // A creator posts thirty times a day: replies, reposts, jokes about lunch.
 // Mirroring all of it turns their room into a feed dump and they would be the
 // first to hate it. These are the only three knobs that matter.
-const MIN_LIKES   = Number(Deno.env.get("MIRROR_MIN_LIKES") || 5);
+const MIN_LIKES   = Number(Deno.env.get("MIRROR_MIN_LIKES") || 25);
 const PER_RUN     = Number(Deno.env.get("MIRROR_PER_RUN") || 3);
 const LOOKBACK_H  = Number(Deno.env.get("MIRROR_LOOKBACK_HOURS") || 12);
 
@@ -43,7 +43,7 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   );
 
-  let body: { handle?: string; huddle_id?: string; probe_lists?: string; list_members?: string; dry?: boolean; probe_search?: string; lookback_hours?: number } = {};
+  let body: { handle?: string; huddle_id?: string; probe_lists?: string; list_members?: string; dry?: boolean; probe_search?: string; lookback_hours?: number; set_handle?: { huddle_id: string; handle: string }; purge_room?: string } = {};
   try { body = await req.json(); } catch { /* no body is the normal case */ }
 
   // ── Probe: can this API tier read Lists? ──────────────────────────────────
@@ -82,6 +82,48 @@ serve(async (req) => {
       out.error = (err as Error).message;
     }
     return json(out);
+  }
+
+  // ── Clear mirrored posts from a room ──────────────────────────────────────
+  // For iterating on a test room without leaving every earlier attempt in it.
+  // Scoped to creator_post only: nothing a person wrote is touched.
+  if (body.purge_room) {
+    // Skip anything somebody has replied to — a reply pointing at a deleted
+    // message is a broken thread, and the foreign key will refuse anyway.
+    const { data: replied } = await supabase
+      .from("huddle_messages").select("reply_to_id")
+      .eq("huddle_id", body.purge_room).not("reply_to_id", "is", null);
+    const keep = new Set((replied ?? []).map((r: any) => r.reply_to_id));
+
+    const { data: mine } = await supabase
+      .from("huddle_messages").select("id")
+      .eq("huddle_id", body.purge_room).eq("message_type", "creator_post");
+    const ids = (mine ?? []).map((m: any) => m.id).filter((id: string) => !keep.has(id));
+
+    let deleted = 0;
+    if (ids.length) {
+      const { error, count } = await supabase
+        .from("huddle_messages").delete({ count: "exact" }).in("id", ids);
+      if (error) return json({ error: error.message }, 500);
+      deleted = count ?? 0;
+    }
+
+    // Release the claims so the improved version of the same post can land.
+    const { data: room } = await supabase
+      .from("huddles").select("x_handle").eq("id", body.purge_room).maybeSingle();
+    if (room?.x_handle) {
+      await supabase.from("seen_events").delete().eq("game_id", `xmirror:${room.x_handle}`);
+    }
+    return json({ ok: true, deleted, kept_because_replied_to: keep.size });
+  }
+
+  // ── Wire a room to a handle ───────────────────────────────────────────────
+  if (body.set_handle) {
+    const h = body.set_handle.handle.replace(/^@/, "");
+    const { error } = await supabase
+      .from("huddles").update({ x_handle: h }).eq("id", body.set_handle.huddle_id);
+    if (error) return json({ error: error.message }, 500);
+    return json({ ok: true, huddle_id: body.set_handle.huddle_id, x_handle: h });
   }
 
   // ── Probe: native recent search ───────────────────────────────────────────
@@ -157,6 +199,7 @@ serve(async (req) => {
     errors: [] as string[],
     preview: [] as string[],
     candidates_kept: 0 as number | undefined,
+    skipped_promo: 0 as number | undefined,
   };
 
   for (const room of rooms) {
@@ -200,11 +243,48 @@ serve(async (req) => {
       const posts = await fetchPosts(ids);
       summary.candidates += posts.length;
 
+      // Quote tweets carry their meaning in the post they quote — and often the
+      // media too. Pulled in the same batched read, so it costs one extra call
+      // per run rather than one per post.
+      const quotedIds = posts.map((p) => p.quotedId).filter(Boolean) as string[];
+      const quoted = new Map<string, typeof posts[number]>();
+      if (quotedIds.length) {
+        for (const q of await fetchPosts(quotedIds)) quoted.set(q.postId, q);
+      }
+
       let postedHere = 0;
       for (const p of posts) {
         if (postedHere >= PER_RUN) break;
         if (p.isReply || p.isRepost) { summary.skipped_reply_or_repost++; continue; }
         if (p.likes < MIN_LIKES)     { summary.skipped_low++; continue; }
+
+        // Drop the newsletter dumps. "JHiTB! From the fine folks at @sportsmockery
+        // • Contextualizing Tyson Bagent • Emails on Malik…" is a promo for
+        // somebody else's site, not a take, and it filled a third of the test
+        // room on its own. Bullets plus multiple links is the shape of it.
+        const bullets = (p.text.match(/[•·]/g) ?? []).length;
+        const links = (p.text.match(/https?:\/\//g) ?? []).length;
+        if (bullets >= 2 || links >= 2) { summary.skipped_promo = (summary.skipped_promo ?? 0) + 1; continue; }
+
+        // Strip the trailing t.co stub, then attribute.
+        const strip = (v: string) => v.replace(/https?:\/\/t\.co\/\S+/g, "").replace(/\s+/g, " ").trim();
+        let clean = strip(p.text);
+
+        // A quote tweet is only worth posting WITH what it quotes.
+        const q = p.quotedId ? quoted.get(p.quotedId) : null;
+        if (p.quotedId && !q) { summary.skipped_promo = (summary.skipped_promo ?? 0) + 1; continue; }
+        if (q) {
+          const qt = strip(q.text);
+          if (qt) clean = `${clean}\n\n↳ @${q.authorHandle ?? "?"}: ${qt}`;
+        }
+
+        // The media may belong to the quoted post rather than theirs — in the
+        // Titans example the video is Stillman's, and without this the room gets
+        // the comment and none of the clip it is about.
+        const mediaVideo = p.videoUrl ?? q?.videoUrl ?? null;
+        const mediaImage = p.imageUrl ?? q?.imageUrl ?? null;
+
+        if (strip(p.text).length < 12 && !q) { summary.skipped_promo = (summary.skipped_promo ?? 0) + 1; continue; }
 
         // Claim before posting, same as the clip puller: a unique violation
         // means another run already took this post.
@@ -214,7 +294,7 @@ serve(async (req) => {
         if (body.dry) {
           postedHere++;
           summary.candidates_kept = (summary.candidates_kept ?? 0) + 1;
-          summary.preview.push(`@${room.x_handle} · ${p.likes} likes · ${p.videoUrl ? "video" : p.imageUrl ? "image" : "text"} · ${p.text.slice(0, 80)}`);
+          summary.preview.push(`${p.likes} likes · ${mediaVideo ? "video" : mediaImage ? "image" : "text"} · ${clean.slice(0, 100).replace(/\n/g, " | ")}`);
           continue;
         }
 
@@ -230,20 +310,24 @@ serve(async (req) => {
         const { error: insErr } = await supabase.from("huddle_messages").insert({
           huddle_id: room.id,
           user_id: botUserId,
-          content: p.text.replace(/https?:\/\/t\.co\/\S+/g, "").trim(),
+          // ATTRIBUTED, because it is not ours. In the test room these landed
+          // under the Side Huddle avatar and read as though the bot had written
+          // someone else's takes. Wrong in the creator's own room, and much
+          // worse anywhere else it might appear.
+          content: `${clean}\n— @${p.authorHandle ?? room.x_handle}`,
           embed_code: p.url,
           is_bot_message: true,
           is_team_agent_message: true,
           message_type: "creator_post",
-          ...(p.videoUrl || p.imageUrl
-            ? { media_url: p.videoUrl ?? p.imageUrl, media_type: p.videoUrl ? "video" : "image" }
+          ...(mediaVideo || mediaImage
+            ? { media_url: mediaVideo ?? mediaImage, media_type: mediaVideo ? "video" : "image" }
             : {}),
         });
         if (insErr) { summary.errors.push(`${room.x_handle}: ${insErr.message}`); continue; }
 
         postedHere++;
         summary.posted++;
-        summary.preview.push(`@${room.x_handle}: ${p.text.slice(0, 70)}`);
+        summary.preview.push(`${mediaVideo ? "[video] " : mediaImage ? "[image] " : "[text]  "}${clean.slice(0, 90).replace(/\n/g, " ")}`);
       }
     } catch (err) {
       summary.errors.push(`${room.x_handle}: ${(err as Error).message}`);
