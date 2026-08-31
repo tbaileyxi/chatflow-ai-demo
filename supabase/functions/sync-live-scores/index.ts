@@ -287,7 +287,7 @@ serve(async (req) => {
 
     const { data: allTeams } = await supabase
       .from('teams')
-      .select('id, name, city, league');
+      .select('id, name, city, league, status');
     // Exact-match index only (full "City Name" and bare "Name") with league
     // verification — fuzzy matching across leagues misfires (Rangers, Giants…).
     const teamIndex = new Map<string, { id: string; league: string }>();
@@ -522,6 +522,30 @@ serve(async (req) => {
         newStatus = 'in_progress';
       }
 
+      // Rename a placeholder through the GAME, not through its name.
+      //
+      // The pass above finds placeholders by looking them up by name, which
+      // cannot work when the name is the broken thing: "Hawai'i Hawai'i" does
+      // not match ESPN's "Hawai'i Rainbow Warriors" under any key. But here we
+      // already know which ESPN game this row IS, so the competitor opposite our
+      // team tells us the nickname directly.
+      for (const [ourId, espnSide] of [
+        [game.home_team_id, sameOrientation ? espnHome : espnAway],
+        [game.away_team_id, sameOrientation ? espnAway : espnHome],
+      ] as Array<[string | null, any]>) {
+        if (!ourId || !espnSide?.team?.name) continue;
+        const ours = allTeams?.find((x: any) => x.id === ourId);
+        if (!ours || ours.status !== 'inactive') continue;
+        if (ours.name === espnSide.team.name) continue;
+        const { error: renErr } = await supabase
+          .from('teams').update({ name: espnSide.team.name }).eq('id', ourId);
+        if (!renErr) {
+          console.log(`🩹 Renamed via game: ${ours.city} ${ours.name} -> ${espnSide.team.name}`);
+          ours.name = espnSide.team.name;
+          namesFixed++;
+        }
+      }
+
       // Build update payload — only include fields that changed
       const updates: Record<string, any> = {};
 
@@ -600,6 +624,42 @@ serve(async (req) => {
     // involve a team in our DB, keyed on odds_game_id = "espn-{sport}-{id}"
     // so reruns are idempotent. Parts 2–3 then keep them updated.
     // ──────────────────────────────────────────────────────
+    // Repair placeholder names created before the nickname was read properly.
+    //
+    // Opponent rows were built with ESPN's shortDisplayName, which is an
+    // abbreviated SCHOOL ("New Mexico St", "San José St") and not a nickname, so
+    // prepending the city produced "New Mexico State New Mexico St" and
+    // "Hawai'i Hawai'i" on scoreboards. New rows use `name` now; these are the
+    // ones already written. Only 'inactive' rows are touched — the real teams
+    // are curated and must never be renamed by a sync.
+    let namesFixed = 0;
+    try {
+      for (const [sport, espnGames] of allEspnGames.entries()) {
+        const league = SPORT_TO_LEAGUE[sport];
+        if (!league) continue;
+        for (const eg of espnGames) {
+          for (const c of (eg.competitions?.[0]?.competitors || [])) {
+            const nick = c.team?.name;
+            if (!nick) continue;
+            const id = resolveTeamId(league, c.team.displayName, c.team.shortDisplayName);
+            if (!id) continue;
+            const ours = allTeams?.find((x: any) => x.id === id);
+            if (!ours || ours.status !== 'inactive') continue;
+            if (ours.name === nick) continue;
+            const { error } = await supabase
+              .from('teams').update({ name: nick }).eq('id', id);
+            if (!error) {
+              ours.name = nick;
+              namesFixed++;
+              console.log(`🩹 Renamed placeholder ${ours.city} -> ${nick}`);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      repairErrors.push(`name repair: ${(err as Error).message}`);
+    }
+
     let gamesInserted = 0;
     for (const [sport, espnGames] of allEspnGames.entries()) {
       const sportKey = SPORT_KEY_MAP[sport];
@@ -734,6 +794,7 @@ serve(async (req) => {
       games_inserted: gamesInserted,
       repair_errors: repairErrors,
       upcoming_repaired: upcomingRepaired,
+      names_fixed: namesFixed,
       sports_fetched: sportsToFetch.length,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

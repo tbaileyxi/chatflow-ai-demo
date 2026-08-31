@@ -54,48 +54,80 @@ serve(async (req) => {
 
     console.log('Starting games sync...');
 
-    // Get all teams for matching
+    // Teams, indexed PER LEAGUE, never by nickname alone.
+    //
+    // This is where the wrong-team games came from. The old index keyed every
+    // team by its bare nickname and then matched by substring in both
+    // directions, with a final fallback that compared only the LAST WORD. So:
+    //
+    //   "New Mexico State Aggies"   -> aggies    -> Texas A&M Aggies
+    //   "Hawai'i Rainbow Warriors"  -> warriors  -> Golden State Warriors
+    //   "Sacramento State"          -> sacramento-> Sacramento Kings
+    //   "San Jose State Spartans"   -> san jose  -> San Jose Sharks
+    //
+    // A Texas A&M room carried a 34-17 loss to Florida State for a game New
+    // Mexico State played. And because this upserts on odds_game_id, it wrote
+    // the wrong team back every run — a hand-repaired row was correct until the
+    // next sync undid it.
+    const SPORT_TO_DB_LEAGUE: Record<string, string> = {
+      americanfootball_nfl: 'NFL',
+      americanfootball_ncaaf: 'NCAA',
+      basketball_nba: 'NBA',
+      basketball_ncaab: 'NCAA',
+      icehockey_nhl: 'NHL',
+      baseball_mlb: 'MLB',
+    };
+
     const { data: teams, error: teamsError } = await supabase
       .from('teams')
-      .select('id, name, city')
+      .select('id, name, city, league')
       .eq('status', 'active');
 
     if (teamsError) throw teamsError;
 
-    const teamMap = new Map<string, Team>();
-    teams?.forEach(team => {
-      // Create multiple lookup keys for team matching
-      const keys = [
-        team.name.toLowerCase(),
-        `${team.city} ${team.name}`.toLowerCase(),
-        team.city.toLowerCase()
-      ];
-      keys.forEach(key => teamMap.set(key, team));
-    });
+    // Fold accents and punctuation so "San José State" and "Hawai'i" compare as
+    // their plain-ASCII spellings.
+    const norm = (v: string) =>
+      (v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 
-    // Helper to find team by name
-    const findTeam = (teamName: string): Team | null => {
-      const normalized = teamName.toLowerCase();
-      
-      // Direct match
-      if (teamMap.has(normalized)) return teamMap.get(normalized)!;
-      
-      // Try partial matches
-      for (const [key, team] of teamMap.entries()) {
-        if (normalized.includes(key) || key.includes(normalized)) {
-          return team;
-        }
-      }
-      
-      // Try matching just the last word (team name without city)
-      const lastWord = normalized.split(' ').pop() || '';
-      for (const [key, team] of teamMap.entries()) {
-        if (key.includes(lastWord) && lastWord.length > 3) {
-          return team;
-        }
-      }
-      
-      return null;
+    const byLeague = new Map<string, Map<string, Team>>();
+    const shortByLeague = new Map<string, Map<string, Team>>();
+    const poisoned = new Map<string, Set<string>>();
+
+    for (const team of (teams ?? []) as (Team & { league: string })[]) {
+      const lg = team.league;
+      if (!byLeague.has(lg)) byLeague.set(lg, new Map());
+      if (!shortByLeague.has(lg)) shortByLeague.set(lg, new Map());
+      if (!poisoned.has(lg)) poisoned.set(lg, new Set());
+
+      byLeague.get(lg)!.set(norm(`${team.city} ${team.name}`), team);
+
+      // The school/city on its own, because the odds feed names college teams
+      // that way ("New Mexico State", not "New Mexico State Aggies"). Only where
+      // it is unambiguous IN THAT LEAGUE: "new york" is two NFL teams, so a key
+      // that would resolve to more than one is poisoned rather than left
+      // pointing at whichever row happened to load first.
+      const shortMap = shortByLeague.get(lg)!;
+      const bad = poisoned.get(lg)!;
+      const key = norm(team.city ?? '');
+      if (!key) continue;
+      if (bad.has(key)) continue;
+      if (shortMap.has(key)) { shortMap.delete(key); bad.add(key); continue; }
+      shortMap.set(key, team);
+    }
+
+    // Exact keys only. No substring, no last-word: those are what produced the
+    // collisions above, and a wrong team is far worse than no team — an
+    // unmatched game is invisible, while a mismatched one posts a result into
+    // the wrong fans' room.
+    const findTeam = (teamName: string, sportKey: string): Team | null => {
+      const lg = SPORT_TO_DB_LEAGUE[sportKey];
+      if (!lg) return null;
+      const key = norm(teamName);
+      return byLeague.get(lg)?.get(key)
+        ?? shortByLeague.get(lg)?.get(key)
+        ?? null;
     };
 
     let gamesUpserted = 0;
@@ -119,18 +151,18 @@ serve(async (req) => {
         console.log(`Fetched ${games.length} games for ${sportKey}`);
 
         for (const game of games) {
-          const homeTeam = findTeam(game.home_team);
-          const awayTeam = findTeam(game.away_team);
+          const homeTeam = findTeam(game.home_team, sportKey);
+          const awayTeam = findTeam(game.away_team, sportKey);
 
           // Determine game status
-          let status: 'scheduled' | 'live' | 'final' = 'scheduled';
+          let status: 'scheduled' | 'in_progress' | 'final' = 'scheduled';
           const now = new Date();
           const commenceTime = new Date(game.commence_time);
           
           if (game.completed) {
             status = 'final';
           } else if (commenceTime <= now) {
-            status = 'live';
+            status = 'in_progress';
           }
 
           // Parse scores
@@ -152,8 +184,14 @@ serve(async (req) => {
               sport_key: sportKey,
               start_time: game.commence_time,
               status,
-              home_team_id: homeTeam?.id || null,
-              away_team_id: awayTeam?.id || null,
+              // Only written when we actually resolved them. Sending null on
+              // every run overwrote the opponent that sync-live-scores had
+              // filled in, so a room's scoreboard flipped between a team name
+              // and the word "Away" once a minute. Omitted columns are left
+              // alone by ON CONFLICT DO UPDATE; a new row simply starts null and
+              // gets repaired on the next pass.
+              ...(homeTeam?.id ? { home_team_id: homeTeam.id } : {}),
+              ...(awayTeam?.id ? { away_team_id: awayTeam.id } : {}),
               home_score: homeScore,
               away_score: awayScore,
               last_synced_at: new Date().toISOString()
