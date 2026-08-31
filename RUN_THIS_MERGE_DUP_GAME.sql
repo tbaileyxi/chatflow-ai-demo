@@ -1,96 +1,103 @@
--- Memphis at UNLV, twice.
+-- The same game held twice, merged rather than half-deleted.
 --
--- Both rows are now correct — that is the point. The odds row arrived labelled
--- "Clemson at Ole Miss", and the previous script repointed it to the real teams
--- rather than deleting it, because something referenced it. It is now a true
--- duplicate of the row we already held from ESPN.
+-- 33 redundant rows across 32 clusters: same sport, same two teams, kickoffs
+-- within six hours of each other. They arrived by several routes — two feeds
+-- writing the same fixture under different ids, and a stale copy carrying a
+-- wrong date that was later corrected onto the right one.
 --
--- Deleting a referenced row is the thing every cleanup so far has refused to do,
--- and rightly. So this MOVES the references first, then deletes.
+-- Earlier cleanups deleted only the rows nothing referenced, which was the right
+-- call at the time: a chat message or a market pointing at a vanished game is
+-- worse than a duplicate fixture. But that leaves the referenced ones forever.
+-- This MOVES the references onto the survivor first, so nothing is orphaned and
+-- nothing has to be spared.
 --
--- The odds row survives: markets hang off odds_game_id, so it is the one other
--- tables are most likely to care about. The ESPN twin is the disposable half.
+-- WHICH ROW SURVIVES: the odds-feed row, because markets hang off
+-- odds_game_id — an ESPN twin is a game nobody can bet on. Among equals, the
+-- oldest, since anything already pointing at the pair most likely points there.
 --
--- Written generically — it walks the foreign keys pointing at games rather than
--- naming child tables from memory, which is how an earlier draft ended up
--- guarding on a huddle_messages.game_id column that does not exist.
+-- Six hours, not "same day": a 9:38pm ET baseball game is 01:38 UTC the next
+-- morning, and the next afternoon's game in that series is 18 hours later. Both
+-- are real. A day-wide window would merge two genuine games into one.
 --
 -- Run in the Supabase SQL editor. Safe to run twice.
 
 do $$
 declare
-  winner uuid;   -- the odds row, kept
-  loser  uuid;   -- the espn twin, merged away
-  fk     record;
-  moved  integer;
+  grp     record;
+  loser   uuid;
+  fk      record;
+  moved   integer;
   dropped integer;
+  merged  integer := 0;
 begin
-  select g.id into winner
-  from public.games g
-  join public.teams aw on aw.id = g.away_team_id
-  join public.teams hm on hm.id = g.home_team_id
-  where aw.city = 'Memphis' and hm.city = 'UNLV'
-    and g.away_score = 27 and g.home_score = 21
-    and g.odds_game_id not like 'espn-%'
-  limit 1;
-
-  select g.id into loser
-  from public.games g
-  join public.teams aw on aw.id = g.away_team_id
-  join public.teams hm on hm.id = g.home_team_id
-  where aw.city = 'Memphis' and hm.city = 'UNLV'
-    and g.away_score = 27 and g.home_score = 21
-    and g.odds_game_id like 'espn-%'
-  limit 1;
-
-  if winner is null or loser is null then
-    raise notice 'nothing to merge (winner=%, loser=%)', winner, loser;
-    return;
-  end if;
-
-  raise notice 'merging % into %', loser, winner;
-
-  for fk in
-    select c.conrelid::regclass as child_table, a.attname as child_column
-    from pg_constraint c
-    join lateral unnest(c.conkey) with ordinality k(attnum, ord) on true
-    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k.attnum
-    where c.contype = 'f' and c.confrelid = 'public.games'::regclass
+  -- Cluster on teams + sport, then keep the first row of each six-hour window.
+  for grp in
+    with ranked as (
+      select
+        g.id,
+        g.odds_game_id,
+        g.start_time,
+        first_value(g.id) over (
+          partition by g.sport_key, g.home_team_id, g.away_team_id,
+                       floor(extract(epoch from g.start_time) / 21600)
+          order by (g.odds_game_id like 'espn-%')::int, g.created_at
+        ) as keeper,
+        count(*) over (
+          partition by g.sport_key, g.home_team_id, g.away_team_id,
+                       floor(extract(epoch from g.start_time) / 21600)
+        ) as n
+      from public.games g
+      where g.home_team_id is not null
+        and g.away_team_id is not null
+    )
+    select id, keeper from ranked where n > 1 and id <> keeper
   loop
-    -- Repoint what we can. A child table with a unique key on (game_id, ...)
-    -- will reject the move where the winner already has the equivalent row —
-    -- that is a duplicate too, so drop it rather than fail the merge.
-    begin
-      execute format('update %s set %I = $1 where %I = $2', fk.child_table, fk.child_column, fk.child_column)
-        using winner, loser;
-      get diagnostics moved = row_count;
-      if moved > 0 then
-        raise notice '  moved % row(s) in %.%', moved, fk.child_table, fk.child_column;
-      end if;
-    exception when unique_violation then
-      execute format('delete from %s where %I = $1', fk.child_table, fk.child_column) using loser;
-      get diagnostics dropped = row_count;
-      raise notice '  %.% had equivalents on the winner; dropped % duplicate row(s)',
-        fk.child_table, fk.child_column, dropped;
-    end;
+    loser := grp.id;
+
+    for fk in
+      select c.conrelid::regclass as child_table, a.attname as child_column
+      from pg_constraint c
+      join lateral unnest(c.conkey) with ordinality k(attnum, ord) on true
+      join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k.attnum
+      where c.contype = 'f' and c.confrelid = 'public.games'::regclass
+    loop
+      begin
+        execute format('update %s set %I = $1 where %I = $2',
+                       fk.child_table, fk.child_column, fk.child_column)
+          using grp.keeper, loser;
+        get diagnostics moved = row_count;
+        if moved > 0 then
+          raise notice 'moved % row(s) %.% -> keeper', moved, fk.child_table, fk.child_column;
+        end if;
+      exception when unique_violation then
+        -- The keeper already has the equivalent child row, so the loser's copy
+        -- is a duplicate too. Drop it rather than fail the whole merge.
+        execute format('delete from %s where %I = $1', fk.child_table, fk.child_column)
+          using loser;
+        get diagnostics dropped = row_count;
+        raise notice 'dropped % duplicate child row(s) in %.%',
+          dropped, fk.child_table, fk.child_column;
+      end;
+    end loop;
+
+    delete from public.games where id = loser;
+    merged := merged + 1;
   end loop;
 
-  delete from public.games where id = loser;
-  raise notice 'merged.';
+  raise notice 'merged % duplicate game row(s)', merged;
 end;
 $$;
 
 
--- Check: one Memphis/UNLV row, and the rest of that night unchanged.
-select
-  g.start_time,
-  aw.city || ' ' || aw.name           as away,
-  hm.city || ' ' || hm.name           as home,
-  g.away_score || '-' || g.home_score as score
-from public.games g
-join public.teams hm on hm.id = g.home_team_id
-join public.teams aw on aw.id = g.away_team_id
-where g.sport_key = 'americanfootball_ncaaf'
-  and g.start_time >= timestamptz '2026-08-29 22:00:00+00'
-  and g.start_time <  timestamptz '2026-08-30 06:00:00+00'
-order by g.start_time;
+-- Check. Expect 0.
+select count(*) as duplicate_rows_left
+from (
+  select g.id,
+         count(*) over (
+           partition by g.sport_key, g.home_team_id, g.away_team_id,
+                        floor(extract(epoch from g.start_time) / 21600)
+         ) as n
+  from public.games g
+  where g.home_team_id is not null and g.away_team_id is not null
+) s
+where n > 1;

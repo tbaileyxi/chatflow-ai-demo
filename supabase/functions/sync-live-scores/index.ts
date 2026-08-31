@@ -377,6 +377,85 @@ serve(async (req) => {
     const repairErrors: string[] = [];
     let upcomingRepaired = 0;
 
+    // ── Correct fixture dates that drifted ───────────────────────────────
+    //
+    // Two scheduled games sat in the table dated 2026-08-29 while ESPN had them
+    // on September 5 and September 7. A Stanford room therefore showed its next
+    // fixture as a date that had already passed — the scoreboard reads as stale
+    // or broken, and a pregame heads-up either fires at the wrong time or never.
+    //
+    // Football only, deliberately. A fixture pair is effectively unique in a
+    // football season, so matching on the two teams alone is safe. Baseball
+    // teams play three games in a row against each other, and matching on teams
+    // without a date there would happily move Tuesday's game onto Thursday.
+    let datesFixed = 0;
+    let staleDupes = 0;
+    try {
+      const soon = new Date(now.getTime() + 21 * 86400000).toISOString();
+      const back = new Date(now.getTime() - 3 * 86400000).toISOString();
+      const { data: upcoming } = await supabase
+        .from('games')
+        .select('id, sport_key, start_time, home_team_id, away_team_id')
+        .eq('status', 'scheduled')
+        .in('sport_key', ['americanfootball_ncaaf', 'americanfootball_nfl'])
+        .gte('start_time', back)
+        .lte('start_time', soon);
+
+      for (const ug of upcoming ?? []) {
+        if (!ug.home_team_id || !ug.away_team_id) continue;
+        const hm = allTeams?.find((x: any) => x.id === ug.home_team_id);
+        const aw = allTeams?.find((x: any) => x.id === ug.away_team_id);
+        if (!hm || !aw) continue;
+
+        const sport = Object.entries(SPORT_KEY_MAP).find(([, k]) => k === ug.sport_key)?.[0];
+        if (!sport) continue;
+
+        const match = findMatchingGame(
+          allEspnGames.get(sport) ?? [],
+          hm.city ? `${hm.city} ${hm.name}` : hm.name,
+          aw.city ? `${aw.city} ${aw.name}` : aw.name,
+        );
+        if (!match?.date) continue;
+
+        const theirs = new Date(match.date).getTime();
+        const ours = new Date(ug.start_time).getTime();
+        // Two hours of slack: kickoff times get nudged, and rewriting the row
+        // every sync over a few minutes' drift would be pure churn.
+        if (Math.abs(theirs - ours) < 2 * 3600 * 1000) continue;
+
+        // Is the correct row already there?
+        //
+        // Moving a wrongly-dated row onto the right date does not fix it when a
+        // correctly-dated row already exists — it just makes two. That is what
+        // happened to Miami at Stanford: the Sep 5 row was already present, and
+        // the stale Aug 29 copy landed on top of it. A row like that is not
+        // mis-dated, it is redundant, and it wants merging rather than moving.
+        const near = new Date(match.date).getTime();
+        const { data: already } = await supabase
+          .from('games')
+          .select('id')
+          .eq('home_team_id', ug.home_team_id)
+          .eq('away_team_id', ug.away_team_id)
+          .neq('id', ug.id)
+          .gte('start_time', new Date(near - 6 * 3600 * 1000).toISOString())
+          .lte('start_time', new Date(near + 6 * 3600 * 1000).toISOString())
+          .limit(1)
+          .maybeSingle();
+        if (already) { staleDupes++; continue; }
+
+        const { error } = await supabase
+          .from('games')
+          .update({ start_time: match.date, last_synced_at: new Date().toISOString() })
+          .eq('id', ug.id);
+        if (!error) {
+          datesFixed++;
+          console.log(`🩹 Moved ${aw.name} @ ${hm.name}: ${ug.start_time} -> ${match.date}`);
+        }
+      }
+    } catch (err) {
+      repairErrors.push(`date repair: ${(err as Error).message}`);
+    }
+
     // ── Repair upcoming games that only have one team ────────────────────
     //
     // Yesterday's fix filled the missing side during enrichment, which only
@@ -795,6 +874,8 @@ serve(async (req) => {
       repair_errors: repairErrors,
       upcoming_repaired: upcomingRepaired,
       names_fixed: namesFixed,
+      dates_fixed: datesFixed,
+      stale_duplicates: staleDupes,
       sports_fetched: sportsToFetch.length,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
