@@ -146,3 +146,93 @@ export function pickBest(items: XMedia[]): XMedia | null {
 
   return [...best].sort((a, b) => a.index - b.index)[0];
 }
+
+/**
+ * Posts, not media.
+ *
+ * fetchPostMedia emits one row PER ATTACHED IMAGE, and nothing at all for a post
+ * with no media — correct for the clip puller, which only wants something to
+ * show. Mirroring a creator's feed needs the opposite: every post, text
+ * included, because a good take with no picture is most of what they write.
+ *
+ * Same endpoint and the same billed read, so this costs nothing extra when both
+ * are used on the same ids.
+ */
+export interface XPost {
+  postId: string;
+  authorHandle: string | null;
+  text: string;
+  likes: number;
+  replies: number;
+  isReply: boolean;
+  isRepost: boolean;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  url: string;
+}
+
+export async function fetchPosts(postIds: string[]): Promise<XPost[]> {
+  const token = Deno.env.get("X_API_BEARER_TOKEN");
+  if (!token || postIds.length === 0) return [];
+
+  const ids = [...new Set(postIds)].slice(0, 100);
+  const qs = new URLSearchParams({
+    ids: ids.join(","),
+    expansions: "attachments.media_keys,author_id",
+    "media.fields": "type,url,preview_image_url,variants",
+    // referenced_tweets is what separates an original post from a reply or a
+    // repost. Without it a creator's room fills with their half of arguments.
+    "tweet.fields": "text,public_metrics,referenced_tweets",
+    "user.fields": "username",
+  });
+
+  let json: any;
+  try {
+    const res = await fetch(`${X_TWEETS}?${qs}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      console.error(`[x-posts] ${res.status} ${(await res.text()).slice(0, 200)}`);
+      return [];
+    }
+    json = await res.json();
+  } catch (err) {
+    console.error("[x-posts] fetch failed", err);
+    return [];
+  }
+
+  const mediaByKey = new Map<string, any>();
+  for (const m of json?.includes?.media ?? []) mediaByKey.set(m.media_key, m);
+  const handleById = new Map<string, string>();
+  for (const u of json?.includes?.users ?? []) handleById.set(u.id, u.username);
+
+  const out: XPost[] = [];
+  for (const post of json?.data ?? []) {
+    const refs = post?.referenced_tweets ?? [];
+    const handle = handleById.get(post.author_id) ?? null;
+
+    // Cover image only — index 0, the one the caption is about.
+    const key = (post?.attachments?.media_keys ?? [])[0];
+    const m = key ? mediaByKey.get(key) : null;
+    let videoUrl: string | null = null;
+    if (m?.variants?.length) {
+      const mp4s = m.variants.filter((v: any) => v.content_type === "video/mp4" && v.url);
+      mp4s.sort((a: any, b: any) => (b.bit_rate ?? 0) - (a.bit_rate ?? 0));
+      videoUrl = mp4s[0]?.url ?? null;
+    }
+
+    out.push({
+      postId: post.id,
+      authorHandle: handle,
+      text: post.text ?? "",
+      likes: post?.public_metrics?.like_count ?? 0,
+      replies: post?.public_metrics?.reply_count ?? 0,
+      isReply: refs.some((r: any) => r.type === "replied_to"),
+      isRepost: refs.some((r: any) => r.type === "retweeted"),
+      imageUrl: m?.url ?? m?.preview_image_url ?? null,
+      videoUrl,
+      url: handle ? `https://x.com/${handle}/status/${post.id}` : `https://x.com/i/status/${post.id}`,
+    });
+  }
+  return out;
+}
