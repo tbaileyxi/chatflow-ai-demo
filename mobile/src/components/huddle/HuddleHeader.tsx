@@ -197,19 +197,21 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
             navigation.navigate("HuddleSettings", { huddleId: huddle.id })
           }
         >
+          {/* Member count sits INLINE with the name, not on its own line. A
+              whole row of header height to say "1 member" is the least
+              interesting fact in the room, and it pushed the game bar and the
+              chat down on every screen. */}
           <View className="flex-row items-center gap-2">
-            <Text className="flex-1 text-lg font-black text-foreground" numberOfLines={1}>
+            <Text className="shrink text-lg font-black text-foreground" numberOfLines={1}>
               {displayName}
             </Text>
             {huddle.isVerified ? (
               <ShieldCheck color={colors.primary} size={15} />
             ) : null}
-          </View>
-          <View className="flex-row items-center gap-1">
-            <Users color={colors.mutedForeground} size={12} />
-            <Text className="text-xs text-muted-foreground">
-              {huddle.memberCount} member{huddle.memberCount === 1 ? "" : "s"}
-            </Text>
+            <View className="flex-row items-center gap-0.5">
+              <Users color={colors.mutedForeground} size={11} />
+              <Text className="text-xs text-muted-foreground">{huddle.memberCount}</Text>
+            </View>
           </View>
         </Pressable>
 

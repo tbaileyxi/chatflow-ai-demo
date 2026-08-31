@@ -13,6 +13,10 @@ const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
 const FROM_EMAIL = Deno.env.get("CHAPTER_FROM_EMAIL") ?? "ty@sidehuddlesports.com";
 const FROM_NAME = "Ty";
 const APP_URL = "https://www.sidehuddlesports.com";
+// The room links are web URLs, but a chapter actually lives in the app — so
+// every mail carries the store link too. Without it the president lands on a
+// page and has to go hunting for how to bring their members along.
+const APP_STORE_URL = "https://apps.apple.com/us/app/id6777524558";
 
 /**
  * Per-org room to drop them into, as {"Cleveland Browns": ".../h/<id>"}.
@@ -20,12 +24,21 @@ const APP_URL = "https://www.sidehuddlesports.com";
  * room beats asking them to create one from an empty screen. Falls back to the
  * site if no room is configured for their team yet.
  */
+function teamSlug(org: string): string {
+  return org.toLowerCase().replace(/&/g, "").replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 function seedRoom(org: string): string {
   try {
     const map = JSON.parse(Deno.env.get("CHAPTER_SEED_ROOMS") ?? "{}");
     if (map && typeof map[org] === "string" && map[org]) return map[org];
-  } catch { /* fall through to the default */ }
-  return APP_URL;
+  } catch { /* fall through to the team page */ }
+  // CHAPTER_SEED_ROOMS has never been set, so this fallback is the real path.
+  // It used to be the generic homepage while the copy promised "the <team>
+  // room" — a broken promise in the first line of a cold email. /t/<slug> is a
+  // page about their team that exists today and needs no live huddle.
+  return `${APP_URL}/t/${teamSlug(org)}`;
 }
 
 type Chapter = {
@@ -41,9 +54,48 @@ type Chapter = {
   email: string;
   member_count: number | null;
   sequence_step: number;
+  /** The six characters that turn this email into their room. */
+  claim_code: string | null;
 };
 
 // ── copy helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * How a team is named in copy, in two registers.
+ *
+ * `full` is the formal name, used where it has to match the team page the CTA
+ * links to. `short` is what a fan would actually say out loud — "your Browns
+ * group", "your Aggies group" — which is how the sentence is written.
+ *
+ * The scraped `org` values are informal and a few are ambiguous on their own:
+ * bare "Texas" could be the state, the Longhorns, or the Rangers, and "your
+ * Texas group to talk" reads like a mail-merge that lost a word. The nickname
+ * fixes that and sounds like a person wrote it.
+ *
+ * Anything not in this map falls back to the raw org for both registers, so a
+ * newly scraped team still produces a sane email before anyone adds a row.
+ */
+const ORG_COPY: Record<string, { full: string; short: string }> = {
+  "Cleveland Browns":    { full: "Cleveland Browns",    short: "Browns" },
+  "Buffalo Bills":       { full: "Buffalo Bills",       short: "Bills" },
+  "Pittsburgh Steelers": { full: "Pittsburgh Steelers", short: "Steelers" },
+  "Green Bay Packers":   { full: "Green Bay Packers",   short: "Packers" },
+  "Dallas Cowboys":      { full: "Dallas Cowboys",      short: "Cowboys" },
+  "Seattle Seahawks":    { full: "Seattle Seahawks",    short: "Seahawks" },
+  "Las Vegas Raiders":   { full: "Las Vegas Raiders",   short: "Raiders" },
+  "Texas A&M":           { full: "Texas A&M",           short: "Aggies" },
+  "Penn State":          { full: "Penn State",          short: "Nittany Lions" },
+  "Ohio State":          { full: "Ohio State",          short: "Buckeyes" },
+  "Alabama":             { full: "Alabama",             short: "Crimson Tide" },
+  "Clemson":             { full: "Clemson",             short: "Tigers" },
+  "Georgia":             { full: "Georgia",             short: "Bulldogs" },
+  "Texas":               { full: "Texas Longhorns",     short: "Longhorns" },
+  "LSU":                 { full: "LSU",                 short: "Tigers" },
+};
+
+function orgNames(org: string): { full: string; short: string } {
+  return ORG_COPY[org] ?? { full: org, short: org };
+}
 
 function greeting(c: Chapter): string {
   const n = (c.first_name || "").trim();
@@ -56,16 +108,39 @@ function chapterRef(c: Chapter): string {
   return /^the\s/i.test(name) ? name : `the ${name}`;
 }
 
-/** Personalisation hook, strongest first: the bar, then the city. */
-function where(c: Chapter): string {
-  if (c.venue) return ` at ${c.venue}`;
-  if (c.city) return ` in ${c.city}`;
+
+/**
+ * Fills "whether they made it___ or not".
+ *
+ * Only the venue is worth naming here. The city variant used to return
+ * " out in Houston", which produced "whether they made it out in Houston or
+ * not" — broken English, and exactly the kind of merge seam that makes an
+ * email read as generated. A bare " out" fits the sentence in every case.
+ */
+function missedOut(c: Chapter): string {
+  if (c.venue) return ` to ${c.venue}`;
+  if (c.city) return " out";
   return "";
 }
 
-function sizeNote(c: Chapter): string {
-  if (!c.member_count || c.member_count < 25) return "";
-  return ` ${c.member_count} members is a real crowd —`;
+/**
+ * Opening line, most specific version available.
+ *
+ * The venue is the single most personal thing we know about a chapter — naming
+ * it in sentence one is the difference between a mail-merge and a note from
+ * someone who actually looked. Degrades to the city, then to nothing, so a lead
+ * with thin data never gets a sentence with a hole in it.
+ *
+ * NEVER NAME A DAY HERE. Eight of the fifteen orgs are college football, which
+ * plays Saturday — an earlier version opened with "You've got Sundays figured
+ * out" and would have been factually wrong to more than half the list.
+ * Anything day-shaped ("game day", "on Sundays", "all week") has the same
+ * problem and is also the wrong pitch: see the note on the step-1 body.
+ */
+function openingLine(c: Chapter): string {
+  if (c.venue) return `You've got a good thing going at ${c.venue}.`;
+  if (c.city) return `You've got a good thing going in ${c.city}.`;
+  return `You've clearly got a good thing going.`;
 }
 
 function shell(inner: string): string {
@@ -76,8 +151,8 @@ function shell(inner: string): string {
   <tr><td align="center">
   <table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
     <tr><td style="background-color:#0a0a0a;padding:20px 32px;">
-      <span style="color:#00c47d;font-size:16px;font-weight:bold;letter-spacing:0.5px;">Side Huddle</span>
-      <span style="color:#888;font-size:13px;margin-left:12px;">Sports community for real fans</span>
+      <span style="color:#FFD700;font-size:16px;font-weight:bold;letter-spacing:0.5px;">Side Huddle</span>
+      <span style="color:#888;font-size:13px;margin-left:12px;">The digital tailgate</span>
     </td></tr>
     <tr><td style="padding:32px;color:#1a1a1a;font-size:15px;line-height:1.7;">
 ${inner}
@@ -92,9 +167,26 @@ ${inner}
 </body></html>`;
 }
 
+
+/**
+ * The code, made impossible to miss.
+ *
+ * This is the one thing in the email that has to survive being read on a phone
+ * and typed into a different screen a minute later. Big, wide-tracked, and real
+ * TEXT — an image of a code cannot be copied, and half of these will be read in
+ * a mail client that blocks images by default.
+ */
+function codeBlock(code: string): string {
+  return `<table cellpadding="0" cellspacing="0" width="100%" style="margin:6px 0 20px 0;"><tr>
+    <td align="center" style="background-color:#faf7ea;border:2px dashed #d8cfa4;border-radius:10px;padding:18px 12px;">
+      <p style="margin:0 0 6px 0;font-size:12px;letter-spacing:1.5px;color:#8a7f55;text-transform:uppercase;font-weight:bold;">Your code</p>
+      <p style="margin:0;font-size:34px;font-weight:bold;letter-spacing:8px;color:#1a1a1a;font-family:'Courier New',Courier,monospace;">${code}</p>
+    </td></tr></table>`;
+}
+
 function cta(label: string, href: string): string {
   return `<table cellpadding="0" cellspacing="0" style="margin:4px 0 18px 0;"><tr>
-    <td style="background-color:#00c47d;border-radius:6px;">
+    <td style="background-color:#FFD700;border-radius:6px;">
       <a href="${href}" style="display:inline-block;padding:13px 26px;color:#000;font-size:15px;font-weight:bold;text-decoration:none;">${label} &rarr;</a>
     </td></tr></table>`;
 }
@@ -103,48 +195,118 @@ function cta(label: string, href: string): string {
 
 function subject(step: number, c: Chapter): string {
   const name = (c.chapter_name || "your chapter").trim();
+  const { short } = orgNames(c.org || "");
   switch (step) {
-    case 2: return `Following up — a private room for ${name}`;
-    case 3: return `Last note on ${name}`;
-    default: return c.venue
-      ? `${name} — for the group at ${c.venue}`
-      : `A private game-day room for ${name}`;
+    case 2: return `Re: the ${name} room`;
+    case 3: return `Last one`;
+    // Matches the season hook the body opens with, and names their chapter.
+    // The old version was `${name}'s group chat`, which produced "Sarasota
+    // Browns Backers's group chat" — a double possessive on any chapter name
+    // ending in s, which most of them do.
+    default: return `Claim the ${name} room`;
   }
+}
+
+/**
+ * The opening line, and the only sentence most of these get.
+ *
+ * "Somewhere to be" was a place, not a reason — it described a venue and gave a
+ * chapter president nothing to want. The tension worth naming is the one every
+ * chapter actually has: the group is scattered, and on any given Sunday most of
+ * the roster is not at the bar. The room is where they are together anyway.
+ *
+ * The venue is the most personal thing we know, so it goes in the sentence when
+ * we have it. Without one the same idea still holds, just less pointed.
+ */
+function hook(c: Chapter, who: string): string {
+  if (c.venue) {
+    return `Side Huddle keeps ${who} together on game day — the ones at ${c.venue}, and the ones who couldn't make it.`;
+  }
+  return `Side Huddle keeps ${who} together on game day — the ones who show up, and the ones who couldn't make it.`;
 }
 
 function body(step: number, c: Chapter): string {
   const who = chapterRef(c);
-  const spot = where(c);
   const org = c.org || "your team";
+  const { short: orgShort } = orgNames(org);
   const room = seedRoom(org);
+  const code = (c.claim_code || "").trim();
+
+  // GAME DAY FIRST. An earlier line read "somewhere to be between game days",
+  // which quietly says the main event is handled elsewhere. It is not — game day
+  // is the whole point, and the days in between are the bonus. Getting that
+  // backwards tells a chapter president you do not know what their group is for.
+  //
+  // LEAD WITH WHAT THE CHAPTER GETS. An earlier draft described what the
+  // product DOES — news lands, members talk — and never said what that is worth
+  // to the person reading. A chapter president is not shopping for an app; they
+  // want their group active between game days and more people in it. Say that
+  // first, then how.
+  //
+  // "CLAIM", NOT "I'VE SET ASIDE". Set-aside is a favour that puts them in debt
+  // to a stranger. Claiming is theirs to take, and it is also literally what the
+  // code does — the room does not exist until they redeem it.
+  //
+  // AND IT IS NOT A PRIVATE ROOM. claim_chapter_huddle creates it with
+  // is_private = false and official_status = 'active', which means it is LISTED
+  // and anyone can walk in. An earlier draft called it "a private room for your
+  // members", which was plainly false and exactly the kind of thing a chapter
+  // president finds out about in front of their members. What it actually is:
+  // findable by their people, theirs to lock down whenever they want. That is a
+  // better pitch anyway, because being findable is how the room grows.
+  //
+  // The code carries in EVERY step. Someone who skims step one and comes back a
+  // week later should not have to work out which email had it.
 
   if (step === 2) {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${greeting(c)},</p>
-      <p style="margin:0 0 18px 0;">Following up on ${who}.</p>
-      <p style="margin:0 0 18px 0;">Easiest way to see it is from the inside — the link below drops you straight into the ${org} room. Live scores, news and game-day prompts flow in on their own while fans talk.</p>
-      <p style="margin:0 0 18px 0;">Once you're in, hit "create a huddle" and you've got your own private room for ${who}. Takes a minute, and you're the admin. Share your link with your members and that's it.</p>
-      ${cta(`Join the ${org} room`, room)}
-      <p style="font-size:13px;color:#999;margin:0;">Free for chapters. If it's not for your group, just say so and I'll leave you alone.</p>`);
+      <p style="margin:0 0 18px 0;">Quick follow-up — ${who} room is still unclaimed.</p>
+      <p style="margin:0 0 18px 0;">${hook(c, who)}</p>
+      <p style="margin:0 0 18px 0;">The part chapter admins tend to like: it grows without you working at it. Members bring friends, the ${orgShort} news shows up on its own, and you stop having to think up reasons to post.</p>
+      ${code ? codeBlock(code) : ""}
+      ${cta(`Get the app`, APP_STORE_URL)}
+      <p style="font-size:13px;color:#999;margin:0;">Free for chapters. If it's not for your group, say so and I'll leave you alone.</p>`);
   }
 
   if (step === 3) {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${greeting(c)},</p>
-      <p style="margin:0 0 18px 0;">Last note from me on ${who} — I don't want to clutter your inbox.</p>
-      <p style="margin:0 0 18px 0;">The link's below if you ever want a look. Join the ${org} room, and if you like it, spin up your own for your members in about a minute.</p>
+      <p style="margin:0 0 18px 0;">Last note from me — not trying to clutter your inbox.</p>
+      <p style="margin:0 0 18px 0;">Your code is below if you ever want it. It doesn't expire and nobody else can use it — it only opens ${who}.</p>
+      ${code ? codeBlock(code) : ""}
       <p style="margin:0 0 18px 0;">Either way, good luck this season.</p>
-      ${cta(`Join the ${org} room`, room)}`);
+      ${cta(`Get the app`, APP_STORE_URL)}`);
   }
 
+  // SEASON-BOUND: "season is almost here" is only true from roughly July to
+  // kickoff. Read at Thanksgiving it tells them immediately that nobody wrote
+  // this to them.
   return shell(`
     <p style="margin:0 0 18px 0;">Hi ${greeting(c)},</p>
-    <p style="margin:0 0 18px 0;">I came across ${who}${spot} and wanted to reach out — you're exactly who I built this for.</p>
-    <p style="margin:0 0 18px 0;">I run Side Huddle. It gives a fan group its own private room: live scores, ${org} news, highlights and game-day prompts flow in on their own, while your members talk to each other. It's the group chat your chapter probably already has, except the game is happening inside it.</p>
-    <p style="margin:0 0 18px 0;">${sizeNote(c)} the members who can't make it${spot ? ` to${spot.replace(/^ at /, " ")}` : ""} on a Sunday still get to be part of it.</p>
-    <p style="margin:0 0 18px 0;">Rather than explain it — the link below puts you in the ${org} room. Have a look around, and if it fits, create your own huddle for ${who} and send your members the link. You're the admin, it's free, and it takes about a minute.</p>
-    ${cta(`Join the ${org} room`, room)}
-    <p style="font-size:13px;color:#999;margin:0;">Worth a look for your group?</p>`);
+    <p style="margin:0 0 18px 0;">${orgShort} season is almost here.</p>
+    <p style="margin:0 0 18px 0;">${hook(c, who)} They talk through every game together, their friends find the room and join, and you never have to write a post to keep it alive.</p>
+    <p style="margin:0 0 18px 0;">There's a room waiting under your chapter's name. Nobody else can take it.</p>
+    ${code ? codeBlock(code) : ""}
+    <p style="margin:0 0 18px 0;">Two steps: get the app, then enter that code. The room is built the moment you do, named for your chapter, with you as the owner.</p>
+    <p style="margin:0 0 18px 0;">The score, the ${orgShort} news and the clip everyone's passing around land in there on their own, so there's always a reason to open it — even on a Tuesday.</p>
+    ${cta(`Get the app`, APP_STORE_URL)}
+    <p style="font-size:13px;color:#999;margin:0;">Free for chapters. Your room is listed so your members can find it — you can lock it to invite-only any time. <a href="${room}" style="color:#999;">More about ${orgShort} rooms</a>.</p>`);
+}
+
+// Strip the HTML shell so a test run shows the words that will actually land in
+// someone's inbox. Reading raw markup in a JSON preview is not a review.
+function asText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<\/p>|<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&rarr;/g, "\u2192")
+    .replace(/&amp;/g, "&")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 // ── sending ───────────────────────────────────────────────────────────────────
@@ -167,7 +329,7 @@ async function brevoSend(apiKey: string, to: string, subj: string, html: string)
 }
 
 const COLS =
-  "id,chapter_name,org,org_type,city,state,venue,leader_name,first_name,email,member_count,sequence_step";
+  "id,chapter_name,org,org_type,city,state,venue,leader_name,first_name,email,member_count,sequence_step,claim_code";
 
 async function selectTargets(
   supabase: SupabaseClient,
@@ -219,10 +381,61 @@ serve(async (req) => {
       maxEmails = 25,
       org = null,
       ids = null,
+      testTo = null,
     } = await req.json();
 
     const step = Number(sequenceStep);
     if (![1, 2, 3].includes(step)) return json({ error: "sequenceStep must be 1, 2, or 3" }, 400);
+
+    // ── mode "self": send the real HTML to one address and touch nothing else.
+    //
+    // `mode:"test"` only ever returned stripped text, which cannot tell you
+    // whether the gold renders, whether the button survives Gmail, or how the
+    // subject line looks in a list of forty other subject lines. This sends the
+    // genuine article to an inbox you control.
+    //
+    // It deliberately does NOT read or write chapter_leads: no lead is marked
+    // emailed, no sequence advances, nothing is consumed. Walk all three steps
+    // as many times as you like without spending a single real lead.
+    if (mode === "self") {
+      const to = String(testTo || "").trim();
+      if (!to.includes("@")) {
+        return json({ error: 'mode "self" needs testTo: "you@example.com"' }, 400);
+      }
+      const apiKeySelf = Deno.env.get("BREVO_API_KEY");
+      if (!apiKeySelf) return json({ error: "BREVO_API_KEY not configured" }, 500);
+
+      // A realistic stand-in so every merge field is exercised — first name,
+      // venue, city and member count all populated, which is the shape that
+      // shows whether the sentences still read well once filled in.
+      const sample: Chapter = {
+        id: "self-test",
+        chapter_name: "Sarasota Browns Backers",
+        org: org || "Cleveland Browns",
+        org_type: "fan club",
+        city: "Sarasota",
+        state: "FL",
+        venue: "The Greenlight Bar",
+        leader_name: "Test Recipient",
+        first_name: "Ty",
+        email: to,
+        member_count: 140,
+        sequence_step: step - 1,
+        // A realistic code so a self-test shows the block that matters most.
+        claim_code: "QBCKAK",
+      };
+
+      const subj = subject(step, sample);
+      const html = body(step, sample);
+      await brevoSend(apiKeySelf, to, subj, html);
+      return json({
+        mode: "self",
+        step,
+        to,
+        subject: subj,
+        note: "Real email sent. No chapter_leads row was read or written.",
+      });
+    }
 
     const live = mode === "live";
     const cap = Math.min(Math.max(Number(maxEmails) || 25, 1), 200);
@@ -233,17 +446,18 @@ serve(async (req) => {
     const targets = await selectTargets(supabase, step, org, ids);
     const batch = targets.slice(0, cap);
 
-    const previews: Array<{ chapter: string; to: string; subject: string }> = [];
+    const previews: Array<{ chapter: string; to: string; subject: string; text: string }> = [];
     const errors: Array<{ chapter: string; error: string }> = [];
     let sent = 0;
 
     for (const c of batch) {
       const subj = subject(step, c);
-      previews.push({ chapter: c.chapter_name, to: c.email, subject: subj });
+      const html = body(step, c);
+      previews.push({ chapter: c.chapter_name, to: c.email, subject: subj, text: asText(html) });
       if (!live) continue;
 
       try {
-        await brevoSend(apiKey!, c.email, subj, body(step, c));
+        await brevoSend(apiKey!, c.email, subj, html);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         errors.push({ chapter: c.chapter_name, error: msg });

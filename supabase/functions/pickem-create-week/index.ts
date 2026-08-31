@@ -74,10 +74,10 @@ serve(async (req) => {
     
     try {
       const espnUrl = league === 'nfl' 
-        ? `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
-        : `https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+        ? `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
+        : `https://site.web.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
       
-      const espnResponse = await fetch(espnUrl);
+      const espnResponse = await fetch(espnUrl, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" } });
       const espnData = await espnResponse.json();
       
       if (espnData?.week?.number) {

@@ -14,6 +14,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getProvider, fetchEspnLeaders, fetchEspnBoxScoreLines } from "../_shared/bot/providers.ts";
 import { gateEvents } from "../_shared/bot/brain.ts";
+import { searchX } from "../_shared/coach/xsearch.ts";
+import { fetchPostMedia, pickBest, postIdFromUrl } from "../_shared/x/media.ts";
 import { generateMessage, defaultPersona } from "../_shared/bot/voice.ts";
 import { publish } from "../_shared/bot/publisher.ts";
 import { findNbaMatchForTeam, fetchGameStats, pickSide, shootingLine } from "../_shared/bot/highlightly.ts";
@@ -81,6 +83,27 @@ serve(async (req) => {
     games_with_followed_team: 0,
     plays_fetched: 0,
     plays_gated: 0,
+    covered_teams: 0,
+    x_moments: 0,        // clips pulled from X for a big play
+    x_moment_reads: 0,   // billed X post reads spent doing it
+    x_clips_24h: 0,      // in-game clips that landed in the last day
+    x_claims_total: 0,   // clip attempts ever made, across every run
+    x_queued: 0,         // plays queued to look for a clip later
+    x_due: 0,            // queued plays whose wait was up this run
+    x_gave_up: 0,        // queued plays that ran out of retries
+    x_duplicate: 0,      // clip already in the room, skipped
+    x_search_failed: 0,  // xAI call itself failed — NOT the same as finding nothing
+    x_attempts: 0,       // searches actually made this run
+    x_claim_failed: 0,   // seen_events claim rejected (another runner, or a constraint)
+    x_citations: 0,      // post URLs xAI came back with
+    x_no_media: 0,       // read the posts, none carried a photo or video
+    excitement_seen: [] as number[], // scores of plays we emitted, to sanity-check the clip bar
+    targets_built: 0,
+    skipped_not_covered: 0,
+    covered_targets: 0,
+    plays_scoring: 0,      // plays the provider says put points on the board
+    gate_candidates: 0,    // what gateEvents returned, BEFORE dedupe
+    deduped_out: 0,        // dropped because that score state already posted
     posts: 0,
     pushes: 0,
     errors: [] as string[],
@@ -90,7 +113,12 @@ serve(async (req) => {
     // Preload DB teams once. Match by canonical lowercased name OR fullName.
     const { data: teams } = await supabase
       .from("teams")
-      .select("id, name, city, league, highlightly_display_name");
+      // Active only. Opponent placeholders (status 'inactive') exist so a
+      // scoreboard can print "San Jose State" instead of the word "Away"; they
+      // are not teams we cover, and pulling them in here would have the bot
+      // fetching play-by-play for every game in the country to then discard it.
+      .select("id, name, city, league, highlightly_display_name")
+      .eq("status", "active");
     const teamIndex = new Map<string, { id: string; name: string; league: string }>();
 
     // Count how many teams share each bare nickname. College is full of these:
@@ -147,6 +175,62 @@ serve(async (req) => {
 
     summary.leagues = await resolveLeagues(supabase);
 
+    // Only cover teams somebody made a room for. This polled every team with
+    // any huddle, which meant 195 seeded Community rooms — 88 live plays in a
+    // day, none of them in a room a person had opened.
+    const { data: ownRooms } = await supabase
+      .from("huddles")
+      .select("team_id")
+      .not("team_id", "is", null)
+      .or("is_official_team_huddle.is.false,is_official_team_huddle.is.null");
+    const coveredTeams = new Set((ownRooms ?? []).map((r: any) => r.team_id));
+    summary.covered_teams = coveredTeams.size;
+    // The clip posts as the same bot that narrated the play.
+    const { data: botUserId } = await supabase.rpc("get_or_create_system_user");
+    // Ops counter, not a reader: how many in-game clips have landed today.
+    {
+      const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+      const { count } = await supabase
+        .from("huddle_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("message_type", "live_play")
+        .like("embed_code", "https://x.com/%")
+        .gte("created_at", since);
+      summary.x_clips_24h = count ?? 0;
+      // Persistent evidence. Every clip attempt writes an 'xlive:' row into
+      // seen_events BEFORE searching, so this counts attempts across all runs —
+      // including the cron runs I never see. Attempts > 0 with clips at 0 means
+      // the search or the media fetch is coming back empty, not that the block
+      // never fires.
+      const { count: claims } = await supabase
+        .from("seen_events")
+        .select("id", { count: "exact", head: true })
+        .like("event_id", "xlive:%");
+      summary.x_claims_total = claims ?? 0;
+      // Ops readout of the clips themselves — public X links and media URLs,
+      // no room names and no message text. Needed because "a clip landed" and
+      // "a clip played" are different claims and only one of them was checked.
+      const { data: clipRows } = await supabase
+        .from("huddle_messages")
+        .select("created_at, media_url, media_type, embed_code")
+        .eq("message_type", "live_play")
+        .like("embed_code", "https://x.com/%")
+        .order("created_at", { ascending: false })
+        .limit(10);
+      (summary as any).clips = (clipRows ?? []).map((r: any) => ({
+        at: r.created_at?.slice(11, 16),
+        type: r.media_type,
+        media: r.media_url,
+        post: r.embed_code,
+      }));
+    }
+
+
+    // ESPN reachability probe. games_seen: 0 is ambiguous on its own — it reads
+    // the same whether there are genuinely no games or ESPN refused us. This
+    // reports the raw HTTP status so the two can be told apart from the summary
+    // alone, without needing function logs.
+
     for (const league of summary.leagues) {
       const games = await provider.liveGames(league);
       summary.games_seen += games.length;
@@ -161,6 +245,41 @@ serve(async (req) => {
         summary.plays_fetched += plays.length;
         if (plays.length === 0) continue;
 
+        // NARRATE ONLY THE GAME WE THINK WE ARE NARRATING.
+        //
+        // Every play carries the game ESPN built it from, out of the summary
+        // header. The outer `game` came from the scoreboard. Those are supposed
+        // to be the same fixture, and when they are not, the bot stitches one
+        // game's team names onto another game's score — brain.ts does exactly
+        // that in scoreLineText(game, play.scoreAfter).
+        //
+        // A Mets room got "8-2 Brewers but this is tagged as us taking the lead,
+        // which doesn't add up" — the model spotted the contradiction and said so
+        // out loud, in a room, to users. Chourio is a Brewer; the header said
+        // Padres at Mets.
+        //
+        // Cheap to check and it fails closed: say nothing rather than say
+        // something wrong about somebody else's game.
+        const playGame = plays[0]?.game;
+        if (playGame) {
+          const same = (a?: string, b?: string) =>
+            !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+          const matches =
+            (same(playGame.home?.name, game.home?.name) &&
+              same(playGame.away?.name, game.away?.name)) ||
+            (same(playGame.home?.fullName, game.home?.fullName) &&
+              same(playGame.away?.fullName, game.away?.fullName));
+          if (!matches) {
+            const msg =
+              `[live-poller] play/game mismatch for providerId ${game.providerId}: ` +
+              `scoreboard says ${game.away?.name} @ ${game.home?.name}, ` +
+              `plays say ${playGame.away?.name} @ ${playGame.home?.name} — skipping`;
+            console.error(msg);
+            summary.errors.push(msg);
+            continue;
+          }
+        }
+
         // Filter plays we've already emitted for this game.
         const { data: seen } = await supabase
           .from("seen_events")
@@ -168,6 +287,9 @@ serve(async (req) => {
           .eq("game_id", game.providerId)
           .eq("emitted", true);
         const emittedIds = new Set((seen ?? []).map((r) => r.event_id));
+        // Clips already pulled for this game, so a wild fourth quarter can't
+        // run the bill up on its own.
+        let clipsThisGame = [...emittedIds].filter((k) => String(k).startsWith("xlive:")).length;
 
         // Dedupe by SCORE STATE, not ESPN play id (which can shift between
         // polls and caused the same "1-1 in the 1st" to post 3 times). One
@@ -176,14 +298,51 @@ serve(async (req) => {
           sa: { home: number; away: number } | undefined,
           side: string,
         ) => `${side}@${sa?.away ?? 0}-${sa?.home ?? 0}`;
-        const gated = gateEvents(plays).filter(
-          (g) => !emittedIds.has(scoreKey(g.play.scoreAfter, g.scoringSide)),
-        );
+        summary.plays_scoring += plays.filter((p) => (p.pointsScored ?? 0) > 0).length;
+        const candidates = gateEvents(plays);
+        summary.gate_candidates += candidates.length;
+        const gated = candidates;
         summary.plays_gated += gated.length;
 
         for (const g of gated) {
-          const dbTeam = lookupTeam(g.team.fullName, g.team.name, teamIndex, league);
-          if (!dbTeam) continue;
+          // BOTH SIDES. This used to publish only to the team that scored, so
+          // a room watching its team get shut out stayed silent — the Bucs
+          // room saw nothing at 0-10 because every score belonged to the Jets.
+          // Being scored on is the moment a room has the most to say.
+          const scorer = lookupTeam(g.team.fullName, g.team.name, teamIndex, league);
+          const conceder = lookupTeam(g.rival.fullName, g.rival.name, teamIndex, league);
+          const baseKey = scoreKey(g.play.scoreAfter, g.scoringSide);
+          const targets: {
+            team: NonNullable<ReturnType<typeof lookupTeam>>;
+            opponent: string;
+            conceded: boolean;
+            key: string;
+          }[] = [];
+          if (scorer) {
+            targets.push({
+              team: scorer,
+              opponent: g.rival.fullName || g.rival.name,
+              conceded: false,
+              key: baseKey, // unchanged, so nothing already posted re-posts
+            });
+          }
+          if (conceder) {
+            targets.push({
+              team: conceder,
+              opponent: g.team.fullName || g.team.name,
+              conceded: true,
+              key: `against:${baseKey}`,
+            });
+          }
+
+          summary.targets_built += targets.length;
+          for (const t of targets) {
+          const dbTeam = t.team;
+          // Skip teams nobody has a room for, and plays already emitted for
+          // THIS side — the two sides carry different keys.
+          if (!coveredTeams.has(dbTeam.id)) { summary.skipped_not_covered += 1; continue; }
+          summary.covered_targets += 1;
+          if (emittedIds.has(t.key)) { summary.deduped_out += 1; continue; }
           // TEST_MODE: also constrain emission to the test team.
           if (TEST_MODE && TEST_TEAM && !dbTeam.name.toLowerCase().includes(TEST_TEAM)) continue;
 
@@ -191,7 +350,11 @@ serve(async (req) => {
             // Surgical Highlightly enrichment (basketball only for now).
             // Cheap: 1 match lookup + 1 stats call per poll cycle per team, both
             // in-process cached. Skips silently when key/data missing.
-            const enrichedFacts = { ...g.facts };
+            const enrichedFacts: Record<string, unknown> = {
+              ...g.facts,
+              // The voice must know whether this went FOR or AGAINST the room.
+              scoredAgainstUs: t.conceded,
+            };
 
             // Real box-score stat leaders for ALL sports (ESPN). This is the
             // smart-bot fuel: "Brunson 31 PTS, 7 AST" / "Soto 3 H, 2 RBI".
@@ -286,7 +449,7 @@ serve(async (req) => {
             const voice = await generateMessage({
               mode: "in_game",
               team: dbTeam.name,
-              rival: g.rival.fullName || g.rival.name,
+              rival: t.opponent,
               persona,
               facts: enrichedFacts,
             });
@@ -296,7 +459,7 @@ serve(async (req) => {
               .from("seen_events")
               .insert({
                 game_id: game.providerId,
-                event_id: scoreKey(g.play.scoreAfter, g.scoringSide),
+                event_id: t.key,
                 team_id: dbTeam.id,
                 excitement_score: g.facts.excitementScore,
                 emitted: true,
@@ -322,8 +485,61 @@ serve(async (req) => {
             });
             summary.posts += result.huddleIdsPosted.length;
             if (result.pushed) summary.pushes += 1;
+            summary.excitement_seen.push(g.facts.excitementScore ?? 0);
+
+            // THE CLIP. The box score says a touchdown happened; X has the
+            // video of it. Only for plays already big enough to be worth a
+            // push notification — tying spend to the moments people would
+            // screenshot, not to every field goal.
+            // 65, not the push bar of 80. Excitement weights closeness and
+            // late-game leverage, so a Q2 preseason touchdown scores low by
+            // design and August would never produce a clip. The per-game cap
+            // is what bounds the spend; this only decides WHICH plays get one.
+            // No per-run cap here any more. Queueing is a row in a table; the
+            // money is spent later in processPendingClips, which takes
+            // XLIVE_PER_RUN off the queue per poll. Capping both ends meant a
+            // second game's touchdown was dropped on the floor rather than
+            // waiting its turn.
+            const XLIVE_MIN = Number(Deno.env.get("XLIVE_MIN_EXCITEMENT") || 0);
+            const XLIVE_PER_GAME = Number(Deno.env.get("XLIVE_PER_GAME") || 3);
+            if (
+              Deno.env.get("X_API_BEARER_TOKEN") &&
+              (g.facts.excitementScore ?? 0) >= XLIVE_MIN &&
+              result.huddleIdsPosted.length > 0 &&
+              clipsThisGame < XLIVE_PER_GAME
+            ) {
+              // Queue the clip; do not search yet.
+              //
+              // The search used to run right here, about two minutes after the
+              // play. It found nothing, over and over — 93 attempts all-time
+              // against 7 clips — because a highlight of the play does not
+              // exist on X yet. Cutting and posting one takes five to fifteen
+              // minutes. We were asking before the answer existed, and because
+              // the play was claimed at the same moment, we never asked again.
+              //
+              // So record the play now and look for its video later, more than
+              // once. The unique constraint on (game, play, team) is what keeps
+              // overlapping runs from queueing the same touchdown twice.
+              const delayMin = Number(Deno.env.get("XLIVE_DELAY_MIN") || 5);
+              const { error: queueErr } = await supabase.from("pending_clips").insert({
+                game_provider_id: game.providerId,
+                play_key: t.key,
+                team_id: dbTeam.id,
+                team_name: dbTeam.name,
+                opponent: t.opponent,
+                scorer: g.facts.scorer ?? null,
+                play_text: g.facts.play ?? null,
+                huddle_ids: result.huddleIdsPosted,
+                search_after: new Date(Date.now() + delayMin * 60000).toISOString(),
+              });
+              if (!queueErr) {
+                clipsThisGame += 1;
+                summary.x_queued += 1;
+              }
+            }
           } catch (err) {
             summary.errors.push(`emit ${game.providerId}/${g.play.providerId}: ${(err as Error).message}`);
+          }
           }
         }
       }
@@ -334,6 +550,7 @@ serve(async (req) => {
     // ~every 10 min (the poller fires every minute) to protect YouTube
     // quota, and guarded per-room so we never double-post.
     // Sendoff recap runs every poll (guarded once per room).
+    await processPendingClips(supabase, summary);
     await postFinals(supabase, summary);
     // YouTube highlights REMOVED — the search returned junk (video-game sims,
     // betting shows, ad clips) and embeds threw Error 153. Pregame heads-up
@@ -349,6 +566,171 @@ serve(async (req) => {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
+
+function decodeEntities(raw: string): string {
+  const named: Record<string, string> = {
+    amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'", "#x27": "'",
+  };
+  // &amp;amp; happens when a string is escaped twice upstream, so resolve until
+  // it stops changing rather than in a single pass.
+  let out = raw, prev = "";
+  while (out !== prev) {
+    prev = out;
+    out = out.replace(/&([a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);/g, (m, e) => {
+      if (named[e]) return named[e];
+      if (e.startsWith("#x")) return String.fromCodePoint(parseInt(e.slice(2), 16));
+      if (e.startsWith("#"))  return String.fromCodePoint(parseInt(e.slice(1), 10));
+      return m;
+    });
+  }
+  return out;
+}
+
+// Work the clip queue.
+//
+// A big play is posted the moment it happens; its video shows up on X several
+// minutes later. This is the second half: come back for the plays whose wait is
+// up, search, and drop the clip into the same rooms that saw the play.
+//
+// Retries matter more than the first delay. A highlight might land in four
+// minutes or in twelve, and one look at a fixed offset will miss half of them.
+// So a miss pushes the next look out and costs one of a small number of tries.
+async function processPendingClips(supabase: any, summary: any) {
+  if (!Deno.env.get("X_API_BEARER_TOKEN")) return;
+
+  const PER_RUN     = Number(Deno.env.get("XLIVE_PER_RUN") || 1);
+  const MAX_READS   = Number(Deno.env.get("XLIVE_MAX_READS") || 3);
+  const MAX_TRIES   = Number(Deno.env.get("XLIVE_MAX_TRIES") || 3);
+  const RETRY_MIN   = Number(Deno.env.get("XLIVE_RETRY_MIN") || 5);
+
+  const { data: due } = await supabase
+    .from("pending_clips")
+    .select("*")
+    .eq("status", "pending")
+    .lte("search_after", new Date().toISOString())
+    .order("search_after", { ascending: true })
+    .limit(PER_RUN);
+
+  if (!due?.length) return;
+  summary.x_due = due.length;
+
+  const botUserId = (await supabase.rpc("get_or_create_system_user")).data;
+
+  for (const row of due) {
+    // Claim this attempt first. Two overlapping runs reading the same due row
+    // would otherwise both pay xAI for the same search.
+    const { data: claimed } = await supabase
+      .from("pending_clips")
+      .update({ attempts: row.attempts + 1 })
+      .eq("id", row.id)
+      .eq("attempts", row.attempts)
+      .select("id")
+      .maybeSingle();
+    if (!claimed) continue;
+
+    summary.x_attempts += 1;
+
+    try {
+      // Ask about the GAME, not the single play — naming the exact play was
+      // what returned nothing 12 times out of 12. The play is a good reason to
+      // go looking and a terrible search term.
+      //
+      // The room has a side. "Best clip from the game" once put a Blue Jays
+      // highlight in a Yankees room: technically responsive, completely wrong.
+      const who = row.scorer ? ` Especially ${row.scorer}.` : "";
+      const found = await searchX(
+        `Find a video or photo of the ${row.team_name} posted in the last two hours, ` +
+          `from their game against the ${row.opponent} being played today.${who} ` +
+          `It must feature the ${row.team_name} — their players, their bench, their fans, ` +
+          `or a play that happened to them. ` +
+          `Do NOT return ${row.opponent} highlights or posts celebrating the ${row.opponent}. ` +
+          `Ignore previews, predictions, betting picks and old highlights.`,
+      );
+
+      // Zero citations has two very different causes and they looked
+      // identical from the outside: xAI erroring (bad key, quota, 5xx) returns
+      // the same empty shape as xAI genuinely finding no clip. Weeks of "the
+      // search comes back empty" could have been either. found.ok separates
+      // them, so the next time this is quiet we know which thing to fix.
+      if (!found.ok) summary.x_search_failed += 1;
+
+      const ids = [...new Set(
+        found.citations.map(postIdFromUrl).filter(Boolean) as string[],
+      )].slice(0, MAX_READS);
+      summary.x_citations += ids.length;
+      summary.x_moment_reads += ids.length;
+
+      const best = ids.length ? pickBest(await fetchPostMedia(ids)) : null;
+
+      // The same clip, twice.
+      //
+      // Each queued play searches on its own, and X only has so many posts
+      // about one game — so two touchdowns five minutes apart both came back
+      // with the SAME video, and the room got it twice. The play that found it
+      // is not the identity that matters here; the post is.
+      //
+      // Checked against the rooms this clip is bound for, not globally: the
+      // same highlight legitimately belongs in both teams' rooms.
+      if (best) {
+        const { data: dupe } = await supabase
+          .from("huddle_messages")
+          .select("id")
+          .eq("embed_code", best.url)
+          .in("huddle_id", row.huddle_ids ?? [])
+          .limit(1)
+          .maybeSingle();
+        if (dupe) {
+          // Not a failure and not worth a retry — this clip is already in the
+          // room. Close the play out and let the next one find something new.
+          await supabase.from("pending_clips").update({ status: "done" }).eq("id", row.id);
+          summary.x_duplicate = (summary.x_duplicate ?? 0) + 1;
+          continue;
+        }
+      }
+
+      if (best) {
+        // X serves post text HTML-escaped, so a caption arrived reading
+        // "4th &amp; 1". Decoded here rather than at display time because the
+        // string is stored, and a stored entity is wrong in every client that
+        // ever reads it.
+        const quote = decodeEntities(best.text)
+          .replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 140);
+        await supabase.from("huddle_messages").insert(
+          (row.huddle_ids ?? []).map((hid: string) => ({
+            huddle_id: hid,
+            user_id: botUserId,
+            content: [quote && `"${quote}"`, best.authorHandle && `— @${best.authorHandle}`]
+              .filter(Boolean).join("\n") || `via @${best.authorHandle ?? "X"}`,
+            embed_code: best.url,
+            is_bot_message: true,
+            is_team_agent_message: true,
+            message_type: "live_play",
+            media_url: best.videoUrl ?? best.imageUrl,
+            media_type: best.videoUrl ? "video" : "image",
+          })),
+        );
+        await supabase.from("pending_clips").update({ status: "done" }).eq("id", row.id);
+        summary.x_moments += 1;
+        continue;
+      }
+
+      summary.x_no_media += 1;
+
+      // Nothing yet. Either come back, or stop — a play from half an hour ago
+      // is not worth posting a clip of even if one finally appears.
+      if (row.attempts + 1 >= MAX_TRIES) {
+        await supabase.from("pending_clips").update({ status: "gave_up" }).eq("id", row.id);
+        summary.x_gave_up += 1;
+      } else {
+        await supabase.from("pending_clips")
+          .update({ search_after: new Date(Date.now() + RETRY_MIN * 60000).toISOString() })
+          .eq("id", row.id);
+      }
+    } catch (err) {
+      console.warn("[live-poller] pending clip skipped", err);
+    }
+  }
+}
 
 // Pregame heads-up: when a followed team tips/first-pitches within the next
 // ~45 min, drop one "game coming up" message into each of its rooms. Templated
@@ -416,7 +798,15 @@ async function postFinals(
 ): Promise<void> {
   summary.finals = 0;
   const now = Date.now();
-  const threeHoursAgo = new Date(now - 3 * 60 * 60 * 1000).toISOString();
+  // BY STATE, NOT BY CLOCK.
+  //
+  // This used to search for finals that started within N hours. Every value of
+  // N is wrong: you cannot predict when a game ENDS. Three hours was shorter
+  // than a football game. Six still loses one that runs seven. The window was
+  // never the right idea — a game has either had its recap or it has not, and
+  // that is a fact about the game, so it lives on the game.
+  //
+  // A delayed game now gets its recap late instead of never.
   const { data: finals } = await supabase
     .from("games")
     .select(
@@ -425,13 +815,15 @@ async function postFinals(
         "away:teams!games_away_team_id_fkey(id, name, city)",
     )
     .eq("status", "final")
-    .gte("start_time", threeHoursAgo)
+    .is("recap_posted_at", null)
     // A game that has not started cannot be final. Without this, a row with a
-    // FUTURE start_time that got wrongly marked final is always inside the
-    // "gte threeHoursAgo" window, so it never ages out and re-posts a bogus
-    // final every 6 hours forever. Seen in production 2026-08-07: two Week 2
-    // September games carrying the Aug 6 Panthers/Cardinals score.
-    .lte("start_time", new Date(now).toISOString());
+    // FUTURE start_time wrongly marked final would post a bogus recap. Seen in
+    // production 2026-08-07: two Week 2 September games carrying the Aug 6
+    // Panthers/Cardinals score.
+    .lte("start_time", new Date(now).toISOString())
+    // Belt and braces against a backfill going wrong: nothing older than two
+    // days should ever produce a recap, whatever the flag says.
+    .gte("start_time", new Date(now - 48 * 60 * 60 * 1000).toISOString());
   if (!finals || finals.length === 0) return;
 
   const { data: sysUser } = await supabase.rpc("get_or_create_system_user");
@@ -463,11 +855,28 @@ async function postFinals(
     } catch { /* leaders optional */ }
 
     for (const team of [home, away]) {
+      // Rooms that get a real recap don't need this line as well. The Coach's
+      // postgame recap already opens with the score and now carries the
+      // leaders and the true season record, so this arrived underneath it
+      // saying the same thing in fewer words — two posts, one fact.
+      //
+      // It stays for rooms the recap doesn't serve, where a bare final is
+      // better than a game that just stops.
       const { data: huddles } = await supabase
-        .from("huddles").select("id").eq("team_id", team.id);
+        .from("huddles").select("id, is_official_team_huddle").eq("team_id", team.id);
       const won = team.id === home.id ? hs > as : as > hs;
       const body = `🏁 Final: ${away.name} ${as}, ${home.name} ${hs}.${leaderLine} ${won ? "Big one in the books." : "On to the next."}`;
       for (const h of huddles ?? []) {
+        // Per ROOM, not per team. This asked whether ANY of the team's rooms
+        // would get the Coach's richer recap and, if so, skipped the bare final
+        // for ALL of them. UNC has two rooms — one official, one a chapter — so
+        // the chapter's existence silenced the official room, and the Tar Heels
+        // beat TCU with neither room ever being told the final score. TCU, with
+        // a single room, got its recap normally.
+        //
+        // coach-recap serves rooms where is_official_team_huddle is false or
+        // null; this serves the rest. Same split, decided one room at a time.
+        if (!h.is_official_team_huddle) continue;
         const { data: recent } = await supabase
           .from("huddle_messages").select("id")
           .eq("huddle_id", h.id).eq("message_type", "postgame")
@@ -480,6 +889,14 @@ async function postFinals(
         if (!error) summary.finals = (summary.finals ?? 0) + 1;
       }
     }
+
+    // Served every room this game reaches, so it is done — whatever happens on
+    // the next run. This is what replaces the old six-hour dedupe window: the
+    // guard is now "has this game been recapped", which cannot expire.
+    await supabase
+      .from("games")
+      .update({ recap_posted_at: new Date().toISOString() })
+      .eq("id", g.id);
   }
 }
 
@@ -492,8 +909,9 @@ async function postHighlights(
   if (!url || !key) return;
   summary.highlights = 0;
 
-  // Games that finished in the last 3 hours.
-  const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+  // Games that finished recently. Six hours from kickoff, for the same
+  // reason as the recap above: three is shorter than a football game.
+  const sixHourWindow = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
   const { data: finals } = await supabase
     .from("games")
     .select(
@@ -502,7 +920,7 @@ async function postHighlights(
         "away:teams!games_away_team_id_fkey(id, name, city)",
     )
     .eq("status", "final")
-    .gte("start_time", threeHoursAgo);
+    .gte("start_time", sixHourWindow);
 
   if (!finals || finals.length === 0) return;
   const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();

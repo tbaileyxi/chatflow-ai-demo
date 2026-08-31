@@ -3,9 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { supabase } from '@/integrations/supabase/client';
 import shLogo from '@/assets/sh-logo-updated.png';
+import { APP_STORE_URL, appStoreUrl, STORE_CAMPAIGN } from '@/lib/appStore';
 
-const APP_STORE_URL = '#';
-const PLAY_STORE_URL = '#';
 const SITE_URL = 'https://sidehuddlesports.com';
 
 interface HuddleMember {
@@ -40,12 +39,18 @@ export default function HuddleInvitePage() {
 
   const loadHuddle = async (id: string) => {
     try {
-      // Try to load by invite code first, then by id
+      // Columns that actually exist.
+      //
+      // This selected `description`, `sport` and `invite_code`, none of which
+      // are columns on huddles — the table has `bio` and a `team_id`, and
+      // there is no invite_code at all. PostgREST rejects the whole query on
+      // the first unknown column, so every share link ever opened landed on
+      // "Huddle not found", for every room, since the page was written.
       const { data: huddleRow, error } = await supabase
         .from('huddles')
-        .select('id, name, description, sport, is_private')
-        .or(`id.eq.${id},invite_code.eq.${id}`)
-        .single();
+        .select('id, name, bio, is_private, teams:team_id (name, city)')
+        .eq('id', id)
+        .maybeSingle();
 
       if (error || !huddleRow) {
         setNotFound(true);
@@ -77,8 +82,11 @@ export default function HuddleInvitePage() {
       setHuddle({
         id: huddleRow.id,
         name: huddleRow.name,
-        description: huddleRow.description,
-        sport: huddleRow.sport,
+        description: huddleRow.bio ?? undefined,
+        // No sport column; the team is the useful thing to name anyway.
+        sport: (huddleRow as any).teams
+          ? [(huddleRow as any).teams.city, (huddleRow as any).teams.name].filter(Boolean).join(' ')
+          : undefined,
         is_private: huddleRow.is_private,
         member_count: count ?? 0,
         members,
@@ -140,7 +148,7 @@ export default function HuddleInvitePage() {
         <meta name="twitter:description" content={ogDesc} />
         <meta name="twitter:image" content={`${SITE_URL}/og-invite.svg`} />
         {/* Deep link for app — when app is installed it opens directly */}
-        <meta name="apple-itunes-app" content={`app-id=YOURAPPID, app-argument=sidehuddle://huddle/${huddle?.id}`} />
+        <meta name="apple-itunes-app" content={`app-id=6777524558, app-argument=sidehuddle://huddle/${huddle?.id}`} />
       </Helmet>
 
       <div className="min-h-screen bg-[#0a0a0a] text-white overflow-x-hidden">
@@ -246,7 +254,7 @@ export default function HuddleInvitePage() {
               Download the app to join this huddle
             </p>
             <a
-              href={APP_STORE_URL}
+              href={appStoreUrl(STORE_CAMPAIGN.invite)}
               onClick={APP_STORE_URL === '#' ? e => e.preventDefault() : undefined}
               className={`flex items-center justify-center gap-3 rounded-2xl py-4 font-semibold text-base transition-all
                 ${APP_STORE_URL === '#'
@@ -258,19 +266,7 @@ export default function HuddleInvitePage() {
               <span>Download on the App Store</span>
               {APP_STORE_URL === '#' && <span className="text-xs bg-[#FFD700]/20 text-[#FFD700] px-2 py-0.5 rounded-full ml-1">Soon</span>}
             </a>
-            <a
-              href={PLAY_STORE_URL}
-              onClick={PLAY_STORE_URL === '#' ? e => e.preventDefault() : undefined}
-              className={`flex items-center justify-center gap-3 rounded-2xl py-4 font-semibold text-base border transition-all
-                ${PLAY_STORE_URL === '#'
-                  ? 'border-white/10 bg-white/[0.03] text-white/40 cursor-not-allowed'
-                  : 'border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700]/20'
-                }`}
-            >
-              <PlayIcon />
-              <span>Get it on Google Play</span>
-              {PLAY_STORE_URL === '#' && <span className="text-xs bg-[#FFD700]/20 text-[#FFD700] px-2 py-0.5 rounded-full ml-1">Soon</span>}
-            </a>
+            
           </div>
 
           {/* Share this invite */}
@@ -317,10 +313,3 @@ function AppleIcon() {
   );
 }
 
-function PlayIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M3.18 23.5a2 2 0 0 1-.98-.27 2 2 0 0 1-1-1.73V2.5a2 2 0 0 1 1-1.73 2 2 0 0 1 2 0l18 10a2 2 0 0 1 0 3.46l-18 10a2 2 0 0 1-1.02.27z" />
-    </svg>
-  );
-}

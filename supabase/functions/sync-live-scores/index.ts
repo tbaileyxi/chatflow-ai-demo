@@ -8,12 +8,12 @@ const corsHeaders = {
 
 // ESPN API endpoints — all free, no API key required
 const ESPN_ENDPOINTS: Record<string, string> = {
-  nfl: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',
-  ncaaf: 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard',
-  nba: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
-  ncaab: 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard',
-  nhl: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard',
-  mlb: 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard',
+  nfl: 'https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',
+  ncaaf: 'https://site.web.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard',
+  nba: 'https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
+  ncaab: 'https://site.web.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard',
+  nhl: 'https://site.web.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard',
+  mlb: 'https://site.web.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard',
 };
 
 // Map ESPN sport keys to Odds API sport_key values used in the games table
@@ -53,14 +53,24 @@ interface ESPNGame {
   }>;
 }
 
-async function fetchESPNScores(sport: string): Promise<ESPNGame[]> {
-  const endpoint = ESPN_ENDPOINTS[sport];
-  if (!endpoint) return [];
-
+// ESPN's scoreboard, asked twice.
+//
+// The bare endpoint answers with the current WEEK, not the current DAY. In
+// college football that meant week 1 — Sep 4 through Sep 7 — while UNC was
+// playing TCU in Dublin that same afternoon. The game was simply absent from
+// the feed, so the sync could not score it, and the room kept showing next
+// week's fixture with the real game underway.
+//
+// So: the bare call for the week ahead, which is what puts upcoming fixtures in
+// the table, plus an explicit three-day range for what is actually happening
+// now. ESPN dates its scoreboard in Eastern time, so the range runs yesterday
+// through tomorrow rather than just today — a 20:00 ET kickoff is already
+// tomorrow in UTC, and asking only for "today" drops it.
+async function fetchOneScoreboard(url: string, sport: string): Promise<ESPNGame[]> {
   try {
-    const response = await fetch(endpoint);
+    const response = await fetch(url, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" } });
     if (!response.ok) {
-      console.error(`ESPN API error for ${sport}: ${response.status}`);
+      console.error(`ESPN API error for ${sport}: ${response.status} (${url})`);
       return [];
     }
     const data = await response.json();
@@ -69,6 +79,29 @@ async function fetchESPNScores(sport: string): Promise<ESPNGame[]> {
     console.error(`Error fetching ESPN ${sport}:`, error);
     return [];
   }
+}
+
+function espnDate(offsetDays: number): string {
+  const d = new Date(Date.now() + offsetDays * 86400000);
+  return d.toISOString().slice(0, 10).replace(/-/g, '');
+}
+
+async function fetchESPNScores(sport: string): Promise<ESPNGame[]> {
+  const endpoint = ESPN_ENDPOINTS[sport];
+  if (!endpoint) return [];
+
+  const range = `${espnDate(-1)}-${espnDate(1)}`;
+  const [thisWeek, theseDays] = await Promise.all([
+    fetchOneScoreboard(endpoint, sport),
+    fetchOneScoreboard(`${endpoint}?dates=${range}&limit=200`, sport),
+  ]);
+
+  // Same game can come back from both calls. ESPN's event id is the identity.
+  const byId = new Map<string, ESPNGame>();
+  for (const g of [...thisWeek, ...theseDays]) {
+    if (g?.id) byId.set(g.id, g);
+  }
+  return [...byId.values()];
 }
 
 function normalizeTeamName(name: string): string {
@@ -243,6 +276,47 @@ serve(async (req) => {
       }
     }
 
+    // Team lookup lives here, above BOTH the users of it: the enrichment pass
+    // below repairs games missing a side, and the insert pass further down
+    // resolves sides for new ones. It used to sit only above the insert, so
+    // the repair referenced it before initialization and took the whole sync
+    // down with it — scores stopped updating everywhere, not just the one game.
+    const SPORT_TO_LEAGUE: Record<string, string> = {
+      nfl: 'NFL', ncaaf: 'NCAAF', nba: 'NBA', ncaab: 'NCAAB', nhl: 'NHL', mlb: 'MLB',
+    };
+
+    const { data: allTeams } = await supabase
+      .from('teams')
+      .select('id, name, city, league, status');
+    // Exact-match index only (full "City Name" and bare "Name") with league
+    // verification — fuzzy matching across leagues misfires (Rangers, Giants…).
+    const teamIndex = new Map<string, { id: string; league: string }>();
+    for (const t of allTeams ?? []) {
+      const league = (t.league ?? '').toUpperCase();
+      const full = `${t.city ?? ''} ${t.name}`.trim().toLowerCase();
+      if (!teamIndex.has(full)) teamIndex.set(full, { id: t.id, league });
+      const short = String(t.name).toLowerCase();
+      if (!teamIndex.has(short)) teamIndex.set(short, { id: t.id, league });
+    }
+    // ESPN says NCAAF and NCAAB; our teams table says NCAA for both. Comparing
+    // them raw means 'NCAA' === 'NCAAF' is false for every college team, so NO
+    // college game was ever matched or created — a live UNC game in Dublin was
+    // simply absent from the database while the room showed next week's fixture
+    // and no updates at all. bot-live-poller already normalises this exact pair;
+    // this function did not.
+    const dbLeague = (l: string) => (l === 'NCAAF' || l === 'NCAAB' ? 'NCAA' : l);
+
+    const resolveTeamId = (league: string, displayName?: string, shortName?: string): string | null => {
+      const want = dbLeague(league);
+      for (const key of [displayName?.toLowerCase(), shortName?.toLowerCase()]) {
+        if (!key) continue;
+        const hit = teamIndex.get(key);
+        if (hit && dbLeague(hit.league) === want) return hit.id;
+      }
+      return null;
+    };
+
+
     // ──────────────────────────────────────────────────────
     // Part 3: Enrich games table with ESPN period + clock
     // ──────────────────────────────────────────────────────
@@ -257,14 +331,214 @@ serve(async (req) => {
     // only consider rows starting within the next few hours.
     const sixHoursAhead = new Date(now.getTime() + 6 * 60 * 60 * 1000);
 
-    const { data: activeGames } = await supabase
+    const GAME_COLS =
+      '*, home_team:teams!games_home_team_id_fkey(id, name, city), away_team:teams!games_away_team_id_fkey(id, name, city)';
+
+    // TWO FETCHES, because the window is right for FINDING games and wrong for
+    // FINISHING them.
+    //
+    // This was one query bounded at six hours either side of now, which meant a
+    // game that started more than six hours ago was never looked at again. Miss
+    // one run, or have a game go long, and nothing would ever mark it final —
+    // it sat 'in_progress' forever. That is not hypothetical: a Mets room showed
+    // "Padres 1 — Mets 4, 9 · 0:00" with the live dot blinking, against a team
+    // they had not played in weeks, because useLiveGameContext takes the newest
+    // in_progress game for a team and that row outranked every real fixture.
+    //
+    // The upper bound stays: a game cannot be live before it kicks off, and
+    // without it one bad name match writes tonight's score onto a game weeks
+    // away. The lower bound only belongs on games we are still WAITING to start.
+    const { data: windowGames } = await supabase
       .from('games')
-      .select('*, home_team:teams!games_home_team_id_fkey(id, name, city), away_team:teams!games_away_team_id_fkey(id, name, city)')
-      .in('status', ['scheduled', 'in_progress', 'live'])
+      .select(GAME_COLS)
+      .eq('status', 'scheduled')
       .gte('start_time', sixHoursAgo.toISOString())
       .lte('start_time', sixHoursAhead.toISOString());
 
+    // Anything already marked live, however old. A game does not stop needing
+    // to be finished just because we stopped looking at it. Capped at two days
+    // so this cannot grow without limit if a whole season goes wrong.
+    const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+    const { data: stillLive } = await supabase
+      .from('games')
+      .select(GAME_COLS)
+      .in('status', ['in_progress', 'live'])
+      .gte('start_time', twoDaysAgo.toISOString())
+      .lte('start_time', sixHoursAhead.toISOString());
+
+    const seen = new Set<string>();
+    const activeGames = [...(windowGames || []), ...(stillLive || [])].filter((g: any) => {
+      if (seen.has(g.id)) return false;
+      seen.add(g.id);
+      return true;
+    });
+
     let gamesEnriched = 0;
+    const repairErrors: string[] = [];
+    let upcomingRepaired = 0;
+
+    // ── Correct fixture dates that drifted ───────────────────────────────
+    //
+    // Two scheduled games sat in the table dated 2026-08-29 while ESPN had them
+    // on September 5 and September 7. A Stanford room therefore showed its next
+    // fixture as a date that had already passed — the scoreboard reads as stale
+    // or broken, and a pregame heads-up either fires at the wrong time or never.
+    //
+    // Football only, deliberately. A fixture pair is effectively unique in a
+    // football season, so matching on the two teams alone is safe. Baseball
+    // teams play three games in a row against each other, and matching on teams
+    // without a date there would happily move Tuesday's game onto Thursday.
+    let datesFixed = 0;
+    let staleDupes = 0;
+    try {
+      const soon = new Date(now.getTime() + 21 * 86400000).toISOString();
+      const back = new Date(now.getTime() - 3 * 86400000).toISOString();
+      const { data: upcoming } = await supabase
+        .from('games')
+        .select('id, sport_key, start_time, home_team_id, away_team_id')
+        .eq('status', 'scheduled')
+        .in('sport_key', ['americanfootball_ncaaf', 'americanfootball_nfl'])
+        .gte('start_time', back)
+        .lte('start_time', soon);
+
+      for (const ug of upcoming ?? []) {
+        if (!ug.home_team_id || !ug.away_team_id) continue;
+        const hm = allTeams?.find((x: any) => x.id === ug.home_team_id);
+        const aw = allTeams?.find((x: any) => x.id === ug.away_team_id);
+        if (!hm || !aw) continue;
+
+        const sport = Object.entries(SPORT_KEY_MAP).find(([, k]) => k === ug.sport_key)?.[0];
+        if (!sport) continue;
+
+        const match = findMatchingGame(
+          allEspnGames.get(sport) ?? [],
+          hm.city ? `${hm.city} ${hm.name}` : hm.name,
+          aw.city ? `${aw.city} ${aw.name}` : aw.name,
+        );
+        if (!match?.date) continue;
+
+        const theirs = new Date(match.date).getTime();
+        const ours = new Date(ug.start_time).getTime();
+        // Two hours of slack: kickoff times get nudged, and rewriting the row
+        // every sync over a few minutes' drift would be pure churn.
+        if (Math.abs(theirs - ours) < 2 * 3600 * 1000) continue;
+
+        // Is the correct row already there?
+        //
+        // Moving a wrongly-dated row onto the right date does not fix it when a
+        // correctly-dated row already exists — it just makes two. That is what
+        // happened to Miami at Stanford: the Sep 5 row was already present, and
+        // the stale Aug 29 copy landed on top of it. A row like that is not
+        // mis-dated, it is redundant, and it wants merging rather than moving.
+        const near = new Date(match.date).getTime();
+        const { data: already } = await supabase
+          .from('games')
+          .select('id')
+          .eq('home_team_id', ug.home_team_id)
+          .eq('away_team_id', ug.away_team_id)
+          .neq('id', ug.id)
+          .gte('start_time', new Date(near - 6 * 3600 * 1000).toISOString())
+          .lte('start_time', new Date(near + 6 * 3600 * 1000).toISOString())
+          .limit(1)
+          .maybeSingle();
+        if (already) { staleDupes++; continue; }
+
+        const { error } = await supabase
+          .from('games')
+          .update({ start_time: match.date, last_synced_at: new Date().toISOString() })
+          .eq('id', ug.id);
+        if (!error) {
+          datesFixed++;
+          console.log(`🩹 Moved ${aw.name} @ ${hm.name}: ${ug.start_time} -> ${match.date}`);
+        }
+      }
+    } catch (err) {
+      repairErrors.push(`date repair: ${(err as Error).message}`);
+    }
+
+    // ── Repair upcoming games that only have one team ────────────────────
+    //
+    // Yesterday's fix filled the missing side during enrichment, which only
+    // looks at games happening around NOW. A room whose next fixture is a week
+    // out still read "Away @ Aggies · Sat, Sep 5" — the scoreboard people see
+    // most of the time is the one for a game that has not started, and that was
+    // exactly the one left broken.
+    //
+    // Matched on the known team AND the same calendar day. Single-team matching
+    // is otherwise dangerous: A&M has fixtures on Sep 5 and Sep 6, and without
+    // the date this would happily fill one from the other.
+    try {
+      const twoDaysBack = new Date(now.getTime() - 2 * 86400000).toISOString();
+      const twoWeeksOn  = new Date(now.getTime() + 14 * 86400000).toISOString();
+      const { data: halfGames } = await supabase
+        .from('games')
+        .select('id, sport_key, start_time, home_team_id, away_team_id')
+        .or('home_team_id.is.null,away_team_id.is.null')
+        .gte('start_time', twoDaysBack)
+        .lte('start_time', twoWeeksOn);
+
+      for (const hg of halfGames ?? []) {
+        const knownId = hg.home_team_id ?? hg.away_team_id;
+        if (!knownId) continue;  // neither side known: nothing to match on
+        const known = allTeams?.find((t: any) => t.id === knownId);
+        if (!known) continue;
+
+        const sport = Object.entries(SPORT_KEY_MAP)
+          .find(([, key]) => key === hg.sport_key)?.[0];
+        if (!sport) continue;
+
+        const ourDay = hg.start_time.slice(0, 10);
+        const candidates = (allEspnGames.get(sport) ?? [])
+          .filter((e: any) => String(e.date ?? '').slice(0, 10) === ourDay);
+
+        const full = known.city ? `${known.city} ${known.name}` : known.name;
+        const match = findMatchingGame(candidates, full, null)
+          ?? findMatchingGame(candidates, known.name, null);
+        if (!match) continue;
+
+        const comps = match.competitions?.[0]?.competitors || [];
+        const eh = comps.find((c: any) => c.homeAway === 'home');
+        const ea = comps.find((c: any) => c.homeAway === 'away');
+        if (!eh || !ea) continue;
+
+        const knownNorm = normalizeTeamName(full);
+        const ehNorm = normalizeTeamName(eh.team.displayName);
+        const weAreHome = ehNorm.includes(knownNorm) || knownNorm.includes(ehNorm);
+        const missing = hg.home_team_id ? ea : eh;
+        // If our known team is the ESPN away side, the side we lack is home.
+        const theirs = weAreHome ? ea : eh;
+        const use = hg.home_team_id && hg.away_team_id ? missing : theirs;
+
+        const nm = use.team.name || use.team.shortDisplayName || use.team.displayName;
+        let fillId = resolveTeamId(SPORT_TO_LEAGUE[sport], use.team.displayName, use.team.shortDisplayName);
+        if (!fillId) {
+          const { data: made, error: mkErr } = await supabase
+            .from('teams')
+            .insert({
+              name: nm,
+              city: use.team.location ?? null,
+              league: dbLeague(SPORT_TO_LEAGUE[sport]),
+              logo_url: use.team.logo ?? null,
+              status: 'inactive',
+            })
+            .select('id')
+            .maybeSingle();
+          if (mkErr) repairErrors.push(`${nm}: ${mkErr.message}`);
+          fillId = made?.id ?? null;
+        }
+        if (!fillId) continue;
+
+        await supabase
+          .from('games')
+          .update(hg.home_team_id ? { away_team_id: fillId } : { home_team_id: fillId })
+          .eq('id', hg.id);
+        upcomingRepaired++;
+        console.log(`🩹 Upcoming game ${ourDay}: filled ${nm}`);
+      }
+    } catch (err) {
+      repairErrors.push(`upcoming repair: ${(err as Error).message}`);
+    }
+
 
     for (const game of activeGames || []) {
       const homeName = (game as any).home_team?.name;
@@ -327,8 +601,75 @@ serve(async (req) => {
         newStatus = 'in_progress';
       }
 
+      // Rename a placeholder through the GAME, not through its name.
+      //
+      // The pass above finds placeholders by looking them up by name, which
+      // cannot work when the name is the broken thing: "Hawai'i Hawai'i" does
+      // not match ESPN's "Hawai'i Rainbow Warriors" under any key. But here we
+      // already know which ESPN game this row IS, so the competitor opposite our
+      // team tells us the nickname directly.
+      for (const [ourId, espnSide] of [
+        [game.home_team_id, sameOrientation ? espnHome : espnAway],
+        [game.away_team_id, sameOrientation ? espnAway : espnHome],
+      ] as Array<[string | null, any]>) {
+        if (!ourId || !espnSide?.team?.name) continue;
+        const ours = allTeams?.find((x: any) => x.id === ourId);
+        if (!ours || ours.status !== 'inactive') continue;
+        if (ours.name === espnSide.team.name) continue;
+        const { error: renErr } = await supabase
+          .from('teams').update({ name: espnSide.team.name }).eq('id', ourId);
+        if (!renErr) {
+          console.log(`🩹 Renamed via game: ${ours.city} ${ours.name} -> ${espnSide.team.name}`);
+          ours.name = espnSide.team.name;
+          namesFixed++;
+        }
+      }
+
       // Build update payload — only include fields that changed
       const updates: Record<string, any> = {};
+
+      // Repair a game that only has one team.
+      //
+      // Games inserted before opponent placeholders existed carry a null on the
+      // side we did not recognise, and a USC room read "Away 0 — Trojans 21"
+      // because of it. Those rows are never re-inserted — the insert path skips
+      // anything already in the table — so the fix has to happen here, on the
+      // pass that already has the ESPN game in hand.
+      if (!game.home_team_id || !game.away_team_id) {
+        // We know which of our sides is filled; the ESPN competitor that is not
+        // its counterpart is the one we are missing.
+        const missingIsHome = !game.home_team_id;
+        const espnMissing = missingIsHome
+          ? (sameOrientation ? espnHome : espnAway)
+          : (sameOrientation ? espnAway : espnHome);
+
+        const nm = espnMissing.team.name || espnMissing.team.shortDisplayName || espnMissing.team.displayName;
+        const existingId = resolveTeamId(
+          SPORT_TO_LEAGUE[matchedSport],
+          espnMissing.team.displayName,
+          espnMissing.team.shortDisplayName,
+        );
+        let fillId = existingId;
+        if (!fillId) {
+          const { data: made, error: makeErr } = await supabase
+            .from('teams')
+            .insert({
+              name: nm,
+              city: espnMissing.team.location ?? null,
+              league: dbLeague(SPORT_TO_LEAGUE[matchedSport]),
+              logo_url: espnMissing.team.logo ?? null,
+              status: 'inactive',
+            })
+            .select('id')
+            .maybeSingle();
+          if (makeErr) repairErrors.push(`${nm}: ${makeErr.message}`);
+          fillId = made?.id ?? null;
+        }
+        if (fillId) {
+          updates[missingIsHome ? 'home_team_id' : 'away_team_id'] = fillId;
+          console.log(`🩹 Filled missing ${missingIsHome ? 'home' : 'away'} team: ${nm}`);
+        }
+      }
 
       if (espnClock !== game.clock) updates.clock = espnClock;
       if (espnPeriod !== game.period) updates.period = espnPeriod;
@@ -362,31 +703,41 @@ serve(async (req) => {
     // involve a team in our DB, keyed on odds_game_id = "espn-{sport}-{id}"
     // so reruns are idempotent. Parts 2–3 then keep them updated.
     // ──────────────────────────────────────────────────────
-    const SPORT_TO_LEAGUE: Record<string, string> = {
-      nfl: 'NFL', ncaaf: 'NCAAF', nba: 'NBA', ncaab: 'NCAAB', nhl: 'NHL', mlb: 'MLB',
-    };
-
-    const { data: allTeams } = await supabase
-      .from('teams')
-      .select('id, name, city, league');
-    // Exact-match index only (full "City Name" and bare "Name") with league
-    // verification — fuzzy matching across leagues misfires (Rangers, Giants…).
-    const teamIndex = new Map<string, { id: string; league: string }>();
-    for (const t of allTeams ?? []) {
-      const league = (t.league ?? '').toUpperCase();
-      const full = `${t.city ?? ''} ${t.name}`.trim().toLowerCase();
-      if (!teamIndex.has(full)) teamIndex.set(full, { id: t.id, league });
-      const short = String(t.name).toLowerCase();
-      if (!teamIndex.has(short)) teamIndex.set(short, { id: t.id, league });
-    }
-    const resolveTeamId = (league: string, displayName?: string, shortName?: string): string | null => {
-      for (const key of [displayName?.toLowerCase(), shortName?.toLowerCase()]) {
-        if (!key) continue;
-        const hit = teamIndex.get(key);
-        if (hit && hit.league === league) return hit.id;
+    // Repair placeholder names created before the nickname was read properly.
+    //
+    // Opponent rows were built with ESPN's shortDisplayName, which is an
+    // abbreviated SCHOOL ("New Mexico St", "San José St") and not a nickname, so
+    // prepending the city produced "New Mexico State New Mexico St" and
+    // "Hawai'i Hawai'i" on scoreboards. New rows use `name` now; these are the
+    // ones already written. Only 'inactive' rows are touched — the real teams
+    // are curated and must never be renamed by a sync.
+    let namesFixed = 0;
+    try {
+      for (const [sport, espnGames] of allEspnGames.entries()) {
+        const league = SPORT_TO_LEAGUE[sport];
+        if (!league) continue;
+        for (const eg of espnGames) {
+          for (const c of (eg.competitions?.[0]?.competitors || [])) {
+            const nick = c.team?.name;
+            if (!nick) continue;
+            const id = resolveTeamId(league, c.team.displayName, c.team.shortDisplayName);
+            if (!id) continue;
+            const ours = allTeams?.find((x: any) => x.id === id);
+            if (!ours || ours.status !== 'inactive') continue;
+            if (ours.name === nick) continue;
+            const { error } = await supabase
+              .from('teams').update({ name: nick }).eq('id', id);
+            if (!error) {
+              ours.name = nick;
+              namesFixed++;
+              console.log(`🩹 Renamed placeholder ${ours.city} -> ${nick}`);
+            }
+          }
+        }
       }
-      return null;
-    };
+    } catch (err) {
+      repairErrors.push(`name repair: ${(err as Error).message}`);
+    }
 
     let gamesInserted = 0;
     for (const [sport, espnGames] of allEspnGames.entries()) {
@@ -400,10 +751,44 @@ serve(async (req) => {
         const away = comps.find((c) => c.homeAway === 'away');
         if (!home || !away) continue;
 
-        const homeTeamId = resolveTeamId(league, home.team.displayName, home.team.shortDisplayName);
-        const awayTeamId = resolveTeamId(league, away.team.displayName, away.team.shortDisplayName);
+        let homeTeamId = resolveTeamId(league, home.team.displayName, home.team.shortDisplayName);
+        let awayTeamId = resolveTeamId(league, away.team.displayName, away.team.shortDisplayName);
         // Only track games at least one of our teams plays in.
         if (!homeTeamId && !awayTeamId) continue;
+
+        // The other side needs a name too.
+        //
+        // A USC room showed "Away 0 — Trojans 14". San Jose State is not one of
+        // our 71 college teams, so away_team_id was null and the scoreboard had
+        // nothing to print but the word "Away". Half a scoreboard is worse than
+        // no scoreboard: it reads like a bug, because it is one.
+        //
+        // So the opponent gets a row — marked 'inactive', not 'active'. Every
+        // team picker, discovery list and admin count filters on status
+        // 'active', so these stay invisible there, and the bot's own team index
+        // filters the same way so it does not start following the whole of
+        // college football. They exist for one purpose: the join that puts a
+        // name on the other half of the score.
+        if (!homeTeamId || !awayTeamId) {
+          const missing = homeTeamId ? away : home;
+          const { data: made } = await supabase
+            .from('teams')
+            .insert({
+              // ESPN's `name` is the nickname ('Aggies'); shortDisplayName is an
+              // abbreviated SCHOOL ('New Mexico St'), and using it as the nickname
+              // rendered "New Mexico State New Mexico St" once city was prepended.
+              name: missing.team.name || missing.team.shortDisplayName || missing.team.displayName,
+              city: missing.team.location ?? null,
+              league: dbLeague(league),
+              logo_url: missing.team.logo ?? null,
+              status: 'inactive',
+            })
+            .select('id')
+            .maybeSingle();
+          if (made?.id) {
+            if (homeTeamId) awayTeamId = made.id; else homeTeamId = made.id;
+          }
+        }
 
         const oddsGameId = `espn-${sport}-${eg.id}`;
         const { data: existing } = await supabase
@@ -412,6 +797,44 @@ serve(async (req) => {
           .eq('odds_game_id', oddsGameId)
           .maybeSingle();
         if (existing) continue;
+
+        // The same game also arrives from the odds feed under ITS id — a 32-char
+        // hash, nothing like `espn-…` — so matching on odds_game_id alone let us
+        // insert a second row for a game already in the table. 146 of 1000 rows
+        // were twins. The odds row is the one to keep: markets hang off its id,
+        // so an ESPN twin is a game nobody can bet on. Enrichment below scores
+        // whichever row is there, so skipping loses nothing.
+        //
+        // Teams plus a same-day kickoff, not an exact timestamp: the two feeds
+        // disagree by a few minutes on when a game starts, which is exactly how
+        // the twins got in.
+        // A TIGHT window, deliberately.
+        //
+        // This was "same UTC day, plus 36 hours", which is wrong for exactly the
+        // case baseball produces constantly: a 9:38pm ET night game is 01:38 UTC
+        // the NEXT day, and the following afternoon's game in the same series is
+        // 20:08 UTC that same day. Two real games, same teams, one UTC date —
+        // and the wide window would have called the second one a duplicate and
+        // never inserted it.
+        //
+        // The twins this is actually for differ by MINUTES: the two feeds
+        // disagree slightly on kickoff, nothing more. Six hours covers that with
+        // room to spare and cannot reach the next game in a series.
+        if (homeTeamId && awayTeamId) {
+          const around = new Date(eg.date).getTime();
+          const dayStart = new Date(around - 6 * 60 * 60 * 1000);
+          const dayEnd = new Date(around + 6 * 60 * 60 * 1000);
+          const { data: twin } = await supabase
+            .from('games')
+            .select('id')
+            .eq('home_team_id', homeTeamId)
+            .eq('away_team_id', awayTeamId)
+            .gte('start_time', dayStart.toISOString())
+            .lt('start_time', dayEnd.toISOString())
+            .limit(1)
+            .maybeSingle();
+          if (twin) continue;
+        }
 
         const status = eg.status.type.completed
           ? 'final'
@@ -448,6 +871,11 @@ serve(async (req) => {
       live_events_updated: liveEventsUpdated,
       games_enriched: gamesEnriched,
       games_inserted: gamesInserted,
+      repair_errors: repairErrors,
+      upcoming_repaired: upcomingRepaired,
+      names_fixed: namesFixed,
+      dates_fixed: datesFixed,
+      stale_duplicates: staleDupes,
       sports_fetched: sportsToFetch.length,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

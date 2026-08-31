@@ -15,7 +15,7 @@ const corsHeaders = {
 };
 
 const SGO_BASE = "https://api.sportsgameodds.com/v2";
-const ESPN_WC = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard";
+const ESPN_WC = "https://site.web.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard";
 const HOUSE_ID = "00000000-0000-0000-0000-0000000000aa";
 const SEED_TOTAL = 1000;
 
@@ -76,7 +76,7 @@ interface EspnMatch {
 
 async function espnMatches(): Promise<EspnMatch[]> {
   const out: EspnMatch[] = [];
-  const res = await fetch(ESPN_WC);
+  const res = await fetch(ESPN_WC, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" } });
   if (!res.ok) return out;
   const json = await res.json();
   for (const ev of json.events ?? []) {

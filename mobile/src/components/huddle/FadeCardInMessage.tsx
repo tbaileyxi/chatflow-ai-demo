@@ -207,16 +207,27 @@ export function FadeCardInMessage({
         // Bot prop nobody has taken — both sides open, one tap to claim.
         <View className="mt-2">
           <Text className="mb-1.5 text-xs text-muted-foreground">
-            Take a side for {CLAIM_STAKE} chips — first come, first served.
+            Pick a side · {CLAIM_STAKE} chips
           </Text>
-          <View className="flex-row gap-2">
+          {/* STACKED, not side by side.
+              The card sits in a chat bubble capped at 75% of screen width, so
+              two buttons in a row got roughly 120px each — less than "Anything
+              less" needs at this weight. React Native then breaks mid-WORD
+              rather than mid-line, producing "Anythi / ng less".
+              A previous fix added adjustsFontSizeToFit with numberOfLines={2}.
+              That cannot work: RN only shrinks text to fit the width when
+              numberOfLines is 1, so with 2 it wraps first and the shrink never
+              engages — which is why the bug survived a commit named after it.
+              Stacking gives each label the card's full width, so there is
+              nothing to break. numberOfLines={1} keeps it honest. */}
+          <View className="gap-2">
             {(["over", "under"] as const).map((s) => (
               <Pressable
                 key={s}
                 disabled={busy || !payload.game}
                 onPress={() => claim(s)}
                 className={cn(
-                  "flex-1 items-center rounded-xl border px-3 py-2.5",
+                  "w-full items-center rounded-xl border px-3 py-2.5",
                   busy || !payload.game
                     ? "border-border bg-muted/40"
                     : "border-success bg-success/15",
@@ -225,7 +236,11 @@ export function FadeCardInMessage({
                 {busy ? (
                   <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
-                  <Text className="text-sm font-black text-success">
+                  <Text
+                    className="text-sm font-black text-success"
+                    numberOfLines={1}
+                    style={{ textAlign: "center" }}
+                  >
                     {s === "over" ? overLabel : underLabel}
                   </Text>
                 )}
@@ -251,9 +266,11 @@ export function FadeCardInMessage({
         // Claimed, still open — one side taken, the other is up for grabs.
         <View className="mt-2">
           <Text className="mb-1.5 text-xs text-muted-foreground">
+            {/* Name the EVENT, not the mechanic. "waiting for someone to fade
+                you" describes plumbing; "JOE took the Over" is what happened. */}
             {isPoster
-              ? `You're on ${posterSide === "over" ? overLabel : underLabel} — waiting for someone to fade you.`
-              : `${nameOf(fade!.poster_id)} is on ${posterSide === "over" ? overLabel : underLabel}`}
+              ? `You took ${posterSide === "over" ? overLabel : underLabel}. Nobody's taken the other side yet.`
+              : `${nameOf(fade!.poster_id)} took ${posterSide === "over" ? overLabel : underLabel}`}
           </Text>
           <Pressable
             disabled={isPoster || busy}
@@ -272,7 +289,7 @@ export function FadeCardInMessage({
                   isPoster ? "text-muted-foreground" : "text-success",
                 )}
               >
-                {isPoster ? "Waiting for a fader" : `Take ${openSideLabel} · ${stake} chips`}
+                {isPoster ? "Waiting on a taker" : `Take the other side · ${openSideLabel}`}
               </Text>
             )}
           </Pressable>

@@ -14,6 +14,10 @@ export type ShadowBet = {
   placedAt: string;
   // Joined market data
   question: string;
+  // Carried so the card can name the side ("Over 7.5") instead of badging
+  // the exchange's word for it ("YES").
+  marketType: string | null;
+  metadata: Record<string, any> | null;
   eventStartTime: string | null;
   isResolved: boolean;
   resolution: string | null;
@@ -35,7 +39,7 @@ export function useShadowBets() {
           `
           id, market_id, position, chips_risked, chips_won,
           is_settled, won, placed_at,
-          kalshi_markets (question, event_start_time, is_resolved, resolution)
+          kalshi_markets (question, market_type, metadata, event_start_time, is_resolved, resolution)
         `,
         )
         .eq("user_id", user.id)
@@ -55,6 +59,8 @@ export function useShadowBets() {
           won: b.won,
           placedAt: b.placed_at ?? new Date().toISOString(),
           question: market?.question ?? "Unknown market",
+          marketType: market?.market_type ?? null,
+          metadata: market?.metadata ?? null,
           eventStartTime: market?.event_start_time ?? null,
           isResolved: market?.is_resolved ?? false,
           resolution: market?.resolution ?? null,

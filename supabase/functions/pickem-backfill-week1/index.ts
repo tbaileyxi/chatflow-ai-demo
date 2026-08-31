@@ -40,10 +40,10 @@ Deno.serve(async (req) => {
     }
 
     // Fetch ESPN data for Week 1 NFL
-    const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=1&seasontype=2`
+    const espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=1&seasontype=2`
     console.log('Fetching ESPN data from:', espnUrl)
     
-    const espnResponse = await fetch(espnUrl)
+    const espnResponse = await fetch(espnUrl, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" } })
     const espnData = await espnResponse.json()
 
     if (!espnData.events || espnData.events.length === 0) {

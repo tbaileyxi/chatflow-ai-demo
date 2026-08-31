@@ -7,6 +7,7 @@ import {
   Image,
   ScrollView,
   Share,
+  Switch,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -69,7 +70,12 @@ function useTeamsList() {
   });
 }
 
-async function backfillTeamContent(newHuddleId: string, teamId: string) {
+// Returns the system bot's user_id when it could be learned from the copied
+// rows, so the caller can post the admin welcome without a second RPC.
+async function backfillTeamContent(
+  newHuddleId: string,
+  teamId: string,
+): Promise<string | null> {
   try {
     // Find the official team huddle
     const { data: officialHuddle } = await supabase
@@ -79,7 +85,7 @@ async function backfillTeamContent(newHuddleId: string, teamId: string) {
       .eq("is_official_team_huddle", true)
       .maybeSingle();
 
-    if (!officialHuddle) return;
+    if (!officialHuddle) return null;
 
     // Get last 24h of bot messages from official huddle
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -92,9 +98,17 @@ async function backfillTeamContent(newHuddleId: string, teamId: string) {
       .order("created_at", { ascending: true })
       .limit(20);
 
-    if (!botMessages || botMessages.length === 0) return;
+    if (!botMessages || botMessages.length === 0) return null;
 
-    // Copy messages into the new huddle
+    // Copy messages into the new huddle.
+    //
+    // is_team_agent_message MUST be true here. The INSERT policy on
+    // huddle_messages is:
+    //     (is_team_agent_message = true) OR (auth.uid() = user_id AND ...)
+    // These rows carry the SYSTEM bot's user_id, not ours, so the second branch
+    // can never pass. Copying the source row's flag (which is false on every
+    // bot-v2 post — the publisher doesn't set it) meant the whole batch was
+    // silently rejected by RLS and every new room came up empty.
     const inserts = botMessages.map((m) => ({
       huddle_id: newHuddleId,
       user_id: m.user_id,
@@ -103,14 +117,76 @@ async function backfillTeamContent(newHuddleId: string, teamId: string) {
       media_type: m.media_type,
       message_type: m.message_type,
       is_bot_message: true,
-      is_team_agent_message: m.is_team_agent_message ?? false,
+      is_team_agent_message: true,
       created_at: m.created_at,
     }));
 
-    await supabase.from("huddle_messages").insert(inserts);
+    // The error was never read before, which is why the RLS rejection above
+    // went unnoticed. Log it.
+    const { error: copyError } = await supabase
+      .from("huddle_messages")
+      .insert(inserts);
+    if (copyError) console.warn("Backfill insert rejected:", copyError);
+
+    return botMessages[0]?.user_id ?? null;
   } catch (err) {
     // Non-critical — don't block huddle creation if backfill fails
     console.warn("Backfill failed:", err);
+  }
+  return null;
+}
+
+/**
+ * The admin's first message.
+ *
+ * The admin is the only person who can turn a 1-person room into a 40-person
+ * room, so this is addressed to them, promises only what the Coach actually
+ * does today, and carries exactly one action.
+ *
+ * Deliberately does NOT say "type @coach" — the Coach answers questions now,
+ * but a brand-new empty room has nothing to answer about, and an instruction
+ * that produces a shrug is worse than no instruction. It offers instead: the
+ * live poller genuinely does post plays into this room during a game.
+ */
+async function postAdminWelcome(
+  huddleId: string,
+  huddleName: string,
+  teamName: string | null,
+  knownSystemUserId: string | null,
+) {
+  try {
+    let systemUserId = knownSystemUserId;
+    if (!systemUserId) {
+      const { data } = await supabase.rpc("get_or_create_system_user");
+      systemUserId = (data as string | null) ?? null;
+    }
+    if (!systemUserId) return;
+
+    const team = teamName ?? "your team";
+    // Say what it IS, then what to DO — with the actual button named. The
+    // 48-hour nudge is useless if nobody knew where anything was on day one.
+    const content =
+      `🏟️ **${huddleName} is your room.**\n\n` +
+      `I've got ${team} covered — news as it breaks, and when they play I'm in ` +
+      `here calling it live. Scores, big plays, all in this thread.\n\n` +
+      `Your half: get your people in. Tap the **+** up top to invite them — ` +
+      `a huddle of one is just me talking to myself.\n\n` +
+      `Ask me anything with **@coach** — the score, who's starting, camp news.\n` +
+      `Going private or managing who's in? That's **Settings**, top right.\n\n` +
+      `**→ Add your crew**`;
+
+    const { error } = await supabase.from("huddle_messages").insert({
+      huddle_id: huddleId,
+      user_id: systemUserId,
+      content,
+      is_bot_message: true,
+      // Same RLS reason as the backfill above — this row isn't ours.
+      is_team_agent_message: true,
+      message_type: "admin_welcome",
+    });
+    if (error) console.warn("Admin welcome rejected:", error);
+  } catch (err) {
+    console.warn("Admin welcome failed:", err);
   }
 }
 
@@ -127,6 +203,9 @@ export function CreateSideHuddleScreen() {
   const [filterLeague, setFilterLeague] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // Off by default: an open room is the norm, and discovery is already scoped
+  // to people you know. This is for someone who wants the door locked too.
+  const [askToJoin, setAskToJoin] = useState(false);
 
   const filtered = teams?.filter((t) => {
     if (filterLeague && t.league.toUpperCase() !== filterLeague) return false;
@@ -182,7 +261,10 @@ export function CreateSideHuddleScreen() {
           name: name.trim(),
           owner_id: user.id,
           team_id: selectedTeamId,
-          is_private: false,
+          // WAS: hardcoded false, which meant no room could ever be private —
+          // so the request-to-join flow and its whole approve/deny admin UI
+          // were unreachable dead code.
+          is_private: askToJoin,
           is_official_team_huddle: false,
           is_verified: false,
           member_count: 1,
@@ -201,8 +283,20 @@ export function CreateSideHuddleScreen() {
         user_id: user.id,
       });
 
-      // Backfill last 24h of bot content from the official team huddle
-      await backfillTeamContent(data.id, selectedTeamId);
+      // Backfill last 24h of bot content from the official team huddle, then
+      // greet the admin. The welcome goes LAST so it lands at the bottom of the
+      // thread — it's the first thing they should read, and the room is
+      // anchored to its newest message.
+      const systemUserId = await backfillTeamContent(data.id, selectedTeamId);
+      const selectedTeam = teams?.find((t) => t.id === selectedTeamId);
+      await postAdminWelcome(
+        data.id,
+        name.trim(),
+        selectedTeam
+          ? [selectedTeam.city, selectedTeam.name].filter(Boolean).join(" ").trim()
+          : null,
+        systemUserId,
+      );
 
       queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
       queryClient.invalidateQueries({ queryKey: ["game-night-communities"] });
@@ -229,8 +323,11 @@ export function CreateSideHuddleScreen() {
                 const inviteLink = code
                   ? `https://www.sidehuddlesports.com/i/${code}`
                   : `https://www.sidehuddlesports.com/h/${data.id}`;
+                // Same as PullInFriendsModal: the URL goes in `url`, never
+                // also in `message`, or iOS sends it twice and Messages drops
+                // the rich preview.
                 await Share.share({
-                  message: `Jump in: ${name.trim()} on Side Huddle. ${inviteLink}`,
+                  message: `Jump in: ${name.trim()} on Side Huddle.`,
                   url: inviteLink,
                 });
               } catch (err) {
@@ -448,6 +545,23 @@ export function CreateSideHuddleScreen() {
 
       {/* Bottom CTA */}
       <View className="absolute bottom-0 left-0 right-0 border-t border-border bg-background px-4 pb-8 pt-4">
+        <View className="mb-3 flex-row items-center justify-between">
+          <View className="flex-1 pr-3">
+            <Text className="text-sm font-bold text-foreground">
+              Private
+            </Text>
+            <Text className="text-xs leading-4 text-muted-foreground">
+              You decide who comes in. Off means anyone who finds the room can
+              walk in.
+            </Text>
+          </View>
+          <Switch
+            value={askToJoin}
+            onValueChange={setAskToJoin}
+            trackColor={{ true: colors.success, false: colors.muted }}
+          />
+        </View>
+
         <Button
           size="lg"
           onPress={handleCreate}

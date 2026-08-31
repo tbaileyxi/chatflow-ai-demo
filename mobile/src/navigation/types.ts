@@ -5,7 +5,7 @@ export type TabParamList = {
   Home: undefined;
   Teams: undefined;
   Search: undefined;
-  Ledger: undefined;
+  Ledger: { huddleId?: string; huddleName?: string } | undefined;
   Profile: undefined;
 };
 
@@ -33,8 +33,6 @@ export type RootStackParamList = {
   JoinHuddle: { huddleId: string };
   HuddleSearch: undefined;
   CreateSideHuddle: { teamId?: string } | undefined;
-  ManageTeams: undefined;
-  TeamFeed: { teamId: string };
   Admin: undefined;
   Settings: undefined;
   FAQ: undefined;

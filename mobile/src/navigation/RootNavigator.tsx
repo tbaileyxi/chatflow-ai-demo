@@ -20,12 +20,10 @@ import { HuddleScreen } from "@/screens/huddle/HuddleScreen";
 import { HuddleSettingsScreen } from "@/screens/huddle-settings/HuddleSettingsScreen";
 import { HuddleCoachSettingsScreen } from "@/screens/huddle-settings/HuddleCoachSettingsScreen";
 import { AdminScreen } from "@/screens/admin/AdminScreen";
-import { TeamFeedScreen } from "@/screens/team-feed/TeamFeedScreen";
 import { EventLobbyScreen } from "@/screens/event-lobby/EventLobbyScreen";
 import { HuddleSearchScreen } from "@/screens/huddle-search/HuddleSearchScreen";
 import { JoinHuddleScreen } from "@/screens/join-huddle/JoinHuddleScreen";
 import { CreateSideHuddleScreen } from "@/screens/create-side-huddle/CreateSideHuddleScreen";
-import { ManageTeamsScreen } from "@/screens/manage-teams/ManageTeamsScreen";
 import { FAQScreen } from "@/screens/faq/FAQScreen";
 import type { RootStackParamList } from "./types";
 
@@ -124,11 +122,6 @@ export function RootNavigator() {
             options={{ animation: "slide_from_right" }}
           />
           <Stack.Screen
-            name="TeamFeed"
-            component={TeamFeedScreen}
-            options={{ animation: "slide_from_right" }}
-          />
-          <Stack.Screen
             name="HuddleSearch"
             component={HuddleSearchScreen}
             options={{ animation: "slide_from_right" }}
@@ -142,11 +135,6 @@ export function RootNavigator() {
             name="CreateSideHuddle"
             component={CreateSideHuddleScreen}
             options={{ animation: "slide_from_bottom" }}
-          />
-          <Stack.Screen
-            name="ManageTeams"
-            component={ManageTeamsScreen}
-            options={{ animation: "slide_from_right" }}
           />
           <Stack.Screen
             name="FAQ"

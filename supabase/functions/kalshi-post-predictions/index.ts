@@ -17,6 +17,22 @@ Deno.serve(async (req) => {
 
     // Find unposted, unresolved markets closing within the next 48 hours.
     const now = new Date();
+    // OFF by default. This posted EVERY unposted market (limit 500) into chat,
+    // hourly through game hours, on top of the fade cards — which is why one
+    // room showed "Over 7.5 · YES 51c/NO 49c" AND "FADE Total 7.5 · Over/Under"
+    // for the same line, plus a carousel of strikes nobody asked for.
+    //
+    // The fade card already carries this market and is actionable; a price card
+    // beside it is the same bet twice in two vocabularies. The full board
+    // belongs in Picks, not in a conversation.
+    //
+    // PREDICTION_CARDS_ENABLED=true brings them back with no deploy.
+    if ((Deno.env.get("PREDICTION_CARDS_ENABLED") || "false").toLowerCase() !== "true") {
+      return new Response(JSON.stringify({ posted: 0, skipped: "prediction cards disabled" }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const cutoff48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
     const { data: markets } = await supabase

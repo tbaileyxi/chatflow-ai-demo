@@ -2,6 +2,7 @@
 // ESPN is the live spine for beta. Highlightly slots in later by env var.
 // Both implement SportsDataProvider so nothing downstream knows which is active.
 
+import { ESPN_HEADERS } from "../espnFetch.ts";
 import type {
   Game,
   League,
@@ -15,7 +16,7 @@ import type {
 // Treat as unofficial: every call try/except, never crash the loop.
 // ---------------------------------------------------------------
 
-const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports";
+const ESPN_BASE = "https://site.web.api.espn.com/apis/site/v2/sports";
 
 // Pull real box-score stat leaders from the ESPN summary so the smart in-game
 // bot can cite actual numbers ("Brunson 31 PTS, 7 AST"). Returns a map of
@@ -223,7 +224,10 @@ function mapEspnStatus(state: string | undefined): Game["status"] {
 
 async function safeJson(url: string): Promise<any | null> {
   try {
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    // ESPN 403s without a User-Agent. This sent none, so every scoreboard call
+    // came back null and the poller reported games_seen: 0 through entire slates
+    // of live games — silently, because a null here reads as "no games".
+    const res = await fetch(url, { headers: ESPN_HEADERS });
     if (!res.ok) {
       console.warn(`[espn] ${res.status} ${url}`);
       return null;
@@ -271,12 +275,34 @@ function normalizeEspnEvent(ev: any, league: League): Game | null {
 export class EspnProvider implements SportsDataProvider {
   name = "espn";
 
+  // ESPN's bare scoreboard answers with the current WEEK, not the current day.
+  // While UNC played TCU in Dublin it returned week 1 — Sep 4 through Sep 7 —
+  // and the game being played that afternoon was not in it. The bot had no game
+  // to narrate, so a live room stayed silent through an actual live game.
+  //
+  // Asking for an explicit date range as well fixes it. Yesterday through
+  // tomorrow rather than just today, because ESPN dates its scoreboard in
+  // Eastern time: a night kickoff is already tomorrow in UTC.
   async liveGames(league: League): Promise<Game[]> {
     const p = leaguePath(league);
     if (!p) return [];
-    const data = await safeJson(`${ESPN_BASE}/${p.sport}/${p.league}/scoreboard`);
-    const events = (data?.events ?? []) as any[];
-    return events
+
+    const day = (offset: number) =>
+      new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10).replace(/-/g, '');
+    const base = `${ESPN_BASE}/${p.sport}/${p.league}/scoreboard`;
+
+    const [week, days] = await Promise.all([
+      safeJson(base),
+      safeJson(`${base}?dates=${day(-1)}-${day(1)}&limit=200`),
+    ]);
+
+    // The same game comes back from both calls; ESPN's event id is the identity.
+    const byId = new Map<string, any>();
+    for (const e of [...(week?.events ?? []), ...(days?.events ?? [])]) {
+      if (e?.id) byId.set(e.id, e);
+    }
+
+    return [...byId.values()]
       .map((e) => normalizeEspnEvent(e, league))
       .filter((g): g is Game => g !== null);
   }

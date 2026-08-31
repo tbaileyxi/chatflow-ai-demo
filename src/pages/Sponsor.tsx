@@ -16,7 +16,7 @@ const FONT_B = "'Barlow', 'Inter', sans-serif";
 type League = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'NCAA';
 type LeagueFilter = 'ALL' | League;
 
-interface StaticTeam { city: string; name: string; league: League; }
+interface StaticTeam { city: string; name: string; league: League; state: string; }
 function teamKey(t: StaticTeam) { return `${t.league}|${t.city}|${t.name}`; }
 
 const EXISTING_TAKEN_CLAIMS: Record<string, ClaimStatus> = {
@@ -54,208 +54,219 @@ const EXISTING_TAKEN_CLAIMS: Record<string, ClaimStatus> = {
 const LEAGUE_LABELS: Record<string, string> = { NCAA: 'CFB', NFL: 'NFL', NBA: 'NBA', MLB: 'MLB', NHL: 'NHL' };
 function displayLeague(l: string) { return LEAGUE_LABELS[l] || l; }
 
+// Flat, per team, per season. No bundle tiers.
+//
+// The old ladder discounted to $180/team at ten teams — real complexity for a
+// product with no closed deals, and at a four-figure season price the discount
+// is not what decides anything. One number is easier to quote, easier to hold
+// in a conversation, and impossible to get wrong in an email.
+//
+// Season, not month: local sponsorship is budgeted by season, and monthly
+// billing invites a cancellation in month two. Each sport carries its own dates
+// rather than a single made-up calendar.
+const SEASON_PRICE = 1000;
+const DEPOSIT = 500;
+
 function bundlePrice(count: number): { total: number; label: string } {
-  if (count >= 10) return { total: 1800, label: '$180/team' };
-  if (count >= 6)  return { total: 1200, label: '$200/team' };
-  if (count >= 3)  return { total: 650,  label: '~$217/team' };
-  return { total: count * 250, label: '$250/team' };
+  return { total: count * SEASON_PRICE, label: `$${SEASON_PRICE.toLocaleString()}/team per season` };
 }
+
 
 // ─── All teams — no Supabase needed ──────────────────────────────────────────
 const ALL_TEAMS: StaticTeam[] = [
   // NFL
-  { city: 'Arizona',       name: 'Cardinals',  league: 'NFL' },
-  { city: 'Atlanta',       name: 'Falcons',    league: 'NFL' },
-  { city: 'Baltimore',     name: 'Ravens',     league: 'NFL' },
-  { city: 'Buffalo',       name: 'Bills',      league: 'NFL' },
-  { city: 'Carolina',      name: 'Panthers',   league: 'NFL' },
-  { city: 'Chicago',       name: 'Bears',      league: 'NFL' },
-  { city: 'Cincinnati',    name: 'Bengals',    league: 'NFL' },
-  { city: 'Cleveland',     name: 'Browns',     league: 'NFL' },
-  { city: 'Dallas',        name: 'Cowboys',    league: 'NFL' },
-  { city: 'Denver',        name: 'Broncos',    league: 'NFL' },
-  { city: 'Detroit',       name: 'Lions',      league: 'NFL' },
-  { city: 'Green Bay',     name: 'Packers',    league: 'NFL' },
-  { city: 'Houston',       name: 'Texans',     league: 'NFL' },
-  { city: 'Indianapolis',  name: 'Colts',      league: 'NFL' },
-  { city: 'Jacksonville',  name: 'Jaguars',    league: 'NFL' },
-  { city: 'Kansas City',   name: 'Chiefs',     league: 'NFL' },
-  { city: 'Las Vegas',     name: 'Raiders',    league: 'NFL' },
-  { city: 'Los Angeles',   name: 'Chargers',   league: 'NFL' },
-  { city: 'Los Angeles',   name: 'Rams',       league: 'NFL' },
-  { city: 'Miami',         name: 'Dolphins',   league: 'NFL' },
-  { city: 'Minnesota',     name: 'Vikings',    league: 'NFL' },
-  { city: 'New England',   name: 'Patriots',   league: 'NFL' },
-  { city: 'New Orleans',   name: 'Saints',     league: 'NFL' },
-  { city: 'New York',      name: 'Giants',     league: 'NFL' },
-  { city: 'New York',      name: 'Jets',       league: 'NFL' },
-  { city: 'Philadelphia',  name: 'Eagles',     league: 'NFL' },
-  { city: 'Pittsburgh',    name: 'Steelers',   league: 'NFL' },
-  { city: 'San Francisco', name: '49ers',      league: 'NFL' },
-  { city: 'Seattle',       name: 'Seahawks',   league: 'NFL' },
-  { city: 'Tampa Bay',     name: 'Buccaneers', league: 'NFL' },
-  { city: 'Tennessee',     name: 'Titans',     league: 'NFL' },
-  { city: 'Washington',    name: 'Commanders', league: 'NFL' },
+  { city: 'Arizona', name: 'Cardinals', league: 'NFL', state: 'AZ' },
+  { city: 'Atlanta', name: 'Falcons', league: 'NFL', state: 'GA' },
+  { city: 'Baltimore', name: 'Ravens', league: 'NFL', state: 'MD' },
+  { city: 'Buffalo', name: 'Bills', league: 'NFL', state: 'NY' },
+  { city: 'Carolina', name: 'Panthers', league: 'NFL', state: 'NC' },
+  { city: 'Chicago', name: 'Bears', league: 'NFL', state: 'IL' },
+  { city: 'Cincinnati', name: 'Bengals', league: 'NFL', state: 'OH' },
+  { city: 'Cleveland', name: 'Browns', league: 'NFL', state: 'OH' },
+  { city: 'Dallas', name: 'Cowboys', league: 'NFL', state: 'TX' },
+  { city: 'Denver', name: 'Broncos', league: 'NFL', state: 'CO' },
+  { city: 'Detroit', name: 'Lions', league: 'NFL', state: 'MI' },
+  { city: 'Green Bay', name: 'Packers', league: 'NFL', state: 'WI' },
+  { city: 'Houston', name: 'Texans', league: 'NFL', state: 'TX' },
+  { city: 'Indianapolis', name: 'Colts', league: 'NFL', state: 'IN' },
+  { city: 'Jacksonville', name: 'Jaguars', league: 'NFL', state: 'FL' },
+  { city: 'Kansas City', name: 'Chiefs', league: 'NFL', state: 'MO' },
+  { city: 'Las Vegas', name: 'Raiders', league: 'NFL', state: 'NV' },
+  { city: 'Los Angeles', name: 'Chargers', league: 'NFL', state: 'CA' },
+  { city: 'Los Angeles', name: 'Rams', league: 'NFL', state: 'CA' },
+  { city: 'Miami', name: 'Dolphins', league: 'NFL', state: 'FL' },
+  { city: 'Minnesota', name: 'Vikings', league: 'NFL', state: 'MN' },
+  { city: 'New England', name: 'Patriots', league: 'NFL', state: 'MA' },
+  { city: 'New Orleans', name: 'Saints', league: 'NFL', state: 'LA' },
+  { city: 'New York', name: 'Giants', league: 'NFL', state: 'NY' },
+  { city: 'New York', name: 'Jets', league: 'NFL', state: 'NY' },
+  { city: 'Philadelphia', name: 'Eagles', league: 'NFL', state: 'PA' },
+  { city: 'Pittsburgh', name: 'Steelers', league: 'NFL', state: 'PA' },
+  { city: 'San Francisco', name: '49ers', league: 'NFL', state: 'CA' },
+  { city: 'Seattle', name: 'Seahawks', league: 'NFL', state: 'WA' },
+  { city: 'Tampa Bay', name: 'Buccaneers', league: 'NFL', state: 'FL' },
+  { city: 'Tennessee', name: 'Titans', league: 'NFL', state: 'TN' },
+  { city: 'Washington', name: 'Commanders', league: 'NFL', state: 'DC' },
   // NBA
-  { city: 'Atlanta',       name: 'Hawks',         league: 'NBA' },
-  { city: 'Boston',        name: 'Celtics',        league: 'NBA' },
-  { city: 'Brooklyn',      name: 'Nets',           league: 'NBA' },
-  { city: 'Charlotte',     name: 'Hornets',        league: 'NBA' },
-  { city: 'Chicago',       name: 'Bulls',          league: 'NBA' },
-  { city: 'Cleveland',     name: 'Cavaliers',      league: 'NBA' },
-  { city: 'Dallas',        name: 'Mavericks',      league: 'NBA' },
-  { city: 'Denver',        name: 'Nuggets',        league: 'NBA' },
-  { city: 'Detroit',       name: 'Pistons',        league: 'NBA' },
-  { city: 'Golden State',  name: 'Warriors',       league: 'NBA' },
-  { city: 'Houston',       name: 'Rockets',        league: 'NBA' },
-  { city: 'Indiana',       name: 'Pacers',         league: 'NBA' },
-  { city: 'Los Angeles',   name: 'Clippers',       league: 'NBA' },
-  { city: 'Los Angeles',   name: 'Lakers',         league: 'NBA' },
-  { city: 'Memphis',       name: 'Grizzlies',      league: 'NBA' },
-  { city: 'Miami',         name: 'Heat',           league: 'NBA' },
-  { city: 'Milwaukee',     name: 'Bucks',          league: 'NBA' },
-  { city: 'Minnesota',     name: 'Timberwolves',   league: 'NBA' },
-  { city: 'New Orleans',   name: 'Pelicans',       league: 'NBA' },
-  { city: 'New York',      name: 'Knicks',         league: 'NBA' },
-  { city: 'Oklahoma City', name: 'Thunder',        league: 'NBA' },
-  { city: 'Orlando',       name: 'Magic',          league: 'NBA' },
-  { city: 'Philadelphia',  name: '76ers',          league: 'NBA' },
-  { city: 'Phoenix',       name: 'Suns',           league: 'NBA' },
-  { city: 'Portland',      name: 'Trail Blazers',  league: 'NBA' },
-  { city: 'Sacramento',    name: 'Kings',          league: 'NBA' },
-  { city: 'San Antonio',   name: 'Spurs',          league: 'NBA' },
-  { city: 'Toronto',       name: 'Raptors',        league: 'NBA' },
-  { city: 'Utah',          name: 'Jazz',           league: 'NBA' },
-  { city: 'Washington',    name: 'Wizards',        league: 'NBA' },
+  { city: 'Atlanta', name: 'Hawks', league: 'NBA', state: 'GA' },
+  { city: 'Boston', name: 'Celtics', league: 'NBA', state: 'MA' },
+  { city: 'Brooklyn', name: 'Nets', league: 'NBA', state: 'NY' },
+  { city: 'Charlotte', name: 'Hornets', league: 'NBA', state: 'NC' },
+  { city: 'Chicago', name: 'Bulls', league: 'NBA', state: 'IL' },
+  { city: 'Cleveland', name: 'Cavaliers', league: 'NBA', state: 'OH' },
+  { city: 'Dallas', name: 'Mavericks', league: 'NBA', state: 'TX' },
+  { city: 'Denver', name: 'Nuggets', league: 'NBA', state: 'CO' },
+  { city: 'Detroit', name: 'Pistons', league: 'NBA', state: 'MI' },
+  { city: 'Golden State', name: 'Warriors', league: 'NBA', state: 'CA' },
+  { city: 'Houston', name: 'Rockets', league: 'NBA', state: 'TX' },
+  { city: 'Indiana', name: 'Pacers', league: 'NBA', state: 'IN' },
+  { city: 'Los Angeles', name: 'Clippers', league: 'NBA', state: 'CA' },
+  { city: 'Los Angeles', name: 'Lakers', league: 'NBA', state: 'CA' },
+  { city: 'Memphis', name: 'Grizzlies', league: 'NBA', state: 'TN' },
+  { city: 'Miami', name: 'Heat', league: 'NBA', state: 'FL' },
+  { city: 'Milwaukee', name: 'Bucks', league: 'NBA', state: 'WI' },
+  { city: 'Minnesota', name: 'Timberwolves', league: 'NBA', state: 'MN' },
+  { city: 'New Orleans', name: 'Pelicans', league: 'NBA', state: 'LA' },
+  { city: 'New York', name: 'Knicks', league: 'NBA', state: 'NY' },
+  { city: 'Oklahoma City', name: 'Thunder', league: 'NBA', state: 'OK' },
+  { city: 'Orlando', name: 'Magic', league: 'NBA', state: 'FL' },
+  { city: 'Philadelphia', name: '76ers', league: 'NBA', state: 'PA' },
+  { city: 'Phoenix', name: 'Suns', league: 'NBA', state: 'AZ' },
+  { city: 'Portland', name: 'Trail Blazers', league: 'NBA', state: 'OR' },
+  { city: 'Sacramento', name: 'Kings', league: 'NBA', state: 'CA' },
+  { city: 'San Antonio', name: 'Spurs', league: 'NBA', state: 'TX' },
+  { city: 'Toronto', name: 'Raptors', league: 'NBA', state: 'ON' },
+  { city: 'Utah', name: 'Jazz', league: 'NBA', state: 'UT' },
+  { city: 'Washington', name: 'Wizards', league: 'NBA', state: 'DC' },
   // MLB
-  { city: 'Arizona',       name: 'Diamondbacks', league: 'MLB' },
-  { city: 'Atlanta',       name: 'Braves',       league: 'MLB' },
-  { city: 'Baltimore',     name: 'Orioles',      league: 'MLB' },
-  { city: 'Boston',        name: 'Red Sox',      league: 'MLB' },
-  { city: 'Chicago',       name: 'Cubs',         league: 'MLB' },
-  { city: 'Chicago',       name: 'White Sox',    league: 'MLB' },
-  { city: 'Cincinnati',    name: 'Reds',         league: 'MLB' },
-  { city: 'Cleveland',     name: 'Guardians',    league: 'MLB' },
-  { city: 'Colorado',      name: 'Rockies',      league: 'MLB' },
-  { city: 'Detroit',       name: 'Tigers',       league: 'MLB' },
-  { city: 'Houston',       name: 'Astros',       league: 'MLB' },
-  { city: 'Kansas City',   name: 'Royals',       league: 'MLB' },
-  { city: 'Los Angeles',   name: 'Angels',       league: 'MLB' },
-  { city: 'Los Angeles',   name: 'Dodgers',      league: 'MLB' },
-  { city: 'Miami',         name: 'Marlins',      league: 'MLB' },
-  { city: 'Milwaukee',     name: 'Brewers',      league: 'MLB' },
-  { city: 'Minnesota',     name: 'Twins',        league: 'MLB' },
-  { city: 'New York',      name: 'Mets',         league: 'MLB' },
-  { city: 'New York',      name: 'Yankees',      league: 'MLB' },
-  { city: 'Oakland',       name: 'Athletics',    league: 'MLB' },
-  { city: 'Philadelphia',  name: 'Phillies',     league: 'MLB' },
-  { city: 'Pittsburgh',    name: 'Pirates',      league: 'MLB' },
-  { city: 'San Diego',     name: 'Padres',       league: 'MLB' },
-  { city: 'San Francisco', name: 'Giants',       league: 'MLB' },
-  { city: 'Seattle',       name: 'Mariners',     league: 'MLB' },
-  { city: 'St. Louis',     name: 'Cardinals',    league: 'MLB' },
-  { city: 'Tampa Bay',     name: 'Rays',         league: 'MLB' },
-  { city: 'Texas',         name: 'Rangers',      league: 'MLB' },
-  { city: 'Toronto',       name: 'Blue Jays',    league: 'MLB' },
-  { city: 'Washington',    name: 'Nationals',    league: 'MLB' },
+  { city: 'Arizona', name: 'Diamondbacks', league: 'MLB', state: 'AZ' },
+  { city: 'Atlanta', name: 'Braves', league: 'MLB', state: 'GA' },
+  { city: 'Baltimore', name: 'Orioles', league: 'MLB', state: 'MD' },
+  { city: 'Boston', name: 'Red Sox', league: 'MLB', state: 'MA' },
+  { city: 'Chicago', name: 'Cubs', league: 'MLB', state: 'IL' },
+  { city: 'Chicago', name: 'White Sox', league: 'MLB', state: 'IL' },
+  { city: 'Cincinnati', name: 'Reds', league: 'MLB', state: 'OH' },
+  { city: 'Cleveland', name: 'Guardians', league: 'MLB', state: 'OH' },
+  { city: 'Colorado', name: 'Rockies', league: 'MLB', state: 'CO' },
+  { city: 'Detroit', name: 'Tigers', league: 'MLB', state: 'MI' },
+  { city: 'Houston', name: 'Astros', league: 'MLB', state: 'TX' },
+  { city: 'Kansas City', name: 'Royals', league: 'MLB', state: 'MO' },
+  { city: 'Los Angeles', name: 'Angels', league: 'MLB', state: 'CA' },
+  { city: 'Los Angeles', name: 'Dodgers', league: 'MLB', state: 'CA' },
+  { city: 'Miami', name: 'Marlins', league: 'MLB', state: 'FL' },
+  { city: 'Milwaukee', name: 'Brewers', league: 'MLB', state: 'WI' },
+  { city: 'Minnesota', name: 'Twins', league: 'MLB', state: 'MN' },
+  { city: 'New York', name: 'Mets', league: 'MLB', state: 'NY' },
+  { city: 'New York', name: 'Yankees', league: 'MLB', state: 'NY' },
+  { city: 'Oakland', name: 'Athletics', league: 'MLB', state: 'CA' },
+  { city: 'Philadelphia', name: 'Phillies', league: 'MLB', state: 'PA' },
+  { city: 'Pittsburgh', name: 'Pirates', league: 'MLB', state: 'PA' },
+  { city: 'San Diego', name: 'Padres', league: 'MLB', state: 'CA' },
+  { city: 'San Francisco', name: 'Giants', league: 'MLB', state: 'CA' },
+  { city: 'Seattle', name: 'Mariners', league: 'MLB', state: 'WA' },
+  { city: 'St. Louis', name: 'Cardinals', league: 'MLB', state: 'MO' },
+  { city: 'Tampa Bay', name: 'Rays', league: 'MLB', state: 'FL' },
+  { city: 'Texas', name: 'Rangers', league: 'MLB', state: 'TX' },
+  { city: 'Toronto', name: 'Blue Jays', league: 'MLB', state: 'ON' },
+  { city: 'Washington', name: 'Nationals', league: 'MLB', state: 'DC' },
   // NHL
-  { city: 'Anaheim',       name: 'Ducks',        league: 'NHL' },
-  { city: 'Boston',        name: 'Bruins',       league: 'NHL' },
-  { city: 'Buffalo',       name: 'Sabres',       league: 'NHL' },
-  { city: 'Calgary',       name: 'Flames',       league: 'NHL' },
-  { city: 'Carolina',      name: 'Hurricanes',   league: 'NHL' },
-  { city: 'Chicago',       name: 'Blackhawks',   league: 'NHL' },
-  { city: 'Colorado',      name: 'Avalanche',    league: 'NHL' },
-  { city: 'Columbus',      name: 'Blue Jackets', league: 'NHL' },
-  { city: 'Dallas',        name: 'Stars',        league: 'NHL' },
-  { city: 'Detroit',       name: 'Red Wings',    league: 'NHL' },
-  { city: 'Edmonton',      name: 'Oilers',       league: 'NHL' },
-  { city: 'Florida',       name: 'Panthers',     league: 'NHL' },
-  { city: 'Los Angeles',   name: 'Kings',        league: 'NHL' },
-  { city: 'Minnesota',     name: 'Wild',         league: 'NHL' },
-  { city: 'Montreal',      name: 'Canadiens',    league: 'NHL' },
-  { city: 'Nashville',     name: 'Predators',    league: 'NHL' },
-  { city: 'New Jersey',    name: 'Devils',       league: 'NHL' },
-  { city: 'New York',      name: 'Islanders',    league: 'NHL' },
-  { city: 'New York',      name: 'Rangers',      league: 'NHL' },
-  { city: 'Ottawa',        name: 'Senators',     league: 'NHL' },
-  { city: 'Philadelphia',  name: 'Flyers',       league: 'NHL' },
-  { city: 'Pittsburgh',    name: 'Penguins',     league: 'NHL' },
-  { city: 'San Jose',      name: 'Sharks',       league: 'NHL' },
-  { city: 'Seattle',       name: 'Kraken',       league: 'NHL' },
-  { city: 'St. Louis',     name: 'Blues',        league: 'NHL' },
-  { city: 'Tampa Bay',     name: 'Lightning',    league: 'NHL' },
-  { city: 'Toronto',       name: 'Maple Leafs',  league: 'NHL' },
-  { city: 'Utah',          name: 'Hockey Club',  league: 'NHL' },
-  { city: 'Vancouver',     name: 'Canucks',      league: 'NHL' },
-  { city: 'Vegas',         name: 'Golden Knights', league: 'NHL' },
-  { city: 'Washington',    name: 'Capitals',     league: 'NHL' },
-  { city: 'Winnipeg',      name: 'Jets',         league: 'NHL' },
+  { city: 'Anaheim', name: 'Ducks', league: 'NHL', state: 'CA' },
+  { city: 'Boston', name: 'Bruins', league: 'NHL', state: 'MA' },
+  { city: 'Buffalo', name: 'Sabres', league: 'NHL', state: 'NY' },
+  { city: 'Calgary', name: 'Flames', league: 'NHL', state: 'AB' },
+  { city: 'Carolina', name: 'Hurricanes', league: 'NHL', state: 'NC' },
+  { city: 'Chicago', name: 'Blackhawks', league: 'NHL', state: 'IL' },
+  { city: 'Colorado', name: 'Avalanche', league: 'NHL', state: 'CO' },
+  { city: 'Columbus', name: 'Blue Jackets', league: 'NHL', state: 'OH' },
+  { city: 'Dallas', name: 'Stars', league: 'NHL', state: 'TX' },
+  { city: 'Detroit', name: 'Red Wings', league: 'NHL', state: 'MI' },
+  { city: 'Edmonton', name: 'Oilers', league: 'NHL', state: 'AB' },
+  { city: 'Florida', name: 'Panthers', league: 'NHL', state: 'FL' },
+  { city: 'Los Angeles', name: 'Kings', league: 'NHL', state: 'CA' },
+  { city: 'Minnesota', name: 'Wild', league: 'NHL', state: 'MN' },
+  { city: 'Montreal', name: 'Canadiens', league: 'NHL', state: 'QC' },
+  { city: 'Nashville', name: 'Predators', league: 'NHL', state: 'TN' },
+  { city: 'New Jersey', name: 'Devils', league: 'NHL', state: 'NJ' },
+  { city: 'New York', name: 'Islanders', league: 'NHL', state: 'NY' },
+  { city: 'New York', name: 'Rangers', league: 'NHL', state: 'NY' },
+  { city: 'Ottawa', name: 'Senators', league: 'NHL', state: 'ON' },
+  { city: 'Philadelphia', name: 'Flyers', league: 'NHL', state: 'PA' },
+  { city: 'Pittsburgh', name: 'Penguins', league: 'NHL', state: 'PA' },
+  { city: 'San Jose', name: 'Sharks', league: 'NHL', state: 'CA' },
+  { city: 'Seattle', name: 'Kraken', league: 'NHL', state: 'WA' },
+  { city: 'St. Louis', name: 'Blues', league: 'NHL', state: 'MO' },
+  { city: 'Tampa Bay', name: 'Lightning', league: 'NHL', state: 'FL' },
+  { city: 'Toronto', name: 'Maple Leafs', league: 'NHL', state: 'ON' },
+  { city: 'Utah', name: 'Hockey Club', league: 'NHL', state: 'UT' },
+  { city: 'Vancouver', name: 'Canucks', league: 'NHL', state: 'BC' },
+  { city: 'Vegas', name: 'Golden Knights', league: 'NHL', state: 'NV' },
+  { city: 'Washington', name: 'Capitals', league: 'NHL', state: 'DC' },
+  { city: 'Winnipeg', name: 'Jets', league: 'NHL', state: 'MB' },
   // NCAA CFB
-  { city: 'Alabama',        name: 'Crimson Tide',    league: 'NCAA' },
-  { city: 'Arkansas',       name: 'Razorbacks',      league: 'NCAA' },
-  { city: 'Auburn',         name: 'Tigers',          league: 'NCAA' },
-  { city: 'Baylor',         name: 'Bears',           league: 'NCAA' },
-  { city: 'Boston College', name: 'Eagles',          league: 'NCAA' },
-  { city: 'BYU',            name: 'Cougars',         league: 'NCAA' },
-  { city: 'Arizona',        name: 'Wildcats',        league: 'NCAA' },
-  { city: 'Arizona State',  name: 'Sun Devils',      league: 'NCAA' },
-  { city: 'Boise State',    name: 'Broncos',         league: 'NCAA' },
-  { city: 'Cincinnati',     name: 'Bearcats',        league: 'NCAA' },
-  { city: 'Clemson',        name: 'Tigers',          league: 'NCAA' },
-  { city: 'Colorado',       name: 'Buffaloes',       league: 'NCAA' },
-  { city: 'Duke',           name: 'Blue Devils',     league: 'NCAA' },
-  { city: 'Florida',        name: 'Gators',          league: 'NCAA' },
-  { city: 'Florida State',  name: 'Seminoles',       league: 'NCAA' },
-  { city: 'Georgia',        name: 'Bulldogs',        league: 'NCAA' },
-  { city: 'Georgia Tech',   name: 'Yellow Jackets',  league: 'NCAA' },
-  { city: 'Houston',        name: 'Cougars',         league: 'NCAA' },
-  { city: 'Illinois',       name: 'Fighting Illini', league: 'NCAA' },
-  { city: 'Indiana',        name: 'Hoosiers',        league: 'NCAA' },
-  { city: 'Iowa',           name: 'Hawkeyes',        league: 'NCAA' },
-  { city: 'Iowa State',     name: 'Cyclones',        league: 'NCAA' },
-  { city: 'Kansas',         name: 'Jayhawks',        league: 'NCAA' },
-  { city: 'Kansas State',   name: 'Wildcats',        league: 'NCAA' },
-  { city: 'Kentucky',       name: 'Wildcats',        league: 'NCAA' },
-  { city: 'LSU',            name: 'Tigers',          league: 'NCAA' },
-  { city: 'Louisville',     name: 'Cardinals',       league: 'NCAA' },
-  { city: 'Miami',          name: 'Hurricanes',      league: 'NCAA' },
-  { city: 'Michigan',       name: 'Wolverines',      league: 'NCAA' },
-  { city: 'Michigan State', name: 'Spartans',        league: 'NCAA' },
-  { city: 'Mississippi State', name: 'Bulldogs',     league: 'NCAA' },
-  { city: 'Missouri',       name: 'Tigers',          league: 'NCAA' },
-  { city: 'Memphis',        name: 'Tigers',          league: 'NCAA' },
-  { city: 'NC State',       name: 'Wolfpack',        league: 'NCAA' },
-  { city: 'Nebraska',       name: 'Cornhuskers',     league: 'NCAA' },
-  { city: 'North Carolina', name: 'Tar Heels',       league: 'NCAA' },
-  { city: 'Notre Dame',     name: 'Fighting Irish',  league: 'NCAA' },
-  { city: 'Ohio State',     name: 'Buckeyes',        league: 'NCAA' },
-  { city: 'Oklahoma',       name: 'Sooners',         league: 'NCAA' },
-  { city: 'Oklahoma State', name: 'Cowboys',         league: 'NCAA' },
-  { city: 'Ole Miss',       name: 'Rebels',          league: 'NCAA' },
-  { city: 'Oregon',         name: 'Ducks',           league: 'NCAA' },
-  { city: 'Penn State',     name: 'Nittany Lions',   league: 'NCAA' },
-  { city: 'Pittsburgh',     name: 'Panthers',        league: 'NCAA' },
-  { city: 'Purdue',         name: 'Boilermakers',    league: 'NCAA' },
-  { city: 'South Carolina', name: 'Gamecocks',       league: 'NCAA' },
-  { city: 'SMU',            name: 'Mustangs',        league: 'NCAA' },
-  { city: 'Syracuse',       name: 'Orange',          league: 'NCAA' },
-  { city: 'TCU',            name: 'Horned Frogs',    league: 'NCAA' },
-  { city: 'Tennessee',      name: 'Volunteers',      league: 'NCAA' },
-  { city: 'Texas',          name: 'Longhorns',       league: 'NCAA' },
-  { city: 'Texas A&M',      name: 'Aggies',          league: 'NCAA' },
-  { city: 'Texas Tech',     name: 'Red Raiders',     league: 'NCAA' },
-  { city: 'Tulane',         name: 'Green Wave',      league: 'NCAA' },
-  { city: 'UCF',            name: 'Knights',         league: 'NCAA' },
-  { city: 'USC',            name: 'Trojans',         league: 'NCAA' },
-  { city: 'Utah',           name: 'Utes',            league: 'NCAA' },
-  { city: 'Vanderbilt',     name: 'Commodores',      league: 'NCAA' },
-  { city: 'Virginia',       name: 'Cavaliers',       league: 'NCAA' },
-  { city: 'Virginia Tech',  name: 'Hokies',          league: 'NCAA' },
-  { city: 'Wake Forest',    name: 'Demon Deacons',   league: 'NCAA' },
-  { city: 'Washington',     name: 'Huskies',         league: 'NCAA' },
-  { city: 'West Virginia',  name: 'Mountaineers',    league: 'NCAA' },
-  { city: 'Wisconsin',      name: 'Badgers',         league: 'NCAA' },
+  { city: 'Alabama', name: 'Crimson Tide', league: 'NCAA', state: 'AL' },
+  { city: 'Arkansas', name: 'Razorbacks', league: 'NCAA', state: 'AR' },
+  { city: 'Auburn', name: 'Tigers', league: 'NCAA', state: 'AL' },
+  { city: 'Baylor', name: 'Bears', league: 'NCAA', state: 'TX' },
+  { city: 'Boston College', name: 'Eagles', league: 'NCAA', state: 'MA' },
+  { city: 'BYU', name: 'Cougars', league: 'NCAA', state: 'UT' },
+  { city: 'Arizona', name: 'Wildcats', league: 'NCAA', state: 'AZ' },
+  { city: 'Arizona State', name: 'Sun Devils', league: 'NCAA', state: 'AZ' },
+  { city: 'Boise State', name: 'Broncos', league: 'NCAA', state: 'ID' },
+  { city: 'Cincinnati', name: 'Bearcats', league: 'NCAA', state: 'OH' },
+  { city: 'Clemson', name: 'Tigers', league: 'NCAA', state: 'SC' },
+  { city: 'Colorado', name: 'Buffaloes', league: 'NCAA', state: 'CO' },
+  { city: 'Duke', name: 'Blue Devils', league: 'NCAA', state: 'NC' },
+  { city: 'Florida', name: 'Gators', league: 'NCAA', state: 'FL' },
+  { city: 'Florida State', name: 'Seminoles', league: 'NCAA', state: 'FL' },
+  { city: 'Georgia', name: 'Bulldogs', league: 'NCAA', state: 'GA' },
+  { city: 'Georgia Tech', name: 'Yellow Jackets', league: 'NCAA', state: 'GA' },
+  { city: 'Houston', name: 'Cougars', league: 'NCAA', state: 'TX' },
+  { city: 'Illinois', name: 'Fighting Illini', league: 'NCAA', state: 'IL' },
+  { city: 'Indiana', name: 'Hoosiers', league: 'NCAA', state: 'IN' },
+  { city: 'Iowa', name: 'Hawkeyes', league: 'NCAA', state: 'IA' },
+  { city: 'Iowa State', name: 'Cyclones', league: 'NCAA', state: 'IA' },
+  { city: 'Kansas', name: 'Jayhawks', league: 'NCAA', state: 'KS' },
+  { city: 'Kansas State', name: 'Wildcats', league: 'NCAA', state: 'KS' },
+  { city: 'Kentucky', name: 'Wildcats', league: 'NCAA', state: 'KY' },
+  { city: 'LSU', name: 'Tigers', league: 'NCAA', state: 'LA' },
+  { city: 'Louisville', name: 'Cardinals', league: 'NCAA', state: 'KY' },
+  { city: 'Miami', name: 'Hurricanes', league: 'NCAA', state: 'FL' },
+  { city: 'Michigan', name: 'Wolverines', league: 'NCAA', state: 'MI' },
+  { city: 'Michigan State', name: 'Spartans', league: 'NCAA', state: 'MI' },
+  { city: 'Mississippi State', name: 'Bulldogs', league: 'NCAA', state: 'MS' },
+  { city: 'Missouri', name: 'Tigers', league: 'NCAA', state: 'MO' },
+  { city: 'Memphis', name: 'Tigers', league: 'NCAA', state: 'TN' },
+  { city: 'NC State', name: 'Wolfpack', league: 'NCAA', state: 'NC' },
+  { city: 'Nebraska', name: 'Cornhuskers', league: 'NCAA', state: 'NE' },
+  { city: 'North Carolina', name: 'Tar Heels', league: 'NCAA', state: 'NC' },
+  { city: 'Notre Dame', name: 'Fighting Irish', league: 'NCAA', state: 'IN' },
+  { city: 'Ohio State', name: 'Buckeyes', league: 'NCAA', state: 'OH' },
+  { city: 'Oklahoma', name: 'Sooners', league: 'NCAA', state: 'OK' },
+  { city: 'Oklahoma State', name: 'Cowboys', league: 'NCAA', state: 'OK' },
+  { city: 'Ole Miss', name: 'Rebels', league: 'NCAA', state: 'MS' },
+  { city: 'Oregon', name: 'Ducks', league: 'NCAA', state: 'OR' },
+  { city: 'Penn State', name: 'Nittany Lions', league: 'NCAA', state: 'PA' },
+  { city: 'Pittsburgh', name: 'Panthers', league: 'NCAA', state: 'PA' },
+  { city: 'Purdue', name: 'Boilermakers', league: 'NCAA', state: 'IN' },
+  { city: 'South Carolina', name: 'Gamecocks', league: 'NCAA', state: 'SC' },
+  { city: 'SMU', name: 'Mustangs', league: 'NCAA', state: 'TX' },
+  { city: 'Syracuse', name: 'Orange', league: 'NCAA', state: 'NY' },
+  { city: 'TCU', name: 'Horned Frogs', league: 'NCAA', state: 'TX' },
+  { city: 'Tennessee', name: 'Volunteers', league: 'NCAA', state: 'TN' },
+  { city: 'Texas', name: 'Longhorns', league: 'NCAA', state: 'TX' },
+  { city: 'Texas A&M', name: 'Aggies', league: 'NCAA', state: 'TX' },
+  { city: 'Texas Tech', name: 'Red Raiders', league: 'NCAA', state: 'TX' },
+  { city: 'Tulane', name: 'Green Wave', league: 'NCAA', state: 'LA' },
+  { city: 'UCF', name: 'Knights', league: 'NCAA', state: 'FL' },
+  { city: 'USC', name: 'Trojans', league: 'NCAA', state: 'CA' },
+  { city: 'Utah', name: 'Utes', league: 'NCAA', state: 'UT' },
+  { city: 'Vanderbilt', name: 'Commodores', league: 'NCAA', state: 'TN' },
+  { city: 'Virginia', name: 'Cavaliers', league: 'NCAA', state: 'VA' },
+  { city: 'Virginia Tech', name: 'Hokies', league: 'NCAA', state: 'VA' },
+  { city: 'Wake Forest', name: 'Demon Deacons', league: 'NCAA', state: 'NC' },
+  { city: 'Washington', name: 'Huskies', league: 'NCAA', state: 'DC' },
+  { city: 'West Virginia', name: 'Mountaineers', league: 'NCAA', state: 'WV' },
+  { city: 'Wisconsin', name: 'Badgers', league: 'NCAA', state: 'WI' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -294,7 +305,10 @@ export default function Sponsor() {
     const q = search.trim().toLowerCase();
     return ALL_TEAMS.filter(t => {
       if (league !== 'ALL' && t.league !== league) return false;
-      if (q && !`${t.city} ${t.name}`.toLowerCase().includes(q)) return false;
+      // Match on state as well as team, so "SC" or "south carolina" returns
+      // Clemson and South Carolina rather than nothing.
+      const hay = `${t.city} ${t.name} ${t.state} ${STATE_NAMES[t.state] ?? ''}`.toLowerCase();
+      if (q && !hay.includes(q)) return false;
       return true;
     });
   }, [search, league]);
@@ -303,6 +317,21 @@ export default function Sponsor() {
   const reservedCount = Object.values(claims).filter(s => s === 'reserved').length;
   const takenCount    = claimedCount + reservedCount;
   const openCount     = ALL_TEAMS.length - takenCount;
+
+  // Take a whole market at once. A local sponsor thinks "who do people around
+  // here care about", not "which league" — so selecting South Carolina should
+  // take Clemson and South Carolina together without four separate taps.
+  function selectMany(ts: StaticTeam[]) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      for (const t of ts) {
+        const st = claims[teamKey(t)];
+        if (st === 'claimed' || st === 'reserved') continue; // never select a taken team
+        next.add(teamKey(t));
+      }
+      return next;
+    });
+  }
 
   function toggle(t: StaticTeam) {
     const k = teamKey(t);
@@ -328,7 +357,7 @@ export default function Sponsor() {
       <RateCard />
       <div ref={formRef}>
         <TeamPicker
-          filtered={filtered} claims={claims} selected={selected} toggle={toggle}
+          filtered={filtered} claims={claims} selected={selected} toggle={toggle} selectMany={selectMany}
           search={search} setSearch={setSearch}
           league={league} setLeague={setLeague}
           taken={takenCount} open={openCount}
@@ -376,8 +405,7 @@ function Hero({ onCta }: { onCta: () => void }) {
           <span style={{ color: G.gold }}>When the game is on the line.</span>
         </h1>
         <p style={{ fontSize: 'clamp(15px, 1.6vw, 19px)', lineHeight: 1.6, color: '#aaa', maxWidth: 760, marginTop: 36, fontWeight: 400 }}>
-          We're opening Side Huddle Founding Team Sponsorships for a limited time. Own a team's entire fanbase —
-          exclusive, always-on, inside the conversation. <strong style={{ color: G.white }}>Your founding rate is
+          Founding sponsorships are open. One brand per team, inside the conversation all season. <strong style={{ color: G.white }}>Your founding rate is
           protected for the first year, and your team stays exclusive while your sponsorship is active.</strong> Select your team and check out securely below.
         </p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 28 }}>
@@ -416,20 +444,20 @@ const HUDDLE_BUBBLES = [
 function Moment({ featured }: { featured: StaticTeam }) {
   return (
     <section className="sh-section" style={{ borderTop: `1px solid ${G.border}` }}>
-      <div className="sh-label">01 — WHY THIS IS DIFFERENT</div>
+      <div className="sh-label">01 — WHAT YOU GET</div>
+      {/* The diagram IS the pitch. It used to sit under a headline and a
+          ninety-word paragraph, so the one asset that explains the model in a
+          glance was the last thing anyone reached.
+          The old copy also promised "hundreds of live huddles" and "hundreds of
+          simultaneous moments" — a claim a buyer can disprove by opening the
+          app. The founding-rate story is true and stronger; this sells that. */}
       <h2 style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(36px, 5vw, 60px)', lineHeight: 1.0, marginTop: 16, maxWidth: 960, textTransform: 'uppercase' }}>
-        It's not one chatroom.<br />
-        It's <span style={{ color: G.gold }}>hundreds of live huddles</span> — all powered by your brand.
+        One sponsor.<br />
+        <span style={{ color: G.gold }}>Every huddle for your team.</span>
       </h2>
-      <p style={{ fontSize: 17, lineHeight: 1.65, color: '#aaa', maxWidth: 860, marginTop: 24 }}>
-        On game day, dozens of separate fan huddles are happening simultaneously around your team. Friends jumping between
-        rooms. Debates, predictions, live reactions. The Side Huddle AI bot is active in every single one — surfacing stats,
-        highlights, and real-time updates. Your brand is on every message.{' '}
-        <strong style={{ color: G.white }}>Not one impression. Hundreds of simultaneous moments, all game long.</strong>
-      </p>
       <HuddleMultiplier />
       <p style={{ textAlign: 'center', marginTop: 32, fontSize: 13, color: G.muted, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-        One team. One sponsor. Everywhere at once.
+        Fans don't gather in one room. You're in all of them.
       </p>
     </section>
   );
@@ -531,7 +559,7 @@ function PlatformPreview() {
         Three placements. <span style={{ color: G.gold }}>One sponsor.</span> Always on.
       </h2>
       <p style={{ color: '#999', marginTop: 16, maxWidth: 720, fontSize: 16, lineHeight: 1.6 }}>
-        Your brand is embedded across three distinct surfaces — not one banner, not one impression. Always on, all game long.
+        Three surfaces, not one banner. On all game.
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px,1fr))', gap: 20, marginTop: 48 }}>
         {PLACEMENT_CARDS.map(c => (
@@ -551,7 +579,7 @@ function PlatformPreview() {
           </h3>
         </div>
         <p style={{ color: '#999', fontSize: 14, lineHeight: 1.55, maxWidth: 390, margin: 0 }}>
-          Gold callouts mark the sponsor inventory fans see in-room: the room-level Presented By line and the bot-card sponsor attribution.
+          Gold marks what fans actually see.
         </p>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1.1fr) repeat(3, minmax(190px, .75fr))', gap: 22, marginTop: 26, alignItems: 'start' }} className="sponsor-shot-grid">
@@ -643,7 +671,7 @@ function ROISection() {
             A single local radio spot runs <strong>$500–1,500/week</strong>. One local TV placement: <strong>$2,000–5,000</strong>. A Side Huddle founding sponsorship comes in <strong>below the average local-sponsorship spend</strong> — exclusive, always-on, inside the conversation when fans are most engaged.
           </p>
           <p style={{ fontSize: 18, lineHeight: 1.65, color: '#ddd', marginTop: 16 }}>
-            Own an entire fanbase on Side Huddle. <strong style={{ color: G.gold }}>$250/month for one team, with lower per-team founding rates for bundles.</strong>
+            Every huddle for your team. <strong style={{ color: G.gold }}>$1,000 for the season. $500 holds it.</strong>
           </p>
         </div>
       </div>
@@ -654,17 +682,16 @@ function ROISection() {
 // ─── Section 5: Rate Card ─────────────────────────────────────────────────────
 function RateCard() {
   const urgency = [
-    { when: 'Single team', detail: '$250/month', sub: 'Exclusive placement for one team', active: true },
-    { when: '3-team bundle', detail: '$650/month', sub: '~$217/team', active: false },
-    { when: '6-team bundle', detail: '$1,200/month', sub: '$200/team', active: false },
-    { when: '10+ teams', detail: '$1,800/month', sub: '$180/team', active: false },
+    { when: 'Football',   detail: 'Aug – Jan', sub: '$1,000 per team', active: true },
+    { when: 'Basketball', detail: 'Oct – Apr', sub: '$1,000 per team', active: true },
+    { when: 'Hockey',     detail: 'Oct – Apr', sub: '$1,000 per team', active: true },
+    { when: 'Baseball',   detail: 'Apr – Oct', sub: '$1,000 per team', active: true },
   ];
   const infoCards = [
-    { title: 'BILLING',     body: 'Month-to-month. No annual contract. Your first monthly charge is paid at checkout and recurring billing continues monthly.' },
-    { title: 'RATE LOCK',   body: 'Your founding monthly rate is protected for the first year.' },
-    { title: 'EXCLUSIVITY', body: 'One active sponsor per team. No competing brand shares your team placement while your sponsorship is active.' },
-    { title: 'FOUNDING BONUS', body: 'Founding sponsors receive two bonus months of placement plus sponsor drops inside the chat experience.' },
-    { title: 'BUNDLES',     body: '3 teams: $650/month. 6 teams: $1,200/month. 10 or more: $1,800/month.' },
+    { title: 'BILLING',     body: '$500 holds your team. The balance is due at the season opener.' },
+    { title: 'RATE LOCK',   body: 'Founding rate, held for as long as you stay a sponsor.' },
+    { title: 'EXCLUSIVITY', body: 'One sponsor per team. No competing brand in your team\u2019s huddles.' },
+    { title: 'OUR SIDE',    body: 'If your team\u2019s huddles don\u2019t reach 250 members this season, the next one is on us.' },
   ];
   return (
     <section className="sh-section" id="rate-card" style={{ borderTop: `1px solid ${G.border}` }}>
@@ -674,7 +701,7 @@ function RateCard() {
         <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(20px,2.8vw,30px)', color: G.gold, textTransform: 'uppercase' }}>
           🏈 Claim your exclusive team sponsorship.
         </div>
-        <p style={{ color: '#ddd', marginTop: 10, fontSize: 16 }}>Lock in one team or bundle multiple teams at the founding sponsor rate. One active sponsor per team.</p>
+        <p style={{ color: '#ddd', marginTop: 10, fontSize: 16 }}>One active sponsor per team. Bundle for a lower rate.</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px,1fr))', gap: 10, marginTop: 20 }}>
           {urgency.map(u => (
             <div key={u.when} style={{ padding: 14, border: `1px solid ${u.active ? G.gold : G.border}`, borderRadius: 6, background: u.active ? 'rgba(255,215,0,.08)' : G.bg }}>
@@ -686,30 +713,18 @@ function RateCard() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 32 }}>
-        <div style={{ border: `1px solid ${G.border}`, borderRadius: 8, padding: 24, background: G.surface }}>
-          <div className="sh-label" style={{ color: G.muted }}>SINGLE TEAM</div>
-          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(28px,4vw,44px)', color: G.white, lineHeight: 1.05, marginTop: 8 }}>Own one team</div>
-          <div style={{ marginTop: 14, fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>Exclusive placement across every huddle for your team — zero competitors in that community.</div>
-        </div>
-        <div style={{ border: `2px solid ${G.gold}`, borderRadius: 8, padding: 24, background: 'rgba(255,215,0,.04)', position: 'relative' }}>
-          <div style={{ position: 'absolute', top: -12, left: 20, background: G.gold, color: '#000', fontSize: 10, fontWeight: 800, padding: '3px 10px', borderRadius: 999, letterSpacing: '0.1em' }}>BEST VALUE</div>
-          <div className="sh-label" style={{ color: G.gold }}>BUNDLE · MULTIPLE TEAMS</div>
-          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(28px,4vw,44px)', color: G.gold, lineHeight: 1.05, marginTop: 8 }}>Own your market</div>
-          <div style={{ marginTop: 14, fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>Bundle a conference or a whole market — best per-team founding rate. Ask us for a bundle quote.</div>
-        </div>
-      </div>
-
+      {/* One price panel, not three. The two-up grid here said the same thing
+          as the block below it and still wore a "BEST VALUE" badge for a bundle
+          discount that no longer exists. */}
       <div style={{ marginTop: 24, border: `1px solid ${G.gold}`, borderRadius: 8, padding: 'clamp(20px,3vw,32px)', background: 'rgba(255,215,0,.04)', textAlign: 'center' }}>
         <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 'clamp(20px,2.6vw,30px)', textTransform: 'uppercase' }}>
-          One team: <span style={{ color: G.gold }}>$250/month</span>
+          One team, one season: <span style={{ color: G.gold }}>$1,000</span>
         </div>
         <p style={{ color: '#ddd', marginTop: 12, fontSize: 16, lineHeight: 1.6, maxWidth: 620, margin: '12px auto 0' }}>
-          Pay the first monthly charge today to claim your team.
-          Founding sponsors receive <strong style={{ color: G.white }}>two bonus months of placement</strong> plus sponsor drops inside the chat experience.
-          Bundle pricing is applied automatically when you select multiple teams.
+          <strong style={{ color: G.white }}>$500 holds your team</strong>; the balance is due at the opener. Founding rate held for
+          as long as you stay. If your huddles don't reach 250 members this season, the next season is on us.
         </p>
-        <p style={{ color: G.muted, marginTop: 14, fontSize: 13 }}>Pick one or more teams below and check out once. Custom conference or market packages can still be arranged through partnerships.</p>
+        <p style={{ color: G.muted, marginTop: 14, fontSize: 13 }}>Same price per team, however many you take.</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px,1fr))', gap: 14, marginTop: 28 }}>
@@ -725,12 +740,25 @@ function RateCard() {
 }
 
 // ─── Section 6: Team Picker ───────────────────────────────────────────────────
+// Full state names, so a sponsor can type how they think — "south carolina",
+// "SC", "Charleston" and "Clemson" all have to land on the same shortlist.
+const STATE_NAMES: Record<string, string> = {
+  AL:'Alabama', AR:'Arkansas', AZ:'Arizona', CA:'California', CO:'Colorado', DC:'Washington DC',
+  FL:'Florida', GA:'Georgia', IA:'Iowa', ID:'Idaho', IL:'Illinois', IN:'Indiana', KS:'Kansas',
+  KY:'Kentucky', LA:'Louisiana', MA:'Massachusetts', MD:'Maryland', MI:'Michigan', MN:'Minnesota',
+  MO:'Missouri', MS:'Mississippi', NC:'North Carolina', NE:'Nebraska', NJ:'New Jersey', NV:'Nevada',
+  NY:'New York', OH:'Ohio', OK:'Oklahoma', OR:'Oregon', PA:'Pennsylvania', SC:'South Carolina',
+  TN:'Tennessee', TX:'Texas', UT:'Utah', VA:'Virginia', WA:'Washington', WI:'Wisconsin',
+  WV:'West Virginia', AB:'Alberta', BC:'British Columbia', MB:'Manitoba', ON:'Ontario', QC:'Quebec',
+};
+
 const LEAGUES: LeagueFilter[] = ['ALL', 'NCAA', 'NFL', 'NBA', 'MLB', 'NHL'];
 const LEAGUE_DISPLAY: Record<LeagueFilter, string> = { ALL: 'ALL', NCAA: 'CFB', NFL: 'NFL', NBA: 'NBA', MLB: 'MLB', NHL: 'NHL' };
 
-function TeamPicker({ filtered, claims, selected, toggle, search, setSearch, league, setLeague, taken, open }: {
+function TeamPicker({ filtered, claims, selected, toggle, selectMany, search, setSearch, league, setLeague, taken, open }: {
   filtered: StaticTeam[]; claims: Record<string, ClaimStatus>;
   selected: Set<string>; toggle: (t: StaticTeam) => void;
+  selectMany: (ts: StaticTeam[]) => void;
   search: string; setSearch: (s: string) => void;
   league: LeagueFilter; setLeague: (l: LeagueFilter) => void;
   taken: number; open: number;
@@ -742,8 +770,7 @@ function TeamPicker({ filtered, claims, selected, toggle, search, setSearch, lea
         First in <span style={{ color: G.gold }}>owns the team.</span>
       </h2>
       <p style={{ color: '#aaa', marginTop: 16, maxWidth: 720, fontSize: 17, lineHeight: 1.6 }}>
-        Tap the team(s) you want — one active sponsor per team, across every huddle that follows them.
-        Your founding monthly price is calculated automatically, and multiple teams check out together.
+        Pick your market or your team. One active sponsor each — take several and the founding rate drops.
       </p>
 
       {/* Honest scarcity — live counts from real DB rows. */}
@@ -751,9 +778,6 @@ function TeamPicker({ filtered, claims, selected, toggle, search, setSearch, lea
         <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 22, color: G.gold }}>
           {taken} claimed · {open} founding slots open
         </div>
-        <span style={{ fontSize: 13, color: G.muted2, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-          Founding window closes August 29, 2026
-        </span>
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 28, alignItems: 'center' }}>
@@ -763,9 +787,17 @@ function TeamPicker({ filtered, claims, selected, toggle, search, setSearch, lea
             {LEAGUE_DISPLAY[l]}
           </button>
         ))}
-        <input className="sh-input" placeholder="Search teams…" value={search} onChange={e => setSearch(e.target.value)}
-          style={{ marginLeft: 8, maxWidth: 280, height: 40 }} />
+        <input className="sh-input" placeholder="Team, city or state…" value={search} onChange={e => setSearch(e.target.value)}
+          style={{ marginLeft: 8, maxWidth: 340, height: 40 }} />
       </div>
+
+      {/* One tap for the whole shortlist, once it is small enough to mean something. */}
+      {filtered.length > 1 && filtered.length <= 12 && (
+        <button onClick={() => selectMany(filtered)}
+          style={{ marginTop: 18, padding: '10px 18px', borderRadius: 4, border: `1px solid ${G.gold}`, background: 'rgba(255,215,0,.08)', color: G.gold, cursor: 'pointer', fontFamily: FONT_H, fontWeight: 700, fontSize: 13, textTransform: 'uppercase' }}>
+          Select all {filtered.length} shown
+        </button>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px,1fr))', gap: 10, marginTop: 28 }}>
         {filtered.length === 0 && <div style={{ gridColumn: '1/-1', color: G.muted, padding: 48, textAlign: 'center' }}>No teams match your search.</div>}
@@ -793,7 +825,7 @@ function TeamPicker({ filtered, claims, selected, toggle, search, setSearch, lea
               {on && !locked && <span style={{ position: 'absolute', top: 8, right: 10, color: G.gold, fontWeight: 800, fontSize: 14 }}>✓</span>}
               <div style={{ fontWeight: 700, fontSize: 14, color: locked ? G.muted2 : on ? G.gold : G.white, lineHeight: 1.2 }}>{t.city} {t.name}</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
-                <span className="sh-label" style={{ fontSize: 9, color: G.muted }}>{displayLeague(t.league)}</span>
+                <span className="sh-label" style={{ fontSize: 9, color: G.muted }}>{displayLeague(t.league)}{t.state ? ` · ${t.state}` : ''}</span>
                 <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 13, color: badgeColor }}>{badge}</span>
               </div>
             </button>
@@ -844,7 +876,7 @@ function CartBar({ teams, onCheckout, onClear }: { teams: StaticTeam[]; onChecko
       <div style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 22, color: G.gold }}>{teams.length} team{teams.length !== 1 ? 's' : ''} selected</span>
-          <span style={{ color: G.muted2, fontSize: 14, marginLeft: 12 }}>${price.total}/month · {price.label}</span>
+          <span style={{ color: G.muted2, fontSize: 14, marginLeft: 12 }}>${price.total.toLocaleString()} per season · ${(teams.length * DEPOSIT).toLocaleString()} to hold</span>
           <button onClick={onClear} style={{ marginLeft: 14, background: 'none', border: 'none', color: G.muted, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>clear</button>
         </div>
         <button className="btn-gold" onClick={onCheckout} style={{ fontSize: 14, padding: '13px 26px' }}>Review &amp; checkout →</button>
@@ -893,24 +925,26 @@ function CheckoutModal({ teams, onClose }: { teams: StaticTeam[]; onClose: () =>
         </div>
 
         <div style={{ marginTop: 16, padding: '15px 16px', background: 'rgba(255,215,0,.07)', border: `1px solid ${G.gold}`, borderRadius: 8 }}>
-          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 19, color: G.gold }}>MONTH-TO-MONTH FOUNDING SPONSORSHIP</div>
+          <div style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 19, color: G.gold }}>FOUNDING SEASON SPONSORSHIP</div>
           <div style={{ fontSize: 13, color: '#ccc', marginTop: 5, lineHeight: 1.55 }}>
-            First monthly charge today. First recurring charge begins September 1. No annual contract.
+            $500 per team holds it today. The balance is due at the season opener. No recurring charge.
           </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 18, paddingTop: 14, borderTop: `1px solid ${G.gold}44` }}>
-          <span className="sh-label">TOTAL TODAY</span>
-          <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 30, color: G.gold }}>${price.total.toLocaleString()}</span>
+          <span className="sh-label">DEPOSIT TODAY</span>
+          <span style={{ fontFamily: FONT_H, fontWeight: 700, fontSize: 30, color: G.gold }}>
+            ${(teams.length * DEPOSIT).toLocaleString()}
+          </span>
         </div>
 
         {error && <p style={{ color: '#ff6b6b', fontSize: 13, marginTop: 12 }}>{error}</p>}
 
         <button className="btn-gold" onClick={go} disabled={loading} style={{ marginTop: 16, width: '100%', fontSize: 15, padding: '15px 28px' }}>
-          {loading ? 'Starting Square checkout…' : `Checkout ${teams.length} team${teams.length !== 1 ? 's' : ''} — $${price.total.toLocaleString()} →`}
+          {loading ? 'Starting Square checkout…' : `Hold ${teams.length} team${teams.length !== 1 ? 's' : ''} — $${(teams.length * DEPOSIT).toLocaleString()} →`}
         </button>
         <p style={{ fontSize: 11, color: G.muted, textAlign: 'center', marginTop: 10, lineHeight: 1.5 }}>
-          Secure checkout powered by Square. This payment claims the selected team sponsorship(s).
+          Secure checkout powered by Square. This deposit holds your team; season total ${'$'}{(teams.length * SEASON_PRICE).toLocaleString()}.
         </p>
       </div>
     </div>

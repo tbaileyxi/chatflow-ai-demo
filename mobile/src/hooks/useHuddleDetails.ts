@@ -18,6 +18,8 @@ export type HuddleDetails = {
   teamName: string | null;
   teamCity: string | null;
   teamLogoUrl: string | null;
+  /** Full-bleed picture behind the chat. Null = plain theme background. */
+  photoUrl: string | null;
   isMember: boolean;
 };
 
@@ -29,18 +31,37 @@ export function useHuddleDetails(huddleId: string) {
     queryFn: async (): Promise<HuddleDetails | null> => {
       // Selecting columns added by recent migrations (official_status, website_url)
       // — generated types lag. Cast the response after the call.
-      const { data: rawData, error } = await (supabase as any)
-        .from("huddles")
-        .select(
-          `
+      // Split in two on purpose. Returning null from here puts HuddleScreen in
+      // `huddleLoading || !huddle` forever — an endless spinner with no error
+      // anywhere — so ONE unreadable column takes the whole room down. That is
+      // exactly what happened when photo_url was added: the column existed, but
+      // PostgREST had not reloaded its schema cache yet, and every room in the
+      // app hung.
+      //
+      // CORE is what the screen cannot render without. EXTRA is everything that
+      // has been bolted on since and may not be readable yet on a given
+      // environment. If EXTRA fails we still show the room.
+      const CORE = `
           id, name, bio, member_count, is_private,
-          is_official_team_huddle, is_verified, official_status, website_url,
-          owner_id, team_id,
+          is_official_team_huddle, is_verified, owner_id, team_id,
           teams!team_id (name, city, logo_url)
-        `,
-        )
+        `;
+      const EXTRA = `official_status, website_url, photo_url`;
+
+      let { data: rawData, error } = await (supabase as any)
+        .from("huddles")
+        .select(`${CORE}, ${EXTRA}`)
         .eq("id", huddleId)
         .single();
+
+      if (error) {
+        console.warn("[huddle-details] falling back to core columns:", error.message);
+        ({ data: rawData, error } = await (supabase as any)
+          .from("huddles")
+          .select(CORE)
+          .eq("id", huddleId)
+          .single());
+      }
       const data: any = rawData;
 
       if (error || !data) return null;
@@ -76,6 +97,7 @@ export function useHuddleDetails(huddleId: string) {
         teamName: team?.name ?? null,
         teamCity: team?.city ?? null,
         teamLogoUrl: team?.logo_url ?? null,
+        photoUrl: (data as any).photo_url ?? null,
         isMember,
       };
     },

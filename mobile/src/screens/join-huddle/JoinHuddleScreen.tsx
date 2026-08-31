@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
+import { pluralize } from "@/lib/plural";
 
 type Route = RouteProp<RootStackParamList, "JoinHuddle">;
 
@@ -52,6 +53,30 @@ export function JoinHuddleScreen() {
       if (error) {
         Alert.alert("Error", "Could not request access. Please try again.");
         return;
+      }
+
+      // Tell the owner. Without this the request just sat in a table nobody
+      // looks at — the approve/deny screen only gets opened by someone who
+      // already knows to go there.
+      const requesterName =
+        profile?.displayName ?? profile?.username ?? "Someone";
+      const { data: ownerRow } = await supabase
+        .from("huddles")
+        .select("owner_id")
+        .eq("id", huddleId)
+        .maybeSingle();
+
+      if (ownerRow?.owner_id) {
+        supabase.functions
+          .invoke("send-push-notification", {
+            body: {
+              user_ids: [ownerRow.owner_id],
+              notification_type: "join_request",
+              title: `${requesterName} wants in`,
+              body: `Tap to approve or deny for ${huddle.name}.`,
+            },
+          })
+          .catch(() => {});
       }
 
       Alert.alert(
@@ -119,7 +144,7 @@ export function JoinHuddleScreen() {
               <View className="flex-row items-center gap-1">
                 <Users color={colors.mutedForeground} size={14} />
                 <Text className="text-sm text-muted-foreground">
-                  {huddle.memberCount} members
+                  {pluralize(huddle.memberCount, "member")}
                 </Text>
               </View>
               <View className="flex-row items-center gap-1">
@@ -140,21 +165,21 @@ export function JoinHuddleScreen() {
                     navigation.navigate("Huddle", { huddleId })
                   }
                 >
-                  Go to Side Huddle
+                  Open the room
                 </Button>
               </View>
             ) : huddle.isPrivate ? (
               <View className="w-full gap-2">
                 <Text className="text-center text-sm text-muted-foreground">
-                  This Official Huddle uses approval membership.
+                  This room is private. The owner lets people in.
                 </Text>
                 <Button size="lg" className="w-full" onPress={handleJoin}>
-                  Request Access
+                  Ask to join
                 </Button>
               </View>
             ) : (
               <Button size="lg" className="w-full" onPress={handleJoin}>
-                Join Side Huddle
+                Join the room
               </Button>
             )}
 
@@ -162,7 +187,7 @@ export function JoinHuddleScreen() {
               variant="ghost"
               onPress={() => navigation.goBack()}
             >
-              Maybe Later
+              Not now
             </Button>
           </CardContent>
         </Card>

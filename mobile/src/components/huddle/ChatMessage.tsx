@@ -1,12 +1,12 @@
 import { useRef, useState, useCallback } from "react";
 import { View, Text, Image, Pressable, Share, Modal, Dimensions, Linking } from "react-native";
 import { MessageSquareReply, Share2, X, Play, Pause, Mic } from "lucide-react-native";
-import { Audio } from "expo-av";
+import { Audio, Video, ResizeMode } from "expo-av";
 import { cn } from "@/lib/utils";
 import { colors } from "@/theme/colors";
-import { PredictionCardInMessage } from "@/components/predictions/PredictionCardInMessage";
 import { FadeCardInMessage } from "@/components/huddle/FadeCardInMessage";
 import { PulseBubble } from "@/components/huddle/PulseBubble";
+import { AdminWelcomeCard } from "@/components/huddle/AdminWelcomeCard";
 import { YouTubeEmbed, parseYouTubeId } from "@/components/embeds/YouTubeEmbed";
 import type { HuddleMessage } from "@/hooks/useHuddleMessages";
 import type { ReactionSummary } from "@/hooks/useMessageReactions";
@@ -65,7 +65,7 @@ function AudioBubble({ uri }: { uri: string }) {
   return (
     <Pressable
       onPress={togglePlayback}
-      className="flex-row items-center gap-2.5 rounded-2xl bg-primary/15 px-4 py-2.5"
+      className="flex-row items-center gap-2.5 rounded-2xl bg-card px-4 py-2.5"
       style={{ width: 230 }}
     >
       <View className="h-8 w-8 items-center justify-center rounded-full bg-primary">
@@ -108,6 +108,9 @@ type Props = {
   // When true the message follows another from the same sender within ~5 min.
   // Avatar + name row + tight spacing.
   isGroupedWithPrev?: boolean;
+  // Opens the invite sheet. Only the admin_welcome card uses this — it's the
+  // single action on the highest-leverage message in the product.
+  onInvite?: () => void;
 };
 
 // Strip raw URLs from bot message content so legacy posts (server fix now puts
@@ -167,12 +170,22 @@ export function ChatMessage({
   isReply,
   hideReplyQuote,
   isGroupedWithPrev,
+  onInvite,
 }: Props) {
   const lastTapRef = useRef<number>(0);
   const [showPicker, setShowPicker] = useState(false);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
 
-  const isPredictionCard = message.messageType === "prediction_card";
+  // Hooks above, early return below — legacy prediction cards render nothing.
+  if (message.messageType === "prediction_card") return null;
+
+  // Retired. The yes/no market card asked a room of Yankees fans whether the
+  // Yankees would win — everyone taps YES, nobody argues, and the card sat
+  // there being a worse version of the fade prop below it. New ones stopped
+  // posting when the kalshi-post-predictions cron was unscheduled; the
+  // thousands already in message history are hidden here rather than deleted,
+  // so nobody's room gains a hole where a card used to be. Without this branch
+  // they fall through to the plain text renderer and print raw JSON.
   const isFadeProp = message.messageType === "fade_prop";
   const youTubeId =
     message.messageType === "youtube_highlight" && message.embedCode
@@ -184,14 +197,23 @@ export function ChatMessage({
   // card with no gold accent, which is exactly why the gold looked
   // inconsistent ("on some chats and not others"). Pin them out first.
   const isNewsOrPlay =
-    message.messageType === "news" || message.messageType === "live_play";
+    message.messageType === "news" ||
+    message.messageType === "live_play" ||
+    // The Coach answering a question or posting a recap is the same voice as
+    // the news/play bubble and must get the same gold treatment. Pinned here
+    // for the same reason the others are: anything with an embed_code was
+    // leaking into the plain muted PulseBubble below.
+    message.messageType === "coach_answer" ||
+    message.messageType === "coach_recap";
+  const isAdminWelcome = message.messageType === "admin_welcome";
   const isPulse =
     !youTubeId &&
     !isNewsOrPlay &&
+    !isAdminWelcome &&
     (message.isPulseMoment ||
       message.messageType === "pulse" ||
       message.messageType === "highlight" ||
-      (message.embedCode != null && !isPredictionCard));
+      message.embedCode != null);
 
   // Pulse bot messages show source, not "@coach"
   const displayName =
@@ -231,10 +253,24 @@ export function ChatMessage({
     const text = body
       ? `${displayName}: "${body}"`
       : `${displayName} shared a moment`;
+    // Share a link to the ROOM, not the picture. `url` used to be
+    // message.mediaUrl, so a shared Giants post arrived as a bare JPEG on
+    // pbs.twimg.com — the recipient got the image and no way back to the app
+    // or the room it came from. /h/:huddleId deep-links installed users
+    // straight to the room and sends everyone else to the App Store.
+    const roomUrl = huddleId
+      ? `https://www.sidehuddlesports.com/h/${huddleId}`
+      : undefined;
     setTimeout(() => {
       Share.share({
-        message: `${text}${huddleName ? ` — in ${huddleName} on Side Huddle Sports` : ""}`,
-        ...(message.mediaUrl ? { url: message.mediaUrl } : {}),
+        // The link goes in `url` ONLY. Putting it in the message as well made
+        // iOS send both, so a shared moment arrived with the same URL printed
+        // twice under it.
+        message: [
+          text,
+          huddleName ? `— in ${huddleName} on Side Huddle Sports` : "",
+        ].filter(Boolean).join("\n"),
+        ...(roomUrl ? { url: roomUrl } : {}),
       }).catch(() => {});
     }, 350);
   };
@@ -310,7 +346,7 @@ export function ChatMessage({
               {/* Quoted reply context — hidden when the parent is the message
                   directly above (redundant). */}
               {replyTo && !hideReplyQuote && (
-                <View className="rounded-xl border-l-2 border-primary/50 bg-muted/50 px-3 py-1.5 mb-1">
+                <View className="rounded-xl border-l-2 border-primary/50 bg-muted px-3 py-1.5 mb-1">
                   <Text className="text-xs font-semibold text-primary" numberOfLines={1}>
                     {replyTo.displayName}
                   </Text>
@@ -331,10 +367,13 @@ export function ChatMessage({
                   </Text>
                   <YouTubeEmbed videoId={youTubeId} />
                 </View>
+              ) : isAdminWelcome ? (
+                <AdminWelcomeCard
+                  content={message.content}
+                  onInvite={onInvite}
+                />
               ) : isPulse ? (
                 <PulseBubble message={message} />
-              ) : isPredictionCard ? (
-                <PredictionCardInMessage content={message.content} huddleId={huddleId} />
               ) : isFadeProp ? (
                 <FadeCardInMessage
                   content={message.content}
@@ -441,6 +480,30 @@ export function ChatMessage({
                     className="mt-1 rounded-xl"
                     style={{ width: 230, height: 230 }}
                     resizeMode="cover"
+                  />
+                </Pressable>
+              )}
+
+              {/* Video — X clips from the daily media drop. Same 230px box as
+                  a photo so a mixed feed doesn't jump around. Tap to play;
+                  muted by default because a highlight that starts shouting in
+                  a quiet room is a reason to close the app. */}
+              {message.mediaUrl && message.mediaType === "video" && (
+                <Pressable onLongPress={handleLongPress}>
+                  <Video
+                    source={{ uri: message.mediaUrl }}
+                    style={{ width: 230, height: 230, borderRadius: 12, marginTop: 4 }}
+                    resizeMode={ResizeMode.COVER}
+                    useNativeControls
+                    isLooping
+                    isMuted
+                    // Autoplay, muted. Without shouldPlay the view renders a
+                    // black rectangle until someone taps it — the URL was
+                    // always fine, the player was simply paused on frame zero
+                    // with no poster behind it. Muted autoplay is what every
+                    // social feed does and it is why they never show a black
+                    // box.
+                    shouldPlay
                   />
                 </Pressable>
               )}

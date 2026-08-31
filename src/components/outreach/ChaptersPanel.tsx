@@ -47,6 +47,8 @@ type Chapter = {
   bounced: boolean;
   unsubscribed: boolean;
   last_touch: string | null;
+  /** The six characters a president types to claim their room. */
+  claim_code: string | null;
 };
 
 type SendResult = {
@@ -55,7 +57,7 @@ type SendResult = {
   eligible: number;
   sent: number;
   errors: Array<{ chapter: string; error: string }>;
-  previews: Array<{ chapter: string; to: string; subject: string }>;
+  previews: Array<{ chapter: string; to: string; subject: string; text?: string }>;
 };
 
 // "sent" is three different facts wearing one label.
@@ -86,6 +88,34 @@ function scoreBadge(score: number) {
   return <Badge variant="outline">{score}</Badge>;
 }
 
+/**
+ * Pull the real message out of a failed `functions.invoke`.
+ *
+ * supabase-js turns any non-2xx into a FunctionsHttpError whose `message` is
+ * the useless string "Edge Function returned a non-2xx status code" — the JSON
+ * body the function actually returned is left on `error.context`, unread. Every
+ * reason chapter-send can refuse a send ("BREVO_API_KEY not configured",
+ * "Admin access required. Current role: user", a Brevo 401 with the provider's
+ * own text) lives in that body, so without this the operator is told only that
+ * something went wrong.
+ */
+async function invokeError(e: unknown): Promise<string> {
+  const ctx = (e as { context?: unknown })?.context;
+  if (ctx instanceof Response) {
+    try {
+      const body = await ctx.clone().json();
+      if (body?.error) return `${body.error} (HTTP ${ctx.status})`;
+    } catch {
+      try {
+        const text = (await ctx.clone().text()).trim();
+        if (text) return `${text.slice(0, 300)} (HTTP ${ctx.status})`;
+      } catch { /* body already consumed — fall through to the generic message */ }
+    }
+    return `HTTP ${ctx.status} from chapter-send`;
+  }
+  return e instanceof Error ? e.message : String(e);
+}
+
 export default function ChaptersPanel() {
   const { toast } = useToast();
 
@@ -99,6 +129,7 @@ export default function ChaptersPanel() {
 
   const [live, setLive] = useState(false);
   const [maxEmails, setMaxEmails] = useState("25");
+  const [testTo, setTestTo] = useState('');
   const [sending, setSending] = useState<number | null>(null);
   const [lastResult, setLastResult] = useState<SendResult | null>(null);
 
@@ -113,7 +144,7 @@ export default function ChaptersPanel() {
         const { data, error } = await supabase
           .from("chapter_leads")
           .select(
-            "id,source,org,org_type,chapter_name,city,state,venue,leader_name,first_name,email,phone,facebook,member_count,contact_channel,score,status,emailed,sequence_step,bounced,unsubscribed,last_touch",
+            "id,source,org,org_type,chapter_name,city,state,venue,leader_name,first_name,email,phone,facebook,member_count,contact_channel,score,status,emailed,sequence_step,bounced,unsubscribed,last_touch,claim_code",
           )
           .order("score", { ascending: false })
           .range(from, from + page - 1);
@@ -201,6 +232,32 @@ export default function ChaptersPanel() {
     }
   }
 
+  // Fires chapter-send in "self" mode: real HTML, real delivery, and it reads
+  // and writes nothing in chapter_leads. Negative `sending` values keep this
+  // spinner distinct from the step buttons above.
+  async function runSelfTest(step: number) {
+    setSending(-step);
+    try {
+      const { data, error } = await supabase.functions.invoke("chapter-send", {
+        body: { mode: "self", testTo, sequenceStep: step },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: `Step ${step} sent to you`,
+        description: `${data.subject} — no lead was touched.`,
+      });
+    } catch (e) {
+      toast({
+        title: "Test send failed",
+        description: await invokeError(e),
+        variant: "destructive",
+      });
+    } finally {
+      setSending(null);
+    }
+  }
+
   async function runSend(step: number) {
     const useSelection = selectedEmailable.length > 0;
     if (live) {
@@ -234,7 +291,7 @@ export default function ChaptersPanel() {
     } catch (e) {
       toast({
         title: "Send failed",
-        description: e instanceof Error ? e.message : String(e),
+        description: await invokeError(e),
         variant: "destructive",
       });
     } finally {
@@ -245,7 +302,7 @@ export default function ChaptersPanel() {
   function downloadCsv() {
     const cols = [
       "first_name", "chapter_name", "org", "city", "state", "venue",
-      "email", "facebook", "contact_channel", "score", "status",
+      "email", "facebook", "contact_channel", "score", "status", "claim_code",
     ] as const;
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const csv = [
@@ -307,6 +364,39 @@ export default function ChaptersPanel() {
               </Button>
             ))}
           </div>
+
+          {/* Send the real HTML to yourself.
+              "Test" mode above only shows stripped text, which cannot tell you
+              whether the gold survives Gmail or how the subject reads in a list
+              of forty others. This sends the genuine article, and touches no
+              chapter_leads row — nothing is marked emailed, no lead consumed. */}
+          <div className="mt-4 space-y-2 rounded-md border border-dashed p-3">
+            <p className="text-xs font-medium">Send the real email to yourself</p>
+            <input
+              type="email"
+              value={testTo}
+              onChange={(e) => setTestTo(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+            />
+            <div className="grid grid-cols-3 gap-2">
+              {[1, 2, 3].map((step) => (
+                <Button
+                  key={step}
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => runSelfTest(step)}
+                  disabled={sending !== null || !testTo.includes("@")}
+                >
+                  {sending === -step ? "..." : `Email me ${step}`}
+                </Button>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Uses a sample chapter (Sarasota Browns Backers · The Greenlight Bar · 140
+              members) so every merge field is filled in. No lead is touched.
+            </p>
+          </div>
         </Card>
 
         {lastResult && (
@@ -322,10 +412,21 @@ export default function ChaptersPanel() {
             )}
             {lastResult.previews.length > 0 && (
               <details>
-                <summary className="cursor-pointer text-muted-foreground">Preview recipients</summary>
-                <ul className="mt-2 space-y-1">
+                <summary className="cursor-pointer text-muted-foreground">
+                  Preview emails ({lastResult.previews.length}) — full text as the recipient sees it
+                </summary>
+                <ul className="mt-2 space-y-3">
                   {lastResult.previews.map((p, i) => (
-                    <li key={i} className="text-xs">{p.chapter} · {p.to} · {p.subject}</li>
+                    <li key={i} className="rounded border border-border p-3 text-xs">
+                      <div className="font-medium">{p.chapter}</div>
+                      <div className="text-muted-foreground">To: {p.to}</div>
+                      <div className="text-muted-foreground">Subject: {p.subject}</div>
+                      {p.text && (
+                        <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap border-t border-border pt-2 font-sans leading-relaxed">
+                          {p.text}
+                        </pre>
+                      )}
+                    </li>
                   ))}
                 </ul>
               </details>
@@ -416,6 +517,7 @@ export default function ChaptersPanel() {
                 <TableHead>Chapter</TableHead>
                 <TableHead>Leader</TableHead>
                 <TableHead>Contact</TableHead>
+                <TableHead className="w-24">Code</TableHead>
                 <TableHead>Venue</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead className="w-20">Members</TableHead>
@@ -452,6 +554,23 @@ export default function ChaptersPanel() {
                     )}
                     {r.bounced && <Badge className="ml-1 border-0 bg-destructive/15 text-destructive">bounced</Badge>}
                     {r.unsubscribed && <Badge className="ml-1 border-0 bg-destructive/15 text-destructive">unsub</Badge>}
+                  </TableCell>
+                  <TableCell>
+                    {r.claim_code ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(r.claim_code!);
+                          toast({ title: `Copied ${r.claim_code}` });
+                        }}
+                        className="rounded border border-border px-2 py-0.5 font-mono text-xs tracking-widest hover:bg-muted"
+                        title="Copy this chapter's claim code"
+                      >
+                        {r.claim_code}
+                      </button>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm">
                     {r.venue || <span className="text-muted-foreground">—</span>}

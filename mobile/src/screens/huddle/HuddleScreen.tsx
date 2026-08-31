@@ -3,6 +3,7 @@ import {
   View,
   Text,
   Image,
+  StyleSheet,
   FlatList,
   ScrollView,
   Keyboard,
@@ -31,8 +32,8 @@ import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { HuddleHeader } from "@/components/huddle/HuddleHeader";
 import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
 import { PresenceBar } from "@/components/huddle/PresenceBar";
-import { PingButton } from "@/components/huddle/PingButton";
 import { FadeButton } from "@/components/huddle/FadeButton";
+import { PingButton } from "@/components/huddle/PingButton";
 import { ChatMessage } from "@/components/huddle/ChatMessage";
 import { MessageInput } from "@/components/huddle/MessageInput";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -47,6 +48,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
+import { CoachThinking } from "@/components/huddle/CoachThinking";
 
 type Route = RouteProp<RootStackParamList, "Huddle">;
 
@@ -225,6 +227,27 @@ export function HuddleScreen() {
 
   // Invite modal — the room's one invite surface (link + in-app friends).
   const [showInvite, setShowInvite] = useState(false);
+  // Tracks whether the invite sheet was opened by a rally, so it can say so.
+  const [invitedViaRally, setInvitedViaRally] = useState(false);
+  // Cleared when a coach_answer actually lands, or after 90s so a failed ask
+  // doesn't leave the dots spinning forever.
+  const [coachThinking, setCoachThinking] = useState(false);
+
+  // Stop the dots the moment the Coach speaks.
+  useEffect(() => {
+    if (!coachThinking) return;
+    const answered = (messages ?? []).some(
+      (m) => m.messageType === "coach_answer" &&
+             Date.now() - new Date(m.createdAt).getTime() < 120_000,
+    );
+    if (answered) setCoachThinking(false);
+  }, [messages, coachThinking]);
+
+  useEffect(() => {
+    if (!coachThinking) return;
+    const t = setTimeout(() => setCoachThinking(false), 90_000);
+    return () => clearTimeout(t);
+  }, [coachThinking]);
 
   // Reactions
   const messageIds = useMemo(
@@ -233,6 +256,21 @@ export function HuddleScreen() {
   );
   const { data: reactionsMap } = useMessageReactions(huddleId, messageIds);
   const toggleReaction = useToggleReaction();
+
+  // People you can @-mention, derived from who has actually spoken in here.
+  // Deliberately not a members query: the people worth mentioning are the ones
+  // talking, and this needs no extra round trip. Coach is pinned above these
+  // inside MessageInput.
+  const mentionables = useMemo(() => {
+    const seen = new Map<string, { key: string; label: string }>();
+    for (const m of messages ?? []) {
+      if (m.isBotMessage || m.userId === user?.id) continue;
+      const label = (m.username || m.displayName || "").trim().replace(/\s+/g, "");
+      if (!label || seen.has(m.userId)) continue;
+      seen.set(m.userId, { key: m.userId, label });
+    }
+    return [...seen.values()].slice(0, 20);
+  }, [messages, user?.id]);
 
   // Build a map of message id -> message for reply lookups
   const messageMap = useMemo(() => {
@@ -298,10 +336,32 @@ export function HuddleScreen() {
     [listItems],
   );
 
-  if (huddleLoading || !huddle) {
+  if (huddleLoading) {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <LoadingSpinner className="flex-1" />
+      </SafeAreaView>
+    );
+  }
+
+  // Loaded, and there is no room. This used to share the branch above, so a
+  // failed lookup rendered a spinner that never stopped — no error, no way back,
+  // and nothing on screen to report. Say so instead.
+  if (!huddle) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center gap-3 bg-background px-8">
+        <Text className="text-center text-lg font-bold text-foreground">
+          Couldn't open this room
+        </Text>
+        <Text className="text-center text-sm leading-5 text-muted-foreground">
+          It may have been deleted, or you may not have access to it.
+        </Text>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          className="mt-2 rounded-xl border border-border px-5 py-3"
+        >
+          <Text className="text-sm font-bold text-foreground">Go back</Text>
+        </Pressable>
       </SafeAreaView>
     );
   }
@@ -314,6 +374,11 @@ export function HuddleScreen() {
     if (!user) return { error: new Error("Not authenticated") };
     const senderName = profile?.displayName ?? profile?.username ?? "Someone";
     const huddleName = huddle?.name ?? "";
+    // Asking @coach takes time — the scan runs on a cron and the answer needs
+    // a model call behind it. Without a sign that anything is happening the
+    // room looks broken, and people ask again, which is how a thread ends up
+    // with the same question three times.
+    if (/@coach\b/i.test(content)) setCoachThinking(true);
     const result = await sendMessage(content, user.id, replyToId, media, {
       senderName,
       huddleName,
@@ -387,17 +452,57 @@ export function HuddleScreen() {
           entryBanner={entryBanner}
           rightSlot={
             <View className="flex-row items-center gap-2">
+              {/* ONE control, still not two — but it has to be the one that
+                  DOES something. This slot used to hold a link to the Picks
+                  tab, which left no way anywhere in the app to *start* a fade:
+                  FadeButton and PostFadeSheet were written, then orphaned, and
+                  the mechanic survived only on bot-posted cards. FadeButton is
+                  the better chip anyway — it badges the props still waiting on
+                  a taker, so the room can see there is something to take. The
+                  Picks tab is still one tap away in the tab bar. */}
               <FadeButton
                 huddleId={huddleId}
                 game={liveGame ?? null}
                 gameState={pingGameState}
               />
               {pingGameState !== "none" ? (
-                <PingButton huddleId={huddleId} gameState={pingGameState} />
+                <PingButton
+                  huddleId={huddleId}
+                  gameState={pingGameState}
+                  onRallied={() => {
+                    setInvitedViaRally(true);
+                    setShowInvite(true);
+                  }}
+                />
               ) : null}
             </View>
           }
         />
+
+        {/* THE ROOM'S OWN PICTURE, behind the conversation.
+            Header, jump row and composer stay opaque on purpose — a photo
+            running under the chrome makes the room name hard to read and the
+            screen feel like a poster instead of a chat.
+
+            The scrim is doing real work: message bubbles are already solid
+            (ChatMessage uses bg-card / bg-primary), but the day separators,
+            the empty state and the timestamps sit directly on the background,
+            and a bright tailgate photo turns those into nothing. */}
+        <View className="flex-1">
+          {huddle.photoUrl ? (
+            <>
+              <Image
+                source={{ uri: huddle.photoUrl }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+                accessible={false}
+              />
+              <View
+                style={StyleSheet.absoluteFill}
+                className="bg-background/[0.72]"
+              />
+            </>
+          ) : null}
 
         {messagesLoading ? (
           <LoadingSpinner className="flex-1" />
@@ -476,6 +581,9 @@ export function HuddleScreen() {
                   isReply={isReply}
                   hideReplyQuote={!!prevMsg && prevMsg.id === msg.replyToId}
                   isGroupedWithPrev={isGroupedWithPrev}
+                  // Drives the admin_welcome card's single CTA straight into
+                  // the invite sheet the header already opens.
+                  onInvite={() => setShowInvite(true)}
                   replyTo={
                     parentMsg
                       ? {
@@ -506,6 +614,15 @@ export function HuddleScreen() {
               justifyContent: "flex-end",
             }}
             keyboardShouldPersistTaps="handled"
+            // Getting OUT of the composer. "Tap outside to dismiss" cannot work
+            // in a chat: nearly everything above the keyboard is a message
+            // bubble, and bubbles are pressable (reply, long-press), so
+            // keyboardShouldPersistTaps="handled" correctly treats those taps as
+            // handled and the keyboard stays up. Dragging is the gesture every
+            // messaging app actually uses — on iOS "interactive" follows your
+            // finger the way iMessage does, and Android has no equivalent so it
+            // dismisses on the drag instead.
+            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             onScrollToIndexFailed={(info) => {
               setTimeout(() => {
                 flatListRef.current?.scrollToIndex({
@@ -517,6 +634,7 @@ export function HuddleScreen() {
             }}
           />
         )}
+        </View>
 
         {user && huddle.isMember && (
           <>
@@ -526,12 +644,14 @@ export function HuddleScreen() {
                 {typingUsers.length === 1 ? " is" : " are"} typing...
               </Text>
             )}
+            {coachThinking && <CoachThinking />}
           <MessageInput
             onSend={handleSend}
             replyTo={replyTo}
             onCancelReply={() => setReplyTo(null)}
             onFocus={scrollToBottom}
             onTypingChange={sendTyping}
+            mentionables={mentionables}
           />
           </>
         )}
@@ -541,7 +661,11 @@ export function HuddleScreen() {
         visible={showInvite}
         huddleId={huddleId}
         huddleName={huddle.name}
-        onClose={() => setShowInvite(false)}
+        rallied={invitedViaRally}
+        onClose={() => {
+          setShowInvite(false);
+          setInvitedViaRally(false);
+        }}
       />
     </SafeAreaView>
   );

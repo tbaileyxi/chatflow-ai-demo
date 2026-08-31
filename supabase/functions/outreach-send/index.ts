@@ -12,6 +12,9 @@ const SPONSOR_URL = "https://sidehuddlesports.com/sponsors";
 // rather than at the sponsor page: the ask in these emails is the deposit, and
 // a page in between is one more place to lose someone reading on a phone.
 const CHECKOUT_URL = "https://square.link/u/iq7jW1sF";
+// A sponsor should be able to look at the thing before paying for it, so every
+// mail carries all three: buy, read the full pitch, see the app itself.
+const APP_STORE_URL = "https://apps.apple.com/us/app/id6777524558";
 const SCHOOL_PARTNER_VERTICAL = "school partner";
 
 // Season sponsorship, collected in two parts. The deposit is what the email
@@ -90,7 +93,7 @@ function shell(inner: string): string {
   <table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
     <tr><td style="background-color:#0a0a0a;padding:20px 32px;">
       <span style="color:#00c47d;font-size:16px;font-weight:bold;letter-spacing:0.5px;">Side Huddle</span>
-      <span style="color:#888;font-size:13px;margin-left:12px;">Sports community for real fans</span>
+      <span style="color:#888;font-size:13px;margin-left:12px;">The digital tailgate</span>
     </td></tr>
     <tr><td style="padding:32px;color:#1a1a1a;font-size:15px;line-height:1.7;">
 ${inner}
@@ -107,15 +110,19 @@ ${inner}
 }
 
 function cta(label: string): string {
-  return `<table cellpadding="0" cellspacing="0" style="margin:4px 0 18px 0;"><tr>
+  return `<table cellpadding="0" cellspacing="0" style="margin:4px 0 10px 0;"><tr>
     <td style="background-color:#00c47d;border-radius:6px;">
       <a href="${CHECKOUT_URL}" style="display:inline-block;padding:13px 26px;color:#000;font-size:15px;font-weight:bold;text-decoration:none;">${label} &rarr;</a>
+    </td>
+    <td style="width:10px;">&nbsp;</td>
+    <td style="border:1.5px solid #d0d0d0;border-radius:6px;">
+      <a href="${SPONSOR_URL}" style="display:inline-block;padding:12px 22px;color:#1a1a1a;font-size:15px;font-weight:bold;text-decoration:none;">See the full pitch &rarr;</a>
     </td></tr></table>`;
 }
 
-function detailsLink(): string {
-  return `<p style="font-size:13px;color:#999;margin:0 0 6px 0;">`
-    + `Full details: <a href="${SPONSOR_URL}" style="color:#999;">${SPONSOR_URL.replace("https://", "")}</a></p>`;
+function appLine(): string {
+  return `<p style="font-size:13px;color:#777;margin:0 0 14px 0;">`
+    + `See the app: <a href="${APP_STORE_URL}" style="color:#00a86b;">${APP_STORE_URL}</a></p>`;
 }
 
 // ── step templates ─────────────────────────────────────────────────────────────
@@ -149,7 +156,8 @@ function body(step: number, lead: Lead): string {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${firstName(lead)} — quick follow-up.</p>
       <p style="margin:0 0 18px 0;">One sponsor, every ${slot} huddle. ${DEPOSIT} holds it; ${BALANCE} on ${BALANCE_DATE} or the day we launch, whichever is later.</p>
-      ${cta("Claim the slot")}`);
+      ${cta("Claim the slot")}
+      ${appLine()}`);
   }
 
   if (step === 3) {
@@ -157,6 +165,7 @@ function body(step: number, lead: Lead): string {
       <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
       <p style="margin:0 0 18px 0;">Last note on ${slot}. One brand gets to be the only one inside those huddles this season.</p>
       ${cta("Claim the slot")}
+      ${appLine()}
       <p style="font-size:13px;color:#999;margin:0;">Not relevant? Reply "unsubscribe" and I won't follow up.</p>`);
   }
 
@@ -168,7 +177,7 @@ function body(step: number, lead: Lead): string {
     <p style="margin:0 0 18px 0;">We sell one sponsor per category. ${lead.company} would be the only one across every ${slot} huddle, in front of ${fans}.</p>
     <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season.</strong> ${DEPOSIT} holds it; the ${BALANCE} balance runs ${BALANCE_DATE} or the day we launch, whichever is later — your 12 months start then, so you never pay for a day you didn't get.</p>
     ${cta("Claim the slot")}
-    ${detailsLink()}
+    ${appLine()}
     <p style="font-size:13px;color:#999;margin:0;">Price goes up each week until kickoff.</p>`);
 }
 
@@ -180,7 +189,8 @@ function schoolPartnerBody(step: number, lead: Lead): string {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${firstName(lead)} — quick follow-up.</p>
       <p style="margin:0 0 18px 0;">One sponsor, every ${huddle} huddle. ${DEPOSIT} holds it; ${BALANCE} on ${BALANCE_DATE} or the day we launch, whichever is later.</p>
-      ${cta("Claim the slot")}`);
+      ${cta("Claim the slot")}
+      ${appLine()}`);
   }
 
   if (step === 3) {
@@ -188,6 +198,7 @@ function schoolPartnerBody(step: number, lead: Lead): string {
       <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
       <p style="margin:0 0 18px 0;">Last note on ${huddle}. One brand gets to be the only one inside those huddles this season.</p>
       ${cta("Claim the slot")}
+      ${appLine()}
       <p style="font-size:13px;color:#999;margin:0;">Not relevant? Reply "unsubscribe" and I won't follow up.</p>`);
   }
 
@@ -201,8 +212,24 @@ function schoolPartnerBody(step: number, lead: Lead): string {
     <p style="margin:0 0 18px 0;">We sell one sponsor per category. ${organization} would be the only one across every ${huddle} huddle.</p>
     <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season.</strong> ${DEPOSIT} holds it; the ${BALANCE} balance runs ${BALANCE_DATE} or the day we launch, whichever is later — your 12 months start then.</p>
     ${cta("Claim the slot")}
-    ${detailsLink()}
+    ${appLine()}
     <p style="font-size:13px;color:#999;margin:0;">Price goes up each week until kickoff.</p>`);
+}
+
+
+// Strip the HTML shell so a test run shows the words that will actually land in
+// someone's inbox. Reading raw markup in a JSON preview is not a review.
+function asText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<\/p>|<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&rarr;/g, "\u2192")
+    .replace(/&amp;/g, "&")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 async function brevoSend(apiKey: string, to: string, subj: string, html: string): Promise<void> {
@@ -296,7 +323,7 @@ serve(async (req) => {
     let sent = 0;
     let skippedDuplicate = 0;
     const errors: string[] = [];
-    const previews: Array<{ to: string; company: string; subject: string }> = [];
+    const previews: Array<{ to: string; company: string; subject: string; text: string }> = [];
 
     for (const lead of targets) {
       if (sent >= cap) break;
@@ -311,7 +338,7 @@ serve(async (req) => {
 
       const subj = subject(step, lead);
       const html = body(step, lead);
-      previews.push({ to, company: lead.company, subject: subj });
+      previews.push({ to, company: lead.company, subject: subj, text: asText(html) });
 
       if (!live) {
         sent++;

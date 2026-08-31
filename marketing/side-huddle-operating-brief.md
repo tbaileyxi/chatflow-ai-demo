@@ -218,3 +218,56 @@ Neither is a code problem.
 SGO's naming convention, not confirmed against a live response. First successful
 run reports the real ones in `unknown_prop_stats`. College team-name matching
 against SGO's `names.long` is also unconfirmed — watch `skipped_no_tracked_team`.
+
+**2026-08-12 — market ladder pruned.** The Kalshi expansion imported every strike
+of every total/spread ladder (Over 4.5, 5.5, 7.5 …), leaving ~22 near-identical
+cards per game and 34 in one Mets room. `kalshi-sync-markets` now keeps only the
+line closest to 50c; a one-off `prune-ladder-markets` function deleted the 1,441
+rows already written (120 kept, 0 had a fade against them, verified with the
+service role). Result: totals 1.0 card/game, spreads 2.0 (one per side).
+
+
+---
+
+## 7. Fade / Picks — agreed design (2026-08-13)
+
+**Principle: chat is where you REACT, Picks is where you MANAGE.** Today both
+surfaces try to do both, which is why the room reads as noise.
+
+### Chat
+One card per game per market type, per gameday — not per moment. The card
+changes STATE rather than spawning new cards:
+
+| state | reads |
+|---|---|
+| open | `Browns vs Bears · Total 44.5` → Over / Under |
+| taken | `JOE took the OVER 44.5` → Take the other side |
+| matched | `JOE 🆚 MIKE · Over 44.5` → Locked, settles at final |
+
+- **No moneyline.** In a Browns room everyone picks the Browns; there is no
+  argument in it. Spreads and totals are where a partisan room splits.
+- **Team-framed only.** A Mariners spread does not belong in a Yankees room.
+- **No price cards.** Same bet twice in two vocabularies.
+
+### Picks (the existing Ledger tab)
+Already has chips, Open / Pending / Settled. Add a **board** — but only lines
+for the games this room is watching, curated the same way chat is. NOT the full
+slate; the 34-strike ladder stays invisible.
+
+### Navigation — the actual gap
+The ledger exists and is reachable only by leaving the huddle. Add a route:
+tapping a fade card or the Fade button opens Picks focused on that game, with a
+back arrow to the room.
+
+### Wording
+Drop sportsbook grammar. "Covers +1.5" / "Yankees wins by over 1.5 runs" are two
+languages fighting. Prefer `Browns by 2+` / `Bears or close`, and
+`JOE took the Browns · take the other side`.
+
+### Shipped server-side 2026-08-13
+- fade cards: one per market TYPE, max 2 per game (`FADE_MAX_PER_GAME`)
+- moneyline excluded (already absent from FADEABLE)
+- `kalshi-post-predictions` OFF (`PREDICTION_CARDS_ENABLED=true` restores)
+
+### Still client-side, needs a build
+Card state transitions, the Picks route from a huddle, the board section, wording.

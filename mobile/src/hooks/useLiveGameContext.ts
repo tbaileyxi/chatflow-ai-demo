@@ -98,6 +98,19 @@ export function useLiveGameContext(teamId: string | undefined) {
         .select("*")
         .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
         .eq("status", "in_progress")
+        // A live game cannot have started yesterday. Without this bound, one
+        // row that never got flipped to 'final' outranks every real fixture
+        // from then on — a Mets room sat on "Padres 1 — Mets 4, 9 · 0:00",
+        // blinking, against a team they had not played in weeks, while the
+        // actual Astros game waited behind it in the scheduled branch.
+        //
+        // Nine hours covers a long baseball game plus sync lag. The database
+        // side also closes these out hourly (close_stale_live_games), but the
+        // app should not depend on that having run.
+        .gte(
+          "start_time",
+          new Date(Date.now() - 9 * 60 * 60 * 1000).toISOString(),
+        )
         .order("start_time", { ascending: false })
         .limit(1)
         .maybeSingle();

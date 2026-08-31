@@ -20,7 +20,7 @@ export interface RssEntry {
 }
 
 export interface ScoredEntry extends RssEntry {
-  category: "HIGH" | "MED" | "LOW" | "DROP";
+  category: "HIGH" | "POP" | "MED" | "LOW" | "DROP";
   llmScore: number | null;  // null when bypassed
   finalScore: number;       // 0..100, used to rank
   breaking: boolean;
@@ -62,16 +62,57 @@ const RETAIL_DROP = [
   "memorabilia", "adult sizes", "youth sizes", "gift guide",
 ];
 
-export function categoryGate(title: string): "HIGH" | "MED" | "LOW" | "DROP" {
-  const t = title.toLowerCase();
-  for (const k of LOW_DROP) {
-    if (t.includes(k)) return "DROP";
+// The stuff that actually travels. A uniform reveal, a viral clip, a tunnel
+// walk — none of it contains "trade" or "injury", so it scored MED (50) and
+// died under the 55 threshold, while the drop list explicitly killed "gallery"
+// and "slideshow", which is the exact shape visual content arrives in. The
+// pipeline was tuned to reject the only news anyone forwards.
+const POP = [
+  "uniform", "uniforms", "jersey reveal", "throwback", "helmet", "alternate",
+  "viral", "goes viral", "reaction", "mic'd up", "miked up", "hype video",
+  "trailer", "tunnel", "celebration", "walkout", "entrance", "crowd",
+  "student section", "tradition", "rivalry week", "trophy", "mascot",
+  "goes off", "breaks the internet", "insane", "unreal", "must see",
+  // Recruiting is the other thing fans follow daily and it rarely uses the
+  // hard-news verbs. "commit" is already HIGH; everything before the commit —
+  // the offer, the visit, the rankings chatter — was scoring MED and dying.
+  "recruit", "recruiting", "five-star", "5-star", "four-star", "4-star",
+  "offer", "offers", "official visit", "decommit", "flips", "transfer portal",
+  "signing day", "top target", "prospect",
+];
+
+// A Yankees room does not want Triple-A Syracuse walk-offs or a 2028 high
+// school right-hander's commitment, and it was getting both — the team feeds
+// carry affiliate and recruiting wire copy alongside the major league club.
+// College rooms DO want recruiting, so this only fires on the minor league
+// vocabulary that has no college equivalent.
+const FARM_DROP = [
+  "triple-a", "double-a", "high-a", "single-a", "milb", "minor league",
+  "rookie ball", "instructional league", "class of 20",
+];
+
+export function categoryGate(title: string): "HIGH" | "POP" | "MED" | "LOW" | "DROP" {
+  {
+    const t0 = title.toLowerCase();
+    for (const k of FARM_DROP) if (t0.includes(k)) return "DROP";
   }
+  const t = title.toLowerCase();
+  // Ads are always out — a shopping listing is never news.
   for (const k of RETAIL_DROP) {
     if (t.includes(k)) return "DROP";
   }
+  // Hard news first: a signing is a signing even if it mentions a jersey.
   for (const k of HIGH) {
     if (t.includes(k)) return "HIGH";
+  }
+  // POP is checked BEFORE the low-value list on purpose. "Photo gallery: the
+  // new alternates" is exactly the post fans share, and the old order dropped
+  // it on the word "gallery" before anything else got a look.
+  for (const k of POP) {
+    if (t.includes(k)) return "POP";
+  }
+  for (const k of LOW_DROP) {
+    if (t.includes(k)) return "DROP";
   }
   return "MED";
 }
@@ -85,6 +126,47 @@ export function categoryGate(title: string): "HIGH" | "MED" | "LOW" | "DROP" {
 export function subjectGate(title: string, teamNameTokens: string[]): boolean {
   const head = title.slice(0, 60).toLowerCase();
   return teamNameTokens.some((t) => t.length >= 3 && head.includes(t.toLowerCase()));
+}
+
+// ---------------------------------------------------------------
+// Gate 2b: the big club, not the farm system.
+//
+// Team blogs (SB Nation and friends) cover affiliates in the same feed as the
+// parent club, so a room for the Yankees got a Triple-A Scranton box score. The
+// naive fix — listing every team's affiliates — is 30 lists per league that go
+// stale every time an affiliation changes. These are LEVEL markers instead:
+// they name the tier, not the team, so one list covers every club in the sport.
+//
+// A story only clears this gate if it mentions no minor-league level at all, OR
+// it is a roster move that IS major-club news. A call-up is the big club's news
+// even though the sentence says Triple-A, and dropping those would lose real
+// stories.
+// ---------------------------------------------------------------
+
+const MINOR_LEVEL = [
+  // baseball tiers + the minor leagues themselves
+  "triple-a", "triple a", "double-a", "double a", "single-a", "single a",
+  "high-a", "low-a", "class a", "rookie ball", "rookie league",
+  "minor league", "minor-league", "the minors", "farm system", "farmhand",
+  "international league", "pacific coast league", "eastern league",
+  "southern league", "texas league", "midwest league", "california league",
+  "carolina league", "florida state league", "south atlantic league",
+  "northwest league", "arizona fall league", "complex league",
+  // other sports
+  "g league", "g-league", "ahl", "echl", "juniors", "reserve team",
+];
+
+// Roster moves that mention the minors but are unambiguously big-club news.
+const MAJOR_MOVE = [
+  "call-up", "called up", "calls up", "recalled", "promoted",
+  "rehab assignment", "optioned", "designated for assignment", "dfa",
+  "sent down", "demoted", "roster move", "activated",
+];
+
+export function bigClubGate(title: string, summary?: string | null): boolean {
+  const text = `${title} ${summary ?? ""}`.toLowerCase();
+  if (!MINOR_LEVEL.some((m) => text.includes(m))) return true;
+  return MAJOR_MOVE.some((m) => text.includes(m));
 }
 
 // ---------------------------------------------------------------
@@ -144,10 +226,15 @@ export async function scoreEntries(
     const category = categoryGate(e.title);
     if (category === "DROP") continue;
     if (!subjectGate(e.title, opts.tokens)) continue;
+    // Free, and it runs BEFORE the judge on purpose: HIGH-category headlines
+    // skip the judge entirely, and a minor-league recap reads as HIGH because
+    // it contains "beats"/"wins". That bypass is how a Scranton box score
+    // reached a Yankees room.
+    if (!bigClubGate(e.title, e.summary)) continue;
     const clusterSize = await computeCluster(client, teamId, e.title);
 
     // Cheap signals: HIGH category OR cluster_size >= 3 bypass the LLM judge.
-    const bypassJudge = category === "HIGH" || clusterSize >= 3;
+    const bypassJudge = category === "HIGH" || category === "POP" || clusterSize >= 3;
     let llmScore: number | null = null;
     let breaking = false;
     if (!bypassJudge) {
@@ -177,8 +264,9 @@ function computeFinalScore(
   clusterSize: number,
   llmScore: number | null,
 ): number {
-  // Base by category.
-  let s = category === "HIGH" ? 85 : category === "MED" ? 50 : 25;
+  // Base by category. POP sits just above the 55 threshold so a viral post
+  // survives on its own, but below HIGH so a trade still outranks a uniform.
+  let s = category === "HIGH" ? 85 : category === "POP" ? 70 : category === "MED" ? 50 : 25;
   // Cluster boost — caps quickly so we don't double-count a swarm.
   s += Math.min(15, (clusterSize - 1) * 5);
   // Blend in judge score when available.
@@ -337,7 +425,17 @@ function hash16(s: string): string {
 // post. Defensive: 5s timeout, junk filter, never throws (returns null).
 // IRON RULE stays intact: we read one <meta> URL, never the article body.
 // ---------------------------------------------------------------
-export async function fetchOgImage(url: string): Promise<string | null> {
+// Returns the article's OG image AND description from a single request.
+//
+// The description matters as much as the photo: Google News RSS items carry a
+// headline and nothing else, so the bot has no facts to relay and can only
+// re-tease the headline ("Colorado is looking at an elite QB prospect" —
+// without ever naming him). That reads as clickbait because it literally is
+// the clickbait, rephrased. og:description is the article's own summary and
+// usually contains the name, number or detail the headline withholds.
+export async function fetchOgMeta(
+  url: string,
+): Promise<{ image: string | null; description: string | null }> {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 5000);
@@ -351,9 +449,9 @@ export async function fetchOgImage(url: string): Promise<string | null> {
       },
     });
     clearTimeout(timer);
-    if (!res.ok) return null;
+    if (!res.ok) return { image: null, description: null };
     const ct = res.headers.get("content-type") || "";
-    if (!ct.includes("html")) return null;
+    if (!ct.includes("html")) return { image: null, description: null };
     // Only need the <head>; cap the read so we never pull a huge page.
     const html = (await res.text()).slice(0, 200_000);
 
@@ -380,17 +478,37 @@ export async function fetchOgImage(url: string): Promise<string | null> {
       meta("og:image") ||
       meta("twitter:image") ||
       meta("twitter:image:src");
-    if (!img) return null;
 
-    img = img.replace(/&amp;/g, "&").trim();
-    if (!/^https:\/\//i.test(img)) return null;               // require https (RN image-safe)
-    if (/\.svg(\?|$)/i.test(img)) return null;                 // vector logos, not photos
-    // Drop obvious non-action assets: site chrome, default share images, avatars.
-    if (/logo|sprite|favicon|placeholder|default[-_]?(share|image)|avatar|1x1|spacer/i.test(img)) {
-      return null;
+    // The article's own summary. This is the payload that lets the bot state
+    // the actual news instead of re-teasing the headline.
+    let desc =
+      meta("og:description") ||
+      meta("twitter:description") ||
+      meta("description");
+    if (desc) {
+      desc = desc.replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim();
+      // Guard against a description that is just the headline echoed back, or
+      // a boilerplate site tagline — neither adds a fact.
+      if (desc.length < 40) desc = null;
     }
-    return img;
+
+    if (img) {
+      img = img.replace(/&amp;/g, "&").trim();
+      if (!/^https:\/\//i.test(img)) img = null;               // require https (RN image-safe)
+      else if (/\.svg(\?|$)/i.test(img)) img = null;            // vector logos, not photos
+      // Drop obvious non-action assets: site chrome, default share images, avatars.
+      else if (/logo|sprite|favicon|placeholder|default[-_]?(share|image)|avatar|1x1|spacer/i.test(img)) {
+        img = null;
+      }
+    }
+    return { image: img ?? null, description: desc ?? null };
   } catch {
-    return null; // offline / abort / parse fail — news still posts, just text-only
+    // offline / abort / parse fail — news still posts, just text-only
+    return { image: null, description: null };
   }
+}
+
+// Back-compat wrapper for callers that only want the photo.
+export async function fetchOgImage(url: string): Promise<string | null> {
+  return (await fetchOgMeta(url)).image;
 }

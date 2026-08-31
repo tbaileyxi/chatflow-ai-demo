@@ -1,0 +1,17 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["796XBTP82R.com.sidehuddle.sports"],
+        "components": [
+          { "/": "/h/*",  "comment": "room invite — opens straight to the room" },
+          { "/": "/i/*",  "comment": "invite code" },
+          { "/": "/picks/*", "comment": "shared pick" }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["796XBTP82R.com.sidehuddle.sports"]
+  }
+}

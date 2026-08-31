@@ -24,7 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { GamePingsToggle } from "@/components/profile/GamePingsToggle";
+import { NotificationSettings } from "@/components/profile/NotificationSettings";
+import { FindYourPeople } from "@/components/profile/FindYourPeople";
 import { Separator } from "@/components/ui/separator";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ScreenWrapper } from "@/components/ui/screen-wrapper";
@@ -487,13 +488,24 @@ export function ProfileScreen() {
 
         <Separator />
 
+        {/* Find your people — reachable again after onboarding, because the
+            answer changes every time somebody new signs up. */}
+        <Card>
+          <CardHeader>
+            <CardTitle>People you know</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <FindYourPeople />
+          </CardContent>
+        </Card>
+
         {/* Notifications */}
         <Card>
           <CardHeader>
             <CardTitle>Notifications</CardTitle>
           </CardHeader>
           <CardContent>
-            <GamePingsToggle />
+            <NotificationSettings />
           </CardContent>
         </Card>
 

@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { View, Text, Pressable, ActivityIndicator, Alert } from "react-native";
 import { Check, X, Clock, Lock, TrendingUp, TrendingDown } from "lucide-react-native";
 import { cn } from "@/lib/utils";
+import { marketSides } from "@/lib/marketSides";
 import { colors } from "@/theme/colors";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { isOutOfChips, offerFreeChips } from "@/lib/chips";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface Market {
@@ -32,13 +34,6 @@ interface BetStats {
 
 function isPast(date: Date): boolean {
   return date.getTime() < Date.now();
-}
-
-// Pull the team out of "Will the Yankees win?" / "Will Detroit win?" so a
-// resolved card can say "Yankees won" instead of the cryptic "Resolved: YES".
-function teamFromQuestion(question: string): string {
-  const m = question.match(/will\s+(?:the\s+)?(.+?)\s+win\??$/i);
-  return m ? m[1].trim() : "";
 }
 
 function timeUntil(dateStr: string): string {
@@ -154,7 +149,13 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
         queryClient.invalidateQueries({ queryKey: ["portfolio"] });
         queryClient.invalidateQueries({ queryKey: ["shadow-bets"] });
       } catch (err: any) {
-        Alert.alert("Error", err.message || "Couldn't make that pick");
+        // Out of chips is not an error to apologise for — it's a top-up prompt.
+        if (isOutOfChips(err)) {
+          const topped = await offerFreeChips(err);
+          if (topped) queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+        } else {
+          Alert.alert("Error", err.message || "Couldn't make that pick");
+        }
       } finally {
         setPlacing(false);
       }
@@ -172,6 +173,14 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
 
   const communityYesPct = stats.total > 0 ? Math.round((stats.yesCount / stats.total) * 100) : 50;
   const divergence = communityYesPct - yesCost;
+
+  // Say the sides in game words. Same derivation the Fade sheet and the bot's
+  // fade cards use, so one game reads the same everywhere it appears.
+  const sides = marketSides(market);
+  const myLabel = userBet?.position === "YES" ? sides.yesLabel : sides.noLabel;
+  // The room's lean, always stated as a side people took rather than a "% YES".
+  const leanPct = communityYesPct >= 50 ? communityYesPct : 100 - communityYesPct;
+  const leanLabel = communityYesPct >= 50 ? sides.yesLabel : sides.noLabel;
 
   const borderStyle = isResolved && userBet?.won === true
     ? "border-success/40"
@@ -193,7 +202,10 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
 
   return (
     <View className={cn("rounded-lg border-2 p-3 gap-2", borderStyle, bgStyle)}>
-      <Text className="text-sm font-semibold text-foreground">{market.question}</Text>
+      <Text className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+        {sides.eyebrow}
+      </Text>
+      <Text className="-mt-1 text-base font-black text-foreground">{sides.headline}</Text>
       {market.metadata?.away && market.metadata?.home && (
         <Text className="-mt-1 text-xs text-muted-foreground">
           {market.metadata.away} @ {market.metadata.home}
@@ -220,13 +232,9 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
                 market.resolution === "YES" ? "text-success" : "text-destructive",
               )}
             >
-              {(() => {
-                const hit = market.resolution === "YES";
-                // Moneyline reads as won/lost; spread/total read as hit/missed.
-                const team = market.market_type === "winner" ? teamFromQuestion(market.question) : "";
-                if (team) return hit ? `Final — ${team} won` : `Final — ${team} lost`;
-                return hit ? "Final — hit ✓" : "Final — missed ✗";
-              })()}
+              {/* Name the side that won. "Final — hit ✓" told you nothing
+                  once the card scrolled out of the moment it was posted. */}
+              Final — {market.resolution === "YES" ? sides.yesLabel : sides.noLabel}
             </Text>
           </View>
           {userBet && (
@@ -246,35 +254,42 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
 
       {/* Pre-bet Buttons */}
       {!isResolved && !userBet && !isLocked && (
-        <View className="flex-row gap-2">
-          <Pressable
-            className="flex-1 flex-row items-center justify-center gap-1 rounded-lg bg-success/80 py-2.5 active:opacity-80"
-            onPress={() => handlePlaceBet("YES")}
-            disabled={placing}
-          >
-            {placing ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Text className="text-sm font-bold text-white">YES</Text>
-                <Text className="text-xs font-medium text-white/70">{yesCost}¢</Text>
-              </>
-            )}
-          </Pressable>
-          <Pressable
-            className="flex-1 flex-row items-center justify-center gap-1 rounded-lg bg-destructive/80 py-2.5 active:opacity-80"
-            onPress={() => handlePlaceBet("NO")}
-            disabled={placing}
-          >
-            {placing ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Text className="text-sm font-bold text-white">NO</Text>
-                <Text className="text-xs font-medium text-white/70">{noCost}¢</Text>
-              </>
-            )}
-          </Pressable>
+        // Both sides styled identically. Green-vs-red read as right-vs-wrong on
+        // a card whose whole point is that neither side is the safe one.
+        <View className="gap-1.5">
+          <Text className="text-xs text-muted-foreground">Pick a side</Text>
+          <View className="flex-row gap-2">
+            {([
+              { pos: "YES" as const, label: sides.yesLabel, cost: yesCost },
+              { pos: "NO" as const, label: sides.noLabel, cost: noCost },
+            ]).map((s) => (
+              <Pressable
+                key={s.pos}
+                className="flex-1 items-center rounded-xl border border-success bg-success/15 px-3 py-2.5 active:opacity-80"
+                onPress={() => handlePlaceBet(s.pos)}
+                disabled={placing}
+              >
+                {placing ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <>
+                    <Text
+                      className="text-sm font-black text-success"
+                      numberOfLines={2}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.7}
+                      style={{ textAlign: "center" }}
+                    >
+                      {s.label}
+                    </Text>
+                    <Text className="text-[11px] font-medium text-muted-foreground">
+                      {s.cost} chips
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            ))}
+          </View>
         </View>
       )}
 
@@ -302,7 +317,7 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
                   userBet.position === "YES" ? "text-success" : "text-destructive",
                 )}
               >
-                Your pick: {userBet.position} ({userBet.chips_risked}¢)
+                Your pick: {myLabel} · {userBet.chips_risked} chips
               </Text>
             </View>
           </View>
@@ -310,9 +325,8 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
             <View className="gap-1">
               <View className="flex-row justify-between">
                 <Text className="text-xs text-muted-foreground">
-                  Community: {communityYesPct}% YES ({stats.total} picks)
+                  {leanPct}% took {leanLabel} ({stats.total} picks)
                 </Text>
-                <Text className="text-xs text-muted-foreground">Market: {yesCost}%</Text>
               </View>
               {Math.abs(divergence) >= 3 && (
                 <View className="flex-row items-center gap-1">
@@ -327,7 +341,10 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
                       divergence > 0 ? "text-success" : "text-destructive",
                     )}
                   >
-                    Community is {Math.abs(divergence)}% {divergence > 0 ? "more" : "less"} bullish
+                    {/* "bullish" is trader-speak. Say who disagrees with whom. */}
+                    {divergence > 0
+                      ? `Room's on ${sides.yesLabel} more than the line is`
+                      : `The line likes ${sides.yesLabel} more than the room does`}
                   </Text>
                 </View>
               )}

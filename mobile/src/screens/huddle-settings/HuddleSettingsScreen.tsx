@@ -34,6 +34,7 @@ import { Separator } from "@/components/ui/separator";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ScreenWrapper } from "@/components/ui/screen-wrapper";
 import { colors } from "@/theme/colors";
+import { useRoomPhoto } from "@/hooks/useRoomPhoto";
 import type { RootStackParamList } from "@/navigation/types";
 
 type Route = RouteProp<RootStackParamList, "HuddleSettings">;
@@ -61,6 +62,7 @@ export function HuddleSettingsScreen() {
 
   const { data: profile } = useProfile();
   const isOwner = user?.id === huddle?.ownerId;
+  const roomPhoto = useRoomPhoto(huddleId);
   const isRoomAdmin =
     isOwner || admins.some((admin) => admin.user_id === user?.id);
   const isOfficial = !!huddle?.isOfficial;
@@ -192,17 +194,10 @@ export function HuddleSettingsScreen() {
 
   const togglePrivate = async () => {
     if (!isRoomAdmin) return;
-    // Private mode is an Official Huddle feature — gate behind the upgrade.
-    // With Official Huddles off for 1.0 there's no purchase to offer, so tell
-    // the owner it's coming rather than opening a paywall that can't complete.
-    if (!isOfficial && !huddle.isPrivate) {
-      if (OFFICIAL_HUDDLES_ENABLED) {
-        setShowPaywall(true);
-      } else {
-        Alert.alert("Coming soon", "Private, approval-only huddles arrive in a future update.");
-      }
-      return;
-    }
+    // WAS: gated behind the Official Huddle upgrade, so a regular owner got a
+    // paywall or a "coming soon" alert and could never lock their own room.
+    // Controlling who is in your room is not a premium feature — it is the
+    // baseline for a room being yours. Free for every owner now.
     const next = !huddle.isPrivate;
     await supabase
       .from("huddles")
@@ -390,6 +385,70 @@ export function HuddleSettingsScreen() {
       </View>
 
       <ScreenWrapper scroll className="gap-4 pt-2">
+        {/* THE ROOM'S PICTURE. Owner or admin only — the storage policy enforces
+            the same rule, so a member who gets here sees nothing rather than a
+            button that fails. */}
+        {isRoomAdmin && (
+          <Card>
+            <CardContent className="gap-3 pt-4">
+              <Text className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                Room photo
+              </Text>
+              <View className="h-40 w-full overflow-hidden rounded-xl bg-muted">
+                {huddle.photoUrl ? (
+                  <Image
+                    source={{ uri: huddle.photoUrl }}
+                    className="h-full w-full"
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View className="h-full w-full items-center justify-center">
+                    <Text className="px-8 text-center text-sm text-muted-foreground">
+                      Your bar, last year's tailgate, the chapter banner — it sits
+                      behind every message in here.
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View className="flex-row gap-2">
+                <Pressable
+                  disabled={roomPhoto.uploading}
+                  onPress={async () => {
+                    const res = await roomPhoto.pick();
+                    if (res.ok)
+                      queryClient.invalidateQueries({
+                        queryKey: ["huddle-details", huddleId],
+                      });
+                  }}
+                  className="flex-1 items-center rounded-xl bg-primary px-4 py-3"
+                >
+                  <Text className="text-sm font-black text-primary-foreground">
+                    {roomPhoto.uploading
+                      ? "Uploading..."
+                      : huddle.photoUrl
+                        ? "Change photo"
+                        : "Add a photo"}
+                  </Text>
+                </Pressable>
+                {huddle.photoUrl && (
+                  <Pressable
+                    disabled={roomPhoto.uploading}
+                    onPress={async () => {
+                      if (await roomPhoto.clear())
+                        queryClient.invalidateQueries({
+                          queryKey: ["huddle-details", huddleId],
+                        });
+                    }}
+                    className="items-center rounded-xl border border-border px-4 py-3"
+                  >
+                    <Text className="text-sm font-bold text-foreground">Remove</Text>
+                  </Pressable>
+                )}
+              </View>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardContent className="gap-3 pt-4">
             <View className="flex-row items-center gap-3">
@@ -539,17 +598,32 @@ export function HuddleSettingsScreen() {
                   <Unlock color={colors.mutedForeground} size={18} />
                 )}
                 <View className="flex-1">
+                  {/* A setting is a STATE the room is in, not an instruction to
+                      the person reading it. "Ask to join" told the owner to do
+                      something he isn't the one doing — it is the visitor who
+                      asks. It stays as the visitor's button on the join screen,
+                      where it is the right words for the right person. */}
                   <Text className="font-bold text-foreground">
-                    {huddle.isPrivate ? "Private / Approval" : "Open by Invite"}
+                    {huddle.isPrivate ? "Private" : "Open"}
                   </Text>
+                  {/* WAS: "Open by Invite", which wasn't true — an open room can
+                      be joined by anyone who finds it, invite or not. */}
                   <Text className="text-sm leading-5 text-muted-foreground">
-                    Private huddles require approval before someone can enter.
+                    {huddle.isPrivate
+                      ? "You decide who comes in."
+                      : "Anyone who finds this room can walk in."}
                   </Text>
                 </View>
                 <Button variant="outline" size="sm" onPress={togglePrivate}>
-                  {huddle.isPrivate ? "Make Open" : "Make Private"}
+                  {huddle.isPrivate ? "Make it open" : "Make it private"}
                 </Button>
               </View>
+
+              {huddle.isPrivate && joinRequests.length === 0 ? (
+                <Text className="text-sm text-muted-foreground">
+                  Nobody's waiting to get in.
+                </Text>
+              ) : null}
 
               {huddle.isPrivate && joinRequests.length > 0 ? (
                 <View className="gap-2">

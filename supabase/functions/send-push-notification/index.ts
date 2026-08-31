@@ -176,15 +176,27 @@ Deno.serve(async (req) => {
     if (type === 'presence_active') {
       const { huddleId, userId, displayName } = body;
 
-      // Only notify for private huddles
+      // Two dead gates lived here before.
+      //
+      // 1. `if (!is_private) skip` — but every room is created is_private:false,
+      //    so this skipped 100% of rooms and the feature never fired for anyone.
+      // 2. A member-count cap that skipped team rooms — but the team room is
+      //    where every uninvited signup lands, so it turned the feature off in
+      //    exactly the room most people are actually sitting in.
+      //
+      // Neither was really about room size. What makes this notification worth
+      // sending is that you KNOW the person who walked in, and that is now
+      // answerable: the recipient filter below keeps it to their friends. A
+      // 500-person team room pings your three friends, not 500 strangers, so
+      // room size stops mattering at all.
       const { data: presenceHuddle } = await supabase
         .from('huddles')
-        .select('is_private, name, team_id')
+        .select('is_private, name, team_id, member_count, is_official_team_huddle')
         .eq('id', huddleId)
         .single();
 
-      if (!presenceHuddle?.is_private) {
-        return new Response(JSON.stringify({ sent: 0, skipped: 'public_huddle' }), {
+      if (!presenceHuddle) {
+        return new Response(JSON.stringify({ sent: 0, skipped: 'no_huddle' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -221,7 +233,54 @@ Deno.serve(async (req) => {
         });
       }
 
-      const userIds = members.map((m) => m.user_id);
+      let allMemberIds = members.map((m) => m.user_id);
+
+      // Only tell people who actually know whoever just walked in. "Someone is
+      // in the room" is noise; "your friend is in the room" is the whole point.
+      const { data: connections } = await supabase
+        .from('friend_connections')
+        .select('requester_id, addressee_id')
+        .eq('status', 'accepted')
+        .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
+
+      const knows = new Set(
+        (connections ?? []).map((c) =>
+          c.requester_id === userId ? c.addressee_id : c.requester_id,
+        ),
+      );
+      allMemberIds = allMemberIds.filter((id) => knows.has(id));
+
+      if (allMemberIds.length === 0) {
+        return new Response(JSON.stringify({ sent: 0, skipped: 'no_friends_here' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Per-recipient throttle: at most one "friend watching" ping per person
+      // per room per hour, no matter how many people walk in. Without this, a
+      // 20-person room on game day pushes 15 times to everyone.
+      const { data: recentlyTold } = await supabase
+        .from('presence_notification_log')
+        .select('recipient_id')
+        .eq('huddle_id', huddleId)
+        .in('recipient_id', allMemberIds)
+        .gte('notified_at', oneHourAgo);
+
+      const alreadyTold = new Set(
+        (recentlyTold ?? []).map((r) => r.recipient_id).filter(Boolean),
+      );
+      // Reassigned below once opt-outs are known.
+      let userIds = allMemberIds.filter((id) => !alreadyTold.has(id));
+
+      if (userIds.length === 0) {
+        await supabase
+          .from('presence_notification_log')
+          .insert({ huddle_id: huddleId, user_id: userId });
+
+        return new Response(JSON.stringify({ sent: 0, throttled: 'all_recipients' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       let teamLabel = 'the game';
       if (presenceHuddle.team_id) {
@@ -242,8 +301,28 @@ Deno.serve(async (req) => {
 
       const { data: preferences } = await supabase
         .from('notification_preferences')
-        .select('user_id, in_app_notifications')
+        .select('user_id, in_app_notifications, presence_active_enabled')
         .in('user_id', userIds);
+
+      // Anyone who turned "Friend watching now" off gets nothing at all —
+      // not a push, not an in-app row. Without this the only way to stop it
+      // was disabling Side Huddle notifications wholesale in iOS.
+      const optedOut = new Set(
+        (preferences ?? [])
+          .filter((p) => (p as any).presence_active_enabled === false)
+          .map((p) => p.user_id),
+      );
+      userIds = userIds.filter((id) => !optedOut.has(id));
+
+      if (userIds.length === 0) {
+        await supabase
+          .from('presence_notification_log')
+          .insert({ huddle_id: huddleId, user_id: userId });
+
+        return new Response(JSON.stringify({ sent: 0, skipped: 'all_opted_out' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       const inAppAllowed = new Map(
         (preferences ?? []).map((p) => [p.user_id, p.in_app_notifications !== false]),
@@ -313,10 +392,20 @@ Deno.serve(async (req) => {
       await sendExpoPush(messages);
       sent = messages.length;
 
-      // Log for throttle
+      // Log for throttle: one row marking this person announced, plus one per
+      // recipient we actually reached. Recipients are logged even when they had
+      // no push token — they still got the in-app notification, and that counts
+      // as having been told.
       await supabase
         .from('presence_notification_log')
-        .insert({ huddle_id: huddleId, user_id: userId });
+        .insert([
+          { huddle_id: huddleId, user_id: userId },
+          ...userIds.map((recipientId) => ({
+            huddle_id: huddleId,
+            user_id: userId,
+            recipient_id: recipientId,
+          })),
+        ]);
     }
 
     // ─── TYPE 4: Game going live ───
@@ -477,7 +566,19 @@ Deno.serve(async (req) => {
     //   bot publisher v2:    { huddle_ids: [...], title, body, source: 'bot_v2' }
     if (!type && (Array.isArray(body.user_ids) || Array.isArray(body.huddle_ids))) {
       const { title, body: messageBody, url, source } = body;
-      const notifType = source === 'bot_v2' ? 'bot_drop' : 'room_invite';
+      // Callers can name the type (friend_joined, huddle_ping, ...) so the
+      // in-app row is filed correctly. Anything unrecognised falls back to the
+      // old defaults rather than tripping the CHECK constraint and losing the
+      // whole insert.
+      const ALLOWED_DIRECT_TYPES = [
+        'friend_joined', 'huddle_ping', 'room_invite', 'bot_drop', 'join_request',
+      ];
+      const requestedType = typeof body.notification_type === 'string'
+        ? body.notification_type
+        : null;
+      const notifType = requestedType && ALLOWED_DIRECT_TYPES.includes(requestedType)
+        ? requestedType
+        : source === 'bot_v2' ? 'bot_drop' : 'room_invite';
 
       let targetUserIds: string[] = [];
       let huddleId: string | null = null;
@@ -502,8 +603,33 @@ Deno.serve(async (req) => {
       // visible even when push permission is denied.
       const { data: preferences } = await supabase
         .from('notification_preferences')
-        .select('user_id, in_app_notifications')
+        .select(
+          'user_id, in_app_notifications, friend_joined_enabled, room_invite_enabled',
+        )
         .in('user_id', targetUserIds);
+
+      // Per-type opt-out. Only the types that have a switch are filtered here;
+      // bot drops are governed elsewhere.
+      const prefColumn: Record<string, string> = {
+        friend_joined: 'friend_joined_enabled',
+        room_invite: 'room_invite_enabled',
+      };
+      const column = prefColumn[notifType];
+      if (column) {
+        const optedOut = new Set(
+          (preferences ?? [])
+            .filter((p) => (p as any)[column] === false)
+            .map((p) => p.user_id),
+        );
+        targetUserIds = targetUserIds.filter((id) => !optedOut.has(id));
+
+        if (targetUserIds.length === 0) {
+          return new Response(JSON.stringify({ sent: 0, skipped: 'opted_out' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
       const inAppAllowed = new Map(
         (preferences ?? []).map((p) => [p.user_id, p.in_app_notifications !== false]),
       );

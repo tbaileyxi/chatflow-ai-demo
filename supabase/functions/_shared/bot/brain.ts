@@ -104,7 +104,24 @@ export function gateEvents(allPlaysChronological: PlayEvent[]): GatedEvent[] {
       W_CLUTCH * clutch
     ));
 
-    if (excitement >= EXCITEMENT_THRESHOLD) {
+    // A touchdown always talks.
+    //
+    // Excitement weights closeness at 0.25 and late-game leverage at 0.20, so
+    // in a 21-0 second quarter both are near zero and even a touchdown scores
+    // in the twenties against a bar of 60. USC scored three times and the room
+    // went silent — 63 plays gated. The formula was letting the scoreline veto
+    // the score, which is exactly backwards for someone sitting in their team's
+    // room watching a rout.
+    //
+    // Football only, and only six points or more. Every made basket in
+    // basketball is a score, and a run crosses the plate in most innings; those
+    // sports need the gate. A touchdown is rare enough to be worth saying out
+    // loud every single time.
+    const isTouchdown =
+      (game.league === "NFL" || game.league === "NCAAF") &&
+      (play.pointsScored ?? 0) >= 6;
+
+    if (excitement >= EXCITEMENT_THRESHOLD || isTouchdown) {
       const facts: InGameFacts = {
         event: classifyEvent(play, game.league),
         scorer: play.scorerName,

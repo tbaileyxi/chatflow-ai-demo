@@ -19,12 +19,13 @@ import {
 } from "lucide-react-native";
 import { Image } from "react-native";
 import { HuddleCard } from "@/components/home/HuddleCard";
+import { CompleteProfileCard } from "@/components/home/CompleteProfileCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useInAppNotifications } from "@/hooks/useInAppNotifications";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
-import { useFriends } from "@/hooks/useFriends";
+import { useKnownPeople } from "@/hooks/useFriends";
 import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { colors } from "@/theme/colors";
 
@@ -68,7 +69,8 @@ function MonogramAvatar({ name, size = 36 }: { name: string; size?: number }) {
 function FriendsNowSection() {
   const navigation = useNavigation<any>();
   const { presentUsers } = useGlobalPresence();
-  const { data: friendIds } = useFriends();
+  const { data: knownPeople } = useKnownPeople();
+  const [expanded, setExpanded] = useState(false);
 
   const inviteFriends = useCallback(() => {
     Share.share({
@@ -77,11 +79,45 @@ function FriendsNowSection() {
     });
   }, []);
 
-  // Friends who are signed in AND currently inside a huddle.
-  const liveFriends = presentUsers.filter(
-    (u) => u.huddleId && friendIds?.has(u.userId),
+  // The whole roster, live ones first. This used to render ONLY people who
+  // were in a room at that exact second, so it was blank almost always — you
+  // had to be looking at the moment a friend walked in or you missed it.
+  // Now everyone you know is here; presence just decides how they look.
+  const liveById = new Map(
+    presentUsers.filter((u) => u.huddleId).map((u) => [u.userId, u]),
   );
-  const anyLive = liveFriends.length > 0;
+
+  const roster = (knownPeople ?? [])
+    .map((person) => {
+      const live = liveById.get(person.userId);
+      return {
+        userId: person.userId,
+        name: person.displayName || person.username || "Friend",
+        avatarUrl: person.avatarUrl,
+        huddleId: live?.huddleId ?? null,
+        huddleName: live?.huddleName ?? null,
+        isLive: !!live,
+      };
+    })
+    .sort((a, b) => {
+      if (a.isLive !== b.isLive) return a.isLive ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+  const anyLive = roster.some((p) => p.isLive);
+
+  // Cap the collapsed list. The roster is unbounded — at 5+ friends it pushed
+  // Your Rooms off the screen entirely, which is the wrong trade: the roster is
+  // reference, your rooms are the thing you came to open.
+  //
+  // The cap never hides someone who is LIVE. Those are the actionable rows and
+  // the entire reason this section exists; a "show more" that buries a friend
+  // currently watching would defeat it.
+  const COLLAPSED_MAX = 4;
+  const liveCount = roster.filter((p) => p.isLive).length;
+  const collapsedCount = Math.max(COLLAPSED_MAX, liveCount);
+  const visible = expanded ? roster : roster.slice(0, collapsedCount);
+  const hiddenCount = roster.length - visible.length;
 
   return (
     <View className="px-4">
@@ -100,15 +136,23 @@ function FriendsNowSection() {
         </Pressable>
       </View>
 
-      {anyLive ? (
+      {roster.length > 0 ? (
         <View className="gap-2">
-          {liveFriends.map((f) => (
+          {visible.map((f) => (
             <Pressable
               key={f.userId}
+              disabled={!f.isLive}
               onPress={() =>
+                f.huddleId &&
                 navigation.navigate("Huddle", { huddleId: f.huddleId })
               }
-              className="flex-row items-center gap-3 rounded-2xl border border-border bg-card p-3 active:opacity-80"
+              className={`flex-row items-center gap-3 rounded-2xl border border-border bg-card p-3 ${
+                f.isLive ? "active:opacity-80" : ""
+              }`}
+              // Offline people stay on the list but read as background: dimmed
+              // avatar and name, no tap target. The list is a roster you can
+              // count on, with presence as the layer on top.
+              style={f.isLive ? undefined : { opacity: 0.45 }}
             >
               {f.avatarUrl ? (
                 <Image
@@ -116,28 +160,41 @@ function FriendsNowSection() {
                   className="h-9 w-9 rounded-full"
                 />
               ) : (
-                <MonogramAvatar name={f.displayName || "User"} size={36} />
+                <MonogramAvatar name={f.name} size={36} />
               )}
               <View className="flex-1">
                 <Text className="text-base font-black text-foreground" numberOfLines={1}>
-                  {f.displayName || "Friend"}
+                  {f.name}
                 </Text>
                 <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-                  in {f.huddleName ?? "a huddle"}
+                  {f.isLive ? `in ${f.huddleName ?? "a huddle"}` : "not watching"}
                 </Text>
               </View>
-              <Text className="text-xs font-black text-primary">Jump in →</Text>
+              {f.isLive ? (
+                <Text className="text-xs font-black text-primary">Jump in →</Text>
+              ) : null}
             </Pressable>
           ))}
+
+          {hiddenCount > 0 || expanded ? (
+            <Pressable
+              onPress={() => setExpanded((v) => !v)}
+              className="py-2 active:opacity-70"
+            >
+              <Text className="text-sm font-black text-primary">
+                {expanded ? "Show less" : `Show all ${roster.length}`}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : (
         <View className="rounded-2xl border border-border bg-card p-4">
           <Text className="text-base font-black text-foreground">
-            No friends watching yet
+            Nobody here yet
           </Text>
           <Text className="mt-2 text-sm leading-5 text-muted-foreground">
-            When a friend checks into a room, it appears here so you can jump in
-            without searching.
+            Invite someone, or find people you already know. When they check
+            into a room it shows up here so you can jump in.
           </Text>
         </View>
       )}
@@ -271,6 +328,7 @@ export function HomeScreen() {
           />
         }
       >
+        <CompleteProfileCard />
         <FriendsNowSection />
         <YourRoomsSection />
       </ScrollView>

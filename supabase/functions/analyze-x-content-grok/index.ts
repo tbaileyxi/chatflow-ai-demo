@@ -14,7 +14,7 @@ const MODEL_PRIORITY = [
   'grok-3.1',
   'grok-3-fast',
   'grok-3',
-  'grok-2-latest',
+  'grok-4.3',
   'grok-2',
 ];
 

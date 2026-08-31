@@ -120,6 +120,37 @@ Deno.serve(async (req) => {
       .from("huddle_members").select("user_id").eq("huddle_id", huddleId);
     const memberIds = (members ?? []).map((m) => m.user_id).filter((id) => id !== uid);
     let pushed = 0;
+
+    // In-app rows first. A rally used to be push-only, so anyone who dismissed
+    // the banner — or had push off entirely — had no way to know it happened.
+    if (memberIds.length > 0) {
+      const { data: prefs } = await admin
+        .from("notification_preferences")
+        .select("user_id, in_app_notifications")
+        .in("user_id", memberIds);
+      const blocked = new Set(
+        (prefs ?? [])
+          .filter((p: any) => p.in_app_notifications === false)
+          .map((p: any) => p.user_id),
+      );
+
+      const rows = memberIds
+        .filter((id) => !blocked.has(id))
+        .map((id) => ({
+          user_id: id,
+          type: "huddle_ping",
+          title,
+          body,
+          huddle_id: huddleId,
+          data: { type: "huddle_ping", huddleId, senderId: uid },
+        }));
+
+      if (rows.length > 0) {
+        const { error: bellErr } = await admin.from("notifications").insert(rows);
+        if (bellErr) console.error("rally in-app notification:", bellErr);
+      }
+    }
+
     if (memberIds.length > 0) {
       const { data: profiles } = await admin
         .from("profiles")

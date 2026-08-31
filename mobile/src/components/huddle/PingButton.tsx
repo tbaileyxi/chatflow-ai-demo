@@ -9,12 +9,19 @@ type PingState = "idle" | "sending" | "done" | "already" | "nogame";
 
 // "Rally the huddle" pill. Only shown during a game window (gameState !== none).
 // One ping per huddle per game is enforced server-side; this just reflects state.
+//
+// Rally is two halves of one intention: ping the people who are already in the
+// room, then offer the people who aren't. onRallied fires after a successful
+// ping so the host can open the pull-in sheet — pinging a three-person room and
+// stopping there was never what "rally" meant.
 export function PingButton({
   huddleId,
   gameState,
+  onRallied,
 }: {
   huddleId: string;
   gameState: "pregame" | "live" | "postgame" | "none";
+  onRallied?: () => void;
 }) {
   const [state, setState] = useState<PingState>("idle");
 
@@ -29,9 +36,15 @@ export function PingButton({
       });
       if (error) throw error;
       const res = data as { ok?: boolean; code?: string };
-      if (res?.ok) setState("done");
-      else if (res?.code === "already_pinged") setState("already");
-      else if (res?.code === "no_game") setState("nogame");
+      if (res?.ok) {
+        setState("done");
+        onRallied?.();
+      } else if (res?.code === "already_pinged") {
+        // The room is capped for this game, but pulling in people who aren't
+        // here yet still makes sense — that half has no cap.
+        setState("already");
+        onRallied?.();
+      } else if (res?.code === "no_game") setState("nogame");
       else setState("idle");
     } catch {
       setState("idle");
