@@ -32,7 +32,14 @@ const json = (b: unknown, status = 200) =>
 // Mirroring all of it turns their room into a feed dump and they would be the
 // first to hate it. These are the only three knobs that matter.
 const MIN_LIKES   = Number(Deno.env.get("MIRROR_MIN_LIKES") || 25);
-const PER_RUN     = Number(Deno.env.get("MIRROR_PER_RUN") || 3);
+// ONE post per room per window, not a batch.
+//
+// Three arriving together reads as a dump, which is the opposite of the thing
+// being sold: his voice showing up through the day the way it does on X. A gap
+// of about ninety minutes is roughly how often an active account says something
+// worth reading anyway.
+const PER_RUN     = Number(Deno.env.get("MIRROR_PER_RUN") || 1);
+const GAP_MIN     = Number(Deno.env.get("MIRROR_GAP_MINUTES") || 90);
 const LOOKBACK_H  = Number(Deno.env.get("MIRROR_LOOKBACK_HOURS") || 12);
 
 serve(async (req) => {
@@ -43,7 +50,7 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   );
 
-  let body: { handle?: string; huddle_id?: string; probe_lists?: string; list_members?: string; dry?: boolean; probe_search?: string; lookback_hours?: number; set_handle?: { huddle_id: string; handle: string }; purge_room?: string } = {};
+  let body: { handle?: string; huddle_id?: string; probe_lists?: string; list_members?: string; dry?: boolean; probe_search?: string; lookback_hours?: number; gap_minutes?: number; set_handle?: { huddle_id: string; handle: string }; purge_room?: string } = {};
   try { body = await req.json(); } catch { /* no body is the normal case */ }
 
   // ── Probe: can this API tier read Lists? ──────────────────────────────────
@@ -200,6 +207,7 @@ serve(async (req) => {
     preview: [] as string[],
     candidates_kept: 0 as number | undefined,
     skipped_promo: 0 as number | undefined,
+    skipped_too_soon: 0 as number | undefined,
   };
 
   for (const room of rooms) {
@@ -240,8 +248,29 @@ serve(async (req) => {
         .map((d: any) => d.id as string);
       if (!ids.length) continue;
 
+      // Has this room heard from him recently?
+      const { data: recent } = await supabase
+        .from("huddle_messages")
+        .select("created_at")
+        .eq("huddle_id", room.id)
+        .eq("message_type", "creator_post")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const gap = body.gap_minutes ?? GAP_MIN;
+      if (recent?.created_at && Date.parse(recent.created_at) > Date.now() - gap * 60000) {
+        summary.skipped_too_soon = (summary.skipped_too_soon ?? 0) + 1;
+        continue;
+      }
+
       const posts = await fetchPosts(ids);
       summary.candidates += posts.length;
+
+      // Oldest first, so the room follows his day in order rather than starting
+      // with the newest and working backwards. Anything older than the lookback
+      // window is simply never posted — that is what stops a newly wired room
+      // dripping out yesterday's takes for the next day and a half.
+      posts.sort((a, b) => Date.parse(a.createdAt ?? "0") - Date.parse(b.createdAt ?? "0"));
 
       // Quote tweets carry their meaning in the post they quote — and often the
       // media too. Pulled in the same batched read, so it costs one extra call

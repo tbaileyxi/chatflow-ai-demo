@@ -170,6 +170,7 @@ export interface XPost {
    *  "Has America ever spent two weeks talking about the Titans?" means nothing
    *  until you can see what it is answering. */
   quotedId: string | null;
+  createdAt: string | null;
   imageUrl: string | null;
   videoUrl: string | null;
   url: string;
@@ -186,7 +187,7 @@ export async function fetchPosts(postIds: string[]): Promise<XPost[]> {
     "media.fields": "type,url,preview_image_url,variants",
     // referenced_tweets is what separates an original post from a reply or a
     // repost. Without it a creator's room fills with their half of arguments.
-    "tweet.fields": "text,public_metrics,referenced_tweets",
+    "tweet.fields": "text,public_metrics,referenced_tweets,created_at",
     "user.fields": "username",
   });
 
@@ -234,6 +235,7 @@ export async function fetchPosts(postIds: string[]): Promise<XPost[]> {
       isReply: refs.some((r: any) => r.type === "replied_to"),
       isRepost: refs.some((r: any) => r.type === "retweeted"),
       quotedId: refs.find((r: any) => r.type === "quoted")?.id ?? null,
+      createdAt: post.created_at ?? null,
       imageUrl: m?.url ?? m?.preview_image_url ?? null,
       videoUrl,
       url: handle ? `https://x.com/${handle}/status/${post.id}` : `https://x.com/i/status/${post.id}`,
