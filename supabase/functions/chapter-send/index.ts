@@ -199,11 +199,21 @@ function subject(step: number, c: Chapter): string {
   switch (step) {
     case 2: return `Re: the ${name} room`;
     case 3: return `Last one`;
-    // Matches the season hook the body opens with, and names their chapter.
-    // The old version was `${name}'s group chat`, which produced "Sarasota
-    // Browns Backers's group chat" — a double possessive on any chapter name
-    // ending in s, which most of them do.
-    default: return `Claim the ${name} room`;
+    // MEASURED, not chosen. Brevo logs for the first 258 sends:
+    //
+    //   "Browns season — a room for X"   71 sent   35.2% open   8.5% click
+    //   "Claim the X room"              185 sent   12.4% open   1.6% click
+    //
+    // Nearly three times the opens and five times the clicks. "Claim the … room"
+    // was written to fix a real bug — `${name}'s group chat` produced "Sarasota
+    // Browns Backers's group chat", a double possessive on any chapter name
+    // ending in s, which most of them do — but the fix threw out the part that
+    // was working. It leads with an instruction to a stranger, where the season
+    // line leads with the thing they already care about and names their club.
+    //
+    // This keeps the season hook and sidesteps the possessive entirely: "a room
+    // for X" needs no apostrophe.
+    default: return `${short} season — a room for ${name}`;
   }
 }
 
