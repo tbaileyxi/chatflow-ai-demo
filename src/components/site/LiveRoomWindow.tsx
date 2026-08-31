@@ -35,6 +35,7 @@ export default function LiveRoomWindow({
 }: { teamName: string; accent: string; ink: string }) {
   const [roomName, setRoomName] = useState<string | null>(null);
   const [members, setMembers] = useState<number | null>(null);
+  const [jump, setJump] = useState<string[]>([]);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [game, setGame] = useState<GameLine | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "empty">("loading");
@@ -70,7 +71,15 @@ export default function LiveRoomWindow({
       setRoomName(room.name);
       const { count } = await supabase
         .from("huddle_members").select("id", { count: "exact", head: true }).eq("huddle_id", room.id);
-      if (!cancelled) setMembers(count ?? 1);
+      if (!cancelled) setMembers(count ?? 0);
+
+      // The JUMP row is the point of the product — a person belongs to several
+      // rooms, not one. Hardcoding this account's own rooms both lied and
+      // implied rooms the visitor does not have.
+      const { data: others } = await supabase
+        .from("huddles").select("name").eq("is_private", false)
+        .neq("id", room.id).limit(3);
+      if (!cancelled) setJump((others ?? []).map((o: any) => o.name).filter(Boolean).slice(0, 3));
 
       const { data: rows } = await supabase
         .from("huddle_messages")
@@ -151,7 +160,7 @@ export default function LiveRoomWindow({
             {teamName.split(" ").map((w) => w[0]).join("").slice(0, 3)}
           </div>
           <div className="text-[14px] font-bold truncate flex-1">{roomName ?? `${teamName} Community`}</div>
-          <span className="text-[10px] text-white/45">👥 {members ?? 1}</span>
+          {members ? <span className="text-[10px] text-white/45">👥 {members}</span> : null}
           <div
             className="h-7 w-7 rounded-full grid place-items-center text-[12px] font-bold flex-none"
             style={{ background: "#F5C518", color: "#12100A" }}
@@ -179,7 +188,7 @@ export default function LiveRoomWindow({
         {/* jump row */}
         <div className="flex items-center gap-1.5 px-3 py-2 overflow-hidden border-b border-[#161620]">
           <span className="text-[9.5px] tracking-widest text-white/35 font-semibold flex-none">JUMP</span>
-          {["Mets", "Bills 12", "G tech"].map((r) => (
+          {jump.map((r) => (
             <span key={r} className="rounded-full bg-[#17171e] border border-[#25252f] px-2.5 py-1 text-[10.5px] text-white/60 flex-none">
               {r}
             </span>
@@ -189,7 +198,7 @@ export default function LiveRoomWindow({
         {/* action row */}
         <div className="flex items-center gap-2 px-3 py-2 border-b border-[#161620]">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          <span className="text-[10.5px] text-white/50">{members ?? 1}</span>
+          <span className="text-[10.5px] text-white/50">{members || ""}</span>
           <div className="ml-auto flex gap-1.5">
             <span className="rounded-full border border-[#2b2b35] px-2.5 py-1 text-[10.5px] text-white/70">⚔ Fade</span>
             <span className="rounded-full px-2.5 py-1 text-[10.5px] font-semibold" style={{ background: "#14351f", color: "#4ADE80" }}>
@@ -247,8 +256,18 @@ export default function LiveRoomWindow({
         </div>
       </div>
 
-      <p className="mt-3 text-center text-[11.5px] text-white/40">
+      {/* THE PAGE USED TO IMPLY ONE BIG ROOM.
+          It showed the community room and nothing else, so a visitor concluded
+          Side Huddle was a single crowded chat — which is both less appealing
+          than the truth and not what they find after installing. The product is
+          the room you start with five friends; this one is the front door. */}
+      <p className="mt-3 text-center text-[11.5px] text-white/45">
         Live from the {teamName} room. Not a mockup.
+      </p>
+      <p className="mt-1.5 text-center text-[12.5px] text-white/60 leading-snug max-w-[300px] mx-auto">
+        Anyone can walk into this one. The one that matters is the
+        {" "}<span className="text-white/85 font-semibold">one you start with your crew</span> —
+        same live game, just your people.
       </p>
     </div>
   );
