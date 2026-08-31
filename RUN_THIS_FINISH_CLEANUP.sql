@@ -41,7 +41,9 @@ update public.teams set name = 'Rebels' where id = 'f8d0b15e-aabe-4410-a395-e205
 -- Both feeds hold San José State at USC, 26-42, same kickoff. Keeping the odds
 -- row: markets hang off its id, so the ESPN twin is the disposable one. Skipped
 -- if anything references it.
-delete from public.games g
+create temp table usc_twin on commit drop as
+select g.id
+from public.games g
 where g.odds_game_id like 'espn-%'
   and g.sport_key = 'americanfootball_ncaaf'
   and g.start_time::date = date '2026-08-29'
@@ -52,9 +54,29 @@ where g.odds_game_id like 'espn-%'
       and o.home_team_id = g.home_team_id
       and o.away_team_id = g.away_team_id
       and o.start_time::date = g.start_time::date
-      and o.odds_game_id not like 'espn-%')
-  and not exists (
-    select 1 from public.huddle_messages m where m.game_id = g.id);
+      and o.odds_game_id not like 'espn-%');
+
+-- Spare it if anything points at it. Walks the real foreign keys rather than
+-- naming a column by hand — an earlier draft guarded on huddle_messages.game_id,
+-- which does not exist, and would have failed the whole script.
+do $$
+declare fk record;
+begin
+  for fk in
+    select c.conrelid::regclass as child_table, a.attname as child_column
+    from pg_constraint c
+    join lateral unnest(c.conkey) with ordinality k(attnum, ord) on true
+    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k.attnum
+    where c.contype = 'f' and c.confrelid = 'public.games'::regclass
+  loop
+    execute format(
+      'delete from usc_twin d where exists (select 1 from %s t where t.%I = d.id)',
+      fk.child_table, fk.child_column);
+  end loop;
+end;
+$$;
+
+delete from public.games g using usc_twin d where g.id = d.id;
 
 
 -- ── 4. what is left ──────────────────────────────────────────────────────────
