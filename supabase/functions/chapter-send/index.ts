@@ -239,7 +239,6 @@ function body(step: number, c: Chapter): string {
   const who = chapterRef(c);
   const org = c.org || "your team";
   const { short: orgShort } = orgNames(org);
-  const room = seedRoom(org);
   const code = (c.claim_code || "").trim();
 
   // GAME DAY FIRST. An earlier line read "somewhere to be between game days",
@@ -270,38 +269,46 @@ function body(step: number, c: Chapter): string {
 
   if (step === 2) {
     return shell(`
-      <p style="margin:0 0 18px 0;">Hi ${greeting(c)},</p>
-      <p style="margin:0 0 18px 0;">Quick follow-up — ${who} room is still unclaimed.</p>
-      <p style="margin:0 0 18px 0;">${hook(c, who)}</p>
-      <p style="margin:0 0 18px 0;">The part chapter admins tend to like: it grows without you working at it. Members bring friends, the ${orgShort} news shows up on its own, and you stop having to think up reasons to post.</p>
-      ${code ? codeBlock(code) : ""}
-      ${cta(`Get the app`, APP_STORE_URL)}
-      <p style="font-size:13px;color:#999;margin:0;">Free for chapters. If it's not for your group, say so and I'll leave you alone.</p>`);
+      <p style="margin:0 0 18px 0;">Hey ${greeting(c)},</p>
+      <p style="margin:0 0 18px 0;">Following up once — the ${orgShort} room for ${chapterRef(c)} is still open.</p>
+      <p style="margin:0 0 18px 0;">It runs itself. The score, the news and the clip everyone's passing around show up without anyone posting them, so it's somewhere to be on a Tuesday and not just Sunday.</p>
+      ${cta(`Get the app — free`, APP_STORE_URL)}
+      <p style="margin:0 0 18px 0;">Ty</p>
+      ${code ? `<p style="font-size:13.5px;color:#777;margin:0;border-top:1px solid #eee;padding-top:16px;">P.S. Your code is <b style="color:#111;letter-spacing:1px;">${code}</b> if you want the room under your chapter's name.</p>` : ""}`);
   }
 
   if (step === 3) {
     return shell(`
-      <p style="margin:0 0 18px 0;">Hi ${greeting(c)},</p>
-      <p style="margin:0 0 18px 0;">Last note from me — not trying to clutter your inbox.</p>
-      <p style="margin:0 0 18px 0;">Your code is below if you ever want it. It doesn't expire and nobody else can use it — it only opens ${who}.</p>
-      ${code ? codeBlock(code) : ""}
-      <p style="margin:0 0 18px 0;">Either way, good luck this season.</p>
-      ${cta(`Get the app`, APP_STORE_URL)}`);
+      <p style="margin:0 0 18px 0;">Hey ${greeting(c)},</p>
+      <p style="margin:0 0 18px 0;">Last one from me. If it's not for your group, no hard feelings — good luck this season either way.</p>
+      <p style="margin:0 0 18px 0;">The ${orgShort} room stays open if you ever want it.</p>
+      ${cta(`Get the app — free`, APP_STORE_URL)}
+      <p style="margin:0 0 18px 0;">Ty</p>
+      ${code ? `<p style="font-size:13.5px;color:#777;margin:0;border-top:1px solid #eee;padding-top:16px;">P.S. Code <b style="color:#111;letter-spacing:1px;">${code}</b>, ${chapterRef(c)} only. It doesn't expire.</p>` : ""}`);
   }
 
-  // SEASON-BOUND: "season is almost here" is only true from roughly July to
-  // kickoff. Read at Thanksgiving it tells them immediately that nobody wrote
-  // this to them.
+  // SIX LINES, AND ONE ASK.
+  //
+  // The long version explained the product to someone who had not agreed to
+  // hear about it yet, and it asked for two things at once: install the app AND
+  // enter a code. The code is what makes them the room's owner, so it read as a
+  // second job on top of the first. 258 sends, 9 clicks, 0 rooms.
+  //
+  // So: one button, and the code demoted to a P.S. where it is a bonus rather
+  // than a gate. Anyone who installs lands in the live team room either way, so
+  // nobody who ignores the P.S. hits an empty screen.
+  //
+  // The angle is theirs, not ours. A chapter president is not looking for a
+  // group chat — they are trying to get people to turn up, and to reach members
+  // between game days without a dead text thread. That is the job. The room is
+  // just how it gets done.
   return shell(`
-    <p style="margin:0 0 18px 0;">Hi ${greeting(c)},</p>
-    <p style="margin:0 0 18px 0;">${orgShort} season is almost here.</p>
-    <p style="margin:0 0 18px 0;">${hook(c, who)} They talk through every game together, their friends find the room and join, and you never have to write a post to keep it alive.</p>
-    <p style="margin:0 0 18px 0;">There's a room waiting under your chapter's name. Nobody else can take it.</p>
-    ${code ? codeBlock(code) : ""}
-    <p style="margin:0 0 18px 0;">Two steps: get the app, then enter that code. The room is built the moment you do, named for your chapter, with you as the owner.</p>
-    <p style="margin:0 0 18px 0;">The score, the ${orgShort} news and the clip everyone's passing around land in there on their own, so there's always a reason to open it — even on a Tuesday.</p>
-    ${cta(`Get the app`, APP_STORE_URL)}
-    <p style="font-size:13px;color:#999;margin:0;">Free for chapters. Your room is listed so your members can find it — you can lock it to invite-only any time. <a href="${room}" style="color:#999;">More about ${orgShort} rooms</a>.</p>`);
+    <p style="margin:0 0 18px 0;">Hey ${greeting(c)},</p>
+    <p style="margin:0 0 18px 0;">Getting people to actually show up is the whole job, and a group text doesn't do it.</p>
+    <p style="margin:0 0 18px 0;">There's a ${orgShort} room for ${chapterRef(c)} — everyone in one place, the score and the ${orgShort} news landing on their own, and when you post "${c.venue ? c.venue : "the bar"}, 1pm" people actually see it.</p>
+    ${cta(`Get the app — free`, APP_STORE_URL)}
+    <p style="margin:0 0 18px 0;">Ty</p>
+    ${code ? `<p style="font-size:13.5px;color:#777;margin:0;border-top:1px solid #eee;padding-top:16px;">P.S. Want it named for ${who} with you running it? Code <b style="color:#111;letter-spacing:1px;">${code}</b> at signup.</p>` : ""}`);
 }
 
 // Strip the HTML shell so a test run shows the words that will actually land in

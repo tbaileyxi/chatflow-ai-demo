@@ -29,6 +29,10 @@ import {
 import { composeRecap } from "../_shared/coach/answer.ts";
 
 
+// Claim failures used to be console-only, so a check constraint rejecting a new
+// kind looked exactly like "the model had nothing to say". Reported now.
+const CLAIM_FAILURES: string[] = [];
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -71,6 +75,8 @@ serve(async (req) => {
     postgame_candidates: 0,
     halftime_candidates: 0,
     daily_candidates: 0,
+    opener_candidates: 0,
+    claim_failures: CLAIM_FAILURES,
     queued: 0,
     ran: 0,
     posted: 0,
@@ -79,7 +85,7 @@ serve(async (req) => {
   };
 
   try {
-    const jobs: { huddleId: string; kind: "postgame" | "daily" | "halftime" }[] = [];
+    const jobs: { huddleId: string; kind: "postgame" | "daily" | "halftime" | "opener" }[] = [];
 
     if (force.huddle_id) {
       jobs.push({
@@ -90,6 +96,10 @@ serve(async (req) => {
       const halftime = await findHalftimeHuddles(supabase);
       summary.halftime_candidates = halftime.length;
       jobs.push(...halftime.map((h) => ({ huddleId: h, kind: "halftime" as const })));
+
+      const opener = await findOpenerHuddles(supabase);
+      summary.opener_candidates = opener.length;
+      jobs.push(...opener.map((h) => ({ huddleId: h, kind: "opener" as const })));
 
       const postgame = await findPostgameHuddles(supabase);
       summary.postgame_candidates = postgame.length;
@@ -116,7 +126,7 @@ serve(async (req) => {
     // at once. Halftime and postgame sort first: they are the time-sensitive
     // ones, and a daily wrap can wait for the next run.
     const BATCH = Number(Deno.env.get("RECAP_BATCH") || 4);
-    const order = { halftime: 0, postgame: 1, daily: 2 } as const;
+    const order = { opener: 0, halftime: 1, postgame: 2, daily: 3 } as const;
     const batch = [...jobs].sort((a, b) => order[a.kind] - order[b.kind]).slice(0, BATCH);
     summary.queued = jobs.length;
     summary.ran = batch.length;
@@ -145,6 +155,53 @@ serve(async (req) => {
 // ---------------------------------------------------------------------------
 
 /** Huddles whose team just had a game go final and haven't been recapped for it. */
+/**
+ * Rooms where someone is sitting alone with nothing to read.
+ *
+ * The empty room is the single biggest leak in the product: every channel we
+ * could ever buy or earn delivers people into it, and a blank screen sends them
+ * straight back out. This finds those rooms so the Coach can say the first
+ * thing.
+ *
+ * Deliberately narrow: a room the Coach has already opened is never opened
+ * again (coach_recap_log holds the claim), and a room that already has real
+ * conversation in it does not need an icebreaker.
+ */
+async function findOpenerHuddles(supabase: SupabaseClient): Promise<string[]> {
+  const { data: rooms } = await supabase
+    .from("huddles")
+    .select("id, team_id, created_at")
+    .not("team_id", "is", null)
+    .gte("created_at", new Date(Date.now() - 14 * 86400000).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(60);
+  if (!rooms?.length) return [];
+
+  const ids = rooms.map((r: any) => r.id);
+
+  // Already opened once.
+  const { data: done } = await supabase
+    .from("coach_recap_log")
+    .select("huddle_id")
+    .eq("kind", "opener")
+    .in("huddle_id", ids);
+  const opened = new Set((done ?? []).map((d: any) => d.huddle_id));
+
+  // Rooms that already have a human conversation do not need starting.
+  const { data: msgs } = await supabase
+    .from("huddle_messages")
+    .select("huddle_id, is_bot_message")
+    .in("huddle_id", ids)
+    .limit(2000);
+  const humanCount = new Map<string, number>();
+  for (const m of msgs ?? []) {
+    if (m.is_bot_message) continue;
+    humanCount.set(m.huddle_id, (humanCount.get(m.huddle_id) ?? 0) + 1);
+  }
+
+  return ids.filter((id) => !opened.has(id) && (humanCount.get(id) ?? 0) < 4);
+}
+
 async function findPostgameHuddles(supabase: SupabaseClient): Promise<string[]> {
   const windowStart = new Date(Date.now() - POSTGAME_WINDOW_MIN * 60 * 1000).toISOString();
   const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -304,7 +361,7 @@ async function recentlyRecapped(
 async function recapOne(
   supabase: SupabaseClient,
   huddleId: string,
-  kind: "postgame" | "daily" | "halftime",
+  kind: "postgame" | "daily" | "halftime" | "opener",
 ): Promise<boolean> {
   const ctx = await getHuddleContext(supabase, huddleId);
   if (!ctx) return false;
@@ -378,6 +435,7 @@ async function recapOne(
     .select("id")
     .single();
   if (claimErr || !claim) {
+    CLAIM_FAILURES.push(`claim failed (${kind}): ${claimErr?.message ?? "no row"}`);
     console.error("[coach-recap] could not claim recap slot, skipping", claimErr);
     return false;
   }
@@ -389,7 +447,10 @@ async function recapOne(
       user_id: systemUserId,
       content: clean,
       is_bot_message: true,
-      message_type: "coach_recap",
+      // An opener is the start of a conversation, not a summary of one. Posting
+      // it as a coach_answer is also what lets the reply rule pick it up: answer
+      // the Coach and you are talking to the Coach, no @ needed.
+      message_type: kind === "opener" ? "coach_answer" : "coach_recap",
     })
     .select("id")
     .single();
@@ -408,7 +469,7 @@ async function recapOne(
   // Postgame is genuinely push-worthy: the game ended, you weren't watching,
   // here is the whole thing in three lines. The daily one is not — it can wait
   // for the next app open.
-  if (kind === "postgame" || kind === "halftime") {
+  if (kind === "postgame" || kind === "halftime") {  // never "opener": they are already in the room
     await triggerPush(ctx.teamName ?? ctx.huddleName, [huddleId], clean.slice(0, 140));
   }
 

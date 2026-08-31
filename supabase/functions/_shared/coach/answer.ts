@@ -296,7 +296,19 @@ ANSWERING:
   candidates WITH their class and number, senior and junior first, because
   experience is what a fan is weighing. Two or three names, not the whole list.
   Say the staff has not declared one rather than implying you cannot find out.
-- Talk like you are texting the room, not writing a report. No headers, no bullet lists unless you are genuinely listing 3+ things.`;
+- Talk like you are texting the room, not writing a report. No headers, no bullet lists unless you are genuinely listing 3+ things.
+
+- HAND IT BACK. A search box answers and stops; a person says something and waits.
+  Often — not every time, or it turns into an interview — end by asking them
+  something real: what they saw, who they are worried about, whether they agree.
+  Ask about the thing you just said, never a generic "anything else?".
+
+- SHORT. Two or three sentences is a whole answer. Length is the tell that
+  something is generated: people do not write paragraphs in a group chat, and
+  the ones who do get scrolled past.
+
+- Never narrate yourself. No "let me look that up", no "based on the facts", no
+  "great question". Just say the thing.`;
 
   const user = `Asked by ${input.asker} in "${ctx.huddleName}":
 "${input.question}"
@@ -314,7 +326,7 @@ ${facts.join("\n\n")}`;
 
 export interface RecapInput {
   ctx: HuddleContext;
-  kind: "postgame" | "daily" | "halftime";
+  kind: "postgame" | "daily" | "halftime" | "opener";
   transcript: TranscriptLine[];
   gameBeats: GameBeat[];
   newsBeats: GameBeat[];
@@ -336,6 +348,56 @@ export interface RecapInput {
  */
 export async function composeRecap(input: RecapInput): Promise<string | null> {
   const { ctx } = input;
+
+  // THE FIRST MESSAGE IN AN EMPTY ROOM.
+  //
+  // Every other lane here summarises what happened. This one has nothing to
+  // summarise — it is what the room says to the one person who just walked in,
+  // before any friends arrive. That moment is where the product is won or lost:
+  // a social app with nobody in it is a blank screen, and a blank screen is why
+  // people uninstall on day one.
+  //
+  // So it opens with something specific and current about their team, and then
+  // asks them something, because a statement ends a conversation and a question
+  // starts one.
+  if (input.kind === "opener") {
+    const bits: string[] = [];
+    if (input.game) {
+      const g = input.game;
+      bits.push(
+        g.state === "postgame"
+          ? `Last game: ${g.away} ${g.awayScore ?? ""} at ${g.home} ${g.homeScore ?? ""}.`
+          : `Next up: ${g.away} at ${g.home}, ${new Date(g.startTime).toDateString()}.`,
+      );
+    }
+    if (input.record) bits.push(`Record: ${input.record.wins}-${input.record.losses}.`);
+    for (const n of input.newsBeats.slice(0, 4)) bits.push(`News: ${n.text}`);
+    if (input.statLines?.length) bits.push(input.statLines.join(" · "));
+    if (!bits.length) return null;
+
+    const openSystem = `You are the ${ctx.teamName ?? "team"} voice in a group chat called "${ctx.huddleName}".
+
+Someone just opened this room and they are the only one in it. Say the first thing.
+
+- Open with something SPECIFIC and current from the FACTS — a number, a name, a
+  fixture. Not "welcome", not "this is the room for X fans", not a description
+  of the app. They can see what the app is; they cannot see what you know.
+- Then ask them one real question about that thing.
+- Two or three sentences. You are a person texting, not an onboarding screen.
+- Say "we" and "us". You are on this team.
+- Never mention that they are alone, that the room is new, or that friends can
+  be invited. That is the app's job and it reads as desperate coming from you.
+- No greeting, no emoji, no markdown.`;
+
+    const openUser = `FACTS — the only things you may reference:\n${bits.join("\n")}`;
+    // The "answer" job, not "recap". Recap runs with thinking ON and a 4,000
+    // token budget shared between thinking and output, because it is
+    // synthesizing a whole game and a whole room. An opener is two sentences —
+    // on that job the model spent its budget reasoning and came back with no
+    // text at all, which surfaced as four rooms silently skipped.
+    const res = await callLlm({ job: "answer", system: openSystem, user: openUser });
+    return res.text?.trim() || null;
+  }
 
   const humanLines = input.transcript.filter((l) => !l.isBot);
   const hasGame = input.gameBeats.length > 0 ||
