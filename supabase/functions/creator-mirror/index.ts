@@ -109,7 +109,15 @@ serve(async (req) => {
     let next: string | undefined;
 
     // Three pages is enough to rank a fanbase and keeps the read budget small.
-    for (let page = 0; page < (body.discover.pages ?? 5); page++) {
+    // TWO pages by default, four maximum.
+    //
+    // Each page is 100 post reads. A five-page run across six schools is 3,000
+    // reads, which is how the account's credits went from working to 402 in a
+    // single afternoon — taking the clip puller down with it, because everything
+    // shares one key. Discovery is a deliberate act, not something to run while
+    // thinking out loud.
+    const maxPages = Math.min(body.discover.pages ?? 2, 4);
+    for (let page = 0; page < maxPages; page++) {
       const qs = new URLSearchParams({
         // Quote tweets stay. Excluding them cut out most of how creators actually
         // post — DaBearsBlog's best material is quote tweets, and the first run of
@@ -313,6 +321,7 @@ serve(async (req) => {
     skipped_reply_or_repost: 0,
     skipped_low: 0,
     errors: [] as string[],
+    halted: null as string | null,
     preview: [] as string[],
     candidates_kept: 0 as number | undefined,
     skipped_promo: 0 as number | undefined,
@@ -346,6 +355,13 @@ serve(async (req) => {
       });
       if (!sr.ok) {
         summary.errors.push(`${room.x_handle}: search ${sr.status}`);
+        // 402 means the account is out of API credits, and every room after this
+        // one will get the same answer. The cron runs every fifteen minutes;
+        // without this it would make one doomed request per wired room, forever.
+        if (sr.status === 402 || sr.status === 429) {
+          summary.halted = `X API returned ${sr.status} — stopping this run`;
+          break;
+        }
         continue;
       }
       const sj = await sr.json();
