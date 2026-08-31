@@ -37,6 +37,8 @@ import { STORE_CAMPAIGN } from '@/lib/appStore';
  */
 
 
+import LiveRoomWindow from '@/components/site/LiveRoomWindow';
+
 export default function TeamLanding() {
   const { slug = '' } = useParams();
   const team = TEAMS[slug.toLowerCase()];
@@ -78,6 +80,15 @@ export default function TeamLanding() {
         <p className="text-white/70 text-lg leading-snug max-w-md mx-auto mb-8">
           {SUBTAGLINE}
         </p>
+
+        {/* THE ROOM ITSELF, ABOVE THE DOWNLOAD BUTTON.
+            Every link this product has ever handed a stranger pointed at the
+            App Store — screenshots, asking for an install before showing
+            anything. This shows the thing running first: real messages, real
+            score, moving while they watch. The button comes after. */}
+        <div className="mb-10">
+          <LiveRoomWindow teamName={name} accent={accent} ink={ink} />
+        </div>
 
         <StoreButton large campaign={STORE_CAMPAIGN.chapterOutreach} />
         <p className="text-white/35 text-xs mt-4">
