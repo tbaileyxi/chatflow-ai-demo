@@ -50,7 +50,7 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   );
 
-  let body: { handle?: string; huddle_id?: string; probe_lists?: string; list_members?: string; dry?: boolean; probe_search?: string; lookback_hours?: number; gap_minutes?: number; set_handle?: { huddle_id: string; handle: string }; purge_room?: string } = {};
+  let body: { handle?: string; huddle_id?: string; probe_lists?: string; list_members?: string; dry?: boolean; probe_search?: string; lookback_hours?: number; gap_minutes?: number; discover?: { query: string; hours?: number; min_followers?: number; max_followers?: number }; set_handle?: { huddle_id: string; handle: string }; purge_room?: string } = {};
   try { body = await req.json(); } catch { /* no body is the normal case */ }
 
   // ── Probe: can this API tier read Lists? ──────────────────────────────────
@@ -89,6 +89,71 @@ serve(async (req) => {
       out.error = (err as Error).message;
     }
     return json(out);
+  }
+
+  // ── Who is actually posting about this team ───────────────────────────────
+  //
+  // The list problem, solved from live data instead of who you happen to follow.
+  // Search the fanbase's terms, see who shows up, rank by the engagement they
+  // earn rather than by follower count — a 9k account whose takes get 300 likes
+  // is a better room owner than a 200k account nobody replies to.
+  if (body.discover) {
+    const token = Deno.env.get("X_API_BEARER_TOKEN");
+    if (!token) return json({ error: "X_API_BEARER_TOKEN not set" }, 500);
+
+    const hours = body.discover.hours ?? 48;
+    const minF = body.discover.min_followers ?? 1000;
+    const maxF = body.discover.max_followers ?? 250000;
+
+    const authors = new Map<string, { handle: string; name: string; followers: number; posts: number; likes: number; best: string; bestLikes: number }>();
+    let next: string | undefined;
+
+    // Three pages is enough to rank a fanbase and keeps the read budget small.
+    for (let page = 0; page < 3; page++) {
+      const qs = new URLSearchParams({
+        query: `(${body.discover.query}) -is:reply -is:retweet -is:quote lang:en`,
+        max_results: "100",
+        "tweet.fields": "public_metrics,created_at",
+        expansions: "author_id",
+        "user.fields": "username,name,public_metrics",
+        start_time: new Date(Date.now() - hours * 3600 * 1000).toISOString(),
+      });
+      if (next) qs.set("next_token", next);
+
+      const r = await fetch(`https://api.x.com/2/tweets/search/recent?${qs}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) return json({ status: r.status, body: (await r.text()).slice(0, 300) });
+      const j = await r.json();
+
+      const users = new Map<string, any>();
+      for (const u of j?.includes?.users ?? []) users.set(u.id, u);
+
+      for (const d of j?.data ?? []) {
+        const u = users.get(d.author_id);
+        if (!u) continue;
+        const f = u?.public_metrics?.followers_count ?? 0;
+        if (f < minF || f > maxF) continue;
+        const likes = d?.public_metrics?.like_count ?? 0;
+        const cur = authors.get(u.username) ?? { handle: u.username, name: u.name, followers: f, posts: 0, likes: 0, best: "", bestLikes: -1 };
+        cur.posts += 1;
+        cur.likes += likes;
+        // Keep their best line. Reading one real post tells you more about
+        // whether someone belongs in a room than any follower count does.
+        if (likes > cur.bestLikes) { cur.bestLikes = likes; cur.best = (d.text ?? "").slice(0, 120); }
+        authors.set(u.username, cur);
+      }
+      next = j?.meta?.next_token;
+      if (!next) break;
+    }
+
+    const ranked = [...authors.values()]
+      .filter((a) => a.posts >= 2)                       // one viral post is luck
+      .map((a) => ({ ...a, avg: Math.round(a.likes / a.posts) }))
+      .sort((a, b) => b.likes - a.likes)
+      .slice(0, 30);
+
+    return json({ query: body.discover.query, hours, found: ranked.length, creators: ranked });
   }
 
   // ── Clear mirrored posts from a room ──────────────────────────────────────
