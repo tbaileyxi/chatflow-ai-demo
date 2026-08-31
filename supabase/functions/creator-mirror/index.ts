@@ -18,7 +18,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { fetchPosts, postIdFromUrl } from "../_shared/x/media.ts";
+import { fetchPostMedia, fetchPosts, postIdFromUrl } from "../_shared/x/media.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,7 +50,7 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   );
 
-  let body: { handle?: string; huddle_id?: string; probe_lists?: string; list_members?: string; dry?: boolean; probe_search?: string; lookback_hours?: number; gap_minutes?: number; discover?: { query: string; hours?: number; min_followers?: number; max_followers?: number; pages?: number; sport?: string; save?: boolean; org?: string }; set_handle?: { huddle_id: string; handle: string }; purge_room?: string } = {};
+  let body: { handle?: string; huddle_id?: string; probe_lists?: string; probe_media?: string; seed?: any[]; list_members?: string; dry?: boolean; probe_search?: string; lookback_hours?: number; gap_minutes?: number; discover?: { query: string; hours?: number; min_followers?: number; max_followers?: number; pages?: number; sport?: string; save?: boolean; org?: string }; set_handle?: { huddle_id: string; handle: string }; purge_room?: string } = {};
   try { body = await req.json(); } catch { /* no body is the normal case */ }
 
   // ── Probe: can this API tier read Lists? ──────────────────────────────────
@@ -241,6 +241,30 @@ serve(async (req) => {
     return json({ ok: true, deleted, kept_because_replied_to: keep.size });
   }
 
+  // ── Seed rows we already have ───────────────────────────────────────────
+  // A discovery run's results outlive the API credits that produced them.
+  // Writing them straight in costs no X reads at all, which is the difference
+  // between having a list to work today and waiting on a top-up.
+  if (body.seed) {
+    let saved = 0;
+    for (const c of body.seed) {
+      const { error } = await supabase.from("creator_leads").upsert({
+        handle: c.handle,
+        display_name: c.name ?? null,
+        org: c.org ?? null,
+        followers: c.followers ?? 0,
+        posts_seen: c.posts ?? 0,
+        likes_seen: c.likes ?? 0,
+        avg_likes: c.avg ?? 0,
+        best_post: c.best ?? null,
+        last_seen: new Date().toISOString(),
+      }, { onConflict: "handle" });
+      if (error) return json({ error: error.message }, 500);
+      saved++;
+    }
+    return json({ ok: true, saved });
+  }
+
   // ── Wire a room to a handle ───────────────────────────────────────────────
   if (body.set_handle) {
     const h = body.set_handle.handle.replace(/^@/, "");
@@ -271,6 +295,16 @@ serve(async (req) => {
       posts: (j?.data ?? []).map((d: any) => ({
         id: d.id, likes: d?.public_metrics?.like_count ?? 0, text: d.text.slice(0, 90),
       })),
+    });
+  }
+
+  // Does a post still resolve to playable media with the X API dead?
+  if (body.probe_media) {
+    const rows = await fetchPostMedia([body.probe_media]);
+    return json({
+      id: body.probe_media,
+      found: rows.length,
+      media: rows.map((r) => ({ type: r.type, handle: r.authorHandle, likes: r.likes, video: r.videoUrl?.slice(0, 70) ?? null, image: r.imageUrl.slice(0, 70) })),
     });
   }
 

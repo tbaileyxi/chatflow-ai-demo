@@ -18,6 +18,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { searchX } from "../_shared/coach/xsearch.ts";
+import { sportFor, sportScopeLine } from "../_shared/sport.ts";
 import { fetchPostMedia, pickBest, postIdFromUrl } from "../_shared/x/media.ts";
 
 const corsHeaders = {
@@ -44,6 +45,20 @@ async function liveGameFor(
     .in("status", ["in_progress", "halftime"])
     .limit(1);
   return (data && data[0]) ? data[0] as any : null;
+}
+
+/**
+ * Which team at the school.
+ *
+ * A Tulane FOOTBALL room was handed a clip from @GreenWaveVB — the volleyball
+ * account. A university fields twenty teams and they all post under the same
+ * name, so "find a Tulane Green Wave post" is answered honestly and wrongly.
+ *
+ * This does not stop the school's own account posting about volleyball; nothing
+ * can. It stops us going looking for it.
+ */
+function sportScope(team: { name: string; league?: string | null }): string {
+  return sportScopeLine(team.name, sportFor(team.league ?? null));
 }
 
 serve(async (req) => {
@@ -264,6 +279,7 @@ serve(async (req) => {
       // tomorrow, the moment will not.
       const search = live
         ? await searchX(
+            `${sportScope(team)}\n\n` +
             `Find a ${team.name} post from the LAST ${IN_GAME_EVERY_MIN + 8} MINUTES ` +
               `showing something that just happened in the game they are playing ` +
               `right now, with a video or photo.\n\n` +
@@ -277,6 +293,7 @@ serve(async (req) => {
               `worth showing, return nothing at all — silence is correct here.`,
           )
         : await searchX(
+        `${sportScope(team)}\n\n` +
         `Find the ${team.name} post from the last 24 hours that fans are actually ` +
           `talking about, and that includes a photo or video.\n\n` +
           `Rank candidates in this order:\n` +
@@ -310,6 +327,7 @@ serve(async (req) => {
       // the clutter the short lookback exists to avoid.
       if (ids.length === 0 && !live) {
         const wider = await searchX(
+          `${sportScope(team)}\n\n` +
           `Show me the best photo or video posted about the ${team.name} in the last 2 days — ` +
             `a highlight, a funny or memorable clip, training camp, practice, players, ` +
             `the facility, fans, or uniforms. Prefer whatever got the most genuine ` +
