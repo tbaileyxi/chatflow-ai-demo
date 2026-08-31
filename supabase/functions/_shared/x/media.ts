@@ -42,6 +42,85 @@ function bestMp4(variants: any[] | undefined): string | null {
   return mp4s[0].url;
 }
 
+
+/**
+ * The keyless route to a public post.
+ *
+ * Everything here reads through one X API key, and when that account ran out of
+ * credits every endpoint began answering 402 — taking the clip puller down with
+ * it. Clips are the most valuable thing the bot does, and they died for a reason
+ * that has nothing to do with whether the clip exists.
+ *
+ * fxtwitter serves the same public post — author, text, likes, direct mp4 — with
+ * no key and no credits. It is community-run rather than official, so it is a
+ * FALLBACK: the X API is tried first and this catches the failure. If it ever
+ * disappears, clips stop again. That is the honest cost of not paying for the
+ * official read.
+ *
+ * One request per post rather than a batch of 100, so it is slower. Capped.
+ */
+const FX_MAX = 8;
+
+async function fetchViaFx(postIds: string[]): Promise<any[]> {
+  const out: any[] = [];
+  for (const id of postIds.slice(0, FX_MAX)) {
+    try {
+      const res = await fetch(`https://api.fxtwitter.com/status/${id}`, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+      });
+      if (!res.ok) continue;
+      const j = await res.json();
+      if (j?.tweet) out.push(j.tweet);
+    } catch { /* one dead post must not stop the rest */ }
+  }
+  return out;
+}
+
+function fxToMedia(tw: any): XMedia[] {
+  const handle = tw?.author?.screen_name ?? null;
+  const url = tw?.url ?? (handle ? `https://x.com/${handle}/status/${tw.id}` : "");
+  const rows: XMedia[] = [];
+  const vids = tw?.media?.videos ?? [];
+  const pics = tw?.media?.photos ?? [];
+  vids.forEach((v: any, i: number) => {
+    if (!v?.url) return;
+    rows.push({
+      postId: String(tw.id), authorHandle: handle, text: tw.text ?? "",
+      likes: tw.likes ?? 0, type: "video", index: i,
+      imageUrl: v.thumbnail_url ?? "", videoUrl: v.url, url,
+    });
+  });
+  pics.forEach((ph: any, i: number) => {
+    if (!ph?.url) return;
+    rows.push({
+      postId: String(tw.id), authorHandle: handle, text: tw.text ?? "",
+      likes: tw.likes ?? 0, type: "photo", index: vids.length + i,
+      imageUrl: ph.url, videoUrl: null, url,
+    });
+  });
+  return rows;
+}
+
+function fxToPost(tw: any): XPost {
+  const handle = tw?.author?.screen_name ?? null;
+  const vid = (tw?.media?.videos ?? [])[0];
+  const pic = (tw?.media?.photos ?? [])[0];
+  return {
+    postId: String(tw.id),
+    authorHandle: handle,
+    text: tw.text ?? "",
+    likes: tw.likes ?? 0,
+    replies: tw.replies ?? 0,
+    isReply: Boolean(tw.replying_to),
+    isRepost: false,
+    quotedId: tw?.quote?.id ? String(tw.quote.id) : null,
+    createdAt: tw?.created_at ?? null,
+    imageUrl: vid?.thumbnail_url ?? pic?.url ?? null,
+    videoUrl: vid?.url ?? null,
+    url: tw?.url ?? (handle ? `https://x.com/${handle}/status/${tw.id}` : ""),
+  };
+}
+
 export async function fetchPostMedia(postIds: string[]): Promise<XMedia[]> {
   const token = Deno.env.get("X_API_BEARER_TOKEN");
   if (!token || postIds.length === 0) return [];
@@ -63,13 +142,13 @@ export async function fetchPostMedia(postIds: string[]): Promise<XMedia[]> {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
-      console.error(`[x-media] ${res.status} ${(await res.text()).slice(0, 200)}`);
-      return [];
+      console.error(`[x-media] ${res.status} — falling back to fxtwitter`);
+      return (await fetchViaFx(ids)).flatMap(fxToMedia);
     }
     json = await res.json();
   } catch (err) {
-    console.error("[x-media] fetch failed", err);
-    return [];
+    console.error("[x-media] fetch failed, falling back", err);
+    return (await fetchViaFx(ids)).flatMap(fxToMedia);
   }
 
   const mediaByKey = new Map<string, any>();
@@ -197,13 +276,13 @@ export async function fetchPosts(postIds: string[]): Promise<XPost[]> {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
-      console.error(`[x-posts] ${res.status} ${(await res.text()).slice(0, 200)}`);
-      return [];
+      console.error(`[x-posts] ${res.status} — falling back to fxtwitter`);
+      return (await fetchViaFx(ids)).map(fxToPost);
     }
     json = await res.json();
   } catch (err) {
-    console.error("[x-posts] fetch failed", err);
-    return [];
+    console.error("[x-posts] fetch failed, falling back", err);
+    return (await fetchViaFx(ids)).map(fxToPost);
   }
 
   const mediaByKey = new Map<string, any>();
