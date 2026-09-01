@@ -125,11 +125,93 @@ function landscape(u: string | null): string | null {
   return u.includes("/og-teams/") ? u.replace("-room.png", "-card.png") : u;
 }
 
+
+/**
+ * The same facts the page shows, written out for a crawler.
+ *
+ * NOT CLOAKING, and the distinction is the whole design. /t/<slug> renders the
+ * live room, the scoreboard and the next fixture to a person; a crawler was
+ * getting a title and one sentence. This gives it the same information in plain
+ * HTML — different presentation, identical facts. Serving a crawler things a
+ * visitor cannot see is what gets a domain penalised, so nothing goes in here
+ * that is not on the page.
+ *
+ * It is also the reason this is worth doing at all: the content changes every
+ * game, so the page has a reason to be recrawled instead of sitting static
+ * forever.
+ */
+async function teamBody(
+  supabase: ReturnType<typeof createClient>,
+  label: string,
+): Promise<{ html: string; extra: string }> {
+  const bits: string[] = [];
+  const facts: string[] = [];
+  try {
+    const { data: teams } = await supabase
+      .from("teams").select("id, name, city").eq("status", "active").limit(600);
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const want = norm(label);
+    const team = (teams ?? []).find((x: any) => {
+      const k = norm(`${x.city ?? ""}${x.name ?? ""}`);
+      return k === want || k.includes(want) || want.includes(k);
+    });
+    if (!team) return { html: "", extra: "" };
+
+    const cols = "status, start_time, home_score, away_score, home:teams!games_home_team_id_fkey(name), away:teams!games_away_team_id_fkey(name)";
+    const mine = `home_team_id.eq.${team.id},away_team_id.eq.${team.id}`;
+
+    const { data: next } = await supabase.from("games").select(cols).or(mine)
+      .eq("status", "scheduled").gt("start_time", new Date().toISOString())
+      .order("start_time", { ascending: true }).limit(1);
+    const { data: last } = await supabase.from("games").select(cols).or(mine)
+      .eq("status", "final").order("start_time", { ascending: false }).limit(1);
+
+    const n: any = next?.[0];
+    if (n) {
+      const when = new Date(n.start_time).toLocaleDateString("en-US",
+        { weekday: "long", month: "long", day: "numeric" });
+      const line = `Next up: ${n.away?.name} at ${n.home?.name}, ${when}.`;
+      bits.push(`<p>${esc(line)}</p>`); facts.push(line);
+    }
+    const l: any = last?.[0];
+    if (l) {
+      const line = `Last result: ${l.away?.name} ${l.away_score ?? ""} at ${l.home?.name} ${l.home_score ?? ""}.`;
+      bits.push(`<p>${esc(line)}</p>`); facts.push(line);
+    }
+
+    // A few lines from the public room — the thing the page actually shows.
+    const { data: rooms } = await supabase
+      .from("huddles").select("id, name").eq("team_id", team.id)
+      .eq("is_private", false)
+      .order("is_official_team_huddle", { ascending: false }).limit(1);
+    const room: any = rooms?.[0];
+    if (room) {
+      const { data: msgs } = await supabase
+        .from("huddle_messages").select("content")
+        .eq("huddle_id", room.id).eq("is_bot_message", true)
+        .order("created_at", { ascending: false }).limit(5);
+      const lines = (msgs ?? []).map((m: any) => (m.content ?? "").trim())
+        .filter(Boolean).slice(0, 5);
+      if (lines.length) {
+        bits.push(`<h2>${esc(`From the ${room.name} room`)}</h2>`);
+        bits.push("<ul>" + lines.map((x: string) => `<li>${esc(x.slice(0, 200))}</li>`).join("") + "</ul>");
+      }
+    }
+  } catch (err) {
+    console.warn("[og-preview] team body skipped", err);
+  }
+  return { html: bits.join("\n"), extra: facts.join(" ") };
+}
+
 function page(o: {
   title: string;
   description: string;
   image: string;
   canonical: string;
+  /** Real content for the crawler — the same facts the app page shows. */
+  body?: string;
+  /** Fresh content wants a short cache; a static card does not. */
+  maxAge?: number;
 }): Response {
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -159,6 +241,7 @@ function page(o: {
 <img src="${esc(o.image)}" alt="${esc(o.title)}" style="width:100%;border-radius:12px;">
 <h1>${esc(o.title)}</h1>
 <p>${esc(o.description)}</p>
+${o.body ?? ""}
 <p><a href="${esc(o.canonical)}">Open in Side Huddle</a></p>
 </body>
 </html>`;
@@ -167,7 +250,10 @@ function page(o: {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       // Crawlers re-fetch aggressively and a room's name rarely changes.
-      "Cache-Control": "public, max-age=300, s-maxage=3600",
+      // A page carrying live room content goes stale in minutes; a static card
+      // does not. Serving both on an hour's cache told crawlers the fresh pages
+      // never change, which is the opposite of what makes them worth recrawling.
+      "Cache-Control": `public, max-age=${o.maxAge ?? 300}, s-maxage=${o.maxAge ?? 3600}`,
       "Access-Control-Allow-Origin": "*",
     },
   });
@@ -285,11 +371,22 @@ Deno.serve(async (req) => {
           .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
           .join(" ");
 
+      const extra = await teamBody(supabase, label);
+
       return page({
-        title: `${label} · Side Huddle`,
-        description: `Talk through the game with other ${label} fans. The score, the news and the clips land while you argue over them.`,
+        // What people search is "browns game chat", not the brand. The team and
+        // the words for the thing come first; the brand goes last.
+        title: `${label} game chat — live room · Side Huddle`,
+        // The fixture lives in the BODY, not here as well. Putting it in both
+        // printed it twice in a row on the rendered page, which reads as
+        // stuffing to a reader and to Google.
+        description: `${label} fans in one room, talking through the game. The score, the news and the clips land while you argue over them.`,
         image: `${SITE}/og-teams/${TEAM_NAMES[teamSlug] ? teamSlug : "default"}-card.png`,
         canonical: `${SITE}/t/${teamSlug}`,
+        body: extra.html,
+        // Five minutes. The room content underneath changes every game, and an
+        // hour's cache tells a crawler the page is static.
+        maxAge: 300,
       });
     }
 
