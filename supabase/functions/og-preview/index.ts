@@ -108,6 +108,23 @@ const esc = (s: string) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+/**
+ * A link preview is LANDSCAPE. A room background is not.
+ *
+ * huddles.photo_url holds the room's chat background, generated at 828x1792 —
+ * phone-wallpaper shape. Feeding that to og:image made every shared room and
+ * clip arrive as an extremely tall strip, which is what a broken link looks
+ * like to whoever receives one.
+ *
+ * The same artwork exists at 1200x630 as `-card.png`, the ratio every platform
+ * wants. A photo an owner uploaded themselves is left alone — it is theirs, and
+ * cropping is the client's job.
+ */
+function landscape(u: string | null): string | null {
+  if (!u) return null;
+  return u.includes("/og-teams/") ? u.replace("-room.png", "-card.png") : u;
+}
+
 function page(o: {
   title: string;
   description: string;
@@ -211,6 +228,32 @@ Deno.serve(async (req) => {
 
       if (!room) return page(fallback);
 
+      // SHOW WHAT WAS SHARED, not the room it came from.
+      //
+      // Every share pointed at /h/<room>, so a clip, a take and a joke all
+      // previewed as the same room background. One query parameter fixes it
+      // without a new page: ?m=<messageId> swaps the image and the description
+      // for that message's own. The link still opens the room, so nothing
+      // about the destination changes.
+      const sharedId = url.searchParams.get("m");
+      let sharedImage: string | null = null;
+      let sharedText: string | null = null;
+      if (sharedId) {
+        const { data: msg } = await supabase
+          .from("huddle_messages")
+          .select("content, media_url, media_type")
+          .eq("id", sharedId)
+          .maybeSingle();
+        if (msg) {
+          sharedText = ((msg as any).content ?? "").trim().slice(0, 180) || null;
+          // A video frame is not fetchable as an image, so a clip keeps the
+          // room card rather than previewing as a broken image.
+          if ((msg as any).media_type === "image" && (msg as any).media_url) {
+            sharedImage = sameOrigin((msg as any).media_url);
+          }
+        }
+      }
+
       const team = (room as any).teams?.name as string | undefined;
       const members = (room as any).member_count as number | null;
       const crowd =
@@ -220,13 +263,14 @@ Deno.serve(async (req) => {
 
       return page({
         title: `${room.name} · Side Huddle`,
-        description: team
-          ? `A ${team} room. Talk through the game with the people in it.${crowd}`
-          : `Talk through the game with the people in it.${crowd}`,
+        description: sharedText
+          ?? (team
+            ? `A ${team} room. Talk through the game with the people in it.${crowd}`
+            : `Talk through the game with the people in it.${crowd}`),
         // The room's own photo when it has one — a picture of their bar beats
         // any card we could generate, and it is why the photo shipped first.
         // Their own photo when they have set one; otherwise their team's card.
-        image: sameOrigin((room as any).photo_url) || teamCardImage(team),
+        image: sharedImage || landscape(sameOrigin((room as any).photo_url)) || teamCardImage(team),
         // Point at the link that was actually shared, so the preview and the
         // destination agree.
         canonical: inviteCode ? `${SITE}/i/${inviteCode}` : `${SITE}/h/${resolvedRoom}`,
