@@ -25,6 +25,7 @@ import { HuddleSearchScreen } from "@/screens/huddle-search/HuddleSearchScreen";
 import { JoinHuddleScreen } from "@/screens/join-huddle/JoinHuddleScreen";
 import { CreateSideHuddleScreen } from "@/screens/create-side-huddle/CreateSideHuddleScreen";
 import { FAQScreen } from "@/screens/faq/FAQScreen";
+import PublicProfileScreen from "@/screens/public-profile/PublicProfileScreen";
 import type { RootStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -96,6 +97,11 @@ export function RootNavigator() {
       ) : (
         <>
           <Stack.Screen name="MainTabs" component={TabNavigator} />
+          <Stack.Screen
+            name="PublicProfile"
+            component={PublicProfileScreen}
+            options={{ animation: "slide_from_right" }}
+          />
           <Stack.Screen
             name="Huddle"
             component={HuddleScreen}

@@ -35,14 +35,32 @@ export function useKnownPeople() {
         console.warn("[friends] known_people failed", error);
         return [];
       }
-      return ((data ?? []) as any[]).map((r) => ({
-        userId: r.user_id,
-        displayName: r.display_name ?? null,
-        username: r.username ?? null,
-        avatarUrl: r.avatar_url ?? null,
-        source: r.source ?? null,
-        connectedAt: r.connected_at ?? null,
-      }));
+      const rows = (data ?? []) as any[];
+      if (rows.length === 0) return [];
+
+      // known_people() cannot tell a person from an abandoned signup: the
+      // trigger that creates a profile names it "User", and onboarding renames
+      // it at the end. Someone who quit halfway is a row in the table and
+      // nobody in the app — showing them gives you a friend called "User" that
+      // you cannot identify because there is nothing there to identify.
+      const { data: live } = await supabase
+        .from("profiles")
+        .select("user_id, onboarding_completed")
+        .in("user_id", rows.map((r) => r.user_id));
+      const finished = new Set(
+        (live ?? []).filter((p: any) => p.onboarding_completed).map((p: any) => p.user_id),
+      );
+
+      return rows
+        .filter((r) => finished.has(r.user_id))
+        .map((r) => ({
+          userId: r.user_id,
+          displayName: r.display_name ?? null,
+          username: r.username ?? null,
+          avatarUrl: r.avatar_url ?? null,
+          source: r.source ?? null,
+          connectedAt: r.connected_at ?? null,
+        }));
     },
   });
 }

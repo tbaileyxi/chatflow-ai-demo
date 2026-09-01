@@ -26,6 +26,8 @@ import { useProfile } from "@/hooks/useProfile";
 import { useInAppNotifications } from "@/hooks/useInAppNotifications";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { useKnownPeople } from "@/hooks/useFriends";
+import { useAutoContactMatch } from "@/hooks/useAutoContactMatch";
+import { useContactMatch } from "@/hooks/useContactMatch";
 import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { colors } from "@/theme/colors";
 
@@ -106,6 +108,11 @@ function FriendsNowSection() {
 
   const anyLive = roster.some((p) => p.isLive);
 
+  // People from your contacts who are here but not in your list yet. The sweep
+  // runs itself once a day; this is only the result of it.
+  const { newPeople, forget } = useAutoContactMatch();
+  const { connect } = useContactMatch();
+
   // Cap the collapsed list. The roster is unbounded — at 5+ friends it pushed
   // Your Rooms off the screen entirely, which is the wrong trade: the roster is
   // reference, your rooms are the thing you came to open.
@@ -136,15 +143,62 @@ function FriendsNowSection() {
         </Pressable>
       </View>
 
+      {newPeople.length > 0 ? (
+        <View className="mb-4 gap-2">
+          <Text className="text-xs font-black uppercase tracking-widest text-primary">
+            {newPeople.length === 1
+              ? "Someone you know is here"
+              : `${newPeople.length} people you know are here`}
+          </Text>
+          {newPeople.slice(0, 5).map((m) => {
+            // Their Side Huddle name can be anything, or "User". What you have
+            // them saved as in your own phone is the name that identifies them.
+            const label = m.contactName ?? m.displayName ?? "Someone";
+            return (
+              <View
+                key={m.userId}
+                className="flex-row items-center gap-3 rounded-2xl border border-primary/40 bg-card p-3"
+              >
+                {m.avatarUrl ? (
+                  <Image source={{ uri: m.avatarUrl }} className="h-9 w-9 rounded-full" />
+                ) : (
+                  <MonogramAvatar name={label} size={36} />
+                )}
+                <View className="flex-1">
+                  <Text className="text-base font-black text-foreground" numberOfLines={1}>
+                    {label}
+                  </Text>
+                  <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+                    From your contacts
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={async () => {
+                    await connect(m.userId);
+                    forget(m.userId);
+                  }}
+                  hitSlop={8}
+                  className="rounded-full bg-primary px-4 py-1.5 active:opacity-80"
+                >
+                  <Text className="text-xs font-black text-primary-foreground">Add</Text>
+                </Pressable>
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+
       {roster.length > 0 ? (
         <View className="gap-2">
           {visible.map((f) => (
             <Pressable
               key={f.userId}
-              disabled={!f.isLive}
+              // Every row taps through now. Offline rows used to be disabled
+              // outright, so a name you did not recognise — and "User" is what
+              // the database calls anyone who never finished onboarding — was a
+              // dead end with no way to find out who it was.
               onPress={() =>
-                f.huddleId &&
-                navigation.navigate("Huddle", { huddleId: f.huddleId })
+                navigation.navigate("PublicProfile", { userId: f.userId, knownAs: f.name })
               }
               className={`flex-row items-center gap-3 rounded-2xl border border-border bg-card p-3 ${
                 f.isLive ? "active:opacity-80" : ""
@@ -170,8 +224,16 @@ function FriendsNowSection() {
                   {f.isLive ? `in ${f.huddleName ?? "a huddle"}` : "not watching"}
                 </Text>
               </View>
-              {f.isLive ? (
-                <Text className="text-xs font-black text-primary">Jump in →</Text>
+              {f.isLive && f.huddleId ? (
+                <Pressable
+                  onPress={() =>
+                    navigation.navigate("Huddle", { huddleId: f.huddleId! })
+                  }
+                  hitSlop={10}
+                  className="active:opacity-70"
+                >
+                  <Text className="text-xs font-black text-primary">Jump in →</Text>
+                </Pressable>
               ) : null}
             </Pressable>
           ))}

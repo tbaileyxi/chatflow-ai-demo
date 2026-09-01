@@ -38,6 +38,7 @@ export type RootStackParamList = {
   FAQ: undefined;
   Sponsor: undefined;
   MessagePost: { id: string };
+  PublicProfile: { userId: string; knownAs?: string };
 };
 
 // Type helper for useNavigation

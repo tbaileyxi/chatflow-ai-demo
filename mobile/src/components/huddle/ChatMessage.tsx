@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback } from "react";
 import { View, Text, Image, Pressable, Share, Modal, Dimensions, Linking } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { MessageSquareReply, Share2, X, Play, Pause, Mic } from "lucide-react-native";
 import { Audio, Video, ResizeMode } from "expo-av";
 import { cn } from "@/lib/utils";
@@ -227,6 +228,7 @@ export function ChatMessage({
         ? "@coach"
       : message.displayName ?? message.username ?? "User";
   const initial = message.isBotMessage ? "SH" : displayName.charAt(0).toUpperCase();
+  const navigation = useNavigation<any>();
 
   const handleDoubleTap = () => {
     const now = Date.now();
@@ -320,7 +322,17 @@ export function ChatMessage({
             {isGroupedWithPrev ? (
               <View className="h-0 w-9" />
             ) : (
-              <View
+              // Tapping whoever said it opens their profile. The name above a
+              // message was the only place you met a stranger, and it went
+              // nowhere.
+              <Pressable
+                disabled={message.isBotMessage}
+                onPress={() =>
+                  navigation.navigate("PublicProfile", {
+                    userId: message.userId,
+                    knownAs: displayName,
+                  })
+                }
                 className={cn(
                   "h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-muted",
                   message.isBotMessage && "border-2 border-primary",
@@ -336,7 +348,7 @@ export function ChatMessage({
                     {initial}
                   </Text>
                 )}
-              </View>
+              </Pressable>
             )}
 
             {/* Bubble */}
