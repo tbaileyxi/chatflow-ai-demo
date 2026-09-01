@@ -32,6 +32,9 @@ export interface XSearchResult {
   citations: string[];          // x.com post URLs, in order of appearance
   ok: boolean;
   tokens: number;
+  // Why this came back empty. Without it a dead API key, a 402 and a quiet
+  // Monday all look identical to the caller, and the bot just goes silent.
+  why?: string;
 }
 
 // Pull markdown-style [[n]](url) citations out, keeping the prose readable.
@@ -58,7 +61,7 @@ export async function searchX(
 ): Promise<XSearchResult> {
   const key = Deno.env.get("XAI_API_KEY");
   const empty: XSearchResult = { text: "", citations: [], ok: false, tokens: 0 };
-  if (!key) return empty;
+  if (!key) return { ...empty, why: "XAI_API_KEY not set" };
 
   try {
     const res = await fetch(XAI_RESPONSES, {
@@ -96,7 +99,9 @@ export async function searchX(
         max_output_tokens: opts.maxTokens ?? 700,
       }),
     });
-    if (!res.ok) return empty;
+    if (!res.ok) {
+      return { ...empty, why: `xai http ${res.status}: ${(await res.text()).slice(0, 160)}` };
+    }
     const j = await res.json();
 
     const raw: string = j?.output_text ??
@@ -105,7 +110,7 @@ export async function searchX(
             .flatMap((o: any) => (o?.content ?? []).map((c: any) => c?.text))
             .filter(Boolean).join(" ")
         : "");
-    if (!raw) return empty;
+    if (!raw) return { ...empty, why: "xai returned no output_text" };
 
     const { text, citations } = splitCitations(raw);
     // An explicit miss is a real answer — it stops the Coach filling the gap.
@@ -124,7 +129,7 @@ export async function searchX(
       return { text: "", citations: [], ok: true, tokens: j?.usage?.total_tokens ?? 0 };
     }
     return { text, citations, ok: true, tokens: j?.usage?.total_tokens ?? 0 };
-  } catch {
-    return empty;
+  } catch (e) {
+    return { ...empty, why: `xai threw: ${String(e).slice(0, 160)}` };
   }
 }

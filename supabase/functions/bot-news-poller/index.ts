@@ -57,6 +57,10 @@ function xEntryId(url: string): string {
   return `x:${Math.abs(h).toString(36)}`;
 }
 
+// Why the last X search came back with nothing, for the debug block. A single
+// module-level value is enough: teams are polled one at a time.
+let lastXWhy = "";
+
 async function fetchXNews(
   teamName: string,
   lookbackHours: number,
@@ -105,12 +109,23 @@ async function fetchXNews(
     );
   }
 
-  if (!out.ok || !out.text.trim()) return [];
+  if (!out.ok || !out.text.trim()) {
+    // Say which of the three it was. "0 found" is what the debug block reported
+    // for every team while the search had actually stopped answering, and that
+    // is indistinguishable from a quiet Monday.
+    lastXWhy = out.why ?? (out.ok ? "search returned empty text" : "search not ok");
+    return [];
+  }
 
   // A citation is the source post; the synthesis is the summary. One entry —
   // the daily cap and MAX_PER_RUN already decide how much of it reaches a room.
   const link = out.citations[0];
-  if (!link) return [];
+  if (!link) {
+    // Text but no citation. The entry needs a source post to link to, so it is
+    // dropped — but that is a different failure from finding nothing at all.
+    lastXWhy = "answered with no citation";
+    return [];
+  }
 
   const firstLine = out.text.split(/(?<=[.!?])\s+/)[0]?.trim() || out.text.trim();
   return [{
@@ -326,6 +341,8 @@ serve(async (req) => {
           const found = await fetchXNews(bundle.teamName, hours, bundle.league);
           allEntries.push(...found);
           dbg.xFound = found.length;
+          if (found.length === 0 && lastXWhy) dbg.xWhy = lastXWhy;
+          lastXWhy = "";
         } catch (err) {
           summary.errors.push(`xsearch ${bundle.teamName}: ${(err as Error).message}`);
         }
