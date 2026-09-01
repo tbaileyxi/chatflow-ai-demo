@@ -735,6 +735,40 @@ async function processPendingClips(supabase: any, summary: any) {
 // Pregame heads-up: when a followed team tips/first-pitches within the next
 // ~45 min, drop one "game coming up" message into each of its rooms. Templated
 // (no LLM) so it's free and reliable. Guarded per room so it fires once.
+
+/**
+ * A push, for the one moment that decides whether an install becomes a user.
+ *
+ * The pregame notice has always been posted into the room and never pushed, so
+ * it only ever reached somebody already looking at the app — the one person who
+ * did not need telling. Kickoff is the whole product: if a new user never hears
+ * that their team is playing, the install was a single session and whatever
+ * channel delivered them was wasted.
+ *
+ * Recaps already push. This is the same idea at the other end of the game, and
+ * the more useful end — a recap is something you missed, a kickoff is something
+ * you can still join.
+ */
+async function pushToRoom(title: string, huddleId: string, body: string): Promise<void> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return;
+  try {
+    await fetch(`${url}/functions/v1/send-push-notification`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title, body,
+        huddle_ids: [huddleId],
+        source: "bot_v2",
+        notification_type: "bot_drop",
+      }),
+    });
+  } catch (err) {
+    console.warn("[pregame] push failed", err);
+  }
+}
+
 async function postPregames(
   supabase: ReturnType<typeof createClient>,
   summary: { errors: string[]; pregames?: number },
@@ -784,7 +818,22 @@ async function postPregames(
           huddle_id: h.id, user_id: sysUser, content: body,
           is_bot_message: true, message_type: "pregame",
         });
-        if (!error) summary.pregames = (summary.pregames ?? 0) + 1;
+        if (!error) {
+          summary.pregames = (summary.pregames ?? 0) + 1;
+
+          // AND TELL THEM. The pregame notice has always been posted into the
+          // room and never pushed, which means it only reached someone already
+          // looking at the app — the one person who did not need telling.
+          //
+          // Kickoff is the whole product. If an install never hears that their
+          // team is playing, it was a one-time visit, and every channel that
+          // delivered them was wasted on a single session.
+          //
+          // Recaps already push. This is the same idea at the other end of the
+          // game, and it is the more important end: a recap is something you
+          // missed, a kickoff is something you can still join.
+          await pushToRoom(`${team.name} vs ${opp.name}`, h.id, `${verb(g.sport_key || "")} at ${time} ET. The room's open.`);
+        }
       }
     }
   }

@@ -50,7 +50,7 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   );
 
-  let body: { handle?: string; huddle_id?: string; probe_lists?: string; probe_media?: string; seed?: any[]; list_members?: string; dry?: boolean; probe_search?: string; lookback_hours?: number; gap_minutes?: number; discover?: { query: string; hours?: number; min_followers?: number; max_followers?: number; pages?: number; sport?: string; save?: boolean; org?: string }; set_handle?: { huddle_id: string; handle: string }; purge_room?: string } = {};
+  let body: { handle?: string; huddle_id?: string; probe_lists?: string; probe_media?: string; seed?: any[]; chapter_stats?: boolean; list_members?: string; dry?: boolean; probe_search?: string; lookback_hours?: number; gap_minutes?: number; discover?: { query: string; hours?: number; min_followers?: number; max_followers?: number; pages?: number; sport?: string; save?: boolean; org?: string }; set_handle?: { huddle_id: string; handle: string }; purge_room?: string } = {};
   try { body = await req.json(); } catch { /* no body is the normal case */ }
 
   // ── Probe: can this API tier read Lists? ──────────────────────────────────
@@ -239,6 +239,31 @@ serve(async (req) => {
       await supabase.from("seen_events").delete().eq("game_id", `xmirror:${room.x_handle}`);
     }
     return json({ ok: true, deleted, kept_because_replied_to: keep.size });
+  }
+
+  // ── How much of the chapter list is left ──────────────────────────────────
+  // chapter_leads is admin-read only, so the number is invisible from anywhere
+  // except a signed-in dashboard. This reads it with the service role.
+  if (body.chapter_stats) {
+    const count = async (q: any) => (await q).count ?? 0;
+    const base = () => supabase.from("chapter_leads").select("id", { count: "exact", head: true });
+    const emailable = () => base()
+      .eq("contact_channel", "email").eq("bounced", false).eq("unsubscribed", false)
+      .not("email", "is", null).neq("email", "");
+
+    return json({
+      total:            await count(base()),
+      emailable:        await count(emailable()),
+      never_emailed:    await count(emailable().eq("emailed", false)),
+      had_step_1:       await count(emailable().eq("emailed", true).eq("sequence_step", 1)),
+      had_step_2:       await count(emailable().eq("emailed", true).eq("sequence_step", 2)),
+      had_step_3:       await count(emailable().eq("emailed", true).eq("sequence_step", 3)),
+      replied:          await count(base().eq("status", "replied")),
+      onboarded:        await count(base().eq("status", "onboarded")),
+      bounced:          await count(base().eq("bounced", true)),
+      unsubscribed:     await count(base().eq("unsubscribed", true)),
+      no_email_at_all:  await count(base().or("email.is.null,email.eq.")),
+    });
   }
 
   // ── Seed rows we already have ───────────────────────────────────────────
