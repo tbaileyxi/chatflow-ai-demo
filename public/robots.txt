@@ -12,3 +12,7 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+# Without this line Google has to discover 103 pages by following links,
+# and nothing on the site links to most of them.
+Sitemap: https://www.sidehuddlesports.com/sitemap.xml
