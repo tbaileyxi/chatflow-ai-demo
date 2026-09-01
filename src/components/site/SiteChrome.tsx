@@ -59,6 +59,15 @@ export function SiteFooter() {
               {t.name}
             </Link>
           ))}
+          {/* The other ~160 are one click away rather than all in the footer:
+              a 180-name footer on every page reads as spam to a crawler and is
+              useless to a person. */}
+          <Link
+            to="/teams"
+            className="text-xs text-white/60 hover:text-white transition-colors underline underline-offset-2"
+          >
+            All teams →
+          </Link>
         </div>
       </nav>
 

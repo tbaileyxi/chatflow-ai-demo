@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
 import { SiteNav, SiteFooter } from '@/components/site/SiteChrome';
-import { TEAMS, type Team } from '@/lib/teams';
+import { ALL_TEAMS, type Team } from '@/lib/teams';
 import {
   StoreButton,
   WhatHappens,
@@ -20,6 +20,7 @@ import { STORE_CAMPAIGN } from '@/lib/appStore';
  * attention. It is now the landing page's body with a data-driven hero on top:
  *
  *   • adding a team is one row in TEAMS, not a design job
+ *   • ~160 more teams come from the database via scripts/gen-team-pages.mjs
  *   • improving the landing page improves all of these for free
  *   • no per-team artwork, ever — the same screenshots run everywhere
  *
@@ -41,7 +42,7 @@ import LiveRoomWindow from '@/components/site/LiveRoomWindow';
 
 export default function TeamLanding() {
   const { slug = '' } = useParams();
-  const team = TEAMS[slug.toLowerCase()];
+  const team = ALL_TEAMS[slug.toLowerCase()];
   if (!team) return <Navigate to="/" replace />;
   const { name, accent, ink } = team;
 

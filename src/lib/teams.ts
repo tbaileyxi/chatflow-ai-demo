@@ -6,6 +6,8 @@
 // the page they land on is the delivery. Two copies drift, and the first symptom
 // is a card in the wrong colour for the wrong team.
 
+import { GENERATED_TEAMS } from './teams.generated';
+
 export type Team = {
   name: string;
   accent: string;
@@ -19,6 +21,9 @@ export type Team = {
   members?: number;
   league: 'nfl' | 'college-football';
   espn: string;
+  // Display label for the directory. `league` above only knows two values, so
+  // without this every hockey and baseball team lists under College.
+  leagueLabel?: string;
 };
 
 // Chapter counts are real, from chapter-db/chapters.db. ESPN ids were each
@@ -52,6 +57,52 @@ export const TEAMS: Record<string, Team> = {
 };
 
 
+// ── The other ~160 teams ────────────────────────────────────────────────────
+//
+// Everything above was typed by hand: real brand colours, real chapter counts.
+// Everything below comes out of the database via scripts/gen-team-pages.mjs —
+// every team whose public room has actually been talking. Those rooms already
+// existed; they just had no page pointing at them, which meant no way for
+// anyone to find them from a search.
+//
+// A generated team gets a colour derived from its own name instead of a brand
+// colour. That is on purpose and matches the trademark posture of the rest of
+// the page: no club marks, no logos, generic accents only. It also means 160
+// pages don't all render in the same gold.
+
+const GENERIC_ACCENTS: Array<[string, string]> = [
+  ['#1E4B8F', '#fff'], ['#7A1F3D', '#fff'], ['#12684F', '#fff'],
+  ['#8A3A12', '#fff'], ['#3B2C6B', '#fff'], ['#0F5563', '#fff'],
+  ['#6B1414', '#fff'], ['#2C4A21', '#fff'],
+];
+
+// Deterministic, so a team's colour never changes between builds — a page that
+// is blue today and green tomorrow looks broken to anyone who saw both.
+function accentFor(slug: string): [string, string] {
+  let h = 0;
+  for (let i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) >>> 0;
+  return GENERIC_ACCENTS[h % GENERIC_ACCENTS.length];
+}
+
+const GENERATED: Record<string, Team> = Object.fromEntries(
+  GENERATED_TEAMS.map((g) => {
+    const [accent, ink] = accentFor(g.slug);
+    return [g.slug, {
+      name: g.name,
+      accent,
+      ink,
+      chapters: 0,
+      league: (g.league === 'NFL' ? 'nfl' : 'college-football') as Team['league'],
+      leagueLabel: g.league === 'NCAA' ? 'College' : g.league,
+      espn: '',
+    }];
+  }),
+);
+
+// Hand-written wins. If somebody bothered to look up the real colour, that is
+// better than a hash of the slug, and the slug is what outreach already links.
+export const ALL_TEAMS: Record<string, Team> = { ...GENERATED, ...TEAMS };
+
 export function teamFor(slug: string): Team | null {
-  return TEAMS[slug] ?? null;
+  return ALL_TEAMS[slug] ?? null;
 }

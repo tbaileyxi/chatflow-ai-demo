@@ -18,6 +18,7 @@ import Privacy from "./pages/Privacy";
 import FAQ from "./pages/FAQ";
 import Contact from "./pages/Contact";
 import TeamLanding from "./pages/TeamLanding";
+import TeamsIndex from "./pages/TeamsIndex";
 import Arena from "./pages/Arena";
 import ArenaProfile from "./pages/ArenaProfile";
 import { OutreachErrorBoundary } from "@/components/OutreachErrorBoundary";
@@ -74,6 +75,7 @@ const AppContent = () => {
         <Route path="/sponsor" element={<Navigate to="/sponsors" replace />} />
         <Route path="/sponsors" element={<Sponsor />} />
         <Route path="/sponsors/admin" element={<SponsorAdmin />} />
+        <Route path="/teams" element={<TeamsIndex />} />
         <Route path="/t/:slug" element={<TeamLanding />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/faq" element={<FAQ />} />
