@@ -211,16 +211,20 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Check for ACTUAL new messages (not just huddle activity timestamp)
+        // Check for ACTUAL new messages (not just huddle activity timestamp).
+        //
+        // This used to collect every room the person had missed and then throw
+        // all but the busiest one away — one email, about one room, while the
+        // other nine rooms they belong to went unmentioned. The whole point of
+        // belonging to several rooms is that the digest covers them.
         const checkSince = emailRecord?.last_email_sent_at || cutoffTime;
-        let hasNewMessages = false;
-        let mostActiveHuddle: {
+        const rooms: Array<{
           huddleId: string;
           huddleName: string;
           teamName: string;
           messageCount: number;
           latestMessage: string;
-        } | null = null;
+        }> = [];
 
         for (const huddle of userData.huddles) {
           // Count new messages NOT from this user
@@ -235,49 +239,80 @@ Deno.serve(async (req) => {
             console.log(`⚠️ Error counting messages for huddle ${huddle.huddleId}: ${countError.message}`);
             continue;
           }
+          if (!count || count === 0) continue;
 
-          if (count && count > 0) {
-            hasNewMessages = true;
-            
-            // Get latest message teaser
-            const { data: latestMsg } = await supabase
-              .from('huddle_messages')
-              .select('content')
-              .eq('huddle_id', huddle.huddleId)
-              .gt('created_at', checkSince)
-              .neq('user_id', userId)
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .single();
+          const { data: latestMsg } = await supabase
+            .from('huddle_messages')
+            .select('content')
+            .eq('huddle_id', huddle.huddleId)
+            .gt('created_at', checkSince)
+            .neq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-            if (!mostActiveHuddle || count > mostActiveHuddle.messageCount) {
-              mostActiveHuddle = {
-                huddleId: huddle.huddleId,
-                huddleName: huddle.huddleName,
-                teamName: huddle.teamName,
-                messageCount: count,
-                latestMessage: latestMsg?.content?.substring(0, 80) || 'New activity'
-              };
-            }
-          }
+          rooms.push({
+            huddleId: huddle.huddleId,
+            huddleName: huddle.huddleName,
+            teamName: huddle.teamName,
+            messageCount: count,
+            latestMessage: latestMsg?.content?.substring(0, 120) || 'New activity',
+          });
         }
 
-        if (!hasNewMessages || !mostActiveHuddle) {
+        if (rooms.length === 0) {
           console.log(`⏭️ No new messages for ${userData.displayName} (${userEmail})`);
           noNewMessages++;
           continue;
         }
 
-        console.log(`📬 Sending email to ${userEmail} - ${mostActiveHuddle.teamName} huddle (${mostActiveHuddle.messageCount} new msgs)`);
+        // Busiest first — if only the top of the email gets read, it should be
+        // the room that actually did something.
+        rooms.sort((a, b) => b.messageCount - a.messageCount);
+        const busiest = rooms[0];
+        const totalNew = rooms.reduce((n, r) => n + r.messageCount, 0);
+
+        console.log(`📬 Sending email to ${userEmail} - ${rooms.length} room(s), ${totalNew} new msgs`);
 
         // Pick a random subject line template
-        const templateIndex = Math.floor(Math.random() * SUBJECT_TEMPLATES.length);
-        const subject = SUBJECT_TEMPLATES[templateIndex](mostActiveHuddle.teamName);
+        const subject =
+          rooms.length === 1
+            ? SUBJECT_TEMPLATES[Math.floor(Math.random() * SUBJECT_TEMPLATES.length)](
+                busiest.teamName,
+              )
+            : `${totalNew} new posts across ${rooms.length} of your rooms`;
 
-        // Build the email body - clean, casual tone
-        const teaser = mostActiveHuddle.latestMessage
-          .replace(/<[^>]*>/g, '')
-          .substring(0, 60);
+        // Build the email body - clean, casual tone.
+        // One block per room, so the digest says what it is: everything you
+        // missed, everywhere you belong.
+        const esc = (t: string) =>
+          t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+           .replace(/"/g, '&quot;');
+
+        const roomBlocks = rooms
+          .map((r) => {
+            const teaser = esc(r.latestMessage.replace(/<[^>]*>/g, '').substring(0, 90));
+            const label = r.messageCount === 1 ? '1 new post' : `${r.messageCount} new posts`;
+            return `
+    <a href="https://www.sidehuddlesports.com/h/${r.huddleId}"
+       style="display: block; text-decoration: none; background-color: #fafafa; border-left: 3px solid #facc15; padding: 16px; margin: 0 0 12px 0;">
+      <p style="font-size: 13px; font-weight: 600; color: #1a1a1a; margin: 0 0 4px 0;">
+        ${esc(r.huddleName)}
+      </p>
+      <p style="font-size: 12px; color: #999999; margin: 0 0 8px 0;">
+        ${label}
+      </p>
+      <p style="font-size: 14px; color: #666666; font-style: italic; margin: 0;">
+        "${teaser}..."
+      </p>
+    </a>`;
+          })
+          .join('');
+
+        const heading =
+          rooms.length === 1
+            ? 'New chatter in your huddle'
+            : `While you were out: ${rooms.length} rooms`;
 
         const htmlBody = `
 <!DOCTYPE html>
@@ -288,37 +323,26 @@ Deno.serve(async (req) => {
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
   <div style="max-width: 480px; margin: 0 auto; background-color: #ffffff; padding: 32px 24px;">
-    
+
     <h1 style="font-size: 22px; font-weight: 600; color: #1a1a1a; margin: 0 0 20px 0;">
-      New chatter in your huddles
+      ${heading}
     </h1>
-    
+
     <p style="font-size: 15px; color: #666666; line-height: 1.5; margin: 0 0 24px 0;">
-      A few new posts came through since your last visit.
+      ${totalNew} new ${totalNew === 1 ? 'post' : 'posts'} since your last visit.
     </p>
-    
-    <div style="background-color: #fafafa; border-left: 3px solid #facc15; padding: 16px; margin: 0 0 24px 0;">
-      <p style="font-size: 13px; font-weight: 600; color: #1a1a1a; margin: 0 0 8px 0;">
-        ${mostActiveHuddle.teamName} Huddle
-      </p>
-      <p style="font-size: 14px; color: #666666; font-style: italic; margin: 0;">
-        "${teaser}..."
-      </p>
-    </div>
-    
-    <p style="font-size: 14px; color: #666666; margin: 0 0 24px 0;">
-      Jump back in to see the full conversation.
-    </p>
-    
-    <a href="https://sidehuddlesports.com/huddle/${mostActiveHuddle.huddleId}" 
-       style="display: inline-block; background-color: #facc15; color: #1a1a1a; font-weight: 600; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 15px;">
+
+    ${roomBlocks}
+
+    <a href="https://www.sidehuddlesports.com/h/${busiest.huddleId}"
+       style="display: inline-block; background-color: #facc15; color: #1a1a1a; font-weight: 600; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 15px; margin-top: 12px;">
       Open Side Huddle
     </a>
-    
+
     <p style="font-size: 12px; color: #999999; margin: 32px 0 0 0;">
       You'll only get emails when there's real activity.
     </p>
-    
+
   </div>
 </body>
 </html>
