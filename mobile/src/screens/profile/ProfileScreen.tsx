@@ -515,6 +515,22 @@ export function ProfileScreen() {
             <CardTitle>Account</CardTitle>
           </CardHeader>
           <CardContent className="gap-3">
+            <Button variant="destructive" onPress={handleSignOut}>
+              <View className="flex-row items-center gap-2">
+                <LogOut color={colors.destructiveForeground} size={16} />
+                <Text className="text-sm font-medium text-destructive-foreground">
+                  Sign Out
+                </Text>
+              </View>
+            </Button>
+            <Button variant="ghost" onPress={handleDeleteAccount}>
+              <View className="flex-row items-center gap-2">
+                <X color={colors.destructive} size={16} />
+                <Text className="text-sm font-medium text-destructive">
+                  Delete Account
+                </Text>
+              </View>
+            </Button>
             {hasAdminAccess && (
               <Button
                 variant="outline"
@@ -562,22 +578,6 @@ export function ProfileScreen() {
                 <Lock color={colors.primary} size={16} />
                 <Text className="text-sm font-medium text-foreground">
                   Privacy Policy
-                </Text>
-              </View>
-            </Button>
-            <Button variant="destructive" onPress={handleSignOut}>
-              <View className="flex-row items-center gap-2">
-                <LogOut color={colors.destructiveForeground} size={16} />
-                <Text className="text-sm font-medium text-destructive-foreground">
-                  Sign Out
-                </Text>
-              </View>
-            </Button>
-            <Button variant="ghost" onPress={handleDeleteAccount}>
-              <View className="flex-row items-center gap-2">
-                <X color={colors.destructive} size={16} />
-                <Text className="text-sm font-medium text-destructive">
-                  Delete Account
                 </Text>
               </View>
             </Button>
