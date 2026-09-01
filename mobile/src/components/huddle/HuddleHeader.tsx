@@ -212,6 +212,19 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
               <Users color={colors.mutedForeground} size={11} />
               <Text className="text-xs text-muted-foreground">{huddle.memberCount}</Text>
             </View>
+            {/* THE COACH IS IN THE ROOM, so say so.
+                It answers when you are alone and when you reply to it, but it
+                appeared nowhere in the room's furniture — so it read as a
+                command you type rather than someone who is here. A room with
+                one person in it also looks empty until you can see there is
+                already something to talk to. */}
+            <View
+              className="flex-row items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-1.5 py-0.5"
+              accessibilityLabel="Coach is in this room"
+            >
+              <View className="h-1.5 w-1.5 rounded-full bg-primary" />
+              <Text className="text-[10px] font-semibold text-primary">Coach</Text>
+            </View>
           </View>
         </Pressable>
 

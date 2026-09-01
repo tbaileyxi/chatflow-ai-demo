@@ -378,7 +378,22 @@ export function HuddleScreen() {
     // a model call behind it. Without a sign that anything is happening the
     // room looks broken, and people ask again, which is how a thread ends up
     // with the same question three times.
-    if (/@coach\b/i.test(content)) setCoachThinking(true);
+    // THE COACH ANSWERS THREE WAYS, so the dots have to appear for all three.
+    //
+    // It used to fire only on a literal @coach. But the trigger also answers
+    // when you are the only person in the room, and when you reply to something
+    // it said in the last ten minutes — both decided server-side, so the app had
+    // no idea an answer was coming and the message arrived out of nowhere.
+    //
+    // This mirrors public.notify_coach_mention(). If that SQL changes, change
+    // this with it: the two agreeing is what makes the dots honest.
+    const alone = (huddle?.memberCount ?? 1) <= 1;
+    const last = (messages ?? [])[0];
+    const answeringCoach =
+      !!last &&
+      last.messageType === "coach_answer" &&
+      Date.now() - new Date(last.createdAt).getTime() < 10 * 60_000;
+    if (/@coach\b/i.test(content) || alone || answeringCoach) setCoachThinking(true);
     const result = await sendMessage(content, user.id, replyToId, media, {
       senderName,
       huddleName,

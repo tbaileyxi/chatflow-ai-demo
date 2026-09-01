@@ -250,26 +250,35 @@ export function ChatMessage({
     // iOS silently no-ops Share.share() if a modal is still dismissing.
     setShowPicker(false);
     const body = (message.content || "").trim();
+    // NO WRAPPING QUOTES, and no name on a bot message.
+    //
+    // A clip caption already arrives quoted and attributed — "Cruising to The
+    // Rock" — @IUHoosiers — so wrapping it again produced
+    // `@coach: ""Cruising to The Rock" — @IUHoosiers"`, which reads as broken
+    // before anyone gets to the link.
     const text = body
-      ? `${displayName}: "${body}"`
+      ? (message.isBotMessage ? body : `${displayName}: ${body}`)
       : `${displayName} shared a moment`;
     // Share a link to the ROOM, not the picture. `url` used to be
     // message.mediaUrl, so a shared Giants post arrived as a bare JPEG on
     // pbs.twimg.com — the recipient got the image and no way back to the app
     // or the room it came from. /h/:huddleId deep-links installed users
     // straight to the room and sends everyone else to the App Store.
+    // ?m=<id> so the PREVIEW shows what was shared rather than the room it came
+    // from. Without it a clip, a take and a joke all previewed as the same room
+    // background — the card showed the door instead of what was behind it. The
+    // destination is unchanged: it still opens this room.
     const roomUrl = huddleId
-      ? `https://www.sidehuddlesports.com/h/${huddleId}`
+      ? `https://www.sidehuddlesports.com/h/${huddleId}?m=${message.id}`
       : undefined;
     setTimeout(() => {
       Share.share({
         // The link goes in `url` ONLY. Putting it in the message as well made
         // iOS send both, so a shared moment arrived with the same URL printed
         // twice under it.
-        message: [
-          text,
-          huddleName ? `— in ${huddleName} on Side Huddle Sports` : "",
-        ].filter(Boolean).join("\n"),
+        // The preview card already carries the room name and Side Huddle, so
+        // repeating them under the text was a third line saying nothing.
+        message: text,
         ...(roomUrl ? { url: roomUrl } : {}),
       }).catch(() => {});
     }, 350);
