@@ -487,13 +487,57 @@ serve(async (req) => {
           .find(([, key]) => key === hg.sport_key)?.[0];
         if (!sport) continue;
 
-        const ourDay = hg.start_time.slice(0, 10);
-        const candidates = (allEspnGames.get(sport) ?? [])
-          .filter((e: any) => String(e.date ?? '').slice(0, 10) === ourDay);
-
+        // CLOSEST IN TIME, not same calendar day.
+        //
+        // Requiring an exact day match was too strict: Georgia and South
+        // Carolina both had fixtures whose opponent stayed null because our
+        // stored kickoff was hours off ESPN's, and both pages went out with no
+        // fixture line at all.
+        //
+        // But a plain team match is too loose in the other direction — A&M has
+        // games on consecutive days, and matching on the team alone fills one
+        // from the other. Taking the candidate nearest our stored time gets
+        // both: tolerant of a few hours, still decisive between two fixtures a
+        // day apart.
+        const ourTime = Date.parse(hg.start_time);
         const full = known.city ? `${known.city} ${known.name}` : known.name;
-        const match = findMatchingGame(candidates, full, null)
-          ?? findMatchingGame(candidates, known.name, null);
+        const pool = (allEspnGames.get(sport) ?? []).filter((e: any) => {
+          const d = Date.parse(String(e.date ?? ''));
+          return Number.isFinite(d) && Math.abs(d - ourTime) < 36 * 3600 * 1000;
+        });
+
+        // Search what we already fetched; if this team is not in it, ask ESPN
+        // for that specific day.
+        //
+        // The default scoreboard returns about 25 marquee games, not the full
+        // slate — South Carolina's opener against Kent State was not in it, so
+        // the opponent stayed null and the page had no fixture line. The
+        // fallback has to trigger on NO MATCH, not on an empty pool: the pool
+        // was full of other Saturday games, just not theirs.
+        const nearest = (games: any[]) => {
+          let best: any = null;
+          let gap = Infinity;
+          for (const c of games) {
+            // Full name only. A bare nickname matched "Bulldogs" against Fresno
+            // State and filled a phantom Georgia fixture with USC.
+            if (!findMatchingGame([c], full, null)) continue;
+            const g = Math.abs(Date.parse(String(c.date)) - ourTime);
+            if (g < gap) { gap = g; best = c; }
+          }
+          return best;
+        };
+
+        let match: any = nearest(pool);
+        if (!match) {
+          const day = hg.start_time.slice(0, 10).replace(/-/g, "");
+          const dayGames = await fetchOneScoreboard(
+            `${ESPN_ENDPOINTS[sport]}?dates=${day}&limit=300`, sport,
+          );
+          match = nearest(dayGames.filter((e: any) => {
+            const d = Date.parse(String(e.date ?? ""));
+            return Number.isFinite(d) && Math.abs(d - ourTime) < 36 * 3600 * 1000;
+          }));
+        }
         if (!match) continue;
 
         const comps = match.competitions?.[0]?.competitors || [];
@@ -533,7 +577,7 @@ serve(async (req) => {
           .update(hg.home_team_id ? { away_team_id: fillId } : { home_team_id: fillId })
           .eq('id', hg.id);
         upcomingRepaired++;
-        console.log(`🩹 Upcoming game ${ourDay}: filled ${nm}`);
+        console.log(`🩹 Upcoming game ${hg.start_time.slice(0, 10)}: filled ${nm}`);
       }
     } catch (err) {
       repairErrors.push(`upcoming repair: ${(err as Error).message}`);

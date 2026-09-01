@@ -151,30 +151,77 @@ async function teamBody(
       .from("teams").select("id, name, city").eq("status", "active").limit(600);
     const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
     const want = norm(label);
-    const team = (teams ?? []).find((x: any) => {
-      const k = norm(`${x.city ?? ""}${x.name ?? ""}`);
-      return k === want || k.includes(want) || want.includes(k);
-    });
+
+    // BEST MATCH, NOT FIRST MATCH.
+    //
+    // "georgia" is a substring of both "georgiabulldogs" and
+    // "georgiatechyellowjackets", so a .find() returned whichever row happened
+    // to load first — and /t/georgia advertised Georgia Tech's fixture against
+    // Colorado. Every one of today's wrong-team bugs has been a loose match
+    // taking the first thing that fit instead of the best thing.
+    //
+    // Scored: an exact full name beats an exact city, which beats a prefix,
+    // which beats a substring. Ties break on the shortest name, so a plain
+    // "Georgia" wins over "Georgia Tech" when the page asked for Georgia.
+    const score = (x: any): number => {
+      const full = norm(`${x.city ?? ""}${x.name ?? ""}`);
+      const city = norm(x.city ?? "");
+      if (full === want) return 100;
+      if (city === want) return 90;
+      if (full.startsWith(want)) return 60;
+      if (want.startsWith(city) && city.length > 2) return 50;
+      if (full.includes(want)) return 20;
+      return 0;
+    };
+    const team = (teams ?? [])
+      .map((x: any) => ({ x, s: score(x), len: norm(`${x.city ?? ""}${x.name ?? ""}`).length }))
+      .filter((c) => c.s > 0)
+      .sort((a, b) => b.s - a.s || a.len - b.len)[0]?.x;
     if (!team) return { html: "", extra: "" };
 
-    const cols = "status, start_time, home_score, away_score, home:teams!games_home_team_id_fkey(name), away:teams!games_away_team_id_fkey(name)";
+    const cols = "status, start_time, sport_key, home_score, away_score, home:teams!games_home_team_id_fkey(name), away:teams!games_away_team_id_fkey(name)";
     const mine = `home_team_id.eq.${team.id},away_team_id.eq.${team.id}`;
 
-    const { data: next } = await supabase.from("games").select(cols).or(mine)
-      .eq("status", "scheduled").gt("start_time", new Date().toISOString())
+    // ONE TEAM ROW COVERS EVERY SPORT THE SCHOOL PLAYS.
+    //
+    // The Alabama page advertised "Crimson Tide 71 at Volunteers 69" as its
+    // last result — a basketball score, on a page about football, indexed by
+    // Google. Same row, same team, different sport; only sport_key separates
+    // them. This is the third place that has bitten: the Coach quoted a
+    // February basketball game in a football room, the news bot put volleyball
+    // in a Tulane room, and now a public page.
+    //
+    // Which sport is "the" sport depends on the calendar, so it is taken from
+    // whatever this team is playing next or played last, and everything else is
+    // matched to it.
+    const { data: anchor } = await supabase.from("games")
+      .select("sport_key, start_time").or(mine)
+      .gte("start_time", new Date(Date.now() - 21 * 86400000).toISOString())
       .order("start_time", { ascending: true }).limit(1);
-    const { data: last } = await supabase.from("games").select(cols).or(mine)
-      .eq("status", "final").order("start_time", { ascending: false }).limit(1);
+    const sport = (anchor?.[0] as any)?.sport_key ?? null;
+    const scope = (q: any) => (sport ? q.eq("sport_key", sport) : q);
+
+    const { data: next } = await scope(supabase.from("games").select(cols).or(mine)
+      .eq("status", "scheduled").gt("start_time", new Date().toISOString()))
+      .order("start_time", { ascending: true }).limit(1);
+    const { data: last } = await scope(supabase.from("games").select(cols).or(mine)
+      .eq("status", "final"))
+      .order("start_time", { ascending: false }).limit(1);
+
+    // A half-known fixture is worse than none. "Bulldogs at undefined" went out
+    // on the Georgia page — a null opponent rendered straight into public HTML
+    // that Google was about to index.
+    const named = (g: any) => g?.home?.name && g?.away?.name;
 
     const n: any = next?.[0];
-    if (n) {
+    if (named(n)) {
       const when = new Date(n.start_time).toLocaleDateString("en-US",
         { weekday: "long", month: "long", day: "numeric" });
       const line = `Next up: ${n.away?.name} at ${n.home?.name}, ${when}.`;
       bits.push(`<p>${esc(line)}</p>`); facts.push(line);
     }
     const l: any = last?.[0];
-    if (l) {
+    if (named(l)) {
       const line = `Last result: ${l.away?.name} ${l.away_score ?? ""} at ${l.home?.name} ${l.home_score ?? ""}.`;
       bits.push(`<p>${esc(line)}</p>`); facts.push(line);
     }
