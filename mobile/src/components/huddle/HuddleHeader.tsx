@@ -96,10 +96,10 @@ function GameBar({
         <View className="flex-row items-center gap-2">
           <PulsingDot />
           <Text className="text-sm font-bold text-foreground">
-            {game.awayTeamName ?? "Away"}{" "}
+            {sides(game).away}{" "}
             <Text className="font-black">{game.awayScore ?? 0}</Text>
             <Text className="text-muted-foreground">  —  </Text>
-            {game.homeTeamName ?? "Home"}{" "}
+            {sides(game).home}{" "}
             <Text className="font-black">{game.homeScore ?? 0}</Text>
           </Text>
         </View>
@@ -114,10 +114,10 @@ function GameBar({
     return (
       <View className="items-center bg-muted/40 px-4 py-1.5">
         <Text className="text-sm font-bold text-foreground">
-          {game.awayTeamName ?? "Away"}{" "}
+          {sides(game).away}{" "}
           <Text className="font-black">{game.awayScore ?? 0}</Text>
           <Text className="text-muted-foreground">  —  </Text>
-          {game.homeTeamName ?? "Home"}{" "}
+          {sides(game).home}{" "}
           <Text className="font-black">{game.homeScore ?? 0}</Text>
         </Text>
         <Text className="text-[11px] text-muted-foreground">Final</Text>
@@ -129,15 +129,38 @@ function GameBar({
   return (
     <View className="items-center bg-primary/5 px-4 py-1.5">
       <Text className="text-sm font-semibold text-foreground">
-        {game.awayTeamName ?? "Away"}
+        {sides(game).away}
         <Text className="text-muted-foreground">  @  </Text>
-        {game.homeTeamName ?? "Home"}
+        {sides(game).home}
       </Text>
       <Text className="text-[11px] text-muted-foreground">
         {formatNextGameDate(game.startTime)}
       </Text>
     </View>
   );
+}
+
+
+/**
+ * "Tigers at Tigers" is a correct scoreboard and a broken-looking one.
+ *
+ * Clemson at LSU are both Tigers, Georgia and Mississippi State are both
+ * Bulldogs, and a nickname alone stops identifying anybody the moment two of
+ * them meet. The school disambiguates and is shorter, so it wins whenever the
+ * two nicknames collide — otherwise the nickname stays, because "Bengals at
+ * Browns" reads better than "Cincinnati at Cleveland".
+ */
+function sides(game: {
+  awayTeamName: string | null; homeTeamName: string | null;
+  awayTeamCity: string | null; homeTeamCity: string | null;
+}): { away: string; home: string } {
+  const an = game.awayTeamName ?? "";
+  const hn = game.homeTeamName ?? "";
+  const clash = !!an && an.toLowerCase() === hn.toLowerCase();
+  return {
+    away: (clash ? game.awayTeamCity : null) ?? an ?? "Away",
+    home: (clash ? game.homeTeamCity : null) ?? hn ?? "Home",
+  };
 }
 
 export function HuddleHeader({ huddle, onInvite }: Props) {

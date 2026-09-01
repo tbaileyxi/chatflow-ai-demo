@@ -179,7 +179,7 @@ async function teamBody(
       .sort((a, b) => b.s - a.s || a.len - b.len)[0]?.x;
     if (!team) return { html: "", extra: "" };
 
-    const cols = "status, start_time, sport_key, home_score, away_score, home:teams!games_home_team_id_fkey(name), away:teams!games_away_team_id_fkey(name)";
+    const cols = "status, start_time, sport_key, home_score, away_score, home:teams!games_home_team_id_fkey(name, city), away:teams!games_away_team_id_fkey(name, city)";
     const mine = `home_team_id.eq.${team.id},away_team_id.eq.${team.id}`;
 
     // ONE TEAM ROW COVERS EVERY SPORT THE SCHOOL PLAYS.
@@ -217,12 +217,20 @@ async function teamBody(
     if (named(n)) {
       const when = new Date(n.start_time).toLocaleDateString("en-US",
         { weekday: "long", month: "long", day: "numeric" });
-      const line = `Next up: ${n.away?.name} at ${n.home?.name}, ${when}.`;
+      // Same reason as the app scoreboard: Clemson at LSU are both Tigers, so
+      // a nickname stops identifying anybody the moment two of them meet.
+      const side = (x: any, other: any) =>
+        (x?.name && other?.name && x.name.toLowerCase() === other.name.toLowerCase())
+          ? (x.city ?? x.name) : x?.name;
+      const line = `Next up: ${side(n.away, n.home)} at ${side(n.home, n.away)}, ${when}.`;
       bits.push(`<p>${esc(line)}</p>`); facts.push(line);
     }
     const l: any = last?.[0];
     if (named(l)) {
-      const line = `Last result: ${l.away?.name} ${l.away_score ?? ""} at ${l.home?.name} ${l.home_score ?? ""}.`;
+      const sideL = (x: any, other: any) =>
+        (x?.name && other?.name && x.name.toLowerCase() === other.name.toLowerCase())
+          ? (x.city ?? x.name) : x?.name;
+      const line = `Last result: ${sideL(l.away, l.home)} ${l.away_score ?? ""} at ${sideL(l.home, l.away)} ${l.home_score ?? ""}.`;
       bits.push(`<p>${esc(line)}</p>`); facts.push(line);
     }
 
