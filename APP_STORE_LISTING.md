@@ -43,16 +43,29 @@ This is the field that actually moves search. Rules that matter:
 
 **Use:**
 ```
-gameday,thread,tailgate,football,college,fantasy,sports,rivalry,watchparty,scores,alumni,huddle
+browns,buckeyes,bills,gamethread,tailgate,gameday,watchparty,cfb,alumni,rivalry,huddle,scores
 ```
-*(97)*
+*(99)*
 
-What each is doing:
-- `thread` — "game thread" is the exact phrase Reddit owns and you want
+Team names are in at your instruction. Stating the tradeoff once and then
+leaving it alone: Apple has pulled apps for trademarked keywords, and a team can
+complain directly. Three team names is also all 100 characters will hold, so
+this buys visibility for three fanbases and none of the other hundred.
+
+If a rejection comes back, the swap is immediate — replace the three names with
+`football,college,fantasy` and resubmit. Nothing else in the listing changes.
+
+The rest of the field is doing the same work without the exposure:
+- `gamethread` — the exact phrase people type; Reddit owns it and you want it
 - `tailgate`, `watchparty` — intent to watch WITH people
-- `alumni` — your chapter audience searches this
-- `rivalry`, `gameday` — season-long intent
-- `fantasy` — adjacent, high volume, cheap to sit near
+- `alumni` — the chapter audience searches this
+- `cfb` — how college football fans actually abbreviate it
+
+Rules that still apply:
+- **Never repeat words from your app name or subtitle.** Apple indexes those
+  already; a repeat wastes characters.
+- No spaces after commas — a space costs a character and buys nothing.
+- Singular only. Apple matches plurals itself.
 
 ---
 
