@@ -90,15 +90,27 @@ async function fetchESPNScores(sport: string): Promise<ESPNGame[]> {
   const endpoint = ESPN_ENDPOINTS[sport];
   if (!endpoint) return [];
 
-  const range = `${espnDate(-1)}-${espnDate(1)}`;
-  const [thisWeek, theseDays] = await Promise.all([
+  // THREE CALLS, because none of them is complete on its own.
+  //
+  // The bare endpoint answers with the current WEEK but only about 25 marquee
+  // games — Colorado at Georgia Tech, a Thursday primetime fixture, is not in
+  // it, and neither was South Carolina's opener. The tight day range covers
+  // what is happening now. Neither reaches next weekend's full slate, which is
+  // why fixtures went missing and could not be re-inserted once removed.
+  //
+  // The third call asks for the next eight days with a real limit, which is the
+  // one that actually returns everybody.
+  const near = `${espnDate(-1)}-${espnDate(1)}`;
+  const ahead = `${espnDate(0)}-${espnDate(8)}`;
+  const [thisWeek, theseDays, nextWeek] = await Promise.all([
     fetchOneScoreboard(endpoint, sport),
-    fetchOneScoreboard(`${endpoint}?dates=${range}&limit=200`, sport),
+    fetchOneScoreboard(`${endpoint}?dates=${near}&limit=300`, sport),
+    fetchOneScoreboard(`${endpoint}?dates=${ahead}&limit=400`, sport),
   ]);
 
   // Same game can come back from both calls. ESPN's event id is the identity.
   const byId = new Map<string, ESPNGame>();
-  for (const g of [...thisWeek, ...theseDays]) {
+  for (const g of [...thisWeek, ...theseDays, ...nextWeek]) {
     if (g?.id) byId.set(g.id, g);
   }
   return [...byId.values()];
@@ -454,6 +466,80 @@ serve(async (req) => {
       }
     } catch (err) {
       repairErrors.push(`date repair: ${(err as Error).message}`);
+    }
+
+    // ── Verify the schedule against ESPN ─────────────────────────────────
+    //
+    // The odds feed wrote a full slate of fixtures with nickname-matched teams:
+    // "Portland Trail Blazers at Illinois Fighting Illini", "Arizona Cardinals
+    // at Ohio State", "Clemson at Georgia" for a game that is really Tennessee
+    // State at Georgia. 69 of 104 college fixtures for one week were wrong.
+    //
+    // A league check catches only the cross-sport ones. Clemson and Georgia are
+    // both NCAA, so the only thing that can tell you Clemson is not playing
+    // there is a source that knows the schedule. ESPN does, for all 760 teams,
+    // for free.
+    //
+    // DELIBERATELY CONSERVATIVE. Only odds-sourced rows are considered — ESPN's
+    // own inserts are the reference and are never judged against it. Only dates
+    // where ESPN returned a real slate, so an empty response never deletes a
+    // day. And nothing referenced by another table is touched, because an
+    // orphaned market is worse than a wrong fixture.
+    let scheduleChecked = 0;
+    let scheduleDropped = 0;
+    const scheduleDrops: string[] = [];
+    try {
+      const horizon = new Date(now.getTime() + 21 * 86400000).toISOString();
+      const { data: future } = await supabase
+        .from('games')
+        .select('id, odds_game_id, sport_key, start_time, home_team_id, away_team_id')
+        .eq('status', 'scheduled')
+        .in('sport_key', ['americanfootball_ncaaf', 'americanfootball_nfl'])
+        .gte('start_time', new Date(now.getTime() + 6 * 3600 * 1000).toISOString())
+        .lte('start_time', horizon);
+
+      const byDay = new Map<string, any[]>();
+      for (const g of future ?? []) {
+        if (String(g.odds_game_id).startsWith('espn-')) continue;
+        const key = `${g.sport_key}|${g.start_time.slice(0, 10)}`;
+        (byDay.get(key) ?? byDay.set(key, []).get(key)!).push(g);
+      }
+
+      for (const [key, games] of byDay) {
+        const [sportKey, day] = key.split('|');
+        const sport = Object.entries(SPORT_KEY_MAP).find(([, k]) => k === sportKey)?.[0];
+        if (!sport) continue;
+
+        const espnDay = await fetchOneScoreboard(
+          `${ESPN_ENDPOINTS[sport]}?dates=${day.replace(/-/g, '')}&limit=400`, sport,
+        );
+        // No slate means ESPN did not answer, not that no games exist.
+        if (espnDay.length < 3) continue;
+
+        for (const g of games) {
+          scheduleChecked++;
+          const hm = allTeams?.find((x: any) => x.id === g.home_team_id);
+          const aw = allTeams?.find((x: any) => x.id === g.away_team_id);
+          if (!hm || !aw) continue;   // a missing side is the repair's job, not this
+          const hFull = hm.city ? `${hm.city} ${hm.name}` : hm.name;
+          const aFull = aw.city ? `${aw.city} ${aw.name}` : aw.name;
+          if (findMatchingGame(espnDay, hFull, aFull)) continue;
+
+          // REPORT ONLY. This deleted real games on its first run — including
+          // Colorado at Georgia Tech, Thursday's primetime fixture — because a
+          // 7:30pm ET kickoff is the NEXT DAY in UTC, so asking ESPN for our
+          // stored date returned a slate that never contained it.
+          //
+          // The timezone gap is the same one that has bitten three times today.
+          // A verifier that deletes on a date mismatch is worse than no
+          // verifier: a wrong fixture is visible and fixable, a deleted real one
+          // is silent.
+          scheduleDropped++;
+          if (scheduleDrops.length < 20) scheduleDrops.push(`${day} ${aFull} @ ${hFull}`);
+        }
+      }
+    } catch (err) {
+      repairErrors.push(`schedule verify: ${(err as Error).message}`);
     }
 
     // ── Repair upcoming games that only have one team ────────────────────
@@ -919,6 +1005,9 @@ serve(async (req) => {
       upcoming_repaired: upcomingRepaired,
       names_fixed: namesFixed,
       dates_fixed: datesFixed,
+      schedule_checked: scheduleChecked,
+      schedule_dropped: scheduleDropped,
+      schedule_drops: scheduleDrops,
       stale_duplicates: staleDupes,
       sports_fetched: sportsToFetch.length,
     }), {
