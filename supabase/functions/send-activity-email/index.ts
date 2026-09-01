@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const APP_STORE_URL = 'https://apps.apple.com/us/app/id6777524558';
+
 // Subject line rotation - feels personal, not system-generated
 const SUBJECT_TEMPLATES = [
   (teamName: string) => `${teamName} huddle is heating up 👀`,
@@ -339,7 +341,21 @@ Deno.serve(async (req) => {
       Open Side Huddle
     </a>
 
-    <p style="font-size: 12px; color: #999999; margin: 32px 0 0 0;">
+    <!-- Every room link above is also an invite: /h/<id> opens the app for
+         anyone who has it and shows the room plus a download button to anyone
+         who does not. That already worked; the email just never said so, and a
+         person forwarding this to a friend is the cheapest way anyone joins. -->
+    <p style="font-size: 13px; color: #666666; line-height: 1.5; margin: 28px 0 0 0; padding-top: 20px; border-top: 1px solid #eeeeee;">
+      Know someone who belongs in one of these rooms?
+      Forward this — every link above works for them too.
+    </p>
+
+    <p style="font-size: 12px; color: #999999; margin: 16px 0 0 0;">
+      Reading this somewhere without the app?
+      <a href="${APP_STORE_URL}" style="color: #666666;">Get Side Huddle</a>.
+    </p>
+
+    <p style="font-size: 12px; color: #999999; margin: 20px 0 0 0;">
       You'll only get emails when there's real activity.
     </p>
 
