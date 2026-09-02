@@ -22,7 +22,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 //   SQUARE_LOCATION_ID   – your Square location id
 //   SQUARE_ENV           – "production" or "sandbox" (default "sandbox")
 //
-// Body: { teams: [{ teamKey, teamName, league }] }
+// Body: { teams: [{ teamKey, teamName, league }], businessName, website }
+//
+// businessName and website are collected on the page and stored on the claim,
+// because team_sponsors.link_url is NOT NULL and Square gives us neither.
+// Without them a payment lands and the sponsor never appears in a room.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,13 +49,20 @@ serve(async (req) => {
     });
 
   try {
-    const { teams } = await req.json();
+    const { teams, businessName, website } = await req.json();
     if (!Array.isArray(teams) || teams.length === 0) {
       return json({ error: "Select at least one team." }, 400);
     }
     if (teams.length > 20) {
       return json({ error: "Contact partnerships for packages larger than 20 teams." }, 400);
     }
+
+    const brand = String(businessName || "").trim();
+    const site = String(website || "").trim();
+    if (!brand) return json({ error: "Add your business name." }, 400);
+    if (!site) return json({ error: "Add your website." }, 400);
+    // Accept "murphys.com" as well as a full URL — nobody types https://.
+    const siteUrl = /^https?:\/\//i.test(site) ? site : `https://${site}`;
 
     const cleanTeams = teams.map((team: unknown) => {
       const candidate = team as { teamKey?: unknown; teamName?: unknown; league?: unknown };
@@ -149,6 +160,8 @@ serve(async (req) => {
       league: team.league,
       status: "open",
       plan: "full",
+      business_name: brand,
+      website: siteUrl,
       amount_paid_cents: 0,   // set by square-webhook when the payment lands
       balance_due_cents: 0,   // nothing owed later — $100 is the whole price
       square_checkout_id: paymentLink.id ?? null,

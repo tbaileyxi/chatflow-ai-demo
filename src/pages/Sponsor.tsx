@@ -341,6 +341,11 @@ function Checkout({ teams, onClose }: { teams: Team[]; onClose: () => void }) {
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Asked here rather than after payment, because team_sponsors needs a name
+  // and a link to render at all — collected later means a sponsor pays and
+  // stays invisible until someone does it by hand.
+  const [brand, setBrand] = useState('');
+  const [site, setSite] = useState('');
 
   const go = async () => {
     setBusy(true);
@@ -350,6 +355,8 @@ function Checkout({ teams, onClose }: { teams: Team[]; onClose: () => void }) {
         'create-sponsor-square-checkout',
         {
           body: {
+            businessName: brand.trim(),
+            website: site.trim(),
             teams: teams.map((t) => ({
               teamKey: t.id,
               teamName: `${t.city} ${t.name}`,
@@ -416,6 +423,25 @@ function Checkout({ teams, onClose }: { teams: Team[]; onClose: () => void }) {
           </p>
         </div>
 
+        <div className="mb-5 space-y-3">
+          <input
+            value={brand}
+            onChange={(e) => setBrand(e.target.value)}
+            placeholder="Business name"
+            className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-base placeholder:text-white/30 focus:outline-none focus:border-[#facc15]/60"
+          />
+          <input
+            value={site}
+            onChange={(e) => setSite(e.target.value)}
+            placeholder="Website"
+            className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-base placeholder:text-white/30 focus:outline-none focus:border-[#facc15]/60"
+          />
+          <p className="text-xs text-white/35">
+            This is the name fans see in the room, and where tapping it takes
+            them.
+          </p>
+        </div>
+
         {err ? (
           <p className="mb-4 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">
             {err}
@@ -424,7 +450,7 @@ function Checkout({ teams, onClose }: { teams: Team[]; onClose: () => void }) {
 
         <button
           onClick={go}
-          disabled={busy}
+          disabled={busy || !brand.trim() || !site.trim()}
           className="w-full rounded-full bg-[#facc15] px-6 py-4 text-base font-black text-black hover:opacity-90 transition-opacity disabled:opacity-50"
         >
           {busy ? 'Opening checkout…' : `Pay $${total}`}

@@ -75,7 +75,7 @@ serve(async (req) => {
 
     const { data: claims, error: findErr } = await supabase
       .from("sponsor_claims")
-      .select("id, plan, status")
+      .select("id, plan, status, team_key, team_name, business_name, website")
       .eq("square_order_id", orderId);
 
     if (findErr || !claims?.length) {
@@ -103,8 +103,55 @@ serve(async (req) => {
         })
         .eq("id", claim.id);
 
-      if (updErr) console.error("sponsor_claims update error:", updErr);
-      else console.log(`Sponsor claim ${claim.id} -> claimed`);
+      if (updErr) {
+        console.error("sponsor_claims update error:", updErr);
+        continue;
+      }
+      console.log(`Sponsor claim ${claim.id} -> claimed`);
+
+      // Put the sponsor ON SCREEN.
+      //
+      // Marking the claim paid used to be the end of it, which meant a sponsor
+      // could pay and never appear anywhere in the product — the app reads
+      // team_sponsors, and nothing was writing it. This is the step that turns
+      // a payment into the thing that was actually sold.
+      //
+      // team_key holds a teams.id uuid for anything bought through the current
+      // board. Older rows key on "NFL|Chicago|Bears" and cannot be resolved to
+      // a team, so they are skipped rather than guessed at.
+      const teamId = String(claim.team_key ?? "");
+      const isUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(teamId);
+      if (!isUuid) {
+        console.log(`Claim ${claim.id}: team_key "${teamId}" is not a team id — no sponsor row written`);
+        continue;
+      }
+      if (!claim.business_name || !claim.website) {
+        console.error(`Claim ${claim.id}: missing business_name/website, cannot create team_sponsors row`);
+        continue;
+      }
+
+      // One active sponsor per team is enforced by a partial unique index, so
+      // retire whatever was there before rather than colliding with it.
+      const { error: retireErr } = await supabase
+        .from("team_sponsors")
+        .update({ is_active: false })
+        .eq("team_id", teamId)
+        .eq("is_active", true);
+      if (retireErr) console.error("team_sponsors retire error:", retireErr);
+
+      const { error: sponsorErr } = await supabase.from("team_sponsors").insert({
+        team_id: teamId,
+        brand_name: claim.business_name,
+        link_url: claim.website,
+        is_active: true,
+        // A season, dated from the payment. Without an end date the sponsorship
+        // would quietly run forever and there would be nothing to renew.
+        end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+
+      if (sponsorErr) console.error("team_sponsors insert error:", sponsorErr);
+      else console.log(`${claim.business_name} is now live on ${claim.team_name}`);
     }
 
     return ok();
