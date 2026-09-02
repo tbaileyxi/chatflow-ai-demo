@@ -457,8 +457,10 @@ function rowFromSponsor(s: Sponsor): Row {
  * glance, so give them one click.
  */
 function Group({
-  title, why, rows, busy, onSend, onPreview, onResearch, onRecategorise,
+  title, why, rows, busy, onSend, onPreview, onResearch, onRecategorise, done, onDone,
 }: {
+  done?: boolean;
+  onDone?: () => void;
   title: string;
   why: string;
   rows: Row[];
