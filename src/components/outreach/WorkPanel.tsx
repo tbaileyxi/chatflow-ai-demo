@@ -62,6 +62,10 @@ export default function WorkPanel() {
   const [index, setIndex] = useState<
     { team: string; kind: "chapter" | "partner" | "business"; open: boolean }[] | null
   >(null);
+  // Which searches have been run, per team. Without this an empty group means
+  // both "nothing found" and "never looked", which are opposite instructions.
+  const [progress, setProgress] = useState<Record<string, Set<string>>>({});
+  const [extraTeams, setExtraTeams] = useState<string[]>([]);
 
   const loadIndex = async () => {
     const [c, s] = await Promise.all([
@@ -88,7 +92,39 @@ export default function WorkPanel() {
       });
     }
     setIndex(out);
+
+    const [pr, et] = await Promise.all([
+      (supabase as any).from("team_progress").select("team,kind"),
+      (supabase as any).from("outreach_teams").select("team"),
+    ]);
+    const m: Record<string, Set<string>> = {};
+    for (const r of (pr.data ?? []) as any[]) {
+      (m[r.team] ??= new Set()).add(r.kind);
+    }
+    setProgress(m);
+    setExtraTeams(((et.data ?? []) as any[]).map((r) => String(r.team)));
   };
+
+  async function markDone(team: string, kind: string, found: number) {
+    await (supabase as any)
+      .from("team_progress")
+      .upsert({ team, kind, found, searched_at: new Date().toISOString() },
+              { onConflict: "team,kind" });
+    setProgress((p) => ({ ...p, [team]: new Set([...(p[team] ?? []), kind]) }));
+  }
+
+  async function addTeam() {
+    const name = prompt("Which team? e.g. Boise State, Cleveland Browns");
+    if (!name || !name.trim()) return;
+    const t = name.trim();
+    const { error } = await (supabase as any).from("outreach_teams").insert({ team: t });
+    if (error && !String(error.message).includes("duplicate")) {
+      toast({ title: "Could not add", description: error.message, variant: "destructive" });
+      return;
+    }
+    setExtraTeams((p) => (p.includes(t) ? p : [...p, t]));
+    setPicked(t);
+  }
 
   // Only the team you opened.
   const load = async (team?: string) => {
@@ -122,8 +158,11 @@ export default function WorkPanel() {
       if (r.open) t.open++;
       m.set(r.team, t);
     }
+    for (const t of extraTeams) {
+      if (!m.has(t)) m.set(t, { key: t, total: 0, open: 0 });
+    }
     return [...m.values()].sort((a, b) => b.total - a.total);
-  }, [index]);
+  }, [index, extraTeams]);
 
   const shown = useMemo(() => {
     const n = q.trim().toLowerCase();
@@ -242,6 +281,7 @@ export default function WorkPanel() {
             ? `${n} businesses near ${where.trim()} added to ${picked}.`
             : "Apollo returned no companies. Check APOLLO_API_KEY, or try a bigger nearby town.",
       });
+      await markDone(picked, "business", n);
       await Promise.all([loadIndex(), load(picked)]);
     } catch (e) {
       toast({
@@ -335,6 +375,8 @@ export default function WorkPanel() {
 
             <Group
               title="Fan clubs"
+              done={progress[place.key]?.has("chapters")}
+              onDone={() => markDone(place.key, "chapters", 0)}
               why="They bring their members into the app."
               rows={place.chapters.map((c) => ({
                 id: c.id,
@@ -354,6 +396,8 @@ export default function WorkPanel() {
 
             <Group
               title="School partner"
+              done={progress[place.key]?.has("partner")}
+              onDone={() => markDone(place.key, "partner", 0)}
               why="Booster and NIL groups — they have the donor list."
               rows={place.partners.map((s) => rowFromSponsor(s))}
               busy={busy}
@@ -364,6 +408,8 @@ export default function WorkPanel() {
 
             <Group
               title="Local businesses"
+              done={progress[place.key]?.has("business")}
+              onDone={() => markDone(place.key, "business", 0)}
               why="They pay $100 to sponsor the team's rooms."
               rows={place.businesses.map((s) => rowFromSponsor(s))}
               busy={busy}
@@ -456,6 +502,19 @@ function Group({
           <p className="text-sm text-muted-foreground">{why}</p>
         </div>
         <div className="flex items-center gap-2">
+          {onDone ? (
+            <button
+              onClick={onDone}
+              className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                done
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Mark this search as done for this team"
+            >
+              {done ? "✓ searched" : "mark searched"}
+            </button>
+          ) : null}
           {live.filter((r) => r.store).length > 0 ? (
             <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-400">
               {live.filter((r) => r.store).length} clicked through to the App Store
