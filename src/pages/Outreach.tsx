@@ -400,6 +400,9 @@ export default function Outreach() {
       total: leads.length,
       priority: priority.length,
       schoolPartners: schoolPartners.length,
+      // Businesses had no tab of their own — they were only visible under
+      // "All", which is where the 665 bars went to be forgotten.
+      businesses: leads.filter((l) => !isSchoolPartnerLead(l)).length,
       withEmail: leads.filter((l) => l.contact_email).length,
       due: due.length,
       contacted: contacted.length,
@@ -408,6 +411,7 @@ export default function Outreach() {
 
   const filtered = useMemo(() => {
     if (view === "school") return leads.filter((l) => campaignMatchesLead(l, campaign));
+    if (view === "business") return leads.filter((l) => !isSchoolPartnerLead(l));
     if (view === "priority") return leads.filter((l) => (l.sponsor_score || 0) >= 12 || l.priority === "TIER1");
     if (view === "contacted") return leads.filter((l) => l.emailed || l.status === "Sent" || l.status === "Follow-up");
     if (view === "followup") {
@@ -1060,9 +1064,16 @@ export default function Outreach() {
         <div className="min-w-0">
           <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">
+              {/* WHO first, then what state. These used to sit in one row, so
+                  "School partners" looked like a sibling of "Follow-up" — one
+                  is an audience with its own letter, the other is a stage. */}
               <Button variant={view === "school" ? "default" : "outline"} size="sm" onClick={() => setView("school")}>
                 School partners ({metrics.schoolPartners})
               </Button>
+              <Button variant={view === "business" ? "default" : "outline"} size="sm" onClick={() => setView("business")}>
+                Businesses ({metrics.businesses})
+              </Button>
+              <span className="mx-1 self-center text-muted-foreground">·</span>
               <Button variant={view === "priority" ? "default" : "outline"} size="sm" onClick={() => setView("priority")}>
                 Priority ({metrics.priority})
               </Button>
