@@ -170,6 +170,41 @@ export default function WorkPanel() {
     }
   }
 
+  // Go and find local businesses for this team. Same Apollo search the old page
+  // hid behind "Build A Sponsor Map", but scoped to the team you are looking at
+  // instead of asking you to retype it.
+  async function research() {
+    if (!picked) return;
+    setBusy("Looking for local businesses…");
+    try {
+      const { data, error } = await supabase.functions.invoke("outreach-enrich", {
+        body: { school: picked, vertical: "restaurants", maxResults: 25 },
+      });
+      if (error) throw error;
+      toast({
+        title: "Search finished",
+        description: `${(data as any)?.inserted ?? 0} new businesses found for ${picked}.`,
+      });
+      await Promise.all([loadIndex(), load(picked)]);
+    } catch (e) {
+      toast({
+        title: "Search failed",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Four Auburn restaurants are filed as school partners because an old search
+  // typed the vertical wrong. A person can see that instantly; this is the one
+  // click that fixes it.
+  async function recategorise(id: string) {
+    await supabase.from("sponsor_leads").update({ vertical: "restaurant" }).eq("id", id);
+    await load(picked!);
+  }
+
   if (!index) {
     return <div className="container mx-auto px-4 py-8 text-muted-foreground">Loading teams…</div>;
   }
@@ -240,6 +275,7 @@ export default function WorkPanel() {
               rows={place.partners.map((s) => rowFromSponsor(s))}
               busy={busy}
               onSend={(ids, step) => send("sponsors", ids, step)}
+              onRecategorise={recategorise}
             />
 
             <Group
@@ -248,6 +284,7 @@ export default function WorkPanel() {
               rows={place.businesses.map((s) => rowFromSponsor(s))}
               busy={busy}
               onSend={(ids, step) => send("sponsors", ids, step)}
+              onResearch={research}
             />
           </>
         )}
@@ -276,20 +313,47 @@ function rowFromSponsor(s: Sponsor): Row {
 }
 
 /**
- * One group in one town, with the only two buttons that make sense for it:
- * write to the ones never written to, and follow up the ones who got step 1.
+ * One group for one team: every contact, selectable, with what has happened to
+ * each.
+ *
+ * The first version showed eight rows and a bulk button, which meant the answer
+ * to "have I written to this person" was "somewhere in + 344 more". Selecting
+ * is the whole job — you look down the list, tick the ones you mean, and send.
+ *
+ * The category fix is here for the same reason: four Auburn restaurants are
+ * filed as school partners because an old search typed the vertical wrong, and
+ * no amount of layout makes that read correctly. A human can see it in one
+ * glance, so give them one click.
  */
 function Group({
-  title, why, rows, busy, onSend,
+  title, why, rows, busy, onSend, onResearch, onRecategorise,
 }: {
-  title: string; why: string; rows: Row[]; busy: string | null;
+  title: string;
+  why: string;
+  rows: Row[];
+  busy: string | null;
   onSend: (ids: string[], step: number) => void;
+  onResearch?: () => void;
+  onRecategorise?: (id: string) => void;
 }) {
+  const [sel, setSel] = useState<string[]>([]);
+  const [showAll, setShowAll] = useState(false);
+
   const live = rows.filter((r) => !r.dead);
   const noEmail = live.filter((r) => !r.email);
-  const unsent = live.filter((r) => r.email && !r.emailed);
-  const dueFollowUp = live.filter((r) => r.email && r.emailed && r.step === 1);
-  const hot = live.filter((r) => r.store);
+  const sendable = live.filter((r) => r.email);
+  const visible = showAll ? rows : rows.slice(0, 12);
+
+  // Selecting somebody with no address, or somebody who asked to be left alone,
+  // is a click that can only end in an error.
+  const selectable = sendable.map((r) => r.id);
+  const allOn = selectable.length > 0 && selectable.every((id) => sel.includes(id));
+
+  // What sending would do to this selection: first letter for anyone never
+  // written to, follow-up for anyone on step 1.
+  const chosen = rows.filter((r) => sel.includes(r.id));
+  const firsts = chosen.filter((r) => !r.emailed).map((r) => r.id);
+  const followUps = chosen.filter((r) => r.emailed && r.step === 1).map((r) => r.id);
 
   return (
     <Card className="space-y-3 p-5">
@@ -300,52 +364,100 @@ function Group({
           </h3>
           <p className="text-sm text-muted-foreground">{why}</p>
         </div>
-        {hot.length > 0 ? (
-          <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-400">
-            {hot.length} clicked through to the App Store
-          </span>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {live.filter((r) => r.store).length > 0 ? (
+            <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-400">
+              {live.filter((r) => r.store).length} clicked through to the App Store
+            </span>
+          ) : null}
+          {onResearch ? (
+            <Button size="sm" variant="outline" disabled={!!busy} onClick={onResearch}>
+              {rows.length === 0 ? "Find some" : "Find more"}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nobody here yet.</p>
+        <p className="text-sm text-muted-foreground">
+          Nobody here yet{onResearch ? " — nothing has been researched for this team." : "."}
+        </p>
       ) : (
         <>
-          <div className="space-y-1">
-            {rows.slice(0, 8).map((r) => (
-              <div key={r.id} className="flex items-baseline justify-between gap-3 text-sm">
+          <label className="flex items-center gap-2 border-b pb-2 text-sm">
+            <input
+              type="checkbox"
+              checked={allOn}
+              onChange={(e) => setSel(e.target.checked ? selectable : [])}
+              disabled={selectable.length === 0}
+            />
+            <span className="text-muted-foreground">
+              {sel.length > 0 ? `${sel.length} selected` : `Select all ${selectable.length} with an address`}
+            </span>
+          </label>
+
+          <div className="max-h-[380px] space-y-1 overflow-y-auto">
+            {visible.map((r) => (
+              <label
+                key={r.id}
+                className={`flex items-center gap-3 rounded px-1 py-1.5 text-sm ${
+                  r.email && !r.dead ? "hover:bg-muted/40" : "opacity-60"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  disabled={!r.email || r.dead}
+                  checked={sel.includes(r.id)}
+                  onChange={(e) =>
+                    setSel((p) => (e.target.checked ? [...p, r.id] : p.filter((x) => x !== r.id)))
+                  }
+                />
                 <span className="min-w-0 flex-1 truncate">
                   {r.name}
                   {r.sub ? <span className="text-muted-foreground"> · {r.sub}</span> : null}
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground">{state(r)}</span>
-              </div>
+                {onRecategorise ? (
+                  <button
+                    onClick={(e) => { e.preventDefault(); onRecategorise(r.id); }}
+                    className="shrink-0 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    title="This is an ordinary local business, not a booster group"
+                  >
+                    not a partner
+                  </button>
+                ) : null}
+              </label>
             ))}
-            {rows.length > 8 ? (
-              <p className="text-xs text-muted-foreground">+ {rows.length - 8} more</p>
-            ) : null}
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-1">
-            {unsent.length > 0 ? (
-              <Button size="sm" disabled={!!busy} onClick={() => onSend(unsent.map((r) => r.id), 1)}>
-                Write to {unsent.length} for the first time
+          {rows.length > 12 ? (
+            <button
+              onClick={() => setShowAll((v) => !v)}
+              className="text-sm text-muted-foreground underline underline-offset-2"
+            >
+              {showAll ? "Show fewer" : `Show all ${rows.length}`}
+            </button>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+            {firsts.length > 0 ? (
+              <Button size="sm" disabled={!!busy} onClick={() => onSend(firsts, 1)}>
+                Email {firsts.length} — first letter
               </Button>
             ) : null}
-            {dueFollowUp.length > 0 ? (
-              <Button size="sm" variant="outline" disabled={!!busy}
-                onClick={() => onSend(dueFollowUp.map((r) => r.id), 2)}>
-                Follow up {dueFollowUp.length}
+            {followUps.length > 0 ? (
+              <Button size="sm" variant="outline" disabled={!!busy} onClick={() => onSend(followUps, 2)}>
+                Email {followUps.length} — follow-up
               </Button>
             ) : null}
-            {noEmail.length > 0 ? (
-              <span className="self-center text-xs text-muted-foreground">
-                {noEmail.length} have no email address
+            {sel.length === 0 ? (
+              <span className="text-xs text-muted-foreground">
+                Tick someone to email them.
               </span>
             ) : null}
-            {unsent.length === 0 && dueFollowUp.length === 0 && noEmail.length === 0 ? (
-              <span className="self-center text-xs text-muted-foreground">
-                All contacted.
+            {noEmail.length > 0 ? (
+              <span className="ml-auto text-xs text-muted-foreground">
+                {noEmail.length} have no address
               </span>
             ) : null}
           </div>

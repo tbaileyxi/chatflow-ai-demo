@@ -837,7 +837,7 @@ export default function Outreach() {
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
               <h1 className="text-3xl font-bold text-foreground">
-                {audience === "work" ? "Today's work" : audience === "coverage" ? "Coverage" : audience === "creators" ? "Creator Outreach" : audience === "chapters" ? "Chapter Outreach" : "Sponsor Prospecting Engine"}
+                {audience === "work" ? "Outreach by team" : audience === "coverage" ? "Coverage" : audience === "creators" ? "Creator Outreach" : audience === "chapters" ? "Chapter Outreach" : "Sponsor Prospecting Engine"}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {audience === "chapters"
@@ -863,7 +863,7 @@ export default function Outreach() {
               size="sm"
               onClick={() => setAudience("work")}
             >
-              Today's work
+              By team
             </Button>
             <Button
               variant={audience === "sponsors" ? "default" : "outline"}
