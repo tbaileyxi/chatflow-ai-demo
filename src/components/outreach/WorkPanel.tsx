@@ -53,54 +53,98 @@ export default function WorkPanel() {
   const [picked, setPicked] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
-  const load = async () => {
+  // Two loads, not one.
+  //
+  // Pulling every column of ten thousand rows to draw a list of team names hung
+  // the page for the best part of a minute. The list only needs the team and
+  // whether each row is outstanding; the detail is fetched for the one team
+  // actually opened.
+  const [index, setIndex] = useState<
+    { team: string; kind: "chapter" | "partner" | "business"; open: boolean }[] | null
+  >(null);
+
+  const loadIndex = async () => {
+    const [c, s] = await Promise.all([
+      supabase
+        .from("chapter_leads")
+        .select("org,emailed,unsubscribed,bounced")
+        .limit(5000),
+      supabase
+        .from("sponsor_leads")
+        .select("school,vertical,emailed,unsubscribed,bounced")
+        .limit(5000),
+    ]);
+    const out: { team: string; kind: "chapter" | "partner" | "business"; open: boolean }[] = [];
+    for (const r of (c.data ?? []) as any[]) {
+      if (!r.org) continue;
+      out.push({ team: String(r.org).trim(), kind: "chapter", open: !r.emailed && !r.unsubscribed && !r.bounced });
+    }
+    for (const r of (s.data ?? []) as any[]) {
+      if (!r.school) continue;
+      out.push({
+        team: String(r.school).trim(),
+        kind: (r.vertical || "").toLowerCase() === SCHOOL_PARTNER ? "partner" : "business",
+        open: !r.emailed && !r.unsubscribed && !r.bounced,
+      });
+    }
+    setIndex(out);
+  };
+
+  // Only the team you opened.
+  const load = async (team?: string) => {
+    const t = team ?? picked;
+    if (!t) return;
     const [c, s] = await Promise.all([
       supabase
         .from("chapter_leads")
         .select("id,org,chapter_name,city,state,email,emailed,sequence_step,unsubscribed,bounced,opened_at,clicked_app_store")
-        .limit(5000),
+        .eq("org", t)
+        .limit(500),
       supabase
         .from("sponsor_leads")
         .select("id,company,vertical,market,region,school,contact_name,contact_email,emailed,sequence_step,unsubscribed,bounced,opened_at,clicked_app_store")
-        .limit(5000),
+        .eq("school", t)
+        .limit(500),
     ]);
     setChapters((c.data ?? []) as Chapter[]);
     setSponsors((s.data ?? []) as Sponsor[]);
   };
-  useEffect(() => { void load(); }, []);
 
-  // Grouped by TEAM, not town. The work is organised the way the product is —
-  // "have I done Boise State" — and a town is only where a chapter happens to
-  // meet. Chapters carry the team on `org`, sponsors on `school`.
-  const places = useMemo(() => {
-    const map = new Map<string, Place>();
-    const at = (k: string) => {
-      const key = k.trim();
-      if (!map.has(key)) map.set(key, { key, chapters: [], partners: [], businesses: [] });
-      return map.get(key)!;
-    };
-    for (const c of chapters ?? []) {
-      const k = (c.org || "").trim();
-      if (!k) continue;
-      at(k).chapters.push(c);
+  useEffect(() => { void loadIndex(); }, []);
+  useEffect(() => { if (picked) void load(picked); }, [picked]);
+
+  // The team list, from the slim index.
+  const teams = useMemo(() => {
+    const m = new Map<string, { key: string; total: number; open: number }>();
+    for (const r of index ?? []) {
+      const t = m.get(r.team) ?? { key: r.team, total: 0, open: 0 };
+      t.total++;
+      if (r.open) t.open++;
+      m.set(r.team, t);
     }
-    for (const s of sponsors ?? []) {
-      const k = (s.school || "").trim();
-      if (!k) continue;
-      const p = at(k);
-      if ((s.vertical || "").toLowerCase() === SCHOOL_PARTNER) p.partners.push(s);
-      else p.businesses.push(s);
-    }
-    return [...map.values()].sort((a, b) => size(b) - size(a));
-  }, [chapters, sponsors]);
+    return [...m.values()].sort((a, b) => b.total - a.total);
+  }, [index]);
 
   const shown = useMemo(() => {
     const n = q.trim().toLowerCase();
-    if (!n) return places.slice(0, 40);
-    return places.filter((p) => p.key.toLowerCase().includes(n)).slice(0, 40);
-  }, [places, q]);
+    const all = teams;
+    if (!n) return all.slice(0, 60);
+    return all.filter((t) => t.key.toLowerCase().includes(n)).slice(0, 60);
+  }, [teams, q]);
 
-  const place = picked ? places.find((p) => p.key === picked) ?? null : null;
+  // The opened team, assembled from the rows fetched for it.
+  const place: Place | null = picked
+    ? {
+        key: picked,
+        chapters: chapters ?? [],
+        partners: (sponsors ?? []).filter(
+          (x) => (x.vertical || "").toLowerCase() === SCHOOL_PARTNER,
+        ),
+        businesses: (sponsors ?? []).filter(
+          (x) => (x.vertical || "").toLowerCase() !== SCHOOL_PARTNER,
+        ),
+      }
+    : null;
 
   // Send this team's unsent people, and only this team's.
   async function send(kind: "chapters" | "sponsors", ids: string[], step: number) {
@@ -126,8 +170,8 @@ export default function WorkPanel() {
     }
   }
 
-  if (!chapters || !sponsors) {
-    return <div className="container mx-auto px-4 py-8 text-muted-foreground">Loading…</div>;
+  if (!index) {
+    return <div className="container mx-auto px-4 py-8 text-muted-foreground">Loading teams…</div>;
   }
 
   return (
@@ -141,7 +185,7 @@ export default function WorkPanel() {
         />
         <div className="max-h-[70vh] space-y-1 overflow-y-auto pr-1">
           {shown.map((p) => {
-            const left = todo(p);
+            const left = p.open;
             return (
               <button
                 key={p.key}
@@ -318,14 +362,4 @@ function state(r: Row) {
   if (r.opened) return `opened · step ${r.step}`;
   if (r.emailed) return `sent step ${r.step}`;
   return "not written to";
-}
-
-function size(p: Place) {
-  return p.chapters.length + p.partners.length + p.businesses.length;
-}
-
-function todo(p: Place) {
-  const n = (rows: { emailed: boolean; unsubscribed: boolean; bounced: boolean }[]) =>
-    rows.filter((r) => !r.emailed && !r.unsubscribed && !r.bounced).length;
-  return n(p.chapters) + n(p.partners) + n(p.businesses);
 }
