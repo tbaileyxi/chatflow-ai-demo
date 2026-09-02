@@ -191,9 +191,10 @@ function body(step: number, lead: Lead): string {
   return shell(`
     <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
     ${signalLine(lead)}
-    <p style="margin:0 0 18px 0;">Side Huddle is the digital tailgate — AI-enhanced team chat where one fanbase splits into hundreds of small huddles, each with a bot pulling live scores, news and highlights into the room.</p>
-    <p style="margin:0 0 18px 0;">We sell one sponsor per category. ${lead.company} would be the only one across every ${slot} huddle, in front of ${fans}.</p>
-    <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season, paid once.</strong> No deposit and nothing owed later — about the cost of one radio spot, and it runs every game instead of once.</p>
+    <p style="margin:0 0 18px 0;">Side Huddle is the digital tailgate — the app fan groups use to watch the game together. Live scores, big plays and highlights land in the room while they argue about the call.</p>
+    <p style="margin:0 0 18px 0;">${lead.company} would be the only sponsor in every ${slot} huddle — your name at the top of the room and on every update, all season, in front of ${fans}.</p>
+    <p style="margin:0 0 18px 0;">Those people are deciding where to watch on Saturday morning. This puts you in front of them at that moment, with a tap that goes straight to you.</p>
+    <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season, paid once.</strong> No deposit, nothing owed later — less than one radio spot, and it runs every game instead of once.</p>
     ${cta("Claim the slot")}
     ${appLine()}
     <p style="font-size:13px;color:#999;margin:0;">Price goes up each week until kickoff.</p>`);
