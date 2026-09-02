@@ -11,20 +11,25 @@ const SPONSOR_URL = "https://sidehuddlesports.com/sponsors";
 // Square hosted payment link for the deposit. The CTA points straight here
 // rather than at the sponsor page: the ask in these emails is the deposit, and
 // a page in between is one more place to lose someone reading on a phone.
-const CHECKOUT_URL = "https://square.link/u/iq7jW1sF";
+// The board, not a fixed Square link. Checkout is generated per team now — a
+// static link cannot know which team they want, and there is no sale without
+// one.
+const CHECKOUT_URL = "https://sidehuddlesports.com/sponsors";
 // A sponsor should be able to look at the thing before paying for it, so every
 // mail carries all three: buy, read the full pitch, see the app itself.
 const APP_STORE_URL = "https://apps.apple.com/us/app/id6777524558";
 const SCHOOL_PARTNER_VERTICAL = "school partner";
 
-// Season sponsorship, collected in two parts. The deposit is what the email
-// actually asks for — it is the decision small enough to make from an inbox —
-// and the balance date carries "whichever is later" so the offer never depends
-// on an App Store review date we do not control.
-const SEASON_PRICE = "$2,500";
-const DEPOSIT = "$500";
-const BALANCE = "$2,000";
-const BALANCE_DATE = "Sept 1";
+// $100 for the season, paid in full.
+//
+// This used to be $2,500 with a $500 deposit and a balance due "the day we
+// launch". The app launched, and the page now sells $100 — an email quoting
+// $2,500 that links to a $100 page is the fastest way to lose a buyer who was
+// otherwise ready. One number, in both places.
+//
+// The deposit is gone with it: at $100 there is nothing to hold, and a deposit
+// is a second conversation, which is the one thing this price exists to avoid.
+const SEASON_PRICE = "$100";
 
 // Trademark posture: we describe who the fans are, never claim affiliation.
 // Never render a school or club mark, logo, or the word "official" beside one.
@@ -146,6 +151,18 @@ function subject(step: number, lead: Lead): string {
   }
 }
 
+// The one line no other pitch in their inbox can write.
+//
+// A bar loaded from chapter-db carries the fan club it already hosts and how
+// many people are in it — "Home of Northern Summit Browns Backers — 687
+// members". Leading with that is the difference between a cold email and a
+// letter about their own Sunday.
+function signalLine(lead: Lead): string {
+  const signal = (lead.sponsor_signal || "").trim();
+  if (!signal) return "";
+  return `<p style="margin:0 0 18px 0;">${signal}. That crowd is the reason I'm writing.</p>`;
+}
+
 function body(step: number, lead: Lead): string {
   if (isSchoolPartnerLead(lead)) return schoolPartnerBody(step, lead);
 
@@ -155,7 +172,7 @@ function body(step: number, lead: Lead): string {
   if (step === 2) {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${firstName(lead)} — quick follow-up.</p>
-      <p style="margin:0 0 18px 0;">One sponsor, every ${slot} huddle. ${DEPOSIT} holds it; ${BALANCE} on ${BALANCE_DATE} or the day we launch, whichever is later.</p>
+      <p style="margin:0 0 18px 0;">One sponsor, every ${slot} huddle, all season. ${SEASON_PRICE} — that is the whole price.</p>
       ${cta("Claim the slot")}
       ${appLine()}`);
   }
@@ -173,9 +190,10 @@ function body(step: number, lead: Lead): string {
   // on a phone, which is where a local owner opens their mail.
   return shell(`
     <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
+    ${signalLine(lead)}
     <p style="margin:0 0 18px 0;">Side Huddle is the digital tailgate — AI-enhanced team chat where one fanbase splits into hundreds of small huddles, each with a bot pulling live scores, news and highlights into the room.</p>
     <p style="margin:0 0 18px 0;">We sell one sponsor per category. ${lead.company} would be the only one across every ${slot} huddle, in front of ${fans}.</p>
-    <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season.</strong> ${DEPOSIT} holds it; the ${BALANCE} balance runs ${BALANCE_DATE} or the day we launch, whichever is later — your 12 months start then, so you never pay for a day you didn't get.</p>
+    <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season, paid once.</strong> No deposit and nothing owed later — about the cost of one radio spot, and it runs every game instead of once.</p>
     ${cta("Claim the slot")}
     ${appLine()}
     <p style="font-size:13px;color:#999;margin:0;">Price goes up each week until kickoff.</p>`);
@@ -188,7 +206,7 @@ function schoolPartnerBody(step: number, lead: Lead): string {
   if (step === 2) {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${firstName(lead)} — quick follow-up.</p>
-      <p style="margin:0 0 18px 0;">One sponsor, every ${huddle} huddle. ${DEPOSIT} holds it; ${BALANCE} on ${BALANCE_DATE} or the day we launch, whichever is later.</p>
+      <p style="margin:0 0 18px 0;">One sponsor, every ${huddle} huddle, all season. ${SEASON_PRICE} — that is the whole price.</p>
       ${cta("Claim the slot")}
       ${appLine()}`);
   }
@@ -210,7 +228,7 @@ function schoolPartnerBody(step: number, lead: Lead): string {
     <p style="margin:0 0 18px 0;">You already put your name in front of ${huddle} fans, so I'll be quick.</p>
     <p style="margin:0 0 18px 0;">Side Huddle is the digital tailgate — AI-enhanced team chat where one fanbase splits into hundreds of small huddles, each with a bot pulling live scores, news and highlights into the room.</p>
     <p style="margin:0 0 18px 0;">We sell one sponsor per category. ${organization} would be the only one across every ${huddle} huddle.</p>
-    <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season.</strong> ${DEPOSIT} holds it; the ${BALANCE} balance runs ${BALANCE_DATE} or the day we launch, whichever is later — your 12 months start then.</p>
+    <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season, paid once.</strong> No deposit and nothing owed later.</p>
     ${cta("Claim the slot")}
     ${appLine()}
     <p style="font-size:13px;color:#999;margin:0;">Price goes up each week until kickoff.</p>`);
