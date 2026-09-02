@@ -100,13 +100,24 @@ export default function Sponsor() {
     })();
   }, []);
 
+  // Football first, because it is football season and the first card a buyer
+  // sees should be a team they might plausibly care about. Alphabetical by city
+  // opened the board on the Anaheim Ducks in September.
+  const LEAGUE_RANK: Record<string, number> = { NCAA: 0, NFL: 1, NBA: 2, NHL: 3, MLB: 4 };
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return (teams ?? []).filter((t) => {
-      if (league !== 'All' && t.league !== league) return false;
-      if (!needle) return true;
-      return `${t.city} ${t.name}`.toLowerCase().includes(needle);
-    });
+    return (teams ?? [])
+      .filter((t) => {
+        if (league !== 'All' && t.league !== league) return false;
+        if (!needle) return true;
+        return `${t.city} ${t.name}`.toLowerCase().includes(needle);
+      })
+      .sort((a, b) => {
+        const r = (LEAGUE_RANK[a.league] ?? 9) - (LEAGUE_RANK[b.league] ?? 9);
+        if (r !== 0) return r;
+        return `${a.city} ${a.name}`.localeCompare(`${b.city} ${b.name}`);
+      });
   }, [teams, league, q]);
 
   const taken = (teams ?? []).filter((t) => t.sponsor && t.sponsor.trim()).length;
@@ -122,100 +133,62 @@ export default function Sponsor() {
         <p className="text-[11px] uppercase tracking-[0.2em] text-[#facc15] font-black mb-5">
           Side Huddle · The digital tailgate
         </p>
-        <h1 className="text-4xl sm:text-6xl font-black leading-[1.02] tracking-tight">
-          Your name in the room
+
+        {/* The price IS the hook. "Your name in the room" was a description of a
+            feature; $100 for a season is the thing that makes somebody stop —
+            it is so far under what local sponsorship costs that the number does
+            the persuading and the copy just has to not get in the way. */}
+        <h1 className="text-5xl sm:text-7xl font-black leading-[0.95] tracking-tight">
+          <span className="text-[#facc15]">$100</span> puts your name
           <br />
-          <span className="text-[#facc15]">when the game is on.</span>
+          in front of a fanbase.
         </h1>
-        {/* Said before the offer, because a bar owner landing here has never
-            heard of us. The old hero sold a placement inside a product the
-            reader could not picture. */}
         <p className="mt-6 text-lg leading-relaxed text-white/60 max-w-xl">
-          Side Huddle is the digital tailgate — the app fan groups use to watch
-          the game together. One brand per team, in every one of those rooms,
-          all season.
+          All season. Every room for that team. Side Huddle is the digital
+          tailgate — the app fan groups use to watch the game together, and
+          you're the only brand in it.
         </p>
+
+        {/* Real scarcity, not a countdown. One sponsor per team is a fact about
+            the product, and the board below proves it — a taken team is visibly
+            gone. Fake urgency is the thing every local owner has learned to
+            ignore. */}
+        {teams ? (
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black text-[#facc15]">{open}</span>
+              <span className="text-sm text-white/50">teams still open</span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black text-white/30">{taken}</span>
+              <span className="text-sm text-white/50">already claimed</span>
+            </div>
+            <a
+              href="#board"
+              className="rounded-full bg-[#facc15] px-7 py-3.5 text-base font-black text-black hover:opacity-90 transition-opacity"
+            >
+              Claim your team →
+            </a>
+          </div>
+        ) : null}
+
         <a
           href={APP_STORE_URL}
           target="_blank"
           rel="noopener"
-          className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[#facc15] hover:opacity-80"
+          className="mt-6 inline-flex items-center gap-2 text-sm font-black text-white/40 hover:text-white/70"
         >
-          See the app on the App Store →
+          See the app first →
         </a>
-
-        {teams ? (
-          <p className="mt-6 text-sm text-white/40">
-            {open} teams open · {taken} taken
-          </p>
-        ) : null}
       </section>
 
-      {/* ── Proof, not prose ──
-          The three explanatory cards that were here read as filler and nobody
-          finished them. A real screenshot of a real sponsor in a real room
-          does the same job in one glance, and it is the only claim on this
-          page that a buyer can verify with their own eyes. */}
+      {/* ── The three placements, shown one at a time ──
+          Three bullet points asked the reader to picture three things at once
+          and picture them correctly. Cycling a highlight over the actual
+          screenshot shows each one where it really sits, which is both quicker
+          to understand and impossible to overstate. */}
       <section className="px-6 pb-16 max-w-5xl mx-auto">
-        <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
-          <div className="relative">
-            <img
-              src="/sponsor-room.png"
-              alt="A Side Huddle room with PRESENTED BY TICKETSR above the live game"
-              className="w-full rounded-2xl border border-white/10"
-            />
-            {/* Points at the sponsor line. Percentages, because the callout has
-                to stay on the line at every width. */}
-            <div
-              className="absolute hidden sm:flex items-center gap-2 pointer-events-none"
-              style={{ top: '24%', left: '100%', marginLeft: -14 }}
-            >
-              <div style={{ width: 42, height: 2, background: '#facc15' }} />
-              <span className="whitespace-nowrap rounded-full bg-[#facc15] px-3 py-1.5 text-[11px] font-black text-black">
-                This is you
-              </span>
-            </div>
-            <p className="mt-3 text-xs text-white/30">
-              A live room today. TicketsR sponsors the Yankees.
-            </p>
-          </div>
-
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.2em] text-[#facc15] font-black mb-5">
-              What you get
-            </p>
-            <ul className="space-y-4">
-              {[
-                'Top of the room, every game, all season.',
-                'Every huddle for your team — including the ones fans make next week.',
-                'On every score, every play, every headline the bot drops.',
-                'Your link on the team page Google already indexes.',
-                'Nobody else. One brand per team.',
-              ].map((b) => (
-                <li key={b} className="flex gap-3">
-                  <span className="text-[#facc15] font-black leading-6">→</span>
-                  <span className="text-lg leading-7">{b}</span>
-                </li>
-              ))}
-            </ul>
-
-            <a
-              href="#board"
-              className="mt-8 inline-block rounded-full bg-[#facc15] px-8 py-4 text-base font-black text-black hover:opacity-90 transition-opacity"
-            >
-              Claim your team — $100
-            </a>
-
-            {/* Said out loud, because a sponsor who finds this out later is a
-                sponsor who does not renew. */}
-            <p className="mt-5 text-sm leading-relaxed text-white/40">
-              Side Huddle is early and rooms are still filling. We would rather
-              you knew that for $100 than found it out for $1,000. What you are
-              buying is the first position on a team, and it stays yours for as
-              long as you keep it.
-            </p>
-          </div>
-        </div>
+        <Placements />
       </section>
 
       {/* ── The board. This is the actual page. ── */}
@@ -477,6 +450,109 @@ function Checkout({ teams, onClose }: { teams: Team[]; onClose: () => void }) {
         >
           Back to the board
         </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The three places a sponsor shows up, highlighted one at a time on a real
+ * screenshot of a real room.
+ *
+ * Motion earns its place here: the page is asking a bar owner to believe his
+ * name appears in three different spots inside an app he has never opened.
+ * Pointing at each one in turn, on a photograph, is the shortest path from
+ * claim to belief — and it beats three paragraphs he will not read.
+ */
+function Placements() {
+  const SPOTS = [
+    {
+      label: 'Top of every room',
+      note: 'Your name under the team name, every game, all season.',
+      // Percentages of the screenshot, so the ring lands correctly at any width.
+      box: { top: '25%', left: '4%', width: '92%', height: '7%' },
+    },
+    {
+      label: 'On every bot card',
+      note: 'The bot posts scores, plays and news all season. Each one carries your name.',
+      box: { top: '70%', left: '4%', width: '80%', height: '22%' },
+    },
+    {
+      label: 'On the team page',
+      note: "The public page Google indexes for that team. Real, crawlable, live today.",
+      box: { top: '13%', left: '4%', width: '92%', height: '10%' },
+    },
+  ];
+
+  const [i, setI] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (paused) return;
+    const t = setInterval(() => setI((n) => (n + 1) % SPOTS.length), 2600);
+    return () => clearInterval(t);
+  }, [paused, SPOTS.length]);
+
+  const spot = SPOTS[i];
+
+  return (
+    <div
+      className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      <div className="relative">
+        <img
+          src="/sponsor-room.png"
+          alt="A Side Huddle room with the sponsor's name above the live game"
+          className="w-full rounded-2xl border border-white/10"
+        />
+        <div
+          className="pointer-events-none absolute rounded-lg"
+          style={{
+            ...spot.box,
+            border: '2px solid #facc15',
+            boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
+            transition: 'all 480ms cubic-bezier(.4,0,.2,1)',
+          }}
+        />
+        <p className="mt-3 text-xs text-white/30">
+          A live room today. TicketsR sponsors the Yankees.
+        </p>
+      </div>
+
+      <div>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-[#facc15] font-black mb-5">
+          Three places, one price
+        </p>
+
+        <div className="space-y-2">
+          {SPOTS.map((sp, n) => (
+            <button
+              key={sp.label}
+              onClick={() => { setI(n); setPaused(true); }}
+              className={`w-full text-left rounded-2xl border p-4 transition-colors ${
+                n === i
+                  ? 'border-[#facc15] bg-[#facc15]/10'
+                  : 'border-white/10 hover:border-white/25'
+              }`}
+            >
+              <p className={`text-base font-black ${n === i ? '' : 'text-white/50'}`}>
+                {sp.label}
+              </p>
+              {n === i ? (
+                <p className="mt-1 text-sm leading-relaxed text-white/60">{sp.note}</p>
+              ) : null}
+            </button>
+          ))}
+        </div>
+
+        <p className="mt-6 text-sm leading-relaxed text-white/40">
+          One brand per team. Side Huddle is early and rooms are still filling —
+          we would rather you knew that for $100 than found it out for $1,000.
+          What you are buying is the first position on a team, and it stays yours
+          for as long as you keep it.
+        </p>
       </div>
     </div>
   );
