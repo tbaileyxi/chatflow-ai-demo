@@ -107,6 +107,29 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     edgeToEdgeEnabled: true,
     package: "com.sidehuddle.sports",
+    // The Android half of Universal Links. Same job as `associatedDomains`
+    // above: a shared room link opens the app instead of the download page.
+    //
+    // This alone is NOT enough. Android verifies the claim by fetching
+    // https://<host>/.well-known/assetlinks.json and checking the app's signing
+    // fingerprint against it — and that fingerprint does not exist until the
+    // first EAS build has produced a signing key. So: build once, read the
+    // SHA-256 out of `eas credentials`, publish assetlinks.json, then links
+    // open the app. Until that file is live, `autoVerify` fails silently and
+    // every link falls back to the browser.
+    intentFilters: [
+      {
+        action: "VIEW",
+        autoVerify: true,
+        data: [
+          { scheme: "https", host: "sidehuddlesports.com", pathPrefix: "/h" },
+          { scheme: "https", host: "www.sidehuddlesports.com", pathPrefix: "/h" },
+          { scheme: "https", host: "sidehuddlesports.com", pathPrefix: "/i" },
+          { scheme: "https", host: "www.sidehuddlesports.com", pathPrefix: "/i" },
+        ],
+        category: ["BROWSABLE", "DEFAULT"],
+      },
+    ],
   },
   web: {
     favicon: "./assets/favicon.png",
