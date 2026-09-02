@@ -206,15 +206,41 @@ export default function WorkPanel() {
   // instead of asking you to retype it.
   async function research() {
     if (!picked) return;
-    setBusy("Looking for local businesses…");
+
+    // The search needs a TOWN, and a team name is not one. Passing "Texas A&M"
+    // meant no location at all, so it searched the whole United States for
+    // restaurants and inserted nothing — which is exactly what happened. Only a
+    // person knows the team plays in College Station.
+    const where = prompt(
+      `Which town are ${picked}'s local businesses in?\n\ne.g. College Station, TX`,
+    );
+    if (!where || !where.trim()) return;
+
+    const kinds = "restaurants, car dealers, insurance, banks, gyms";
+    setBusy(`Looking around ${where.trim()}…`);
     try {
       const { data, error } = await supabase.functions.invoke("outreach-enrich", {
-        body: { school: picked, vertical: "restaurants", maxResults: 25 },
+        body: {
+          school: picked,
+          market: where.trim(),
+          region: where.trim(),
+          vertical: kinds,
+          maxResults: 25,
+        },
       });
-      if (error) throw error;
+      // functions.invoke hides the real message on error.context.
+      if (error) {
+        let detail = "";
+        try { detail = (await (error as any).context?.json())?.error ?? ""; } catch { /* generic */ }
+        throw new Error(detail || "The search function failed.");
+      }
+      const n = (data as any)?.inserted ?? (data as any)?.saved ?? 0;
       toast({
-        title: "Search finished",
-        description: `${(data as any)?.inserted ?? 0} new businesses found for ${picked}.`,
+        title: n > 0 ? `Found ${n}` : "Nothing came back",
+        description:
+          n > 0
+            ? `${n} businesses near ${where.trim()} added to ${picked}.`
+            : "Apollo returned no companies. Check APOLLO_API_KEY, or try a bigger nearby town.",
       });
       await Promise.all([loadIndex(), load(picked)]);
     } catch (e) {
@@ -398,11 +424,16 @@ function Group({
 }) {
   const [sel, setSel] = useState<string[]>([]);
   const [showAll, setShowAll] = useState(false);
+  // Rows with no address cannot be emailed and cannot be ticked, so by default
+  // they are just noise between the ones you can act on — and for a team like
+  // the Packers that is most of the list.
+  const [showNoEmail, setShowNoEmail] = useState(false);
 
   const live = rows.filter((r) => !r.dead);
   const noEmail = live.filter((r) => !r.email);
   const sendable = live.filter((r) => r.email);
-  const visible = showAll ? rows : rows.slice(0, 12);
+  const actionable = showNoEmail ? rows : rows.filter((r) => r.email);
+  const visible = showAll ? actionable : actionable.slice(0, 12);
 
   // Selecting somebody with no address, or somebody who asked to be left alone,
   // is a click that can only end in an error.
@@ -482,14 +513,24 @@ function Group({
             ))}
           </div>
 
-          {rows.length > 12 ? (
-            <button
-              onClick={() => setShowAll((v) => !v)}
-              className="text-sm text-muted-foreground underline underline-offset-2"
-            >
-              {showAll ? "Show fewer" : `Show all ${rows.length}`}
-            </button>
-          ) : null}
+          <div className="flex flex-wrap gap-4">
+            {actionable.length > 12 ? (
+              <button
+                onClick={() => setShowAll((v) => !v)}
+                className="text-sm text-muted-foreground underline underline-offset-2"
+              >
+                {showAll ? "Show fewer" : `Show all ${actionable.length}`}
+              </button>
+            ) : null}
+            {noEmail.length > 0 ? (
+              <button
+                onClick={() => setShowNoEmail((v) => !v)}
+                className="text-sm text-muted-foreground underline underline-offset-2"
+              >
+                {showNoEmail ? "Hide" : "Show"} {noEmail.length} with no address
+              </button>
+            ) : null}
+          </div>
 
           <div className="space-y-2 border-t pt-3">
             {sel.length === 0 ? (
