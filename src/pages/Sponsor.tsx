@@ -33,7 +33,7 @@ const SEASON_PRICE = 100;
 // rather than dead-ending on a checkout that does not exist. That fallback is
 // also the honest state: we would rather take an email we answer than a payment
 // we cannot yet fulfil.
-const SQUARE_LINK = '';
+const SQUARE_LINK = 'https://square.link/u/jdN4g1zs';
 
 const CONTACT = 'sponsors@sidehuddlesports.com';
 
@@ -293,9 +293,11 @@ function Checkout({ team, onClose }: { team: Team; onClose: () => void }) {
 
   const go = () => {
     if (SQUARE_LINK) {
-      // The team goes in the note so a payment can be matched to a slot
-      // without asking the buyer to tell us twice.
-      window.open(`${SQUARE_LINK}?note=${encodeURIComponent(label)}`, '_blank');
+      // Opened clean. Square payment links do not carry an arbitrary note
+      // through the URL — the team comes back on the required "Which team?"
+      // field configured on the link itself, which is also the only version
+      // the buyer can see and correct.
+      window.open(SQUARE_LINK, '_blank', 'noopener');
       return;
     }
     const subject = `Sponsor ${label} — $${SEASON_PRICE} season`;
@@ -334,6 +336,10 @@ function Checkout({ team, onClose }: { team: Team; onClose: () => void }) {
           <p className="mt-2 text-sm text-white/50">
             Paid once. Your name goes up when the payment clears and stays for
             the season.
+          </p>
+          <p className="mt-3 rounded-xl bg-[#facc15]/10 px-3 py-2 text-xs text-[#facc15]">
+            At checkout, enter <span className="font-black">{label}</span> as
+            your team.
           </p>
         </div>
 
