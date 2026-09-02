@@ -6,6 +6,7 @@ import ChaptersPanel from "@/components/outreach/ChaptersPanel";
 import CreatorsPanel from "@/components/outreach/CreatorsPanel";
 import CoveragePanel from "@/components/outreach/CoveragePanel";
 import BrevoImport from "@/components/outreach/BrevoImport";
+import WorkPanel from "@/components/outreach/WorkPanel";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -344,7 +345,11 @@ export default function Outreach() {
   }, [leads]);
   const [lastResult, setLastResult] = useState<SendResult | null>(null);
   const [view, setView] = useState<"school" | "priority" | "all" | "contacted" | "followup">("school");
-  const [audience, setAudience] = useState<"sponsors" | "chapters" | "creators" | "coverage">("sponsors");
+  // The worklist opens by default. Everything else on this page is machinery —
+  // campaigns, scores, filters — and machinery is not what anyone came to do.
+  const [audience, setAudience] = useState<
+    "work" | "sponsors" | "chapters" | "creators" | "coverage"
+  >("work");
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -832,7 +837,7 @@ export default function Outreach() {
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
               <h1 className="text-3xl font-bold text-foreground">
-                {audience === "coverage" ? "Coverage" : audience === "creators" ? "Creator Outreach" : audience === "chapters" ? "Chapter Outreach" : "Sponsor Prospecting Engine"}
+                {audience === "work" ? "Today's work" : audience === "coverage" ? "Coverage" : audience === "creators" ? "Creator Outreach" : audience === "chapters" ? "Chapter Outreach" : "Sponsor Prospecting Engine"}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {audience === "chapters"
@@ -853,6 +858,13 @@ export default function Outreach() {
           </div>
 
           <div className="mt-4 flex gap-2">
+            <Button
+              variant={audience === "work" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAudience("work")}
+            >
+              Today's work
+            </Button>
             <Button
               variant={audience === "sponsors" ? "default" : "outline"}
               size="sm"
@@ -888,7 +900,7 @@ export default function Outreach() {
         </div>
       </div>
 
-      {audience === "coverage" ? <CoveragePanel /> : audience === "creators" ? <CreatorsPanel /> : audience === "chapters" ? <ChaptersPanel /> : (
+      {audience === "work" ? <WorkPanel /> : audience === "coverage" ? <CoveragePanel /> : audience === "creators" ? <CreatorsPanel /> : audience === "chapters" ? <ChaptersPanel /> : (
 
       <div className="container mx-auto grid gap-6 px-4 py-8 xl:grid-cols-[390px,1fr]">
         <div className="space-y-6">

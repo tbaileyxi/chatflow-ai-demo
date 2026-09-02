@@ -268,7 +268,12 @@ async function brevoSend(apiKey: string, to: string, subj: string, html: string)
   }
 }
 
-async function selectTargets(supabase: SupabaseClient, step: number, campaign: string): Promise<Lead[]> {
+async function selectTargets(
+  supabase: SupabaseClient,
+  step: number,
+  campaign: string,
+  ids?: string[],
+): Promise<Lead[]> {
   let q = supabase
     .from("sponsor_leads")
     .select("id,company,domain,website,contact_name,contact_email,vertical,region,market,school,best_package,best_angle,sponsor_signal,sequence_step")
@@ -282,6 +287,14 @@ async function selectTargets(supabase: SupabaseClient, step: number, campaign: s
   // fact about when data was loaded, not a choice anyone wants to make. The
   // batch keys still work so old sends are reproducible, but nothing new should
   // use them.
+  // An explicit list wins over every filter. The dashboard's worklist sends to
+  // the people in ONE town, and no campaign filter can express "these ones".
+  if (ids && ids.length) {
+    const { data, error } = await q.in("id", ids).limit(500);
+    if (error) throw new Error(`DB query failed: ${error.message}`);
+    return (data || []) as Lead[];
+  }
+
   if (campaign.startsWith("vertical:")) {
     q = q.eq("vertical", campaign.slice("vertical:".length));
   } else if (campaign.startsWith("school_partner")) {
@@ -318,7 +331,7 @@ serve(async (req) => {
   }
 
   try {
-    const { sequenceStep = 1, mode = "test", maxEmails = 40, campaign = "school_partner_batch_4" } = await req.json();
+    const { sequenceStep = 1, mode = "test", maxEmails = 40, campaign = "all", ids } = await req.json();
     const step = Number(sequenceStep);
     if (![1, 2, 3].includes(step)) return json({ error: "sequenceStep must be 1, 2, or 3" }, 400);
     const live = mode === "live";
@@ -335,7 +348,7 @@ serve(async (req) => {
     // cannot be hardcoded here without going stale the next time one is added.
     if (String(campaign).startsWith("vertical:")) KNOWN_CAMPAIGNS.add(String(campaign));
     const campaignKey = KNOWN_CAMPAIGNS.has(campaign) ? campaign : "all";
-    const targets = await selectTargets(supabase, step, campaignKey);
+    const targets = await selectTargets(supabase, step, campaignKey, Array.isArray(ids) ? ids : undefined);
 
     // Step 1: skip companies whose domain was already contacted (dedup like emailed_global.csv).
     const contactedDomains = new Set<string>();
