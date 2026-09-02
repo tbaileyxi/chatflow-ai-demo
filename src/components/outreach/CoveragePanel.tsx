@@ -5,17 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
 /**
- * Coverage — "in Boulder, did I do chapters? did I do businesses?"
+ * Coverage — "for Boise State, did I do the fan clubs? did I do the businesses?"
  *
- * Every other view on this page answers "what is in my list". None of them
- * answered "where have I actually been", which is the question you ask before
- * deciding where to spend a morning. The lists are per-record; this is per-town,
- * and a town is how the work is really organised — you do Boulder, then you do
- * Columbia.
+ * Every other view answers "what is in my list". This one answers "where have I
+ * been", and the unit is a TEAM, because that is how the product and the work
+ * are organised. A town is only where a chapter happens to meet.
  *
- * One row per place. Two columns, because there are two things you can do in a
- * town: reach the fan clubs, and reach the businesses. Each cell says how far
- * along that half is, so a blank one is a town nobody has touched.
+ * One row per team, two columns for the two things you can do. Each cell says
+ * how far along that half is, so a blank one is a team nobody has touched.
  */
 
 type Row = {
@@ -35,11 +32,11 @@ export default function CoveragePanel() {
       const [ch, sp] = await Promise.all([
         supabase
           .from("chapter_leads")
-          .select("city,state,email,emailed,sequence_step,unsubscribed,bounced")
+          .select("org,city,state,email,emailed,sequence_step,unsubscribed,bounced")
           .limit(5000),
         supabase
           .from("sponsor_leads")
-          .select("market,region,vertical,contact_email,emailed,sequence_step,unsubscribed,bounced")
+          .select("school,market,region,vertical,contact_email,emailed,sequence_step,unsubscribed,bounced")
           .limit(5000),
       ]);
 
@@ -57,8 +54,8 @@ export default function CoveragePanel() {
       };
 
       for (const c of (ch.data ?? []) as any[]) {
-        if (!c.city) continue;
-        const b = get(`${c.city}${c.state ? `, ${c.state}` : ""}`).chapters;
+        if (!c.org) continue;
+        const b = get(String(c.org)).chapters;
         b.total++;
         if (!c.email) b.noEmail++;
         if (c.emailed) b.emailed++;
@@ -66,9 +63,9 @@ export default function CoveragePanel() {
       }
 
       for (const s of (sp.data ?? []) as any[]) {
-        // Sponsor rows keep the town in `market`, or "City, ST" in `region`
-        // when they came in through a batch import.
-        const place = (s.market || s.region || "").trim();
+        // By team, the way the product is organised — a town is only where a
+        // chapter happens to meet.
+        const place = (s.school || "").trim();
         if (!place) continue;
         const b = get(place).business;
         b.total++;
@@ -107,21 +104,21 @@ export default function CoveragePanel() {
         <div>
           <h2 className="text-lg font-semibold">Where have I been</h2>
           <p className="text-sm text-muted-foreground">
-            One row per town. Have you emailed the fan clubs there, and have you
-            emailed the businesses?
+            One row per team. Have you emailed its fan clubs, and have you emailed
+            the businesses around it?
           </p>
         </div>
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Find a town — Boulder, Columbia…"
+          placeholder="Find a team — Boise State, Browns…"
           className="sm:w-72"
         />
       </div>
 
       {rows ? (
         <div className="flex flex-wrap gap-3 text-sm">
-          <Badge variant="outline">{totals.places} towns</Badge>
+          <Badge variant="outline">{totals.places} teams</Badge>
           <Badge variant="outline">{totals.bothDone} done both sides</Badge>
           <Badge variant="outline">{totals.neither} untouched</Badge>
         </div>
@@ -131,7 +128,7 @@ export default function CoveragePanel() {
         <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="px-4 py-3">Town</th>
+              <th className="px-4 py-3">Team</th>
               <th className="px-4 py-3">Fan clubs</th>
               <th className="px-4 py-3">Businesses</th>
             </tr>
@@ -146,7 +143,7 @@ export default function CoveragePanel() {
             ) : filtered.length === 0 ? (
               <tr>
                 <td className="px-4 py-6 text-muted-foreground" colSpan={3}>
-                  No town matches that.
+                  No team matches that.
                 </td>
               </tr>
             ) : (
@@ -167,7 +164,7 @@ export default function CoveragePanel() {
       </Card>
       {rows && filtered.length > 300 ? (
         <p className="text-xs text-muted-foreground">
-          Showing the 300 biggest. Search for a town to find the rest.
+          Showing the 300 biggest. Search for a team to find the rest.
         </p>
       ) : null}
     </div>
@@ -175,8 +172,8 @@ export default function CoveragePanel() {
 }
 
 /**
- * One cell. Says the state of that half of a town in a phrase, not a number
- * salad — "12 · none emailed" tells you what to do next, "12/0/0/9" does not.
+ * One cell. Says the state of that half in a phrase, not a number salad —
+ * "12 · none emailed" tells you what to do next, "12/0/0/9" does not.
  */
 function Cell({
   total,

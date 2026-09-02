@@ -9,14 +9,14 @@ import { useToast } from "@/hooks/use-toast";
  * The worklist.
  *
  * The rest of this page is a dashboard, and the job is not a dashboard. Nobody
- * sits down wanting "Priority (337)" — they sit down wanting to work Boulder,
- * or Boise State, and the only real questions are: who is here, who have I
- * already written to, and what is left.
+ * sits down wanting "Priority (337)" — they sit down wanting to work Boise
+ * State, and the only real questions are: who is here, who have I already
+ * written to, and what is left.
  *
- * So: pick a place, see the three groups that live there, act on whichever one
+ * So: pick a team, see the three groups attached to it, act on whichever one
  * has a gap. No campaigns, no scores, no abstract Step 1 button firing at
- * whoever happens to match a filter — every action on this screen is scoped to
- * the place you are looking at, which is how the work is actually done.
+ * whoever happens to match a filter — every action here is scoped to the team
+ * you are looking at, which is how the work is actually done.
  */
 
 type Chapter = {
@@ -69,7 +69,9 @@ export default function WorkPanel() {
   };
   useEffect(() => { void load(); }, []);
 
-  // A place is a town. Everything that happens in outreach happens in one.
+  // Grouped by TEAM, not town. The work is organised the way the product is —
+  // "have I done Boise State" — and a town is only where a chapter happens to
+  // meet. Chapters carry the team on `org`, sponsors on `school`.
   const places = useMemo(() => {
     const map = new Map<string, Place>();
     const at = (k: string) => {
@@ -78,11 +80,12 @@ export default function WorkPanel() {
       return map.get(key)!;
     };
     for (const c of chapters ?? []) {
-      if (!c.city) continue;
-      at(`${c.city}${c.state ? `, ${c.state}` : ""}`).chapters.push(c);
+      const k = (c.org || "").trim();
+      if (!k) continue;
+      at(k).chapters.push(c);
     }
     for (const s of sponsors ?? []) {
-      const k = (s.market || s.region || "").trim();
+      const k = (s.school || "").trim();
       if (!k) continue;
       const p = at(k);
       if ((s.vertical || "").toLowerCase() === SCHOOL_PARTNER) p.partners.push(s);
@@ -99,10 +102,10 @@ export default function WorkPanel() {
 
   const place = picked ? places.find((p) => p.key === picked) ?? null : null;
 
-  // Send this place's unsent people, and only this place's.
+  // Send this team's unsent people, and only this team's.
   async function send(kind: "chapters" | "sponsors", ids: string[], step: number) {
     if (ids.length === 0) return;
-    if (!confirm(`Send step ${step} to ${ids.length} in ${picked}?`)) return;
+    if (!confirm(`Send step ${step} to ${ids.length} for ${picked}?`)) return;
     setBusy(`Sending to ${ids.length}…`);
     try {
       const fn = kind === "chapters" ? "chapter-send" : "outreach-send";
@@ -134,7 +137,7 @@ export default function WorkPanel() {
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Boulder, Boise, Columbia…"
+          placeholder="Boise State, Cleveland Browns, Ohio State…"
         />
         <div className="max-h-[70vh] space-y-1 overflow-y-auto pr-1">
           {shown.map((p) => {
@@ -161,8 +164,9 @@ export default function WorkPanel() {
       <div className="space-y-4">
         {!place ? (
           <Card className="p-8 text-center text-muted-foreground">
-            Pick a town on the left. You'll see its fan clubs, its school
-            partner, and its local businesses — and what's left to do in each.
+            Pick a team on the left. You'll see its fan clubs, its booster or
+            NIL group, and the local businesses around it — and what's left to
+            do in each.
           </Card>
         ) : (
           <>
