@@ -29,12 +29,18 @@ const EVERY_MS = 24 * 60 * 60 * 1000;
 export function useAutoContactMatch() {
   const { user } = useAuth();
   const [newPeople, setNewPeople] = useState<ContactMatch[]>([]);
+  // Whether the sweep is allowed to run at all. The caller needs this to decide
+  // whether to offer a manual "find friends" — somebody who tapped "Not now" at
+  // onboarding never granted, so this hook does nothing for them forever, and
+  // they need a way back in that is not buried on another tab.
+  const [granted, setGranted] = useState<boolean | null>(null);
 
   const sweep = useCallback(async (force = false) => {
     if (!user?.id) return;
     try {
       // getPermissionsAsync, never request — see the note above.
       const { status } = await Contacts.getPermissionsAsync();
+      setGranted(status === "granted");
       if (status !== "granted") return;
 
       if (!force) {
@@ -94,5 +100,12 @@ export function useAutoContactMatch() {
     setNewPeople((prev) => prev.filter((p) => p.userId !== userId));
   }, []);
 
-  return { newPeople, forget, resweep: () => sweep(true) };
+  // Let a manual run hand its results back here, so matches found by tapping a
+  // button land in the same list as matches found by the sweep.
+  const offer = useCallback((found: ContactMatch[]) => {
+    setNewPeople(found.filter((m) => !m.alreadyConnected));
+    setGranted(true);
+  }, []);
+
+  return { newPeople, forget, granted, offer, resweep: () => sweep(true) };
 }

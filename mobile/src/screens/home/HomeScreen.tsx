@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -165,8 +166,37 @@ function FriendsNowSection() {
 
   // People from your contacts who are here but not in your list yet. The sweep
   // runs itself once a day; this is only the result of it.
-  const { newPeople, forget } = useAutoContactMatch();
-  const { connect } = useContactMatch();
+  const { newPeople, forget, granted, offer } = useAutoContactMatch();
+  const { connect, run, state: matchState } = useContactMatch();
+
+  // A permanent way in, the way WhatsApp and Telegram keep one, rather than a
+  // single onboarding step you either take or lose forever. Most people skip at
+  // signup because they want to see the app first — and on iOS that choice is
+  // one-way: tapping "Not now" leaves permission undetermined and askable, but
+  // an actual denial at the system dialog can never be re-asked in-app. So this
+  // stays available for as long as it has not been granted, and disappears the
+  // moment it has, because after that the daily sweep does it silently.
+  const findFriends = useCallback(async () => {
+    const found = await run();
+    offer(found);
+  }, [run, offer]);
+
+  const scanning = matchState === "requesting" || matchState === "scanning";
+
+  // A denial is the one state the button cannot fix on its own: iOS will not
+  // show the dialog a second time, so run() returns immediately with nothing
+  // and the tap looks broken. Say where the switch is instead.
+  useEffect(() => {
+    if (matchState !== "denied") return;
+    Alert.alert(
+      "Contacts are turned off",
+      "Side Huddle needs contacts access to find people you already know. You can turn it on in Settings.",
+      [
+        { text: "Not now", style: "cancel" },
+        { text: "Open Settings", onPress: () => void Linking.openSettings() },
+      ],
+    );
+  }, [matchState]);
 
   // Cap the collapsed list. The roster is unbounded — at 5+ friends it pushed
   // Your Rooms off the screen entirely, which is the wrong trade: the roster is
@@ -197,6 +227,26 @@ function FriendsNowSection() {
           <Text className="text-xs font-black text-primary">Invite</Text>
         </Pressable>
       </View>
+
+      {granted === false && newPeople.length === 0 ? (
+        <Pressable
+          onPress={findFriends}
+          disabled={scanning}
+          className="mb-4 flex-row items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 p-3 active:opacity-80"
+        >
+          <View className="h-9 w-9 items-center justify-center rounded-full bg-primary/15">
+            <UserPlus color={colors.primary} size={18} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-base font-black text-foreground">
+              {scanning ? "Looking..." : "Find friends you know"}
+            </Text>
+            <Text className="text-sm text-muted-foreground">
+              Checked on your phone. Nothing is stored.
+            </Text>
+          </View>
+        </Pressable>
+      ) : null}
 
       {newPeople.length > 0 ? (
         <View className="mb-4 gap-2">
@@ -313,6 +363,21 @@ function FriendsNowSection() {
             Invite someone, or find people you already know. When they check
             into a room it shows up here so you can jump in.
           </Text>
+          {/* "find people you already know" was the right thing to say and did
+              nothing — it was a sentence, not a control. Someone looking at an
+              empty friends list is the most willing they will ever be to hand
+              over contacts, and this is that moment. */}
+          {granted === false ? (
+            <Pressable
+              onPress={findFriends}
+              disabled={scanning}
+              className="mt-4 self-start rounded-full bg-primary px-5 py-3 active:opacity-80"
+            >
+              <Text className="text-sm font-black text-primary-foreground">
+                {scanning ? "Looking..." : "Find people you know"}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       )}
     </View>
