@@ -299,6 +299,7 @@ export default function Outreach() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [enriching, setEnriching] = useState(false);
+  const [barHunt, setBarHunt] = useState<string | null>(null);
   const [findingEmail, setFindingEmail] = useState<string | null>(null);
   const [sending, setSending] = useState<number | null>(null);
   const [importingProspects, setImportingProspects] = useState(false);
@@ -607,6 +608,62 @@ export default function Outreach() {
     }
   }
 
+  // Find emails for the bars we already know about, biggest crowd first.
+  //
+  // Every bar loaded from chapter-db is a venue some fan club already watches
+  // at, and sponsor_signal carries how many people that is. Looking them up one
+  // click at a time meant fifty clicks, so nobody did it.
+  //
+  // Skips anything already emailed, bounced or unsubscribed — re-pitching
+  // somebody who told us to stop is the one mistake that costs a domain.
+  async function findBarEmails() {
+    const size = (l: Lead) => {
+      const m = (l.sponsor_signal || "").match(/(\d[\d,]*)\s*members/i);
+      return m ? Number(m[1].replace(/,/g, "")) : 0;
+    };
+    const queue = leads
+      .filter(
+        (l) =>
+          l.vertical === "sports bar" &&
+          !l.contact_email &&
+          !l.bounced &&
+          !l.unsubscribed &&
+          !l.emailed,
+      )
+      .sort((a, b) => size(b) - size(a))
+      .slice(0, 50);
+
+    if (queue.length === 0) {
+      toast({
+        title: "Nothing to look up",
+        description: "Every bar either has an email already or has been contacted.",
+      });
+      return;
+    }
+
+    let found = 0;
+    for (let i = 0; i < queue.length; i++) {
+      const l = queue[i];
+      setBarHunt(`${i + 1} of ${queue.length} — ${l.company}`);
+      try {
+        const { data } = await supabase.functions.invoke("outreach-enrich", {
+          body: { leadId: l.id },
+        });
+        if (data?.contact_email) found++;
+      } catch {
+        // One bad lookup must not end the run — the rest of the list is fine.
+      }
+    }
+    setBarHunt(null);
+    await loadLeads();
+    toast({
+      title: `Found ${found} of ${queue.length}`,
+      description: found
+        ? "Those bars can be emailed now."
+        : "No emails came back. Check the Hunter and Apollo keys.",
+    });
+  }
+
   async function findEmail(l: Lead) {
     setFindingEmail(l.id);
     try {
@@ -849,6 +906,19 @@ export default function Outreach() {
               <Search className="h-4 w-4" />
               {enriching ? "Building map..." : "Find and score sponsors"}
             </Button>
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={findBarEmails}
+              disabled={barHunt !== null}
+            >
+              <Search className="h-4 w-4" />
+              {barHunt ? barHunt : "Find emails — top 50 bars"}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              The bars fan clubs already watch at, biggest crowd first. Skips
+              anyone already contacted.
+            </p>
           </Card>
 
           <Card className="space-y-4 p-5">
