@@ -1,6 +1,13 @@
-// outreach-enrich — discover sponsor prospects via Google Places, find a contact email
-// via Hunter.io (optionally Apollo if APOLLO_API_KEY is set), store in sponsor_leads.
-// Ports the real AISEARCHAudit pipeline: lib/prospector.ts (Places) + enrichment.py (Hunter/Apollo).
+// outreach-enrich — find sponsor prospects and a contact email, store in sponsor_leads.
+//
+// Discovery is APOLLO, not Google Places. The Places half was removed and this
+// comment was not: there is no Google key read anywhere in this file and no
+// Places call, so anyone reading the old note went hunting for a key that does
+// not exist. Emails come from Hunter.io, with Apollo as the fallback.
+//
+// Requires APOLLO_API_KEY for discovery and HUNTER_API_KEY for emails. With
+// neither set this function finds nothing and reports success, which is its own
+// trap — check the counts it returns, not just that it ran.
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import {
   corsHeaders,
