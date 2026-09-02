@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import ChaptersPanel from "@/components/outreach/ChaptersPanel";
 import CreatorsPanel from "@/components/outreach/CreatorsPanel";
 import CoveragePanel from "@/components/outreach/CoveragePanel";
+import BrevoImport from "@/components/outreach/BrevoImport";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -891,6 +892,8 @@ export default function Outreach() {
 
       <div className="container mx-auto grid gap-6 px-4 py-8 xl:grid-cols-[390px,1fr]">
         <div className="space-y-6">
+          <BrevoImport onDone={loadLeads} />
+
           <Card className="space-y-4 p-5">
             <div>
               <h2 className="text-lg font-semibold">School Partner Batch</h2>
