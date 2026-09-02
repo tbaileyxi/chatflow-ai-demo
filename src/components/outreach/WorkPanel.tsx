@@ -170,6 +170,37 @@ export default function WorkPanel() {
     }
   }
 
+  // The email itself, before it goes anywhere.
+  //
+  // Nothing on this page has ever shown the letter, which is why "first letter"
+  // means nothing and why a $2,500 price sat in it for weeks after the offer
+  // became $100. The send function already builds a preview in test mode; it
+  // was simply never displayed.
+  const [preview, setPreview] = useState<{ subject: string; text: string; to: string; n: number } | null>(null);
+
+  async function showLetter(kind: "chapters" | "sponsors", ids: string[], step: number) {
+    if (ids.length === 0) return;
+    setBusy("Fetching the letter…");
+    try {
+      const fn = kind === "chapters" ? "chapter-send" : "outreach-send";
+      const { data, error } = await supabase.functions.invoke(fn, {
+        body: { sequenceStep: step, mode: "test", maxEmails: ids.length, ids },
+      });
+      if (error) throw error;
+      const p = (data as any)?.previews?.[0];
+      if (!p) throw new Error("No preview came back — check the leads have email addresses.");
+      setPreview({ subject: p.subject, text: p.text, to: p.to, n: ids.length });
+    } catch (e) {
+      toast({
+        title: "Could not show the letter",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   // Go and find local businesses for this team. Same Apollo search the old page
   // hid behind "Build A Sponsor Map", but scoped to the team you are looking at
   // instead of asking you to retype it.
@@ -200,9 +231,11 @@ export default function WorkPanel() {
   // Four Auburn restaurants are filed as school partners because an old search
   // typed the vertical wrong. A person can see that instantly; this is the one
   // click that fixes it.
-  async function recategorise(id: string) {
-    await supabase.from("sponsor_leads").update({ vertical: "restaurant" }).eq("id", id);
-    await load(picked!);
+  async function recategorise(ids: string[]) {
+    if (ids.length === 0) return;
+    if (!confirm(`Move ${ids.length} out of school partners? They become ordinary local businesses.`)) return;
+    await supabase.from("sponsor_leads").update({ vertical: "other local business" }).in("id", ids);
+    await Promise.all([loadIndex(), load(picked!)]);
   }
 
   if (!index) {
@@ -239,6 +272,29 @@ export default function WorkPanel() {
         </div>
       </div>
 
+      {preview ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPreview(null)}
+        >
+          <Card
+            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              This goes to {preview.n} {preview.n === 1 ? "person" : "people"} · first is {preview.to}
+            </p>
+            <p className="mt-3 text-base font-semibold">Subject: {preview.subject}</p>
+            <pre className="mt-4 whitespace-pre-wrap font-sans text-sm leading-relaxed">
+              {preview.text}
+            </pre>
+            <Button className="mt-6" variant="outline" onClick={() => setPreview(null)}>
+              Close
+            </Button>
+          </Card>
+        </div>
+      ) : null}
+
       {/* Work it */}
       <div className="space-y-4">
         {!place ? (
@@ -267,6 +323,7 @@ export default function WorkPanel() {
               }))}
               busy={busy}
               onSend={(ids, step) => send("chapters", ids, step)}
+              onPreview={(ids, step) => showLetter("chapters", ids, step)}
             />
 
             <Group
@@ -276,6 +333,7 @@ export default function WorkPanel() {
               busy={busy}
               onSend={(ids, step) => send("sponsors", ids, step)}
               onRecategorise={recategorise}
+              onPreview={(ids, step) => showLetter("sponsors", ids, step)}
             />
 
             <Group
@@ -285,6 +343,7 @@ export default function WorkPanel() {
               busy={busy}
               onSend={(ids, step) => send("sponsors", ids, step)}
               onResearch={research}
+              onPreview={(ids, step) => showLetter("sponsors", ids, step)}
             />
           </>
         )}
@@ -326,15 +385,16 @@ function rowFromSponsor(s: Sponsor): Row {
  * glance, so give them one click.
  */
 function Group({
-  title, why, rows, busy, onSend, onResearch, onRecategorise,
+  title, why, rows, busy, onSend, onPreview, onResearch, onRecategorise,
 }: {
   title: string;
   why: string;
   rows: Row[];
   busy: string | null;
   onSend: (ids: string[], step: number) => void;
+  onPreview: (ids: string[], step: number) => void;
   onResearch?: () => void;
-  onRecategorise?: (id: string) => void;
+  onRecategorise?: (ids: string[]) => void;
 }) {
   const [sel, setSel] = useState<string[]>([]);
   const [showAll, setShowAll] = useState(false);
@@ -417,15 +477,7 @@ function Group({
                   {r.sub ? <span className="text-muted-foreground"> · {r.sub}</span> : null}
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground">{state(r)}</span>
-                {onRecategorise ? (
-                  <button
-                    onClick={(e) => { e.preventDefault(); onRecategorise(r.id); }}
-                    className="shrink-0 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                    title="This is an ordinary local business, not a booster group"
-                  >
-                    not a partner
-                  </button>
-                ) : null}
+
               </label>
             ))}
           </div>
@@ -439,26 +491,54 @@ function Group({
             </button>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-2 border-t pt-3">
-            {firsts.length > 0 ? (
-              <Button size="sm" disabled={!!busy} onClick={() => onSend(firsts, 1)}>
-                Email {firsts.length} — first letter
-              </Button>
-            ) : null}
-            {followUps.length > 0 ? (
-              <Button size="sm" variant="outline" disabled={!!busy} onClick={() => onSend(followUps, 2)}>
-                Email {followUps.length} — follow-up
-              </Button>
-            ) : null}
+          <div className="space-y-2 border-t pt-3">
             {sel.length === 0 ? (
-              <span className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Tick someone to email them.
-              </span>
-            ) : null}
+              </p>
+            ) : (
+              <>
+                {/* Read it, then send it. In that order, and never send without
+                    the option to read — that is how the wrong price went out
+                    for weeks. */}
+                {firsts.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm">{firsts.length} never written to:</span>
+                    <Button size="sm" variant="outline" disabled={!!busy}
+                      onClick={() => onPreview(firsts, 1)}>
+                      Read the letter
+                    </Button>
+                    <Button size="sm" disabled={!!busy} onClick={() => onSend(firsts, 1)}>
+                      Send it
+                    </Button>
+                  </div>
+                ) : null}
+                {followUps.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm">{followUps.length} due a follow-up:</span>
+                    <Button size="sm" variant="outline" disabled={!!busy}
+                      onClick={() => onPreview(followUps, 2)}>
+                      Read the follow-up
+                    </Button>
+                    <Button size="sm" disabled={!!busy} onClick={() => onSend(followUps, 2)}>
+                      Send it
+                    </Button>
+                  </div>
+                ) : null}
+                {onRecategorise ? (
+                  <button
+                    onClick={() => onRecategorise(sel)}
+                    className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                  >
+                    These {sel.length} aren't booster groups — move to businesses
+                  </button>
+                ) : null}
+              </>
+            )}
             {noEmail.length > 0 ? (
-              <span className="ml-auto text-xs text-muted-foreground">
-                {noEmail.length} have no address
-              </span>
+              <p className="text-xs text-muted-foreground">
+                {noEmail.length} have no address and can't be emailed.
+              </p>
             ) : null}
           </div>
         </>
