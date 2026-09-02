@@ -685,6 +685,10 @@ values
 ('sports bar', 'Mustard Seed Grill & Pub', 'Bellevue, WA', 'Bellevue', 'Green Bay Packers', 'Home of Northwest Packer Backers (Green Bay Packers fan club)', 'Sponsor the Green Bay Packers huddle their members already use on game day', 'Watch venue for Northwest Packer Backers. Address: 5608 119th Ave SE'),
 ('sports bar', 'Iron Horse Bar & Grill', 'Coeur d''Alene, ID', 'Coeur d''Alene', 'Green Bay Packers', 'Home of North Idaho Packer Backers (Green Bay Packers fan club)', 'Sponsor the Green Bay Packers huddle their members already use on game day', 'Watch venue for North Idaho Packer Backers. Address: 407 E Sherman Ave')
 on conflict do nothing;
+-- NOTE: "on conflict do nothing" does nothing without a unique constraint to
+-- conflict against, and there was none — so running this file twice inserted
+-- every bar twice. RUN_THIS_FIX_DUPES.sql adds the constraint. Run that first
+-- if you are re-running this.
 
 -- What landed, and how many can actually be emailed yet.
 select count(*) as bar_leads,
