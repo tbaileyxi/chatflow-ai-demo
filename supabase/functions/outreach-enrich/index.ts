@@ -317,6 +317,27 @@ const SPONSOR_CATEGORY_SIGNALS: Record<string, { score: number; package: string;
   },
 };
 
+// Category names, normalised on the way in.
+//
+// The list was collapsed from 32 spellings to 12 by hand, and one search put
+// "restaurants" back alongside "restaurant" the same afternoon. Anything that
+// creates a lead goes through here, so the fix holds.
+function canonicalVertical(v: string): string {
+  const x = (v || "").trim().toLowerCase();
+  if (!x) return "other local business";
+  if (/(car|auto).*(dealer)|dealership/.test(x)) return "auto dealer";
+  if (/insurance/.test(x)) return "insurance";
+  if (/bank|credit union/.test(x)) return "bank or credit union";
+  if (/sports bar|^bars?$/.test(x)) return "sports bar";
+  if (/restaurant|pizza|wings|deli|bbq|barbecue|cafe/.test(x)) return "restaurant";
+  if (/ticket/.test(x)) return "ticketing";
+  if (/urgent care|physical therapy|orthodont|dentist|chiropract|dental/.test(x)) return "health and dental";
+  if (/advisor|finance|financial|wealth/.test(x)) return "financial advice";
+  if (/gym|fitness/.test(x)) return "gym";
+  if (/school partner/.test(x)) return "school partner";
+  return x;
+}
+
 function keywordTags(vertical: string): string[] {
   const k = (vertical || "").toLowerCase().trim();
   return VERTICAL_SYNONYMS[k] ?? (vertical ? [vertical] : []);
@@ -569,7 +590,7 @@ serve(async (req) => {
       const score = scoreForCategory(c.category, Boolean(contact?.email), Boolean(instagram));
 
       rows.push({
-        vertical: c.category || v,
+        vertical: canonicalVertical(c.category || v),
         region: reg || null,
         market: mkt || reg || null,
         school: sch || null,
@@ -611,7 +632,7 @@ serve(async (req) => {
     }
 
     return json({
-      vertical: v,
+      vertical: canonicalVertical(v),
       region: reg,
       found: rows.length,
       stored,
