@@ -240,6 +240,42 @@ export default function WorkPanel() {
     }
   }
 
+  // Look for the booster or NIL group, rather than asking you to tick a box
+  // claiming you looked. "Mark searched" was a placeholder for a search that
+  // did not exist.
+  async function findPartner() {
+    if (!picked) return;
+    const where = prompt(
+      `Which town is ${picked} in?\n\nUsed to find its booster / NIL / alumni organisation.`,
+    );
+    if (!where || !where.trim()) return;
+    setBusy("Looking for the booster group…");
+    try {
+      const { data, error } = await supabase.functions.invoke("outreach-enrich", {
+        body: {
+          school: picked,
+          market: where.trim(),
+          region: where.trim(),
+          vertical: "school partner",
+          company: `${picked} booster club foundation`,
+          maxResults: 10,
+        },
+      });
+      if (error) throw error;
+      const n = (data as any)?.inserted ?? (data as any)?.saved ?? 0;
+      toast({
+        title: n > 0 ? `Found ${n}` : "Nothing came back",
+        description: n > 0 ? `Added to ${picked}.` : "No booster organisation matched.",
+      });
+      await markDone(picked, "partner", n);
+      await Promise.all([loadIndex(), load(picked)]);
+    } catch (e) {
+      toast({ title: "Search failed", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   // Go and find local businesses for this team. Same Apollo search the old page
   // hid behind "Build A Sponsor Map", but scoped to the team you are looking at
   // instead of asking you to retype it.
@@ -377,6 +413,7 @@ export default function WorkPanel() {
               title="Fan clubs"
               done={progress[place.key]?.has("chapters")}
               onDone={() => markDone(place.key, "chapters", 0)}
+              doneHint="Fan clubs come from the chapter scraper, which runs outside this page."
               why="They bring their members into the app."
               rows={place.chapters.map((c) => ({
                 id: c.id,
@@ -397,7 +434,7 @@ export default function WorkPanel() {
             <Group
               title="School partner"
               done={progress[place.key]?.has("partner")}
-              onDone={() => markDone(place.key, "partner", 0)}
+              onResearch={findPartner}
               why="Booster and NIL groups — they have the donor list."
               rows={place.partners.map((s) => rowFromSponsor(s))}
               busy={busy}
@@ -457,10 +494,11 @@ function rowFromSponsor(s: Sponsor): Row {
  * glance, so give them one click.
  */
 function Group({
-  title, why, rows, busy, onSend, onPreview, onResearch, onRecategorise, done, onDone,
+  title, why, rows, busy, onSend, onPreview, onResearch, onRecategorise, done, onDone, doneHint,
 }: {
   done?: boolean;
   onDone?: () => void;
+  doneHint?: string;
   title: string;
   why: string;
   rows: Row[];
@@ -512,7 +550,7 @@ function Group({
                   ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
                   : "text-muted-foreground hover:text-foreground"
               }`}
-              title="Mark this search as done for this team"
+              title={doneHint ?? "Mark this search as done for this team"}
             >
               {done ? "✓ searched" : "mark searched"}
             </button>
@@ -569,6 +607,15 @@ function Group({
                   {r.sub ? <span className="text-muted-foreground"> · {r.sub}</span> : null}
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground">{state(r)}</span>
+                {onRecategorise ? (
+                  <button
+                    onClick={(e) => { e.preventDefault(); onRecategorise([r.id]); }}
+                    className="shrink-0 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    title="Not a booster group — move to local businesses"
+                  >
+                    not a partner
+                  </button>
+                ) : null}
 
               </label>
             ))}
@@ -595,9 +642,20 @@ function Group({
 
           <div className="space-y-2 border-t pt-3">
             {sel.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Tick someone to email them.
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  Tick someone to email them —
+                </span>
+                {/* Readable without selecting anyone: what this group sends is
+                    a property of the group, and you should be able to check it
+                    before deciding who gets it. */}
+                {sendable.length > 0 ? (
+                  <Button size="sm" variant="ghost" disabled={!!busy}
+                    onClick={() => onPreview([sendable[0].id], 1)}>
+                    or read what this group sends
+                  </Button>
+                ) : null}
+              </div>
             ) : (
               <>
                 {/* Read it, then send it. In that order, and never send without
