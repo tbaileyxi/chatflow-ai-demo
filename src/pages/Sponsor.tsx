@@ -58,12 +58,41 @@ export default function Sponsor() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from('teams')
-        .select('id, city, name, league, logo_url, sponsor, sponsor_url')
-        .eq('status', 'active')
-        .order('city');
-      setTeams((data as Team[]) ?? []);
+      // Taken/open has to come from team_sponsors, NOT teams.sponsor.
+      //
+      // There are two sponsor fields in this database and they disagree.
+      // teams.sponsor is older and nothing renders it; team_sponsors is what
+      // HuddleHeader and the bot cards actually read. Reading the wrong one
+      // had this board calling Colorado sold — its room shows no sponsor at
+      // all — while offering the Yankees, whose room says PRESENTED BY
+      // TICKETSR today. Selling a slot that is already on screen is the worst
+      // failure this page can have.
+      const [{ data: rows }, { data: live }] = await Promise.all([
+        supabase
+          .from('teams')
+          .select('id, city, name, league, logo_url')
+          .eq('status', 'active')
+          .order('city'),
+        (supabase as any)
+          .from('team_sponsors')
+          .select('team_id, brand_name, end_date')
+          .eq('is_active', true),
+      ]);
+
+      const now = Date.now();
+      const byTeam = new Map<string, string>();
+      for (const r of (live ?? []) as any[]) {
+        if (r.end_date && new Date(r.end_date).getTime() < now) continue;
+        byTeam.set(r.team_id, r.brand_name);
+      }
+
+      setTeams(
+        ((rows as any[]) ?? []).map((t) => ({
+          ...t,
+          sponsor: byTeam.get(t.id) ?? null,
+          sponsor_url: null,
+        })) as Team[],
+      );
     })();
   }, []);
 
@@ -89,15 +118,14 @@ export default function Sponsor() {
         <p className="text-[11px] uppercase tracking-[0.2em] text-[#facc15] font-black mb-5">
           Team sponsorship
         </p>
-        <h1 className="text-4xl sm:text-5xl font-black leading-[1.05] tracking-tight">
-          Put your name on a team's huddle.
+        <h1 className="text-4xl sm:text-6xl font-black leading-[1.02] tracking-tight">
+          Your name in the room
           <br />
-          <span className="text-[#facc15]">$100 for the season.</span>
+          <span className="text-[#facc15]">when the game is on.</span>
         </h1>
         <p className="mt-6 text-lg leading-relaxed text-white/60 max-w-xl">
-          One sponsor per team. Your name sits in the room while fans watch the
-          game, on the team's page, and on every card the Side Huddle bot posts
-          about that team — all season, for about the cost of one radio spot.
+          One brand per team. Not one room — every huddle for that team, every
+          game, all season. Fans see you while they're arguing about the call.
         </p>
 
         {teams ? (
@@ -107,45 +135,75 @@ export default function Sponsor() {
         ) : null}
       </section>
 
-      {/* ── What the money buys. Three things, all of which exist today. ── */}
-      <section className="px-6 pb-14 max-w-3xl mx-auto">
-        <div className="grid sm:grid-cols-3 gap-4">
-          {[
-            {
-              h: 'Every huddle for that team',
-              b: "Not one room. Your name appears in the team's main room and in every private huddle anchored to that team — automatically, as fans make more of them.",
-            },
-            {
-              h: 'The team page',
-              b: 'Your name and link on the public team page, which Google indexes. Real, crawlable, and live today.',
-            },
-            {
-              h: 'Every bot card',
-              b: 'The bot posts scores, plays and news in those rooms all season. Each card carries your name.',
-            },
-          ].map((c) => (
+      {/* ── Proof, not prose ──
+          The three explanatory cards that were here read as filler and nobody
+          finished them. A real screenshot of a real sponsor in a real room
+          does the same job in one glance, and it is the only claim on this
+          page that a buyer can verify with their own eyes. */}
+      <section className="px-6 pb-16 max-w-5xl mx-auto">
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+          <div className="relative">
+            <img
+              src="/sponsor-room.png"
+              alt="A Side Huddle room with PRESENTED BY TICKETSR above the live game"
+              className="w-full rounded-2xl border border-white/10"
+            />
+            {/* Points at the sponsor line. Percentages, because the callout has
+                to stay on the line at every width. */}
             <div
-              key={c.h}
-              className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+              className="absolute hidden sm:flex items-center gap-2 pointer-events-none"
+              style={{ top: '24%', left: '100%', marginLeft: -14 }}
             >
-              <p className="text-base font-black mb-2">{c.h}</p>
-              <p className="text-sm leading-relaxed text-white/50">{c.b}</p>
+              <div style={{ width: 42, height: 2, background: '#facc15' }} />
+              <span className="whitespace-nowrap rounded-full bg-[#facc15] px-3 py-1.5 text-[11px] font-black text-black">
+                This is you
+              </span>
             </div>
-          ))}
-        </div>
+            <p className="mt-3 text-xs text-white/30">
+              A live room today. TicketsR sponsors the Yankees.
+            </p>
+          </div>
 
-        {/* Said plainly, because a sponsor who finds this out later is a
-            sponsor who does not renew. */}
-        <p className="mt-6 text-sm leading-relaxed text-white/40">
-          Side Huddle is early. Rooms are still filling, and we would rather you
-          knew that for $100 than found it out for $1,000. What you are buying is
-          the first position on a team — your name is there from the start, and
-          it stays yours for as long as you keep it.
-        </p>
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-[#facc15] font-black mb-5">
+              What you get
+            </p>
+            <ul className="space-y-4">
+              {[
+                'Top of the room, every game, all season.',
+                'Every huddle for your team — including the ones fans make next week.',
+                'On every score, every play, every headline the bot drops.',
+                'Your link on the team page Google already indexes.',
+                'Nobody else. One brand per team.',
+              ].map((b) => (
+                <li key={b} className="flex gap-3">
+                  <span className="text-[#facc15] font-black leading-6">→</span>
+                  <span className="text-lg leading-7">{b}</span>
+                </li>
+              ))}
+            </ul>
+
+            <a
+              href="#board"
+              className="mt-8 inline-block rounded-full bg-[#facc15] px-8 py-4 text-base font-black text-black hover:opacity-90 transition-opacity"
+            >
+              Claim your team — $100
+            </a>
+
+            {/* Said out loud, because a sponsor who finds this out later is a
+                sponsor who does not renew. */}
+            <p className="mt-5 text-sm leading-relaxed text-white/40">
+              Side Huddle is early and rooms are still filling. We would rather
+              you knew that for $100 than found it out for $1,000. What you are
+              buying is the first position on a team, and it stays yours for as
+              long as you keep it.
+            </p>
+          </div>
+        </div>
       </section>
 
       {/* ── The board. This is the actual page. ── */}
-      <section className="px-6 pb-24 max-w-5xl mx-auto">
+      <section id="board" className="px-6 pb-24 max-w-5xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
           <input
             value={q}
