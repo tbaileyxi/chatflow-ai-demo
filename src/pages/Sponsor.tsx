@@ -26,6 +26,9 @@ import { supabase } from '@/integrations/supabase/client';
 // negotiating again, and not negotiating is the entire point.
 const SEASON_PRICE = 100;
 
+// So a bar owner can go and look at the thing before buying a place inside it.
+const APP_STORE_URL = 'https://apps.apple.com/us/app/id6777524558';
+
 // Checkout is built server-side by create-sponsor-square-checkout, NOT by
 // pointing at a fixed Square link.
 //
@@ -117,17 +120,29 @@ export default function Sponsor() {
       {/* ── The offer, in as few words as it can be made ── */}
       <section className="px-6 pt-14 pb-10 max-w-3xl mx-auto">
         <p className="text-[11px] uppercase tracking-[0.2em] text-[#facc15] font-black mb-5">
-          Team sponsorship
+          Side Huddle · The digital tailgate
         </p>
         <h1 className="text-4xl sm:text-6xl font-black leading-[1.02] tracking-tight">
           Your name in the room
           <br />
           <span className="text-[#facc15]">when the game is on.</span>
         </h1>
+        {/* Said before the offer, because a bar owner landing here has never
+            heard of us. The old hero sold a placement inside a product the
+            reader could not picture. */}
         <p className="mt-6 text-lg leading-relaxed text-white/60 max-w-xl">
-          One brand per team. Not one room — every huddle for that team, every
-          game, all season. Fans see you while they're arguing about the call.
+          Side Huddle is the digital tailgate — the app fan groups use to watch
+          the game together. One brand per team, in every one of those rooms,
+          all season.
         </p>
+        <a
+          href={APP_STORE_URL}
+          target="_blank"
+          rel="noopener"
+          className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[#facc15] hover:opacity-80"
+        >
+          See the app on the App Store →
+        </a>
 
         {teams ? (
           <p className="mt-6 text-sm text-white/40">
