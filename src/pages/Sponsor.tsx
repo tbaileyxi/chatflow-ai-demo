@@ -139,14 +139,14 @@ export default function Sponsor() {
             it is so far under what local sponsorship costs that the number does
             the persuading and the copy just has to not get in the way. */}
         <h1 className="text-5xl sm:text-7xl font-black leading-[0.95] tracking-tight">
-          <span className="text-[#facc15]">$100</span> puts your name
+          <span className="text-[#facc15]">$100</span> sponsors the
           <br />
-          in front of a fanbase.
+          digital tailgate for your team.
         </h1>
         <p className="mt-6 text-lg leading-relaxed text-white/60 max-w-xl">
-          All season. Every room for that team. Side Huddle is the digital
-          tailgate — the app fan groups use to watch the game together, and
-          you're the only brand in it.
+          Your brand inside the group chats where that team's fans watch the
+          game — not beside them, in them. One brand per team, every room, all
+          season.
         </p>
 
         {/* Real scarcity, not a countdown. One sponsor per team is a fact about
@@ -465,22 +465,19 @@ function Checkout({ teams, onClose }: { teams: Team[]; onClose: () => void }) {
  * claim to belief — and it beats three paragraphs he will not read.
  */
 function Placements() {
+  // Measured off the screenshot itself (760x874), not guessed. The old boxes
+  // pointed at the room title instead of the sponsor line, and at empty space
+  // instead of the bot message.
   const SPOTS = [
     {
       label: 'Top of every room',
-      note: 'Your name under the team name, every game, all season.',
-      // Percentages of the screenshot, so the ring lands correctly at any width.
-      box: { top: '25%', left: '4%', width: '92%', height: '7%' },
+      note: 'Presented by your brand, under the team name, in every room for that team.',
+      box: { top: '25.7%', left: '3%', width: '94%', height: '4.2%' },
     },
     {
-      label: 'On every bot card',
-      note: 'The bot posts scores, plays and news all season. Each one carries your name.',
-      box: { top: '70%', left: '4%', width: '80%', height: '22%' },
-    },
-    {
-      label: 'On the team page',
-      note: "The public page Google indexes for that team. Real, crawlable, live today.",
-      box: { top: '13%', left: '4%', width: '92%', height: '10%' },
+      label: 'On the bot cards',
+      note: 'The bot posts scores, plays and news all season. Your brand rides along.',
+      box: { top: '70.4%', left: '3%', width: '80%', height: '21.2%' },
     },
   ];
 
@@ -501,21 +498,26 @@ function Placements() {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div className="relative">
-        <img
-          src="/sponsor-room.png"
-          alt="A Side Huddle room with the sponsor's name above the live game"
-          className="w-full rounded-2xl border border-white/10"
-        />
-        <div
-          className="pointer-events-none absolute rounded-lg"
-          style={{
-            ...spot.box,
-            border: '2px solid #facc15',
-            boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
-            transition: 'all 480ms cubic-bezier(.4,0,.2,1)',
-          }}
-        />
+      <div>
+        {/* overflow-hidden is load-bearing: the spotlight is a very large box
+            shadow, and without a clip it darkens the entire page rather than
+            the area around the highlight. */}
+        <div className="relative overflow-hidden rounded-2xl border border-white/10">
+          <img
+            src="/sponsor-room.png"
+            alt="A Side Huddle room with the sponsor's brand above the live game"
+            className="block w-full"
+          />
+          <div
+            className="pointer-events-none absolute rounded-md"
+            style={{
+              ...spot.box,
+              border: '2px solid #facc15',
+              boxShadow: '0 0 0 2000px rgba(0,0,0,0.55)',
+              transition: 'all 480ms cubic-bezier(.4,0,.2,1)',
+            }}
+          />
+        </div>
         <p className="mt-3 text-xs text-white/30">
           A live room today. TicketsR sponsors the Yankees.
         </p>
@@ -547,7 +549,23 @@ function Placements() {
           ))}
         </div>
 
-        <p className="mt-6 text-sm leading-relaxed text-white/40">
+        <div className="mt-4 rounded-2xl border border-white/10 p-4">
+          <p className="text-base font-black">And on the team page</p>
+          <p className="mt-1 text-sm leading-relaxed text-white/60">
+            Your brand and a link to your site on the public page Google indexes
+            for that team. A different screen from the one above — that is why it
+            is not marked on it.
+          </p>
+        </div>
+
+        <a
+          href="#board"
+          className="mt-6 inline-block rounded-full bg-[#facc15] px-8 py-4 text-base font-black text-black hover:opacity-90"
+        >
+          Claim your team — $100
+        </a>
+
+        <p className="mt-5 text-sm leading-relaxed text-white/40">
           One brand per team. Side Huddle is early and rooms are still filling —
           we would rather you knew that for $100 than found it out for $1,000.
           What you are buying is the first position on a team, and it stays yours
