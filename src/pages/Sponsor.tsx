@@ -26,16 +26,14 @@ import { supabase } from '@/integrations/supabase/client';
 // negotiating again, and not negotiating is the entire point.
 const SEASON_PRICE = 100;
 
-// Square payment link for the $100 season sponsorship. Create the item in
-// Square, paste the link here, and the button starts taking money.
+// Checkout is built server-side by create-sponsor-square-checkout, NOT by
+// pointing at a fixed Square link.
 //
-// Until it is set the button falls back to email, so the page works today
-// rather than dead-ending on a checkout that does not exist. That fallback is
-// also the honest state: we would rather take an email we answer than a payment
-// we cannot yet fulfil.
-const SQUARE_LINK = 'https://square.link/u/jdN4g1zs';
-
-const CONTACT = 'sponsors@sidehuddlesports.com';
+// A fixed link cannot know that somebody picked four teams. It charges $100 and
+// asks them to retype the teams they just chose — which is asking the same
+// question twice and losing people between the two. The function prices the
+// order, attaches the team list to the Square order note, and reserves the
+// slots before the buyer ever sees a card field.
 
 type Team = {
   id: string;
@@ -341,24 +339,43 @@ function Checkout({ teams, onClose }: { teams: Team[]; onClose: () => void }) {
   const total = teams.length * SEASON_PRICE;
   const list = names.join(', ');
 
-  const go = () => {
-    if (SQUARE_LINK) {
-      // Opened clean. Square payment links do not carry an arbitrary note
-      // through the URL, so the teams come back on the link's own required
-      // field — which is also the only version the buyer can see and correct.
-      window.open(SQUARE_LINK, '_blank', 'noopener');
-      return;
-    }
-    const subject = `Sponsor ${names.length} team${names.length > 1 ? 's' : ''} — $${total}`;
-    const body =
-      `I'd like to sponsor: ${list}\n\nBusiness name:\nWebsite:\nContact:\n`;
-    window.location.href = `mailto:${CONTACT}?subject=${encodeURIComponent(
-      subject,
-    )}&body=${encodeURIComponent(body)}`;
-  };
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
-  const copyList = () => {
-    navigator.clipboard?.writeText(list).catch(() => {});
+  const go = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        'create-sponsor-square-checkout',
+        {
+          body: {
+            teams: teams.map((t) => ({
+              teamKey: t.id,
+              teamName: `${t.city} ${t.name}`,
+              league: t.league,
+            })),
+          },
+        },
+      );
+      // functions.invoke buries the real message on error.context — "non-2xx
+      // status code" on its own tells a buyer nothing and tells us less.
+      if (error) {
+        let detail = '';
+        try {
+          detail = (await (error as any).context?.json())?.error ?? '';
+        } catch {
+          /* keep the generic message */
+        }
+        throw new Error(detail || 'Checkout could not be created.');
+      }
+      const url = (data as any)?.url;
+      if (!url) throw new Error('Checkout did not come back with a payment link.');
+      window.location.href = url;
+    } catch (e) {
+      setErr((e as Error).message);
+      setBusy(false);
+    }
   };
 
   return (
@@ -399,32 +416,18 @@ function Checkout({ teams, onClose }: { teams: Team[]; onClose: () => void }) {
           </p>
         </div>
 
-        {/* Square carries neither the team names nor the count, so the buyer
-            has to set both. Saying it here — and handing them the list on the
-            clipboard — is the difference between a payment we can match to a
-            slot and one we cannot. */}
-        <div className="mb-5 rounded-xl bg-[#facc15]/10 p-4 text-xs text-[#facc15] leading-relaxed">
-          <p className="font-black mb-2">Two things at checkout:</p>
-          <p>
-            1. Set quantity to <span className="font-black">{names.length}</span>
+        {err ? (
+          <p className="mb-4 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {err}
           </p>
-          <p className="mt-1">2. Enter your team{names.length > 1 ? 's' : ''}:</p>
-          <p className="mt-2 rounded-lg bg-black/40 p-2 font-black break-words">
-            {list}
-          </p>
-          <button
-            onClick={copyList}
-            className="mt-2 underline underline-offset-2 hover:opacity-80"
-          >
-            Copy list
-          </button>
-        </div>
+        ) : null}
 
         <button
           onClick={go}
-          className="w-full rounded-full bg-[#facc15] px-6 py-4 text-base font-black text-black hover:opacity-90 transition-opacity"
+          disabled={busy}
+          className="w-full rounded-full bg-[#facc15] px-6 py-4 text-base font-black text-black hover:opacity-90 transition-opacity disabled:opacity-50"
         >
-          {SQUARE_LINK ? `Pay $${total}` : 'Claim these teams'}
+          {busy ? 'Opening checkout…' : `Pay $${total}`}
         </button>
 
         <button

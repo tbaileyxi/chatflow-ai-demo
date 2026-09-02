@@ -1,13 +1,17 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-// Founding-sponsor checkout via Square Payment Links (Online Checkout).
+// Sponsor checkout via Square Payment Links (Online Checkout).
 //
-// SEASON, NOT MONTH. $1,000 per team per season, and what Square collects here
-// is the $500 deposit that holds the team — the balance is due at the opener.
-// The old tier ladder ($250/$650/$1,200/$1,800) is gone: at a four-figure
-// season price a volume discount decides nothing and cost more to explain than
-// it earned.
+// $100 per team per season, paid in full. No deposit, no balance at the opener,
+// no tier ladder — every one of those was a second conversation, and the whole
+// reason the price is $100 is that there is no conversation.
+//
+// The link is built HERE rather than pointing at a fixed Square link, and that
+// is the entire point: a fixed link cannot know that somebody picked four
+// teams. It would charge $100 and ask them to retype the teams they already
+// chose. This sends the exact total and puts the team list on the order note,
+// so the buyer picks on the page and then only pays.
 //
 // This number must match the page. It is computed here, not sent by the client,
 // so the two are edited together or a sponsor is charged something other than
@@ -25,11 +29,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SEASON_PRICE_CENTS = 100000; // $1,000 per team per season
-const DEPOSIT_CENTS = 50000;       // $500 holds a team
+const SEASON_PRICE_CENTS = 10000; // $100 per team per season, paid in full
 
-function depositCents(count: number) {
-  return count * DEPOSIT_CENTS;
+function totalCents(count: number) {
+  return count * SEASON_PRICE_CENTS;
 }
 
 serve(async (req) => {
@@ -92,13 +95,13 @@ serve(async (req) => {
     }
 
     const count = cleanTeams.length;
-    const total = depositCents(count);
+    const total = totalCents(count);
 
     const teamNames: string[] = cleanTeams.map((team) => team.teamName);
     const teamList = teamNames.join(", ");
     const productName = count === 1
-      ? `Side Huddle Founding Sponsor — ${teamNames[0]} (season deposit)`
-      : `Side Huddle Founding Sponsor — ${count} teams (season deposit)`;
+      ? `Side Huddle sponsor — ${teamNames[0]} (season)`
+      : `Side Huddle sponsor — ${count} teams (season)`;
 
     const origin = req.headers.get("origin") || "https://sidehuddlesports.com";
 
@@ -121,7 +124,9 @@ serve(async (req) => {
           ask_for_shipping_address: false,
         },
         // Team list is recorded on the order note so you can see what was bought.
-        payment_note: `season deposit · ${teamList}`.slice(0, 500),
+        // The teams ride on the order note, so a payment is always matchable
+        // to the slots it bought without asking the buyer to say it twice.
+        payment_note: `season · ${teamList}`.slice(0, 500),
       }),
     });
 
@@ -143,9 +148,9 @@ serve(async (req) => {
       team_name: team.teamName,
       league: team.league,
       status: "open",
-      plan: "monthly",
-      amount_paid_cents: 0,
-      balance_due_cents: 0,
+      plan: "full",
+      amount_paid_cents: 0,   // set by square-webhook when the payment lands
+      balance_due_cents: 0,   // nothing owed later — $100 is the whole price
       square_checkout_id: paymentLink.id ?? null,
       square_order_id: orderId,
     }));
