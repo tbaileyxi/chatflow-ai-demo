@@ -437,21 +437,51 @@ serve(async (req) => {
     if (leadId) {
       const { data: lead, error: leadError } = await supabase
         .from("sponsor_leads")
-        .select("id,company,website,domain,vertical,sponsor_score")
+        .select("id,company,website,domain,vertical,region,sponsor_score")
         .eq("id", String(leadId))
         .maybeSingle();
       if (leadError) throw new Error(`Lead lookup failed: ${leadError.message}`);
       if (!lead) return json({ error: "Lead not found" }, 404);
 
-      const { contact, instagram } = await findContactForCompany(
-        (lead as { website: string | null }).website,
-        (lead as { domain: string | null }).domain,
-      );
+      const row = lead as {
+        company: string; website: string | null; domain: string | null;
+        vertical: string | null; region: string | null; sponsor_score: number | null;
+      };
+
+      // Emails are found BY DOMAIN, so a lead without one cannot be enriched at
+      // all — it silently returns nothing, every time. That is exactly what the
+      // 665 bars imported from chapter-db are: a venue name and a town, no
+      // website, because the fan-club pages that named them never listed one.
+      //
+      // So find the company first. Apollo can turn "Wing Warehouse" + "Stow, OH"
+      // into a domain, and only then is there something to look an email up on.
+      let website = row.website;
+      let domain = row.domain;
+      let resolved = false;
+      if (!domain && !website && row.company) {
+        const hits = await apolloOrgSearch(
+          row.vertical || "",
+          row.company,
+          row.region || "",
+          1,
+        );
+        if (hits.length) {
+          website = hits[0].website;
+          domain = hits[0].domain;
+          resolved = true;
+        }
+      }
+
+      const { contact, instagram } = await findContactForCompany(website, domain);
 
       const update: Record<string, unknown> = {
         instagram_handle: instagram || null,
         last_error: null,
       };
+      if (resolved) {
+        update.website = website;
+        update.domain = domain;
+      }
       if (contact?.email) {
         update.contact_email = contact.email;
         update.contact_name = contact.name;
@@ -467,9 +497,25 @@ serve(async (req) => {
         .eq("id", String(leadId));
       if (updateError) throw new Error(`Lead update failed: ${updateError.message}`);
 
+      // Never just "no email". A missing key, a company we could not identify
+      // and a real business with no findable address are three different
+      // problems with three different fixes, and they all used to look the same
+      // from the dashboard.
+      const why = contact?.email
+        ? null
+        : !Deno.env.get("APOLLO_API_KEY") && !domain
+          ? "APOLLO_API_KEY is not set, so a company with no website cannot be identified"
+          : !domain
+            ? `Could not find a website for "${row.company}" — too small or named too generically to match`
+            : !Deno.env.get("HUNTER_API_KEY")
+              ? "HUNTER_API_KEY is not set, so no email lookup ran"
+              : `Found ${domain} but no public email address on it`;
+
       return json({
         leadId,
-        company: (lead as { company: string }).company,
+        reason: why,
+        resolved_domain: resolved ? domain : undefined,
+        company: row.company,
         contact_email: contact?.email ?? null,
         contact_name: contact?.name ?? null,
         contact_title: contact?.title ?? null,

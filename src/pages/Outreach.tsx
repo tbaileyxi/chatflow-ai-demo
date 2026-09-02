@@ -642,6 +642,7 @@ export default function Outreach() {
     }
 
     let found = 0;
+    const reasons = new Map<string, number>();
     for (let i = 0; i < queue.length; i++) {
       const l = queue[i];
       setBarHunt(`${i + 1} of ${queue.length} — ${l.company}`);
@@ -650,17 +651,24 @@ export default function Outreach() {
           body: { leadId: l.id },
         });
         if (data?.contact_email) found++;
+        else if (data?.reason) reasons.set(data.reason, (reasons.get(data.reason) ?? 0) + 1);
       } catch {
         // One bad lookup must not end the run — the rest of the list is fine.
       }
     }
     setBarHunt(null);
     await loadLeads();
+
+    // The commonest reason, said out loud. "Found 0 of 50" on its own sent us
+    // looking for the wrong problem twice.
+    const top = [...reasons.entries()].sort((a, b) => b[1] - a[1])[0];
     toast({
       title: `Found ${found} of ${queue.length}`,
       description: found
         ? "Those bars can be emailed now."
-        : "No emails came back. Check the Hunter and Apollo keys.",
+        : top
+          ? `Commonest reason: ${top[0]}`
+          : "Nothing came back and nothing said why.",
     });
   }
 
