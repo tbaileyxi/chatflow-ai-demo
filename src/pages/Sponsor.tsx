@@ -54,7 +54,10 @@ export default function Sponsor() {
   const [teams, setTeams] = useState<Team[] | null>(null);
   const [league, setLeague] = useState<string>('All');
   const [q, setQ] = useState('');
-  const [picked, setPicked] = useState<Team | null>(null);
+  // A set, not one team. Somebody who owns three bars in three towns wants
+  // three teams, and making them buy one at a time is three chances to stop.
+  const [sel, setSel] = useState<string[]>([]);
+  const [checkout, setCheckout] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -240,11 +243,19 @@ export default function Sponsor() {
                 <button
                   key={t.id}
                   disabled={isTaken}
-                  onClick={() => setPicked(t)}
+                  onClick={() =>
+                    setSel((prev) =>
+                      prev.includes(t.id)
+                        ? prev.filter((x) => x !== t.id)
+                        : [...prev, t.id],
+                    )
+                  }
                   className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition-colors ${
                     isTaken
                       ? 'border-white/5 bg-white/[0.02] cursor-default'
-                      : 'border-white/10 bg-white/[0.03] hover:border-[#facc15]/60'
+                      : sel.includes(t.id)
+                        ? 'border-[#facc15] bg-[#facc15]/10'
+                        : 'border-white/10 bg-white/[0.03] hover:border-[#facc15]/60'
                   }`}
                 >
                   {t.logo_url ? (
@@ -263,7 +274,11 @@ export default function Sponsor() {
                       {t.city} {t.name}
                     </p>
                     <p className="text-xs text-white/35 truncate">
-                      {isTaken ? `Taken — ${t.sponsor}` : `$${SEASON_PRICE} · open`}
+                      {isTaken
+                        ? `Taken — ${t.sponsor}`
+                        : sel.includes(t.id)
+                          ? 'Selected'
+                          : `$${SEASON_PRICE} · open`}
                     </p>
                   </div>
                 </button>
@@ -273,7 +288,40 @@ export default function Sponsor() {
         )}
       </section>
 
-      {picked ? <Checkout team={picked} onClose={() => setPicked(null)} /> : null}
+      {/* Sticky, because the board is long and the decision happens while
+          scrolling it — a checkout button at the bottom of 193 teams is a
+          checkout button nobody reaches. */}
+      {sel.length > 0 && !checkout ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#111]/95 backdrop-blur px-6 py-4">
+          <div className="max-w-5xl mx-auto flex items-center gap-4">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-black">
+                {sel.length} team{sel.length > 1 ? 's' : ''} · $
+                {sel.length * SEASON_PRICE}
+              </p>
+              <button
+                onClick={() => setSel([])}
+                className="text-xs text-white/40 hover:text-white/70"
+              >
+                Clear
+              </button>
+            </div>
+            <button
+              onClick={() => setCheckout(true)}
+              className="rounded-full bg-[#facc15] px-7 py-3 text-sm font-black text-black hover:opacity-90"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {checkout ? (
+        <Checkout
+          teams={(teams ?? []).filter((t) => sel.includes(t.id))}
+          onClose={() => setCheckout(false)}
+        />
+      ) : null}
 
       <SiteFooter />
     </div>
@@ -288,25 +336,29 @@ export default function Sponsor() {
  * about a future we cannot control yet, and scarcity language only works where
  * there is scarcity.
  */
-function Checkout({ team, onClose }: { team: Team; onClose: () => void }) {
-  const label = `${team.city} ${team.name}`;
+function Checkout({ teams, onClose }: { teams: Team[]; onClose: () => void }) {
+  const names = teams.map((t) => `${t.city} ${t.name}`);
+  const total = teams.length * SEASON_PRICE;
+  const list = names.join(', ');
 
   const go = () => {
     if (SQUARE_LINK) {
       // Opened clean. Square payment links do not carry an arbitrary note
-      // through the URL — the team comes back on the required "Which team?"
-      // field configured on the link itself, which is also the only version
-      // the buyer can see and correct.
+      // through the URL, so the teams come back on the link's own required
+      // field — which is also the only version the buyer can see and correct.
       window.open(SQUARE_LINK, '_blank', 'noopener');
       return;
     }
-    const subject = `Sponsor ${label} — $${SEASON_PRICE} season`;
+    const subject = `Sponsor ${names.length} team${names.length > 1 ? 's' : ''} — $${total}`;
     const body =
-      `I'd like to sponsor the ${label} huddle for the season.\n\n` +
-      `Business name:\nWebsite:\nContact:\n`;
+      `I'd like to sponsor: ${list}\n\nBusiness name:\nWebsite:\nContact:\n`;
     window.location.href = `mailto:${CONTACT}?subject=${encodeURIComponent(
       subject,
     )}&body=${encodeURIComponent(body)}`;
+  };
+
+  const copyList = () => {
+    navigator.clipboard?.writeText(list).catch(() => {});
   };
 
   return (
@@ -315,39 +367,64 @@ function Checkout({ team, onClose }: { team: Team; onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-3xl border border-white/10 bg-[#111] p-7"
+        className="w-full max-w-md rounded-3xl border border-white/10 bg-[#111] p-7 max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-3 mb-5">
-          {team.logo_url ? (
-            <img src={team.logo_url} alt="" className="h-11 w-11 object-contain" />
-          ) : null}
-          <div>
-            <p className="text-lg font-black leading-tight">{label}</p>
-            <p className="text-xs text-white/40">One sponsor · full season</p>
+        <p className="text-lg font-black leading-tight mb-1">
+          {names.length === 1 ? names[0] : `${names.length} teams`}
+        </p>
+        <p className="text-xs text-white/40 mb-5">
+          One sponsor per team · full season
+        </p>
+
+        {names.length > 1 ? (
+          <div className="mb-5 rounded-2xl bg-white/[0.04] p-4 text-sm text-white/70 space-y-1">
+            {names.map((n) => (
+              <p key={n}>{n}</p>
+            ))}
           </div>
-        </div>
+        ) : null}
 
         <div className="rounded-2xl bg-white/[0.04] p-5 mb-5">
           <p className="text-3xl font-black">
-            ${SEASON_PRICE}
-            <span className="text-base font-bold text-white/40"> / season</span>
+            ${total}
+            <span className="text-base font-bold text-white/40">
+              {' '}
+              / season{names.length > 1 ? ` · $${SEASON_PRICE} each` : ''}
+            </span>
           </p>
           <p className="mt-2 text-sm text-white/50">
             Paid once. Your name goes up when the payment clears and stays for
             the season.
           </p>
-          <p className="mt-3 rounded-xl bg-[#facc15]/10 px-3 py-2 text-xs text-[#facc15]">
-            At checkout, enter <span className="font-black">{label}</span> as
-            your team.
+        </div>
+
+        {/* Square carries neither the team names nor the count, so the buyer
+            has to set both. Saying it here — and handing them the list on the
+            clipboard — is the difference between a payment we can match to a
+            slot and one we cannot. */}
+        <div className="mb-5 rounded-xl bg-[#facc15]/10 p-4 text-xs text-[#facc15] leading-relaxed">
+          <p className="font-black mb-2">Two things at checkout:</p>
+          <p>
+            1. Set quantity to <span className="font-black">{names.length}</span>
           </p>
+          <p className="mt-1">2. Enter your team{names.length > 1 ? 's' : ''}:</p>
+          <p className="mt-2 rounded-lg bg-black/40 p-2 font-black break-words">
+            {list}
+          </p>
+          <button
+            onClick={copyList}
+            className="mt-2 underline underline-offset-2 hover:opacity-80"
+          >
+            Copy list
+          </button>
         </div>
 
         <button
           onClick={go}
           className="w-full rounded-full bg-[#facc15] px-6 py-4 text-base font-black text-black hover:opacity-90 transition-opacity"
         >
-          {SQUARE_LINK ? `Sponsor for $${SEASON_PRICE}` : 'Claim this team'}
+          {SQUARE_LINK ? `Pay $${total}` : 'Claim these teams'}
         </button>
 
         <button
