@@ -177,10 +177,13 @@ export function OnboardingScreen() {
                   <FindYourPeople onDone={enterApp} />
                 ) : onTeamStep ? (
                   <>
-                    <TeamPicker
-                      onJoined={() => setStep(contactsStep)}
-                      onSkip={() => setStep(contactsStep)}
-                    />
+                    {/* No skip. Picking a team joins that team's community
+                        room, and skipping landed people in the app with no room
+                        and nobody in it — 59 of the first 72 accounts, and a
+                        person with no room has nothing to open and nothing to
+                        invite anyone to. Choosing a team is the cheapest thing
+                        we ask for and the only one that makes the app work. */}
+                    <TeamPicker onJoined={() => setStep(contactsStep)} />
                     {/* A president with a code does not want the generic team
                         room — he wants his chapter's, which does not exist until
                         he claims it. Sits under the team picker because that is

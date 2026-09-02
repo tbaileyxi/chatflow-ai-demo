@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import {
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -29,6 +30,7 @@ import { useKnownPeople } from "@/hooks/useFriends";
 import { useAutoContactMatch } from "@/hooks/useAutoContactMatch";
 import { useContactMatch } from "@/hooks/useContactMatch";
 import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
+import { supabase } from "@/integrations/supabase/client";
 import { colors } from "@/theme/colors";
 
 function initials(name: string) {
@@ -74,12 +76,65 @@ function FriendsNowSection() {
   const { data: knownPeople } = useKnownPeople();
   const [expanded, setExpanded] = useState(false);
 
-  const inviteFriends = useCallback(() => {
-    Share.share({
-      message:
-        "Join me on Side Huddle. We can jump into game rooms when friends are watching. https://www.sidehuddlesports.com",
-    });
-  }, []);
+  const { data: myHuddles } = useUserHuddles();
+
+  // Invite someone to a ROOM, not to the homepage.
+  //
+  // This used to share "Join me on Side Huddle … sidehuddlesports.com" — the
+  // marketing page. Three things wrong with it, all of which the room invite in
+  // PullInFriendsModal had already solved and this one never picked up: the
+  // link went nowhere in particular, so a person who installed the app arrived
+  // as a stranger with no room and no connection to whoever asked them; the URL
+  // sat inside the message text, which stops iMessage building a preview card,
+  // so it sent as a bare grey link; and it carried no invite code, so nothing
+  // tied the two people together on the other end.
+  const inviteFriends = useCallback(async () => {
+    const all = myHuddles ?? [];
+    // A room you own reads as an invitation from a person. The team's community
+    // room reads as a mailing list. Prefer yours; fall back to whichever room
+    // has been talking most recently.
+    const owned = all.filter((h) => h.roomRole === "owner" && !h.isOfficialTeam);
+    const pool = owned.length > 0 ? owned : all;
+    const pick = [...pool].sort(
+      (a, b) =>
+        new Date(b.lastMessageAt ?? 0).getTime() -
+        new Date(a.lastMessageAt ?? 0).getTime(),
+    )[0];
+
+    // No room means there is nothing to invite anyone TO. Sending the homepage
+    // anyway is what the old version did, and it is why nobody ever joined from
+    // it. Send the person to find a room instead of sending a link that cannot
+    // work.
+    if (!pick) {
+      navigation.navigate("MainTabs", { screen: "Search" });
+      return;
+    }
+
+    try {
+      const { data, error } = await (supabase.rpc as any)(
+        "create_room_invite_code",
+        { p_huddle_id: pick.id },
+      );
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      const code: string | undefined = row?.invite_code;
+      if (!code) throw new Error("no invite code");
+
+      // Message and URL passed SEPARATELY, and the link is not repeated in the
+      // text — see the note in PullInFriendsModal. Both together is what breaks
+      // the preview card.
+      await Share.share({
+        message: `Jump into ${pick.name} on Side Huddle.`,
+        url: `https://www.sidehuddlesports.com/i/${code}`,
+      });
+    } catch (err) {
+      console.warn("[invite] could not mint a code", err);
+      Alert.alert(
+        "Couldn't make an invite",
+        "Try again in a moment, or invite from inside the room.",
+      );
+    }
+  }, [myHuddles, navigation]);
 
   // The whole roster, live ones first. This used to render ONLY people who
   // were in a room at that exact second, so it was blank almost always — you
