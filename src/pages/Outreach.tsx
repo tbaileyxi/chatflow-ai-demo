@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import ChaptersPanel from "@/components/outreach/ChaptersPanel";
 import CreatorsPanel from "@/components/outreach/CreatorsPanel";
+import CoveragePanel from "@/components/outreach/CoveragePanel";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -342,7 +343,7 @@ export default function Outreach() {
   }, [leads]);
   const [lastResult, setLastResult] = useState<SendResult | null>(null);
   const [view, setView] = useState<"school" | "priority" | "all" | "contacted" | "followup">("school");
-  const [audience, setAudience] = useState<"sponsors" | "chapters" | "creators">("sponsors");
+  const [audience, setAudience] = useState<"sponsors" | "chapters" | "creators" | "coverage">("sponsors");
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -830,7 +831,7 @@ export default function Outreach() {
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
               <h1 className="text-3xl font-bold text-foreground">
-                {audience === "creators" ? "Creator Outreach" : audience === "chapters" ? "Chapter Outreach" : "Sponsor Prospecting Engine"}
+                {audience === "coverage" ? "Coverage" : audience === "creators" ? "Creator Outreach" : audience === "chapters" ? "Chapter Outreach" : "Sponsor Prospecting Engine"}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {audience === "chapters"
@@ -872,11 +873,21 @@ export default function Outreach() {
             >
               Creators
             </Button>
+            {/* Every other tab answers "what is in my list". This one answers
+                "where have I been", which is the question you ask before
+                deciding where to spend a morning. */}
+            <Button
+              variant={audience === "coverage" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAudience("coverage")}
+            >
+              Where I've been
+            </Button>
           </div>
         </div>
       </div>
 
-      {audience === "creators" ? <CreatorsPanel /> : audience === "chapters" ? <ChaptersPanel /> : (
+      {audience === "coverage" ? <CoveragePanel /> : audience === "creators" ? <CreatorsPanel /> : audience === "chapters" ? <ChaptersPanel /> : (
 
       <div className="container mx-auto grid gap-6 px-4 py-8 xl:grid-cols-[390px,1fr]">
         <div className="space-y-6">
