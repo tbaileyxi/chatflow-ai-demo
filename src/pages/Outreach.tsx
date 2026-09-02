@@ -66,6 +66,7 @@ type SendResult = {
 };
 
 type Campaign =
+  | string // "vertical:<name>" — the audience you are writing to
   | "school_partner_batch_4"
   | "school_partner_batch_3"
   | "school_partner_batch_2"
@@ -232,6 +233,9 @@ function campaignRegion(campaign: Campaign) {
 }
 
 function campaignLabel(campaign: Campaign) {
+  if (campaign.startsWith("vertical:")) {
+    return campaign.slice("vertical:".length);
+  }
   if (campaign === "school_partner_batch_4") return "athletics partners batch 4";
   if (campaign === "school_partner_batch_3") return "school partner batch 3";
   if (campaign === "school_partner_batch_2") return "school partner batch 2";
@@ -241,6 +245,9 @@ function campaignLabel(campaign: Campaign) {
 
 function campaignMatchesLead(lead: Lead, campaign: Campaign) {
   if (campaign === "all") return true;
+  if (campaign.startsWith("vertical:")) {
+    return (lead.vertical || "other").trim() === campaign.slice("vertical:".length);
+  }
   if (!isSchoolPartnerLead(lead)) return false;
   const region = campaignRegion(campaign);
   return region ? lead.region === region : true;
@@ -306,7 +313,33 @@ export default function Outreach() {
 
   const [live, setLive] = useState(false);
   const [maxEmails, setMaxEmails] = useState("25");
-  const [campaign, setCampaign] = useState<Campaign>("school_partner_batch_4");
+  const [campaign, setCampaign] = useState<Campaign>("all");
+
+  // Who you can write to, worked out from the data instead of hardcoded.
+  //
+  // The old list was import batches — "school partner batch 3" — which says
+  // when a row was loaded, not who is on the other end, and it grew by one
+  // dead option every time anything was imported. This cannot go stale: add a
+  // new kind of lead and it appears, with a count of how many can actually be
+  // emailed today.
+  const audiences = useMemo(() => {
+    const by = new Map<string, { ready: number; noEmail: number }>();
+    for (const l of leads) {
+      const v = (l.vertical || "other").trim();
+      const b = by.get(v) ?? { ready: 0, noEmail: 0 };
+      if (l.bounced || l.unsubscribed) continue;
+      if (l.contact_email) b.ready++;
+      else b.noEmail++;
+      by.set(v, b);
+    }
+    return [...by.entries()]
+      .map(([v, n]) => ({
+        key: `vertical:${v}`,
+        label: v.replace(/\b\w/g, (c) => c.toUpperCase()),
+        ...n,
+      }))
+      .sort((a, b) => b.ready - a.ready || b.noEmail - a.noEmail);
+  }, [leads]);
   const [lastResult, setLastResult] = useState<SendResult | null>(null);
   const [view, setView] = useState<"school" | "priority" | "all" | "contacted" | "followup">("school");
   const [audience, setAudience] = useState<"sponsors" | "chapters" | "creators">("sponsors");
@@ -847,7 +880,7 @@ export default function Outreach() {
             <div>
               <h2 className="text-lg font-semibold">School Partner Batch</h2>
               <p className="text-sm text-muted-foreground">
-                Load the booster/NIL prospects with contact, school context, subject line, and the $1,000/season official partner pitch.
+                Load the booster and NIL prospects, with their contact and school context.
               </p>
             </div>
             <Button className="w-full gap-2" variant="secondary" onClick={importSchoolPartnerProspects} disabled={importingProspects}>
@@ -955,15 +988,18 @@ export default function Outreach() {
                 value={campaign}
                 onChange={(e) => setCampaign(e.target.value as Campaign)}
               >
-                <option value="school_partner_batch_4">Athletics partners batch 4 (latest)</option>
-                <option value="school_partner_batch_3">School partner batch 3 only</option>
-                <option value="school_partner_batch_2">School partner batch 2 only</option>
-                <option value="school_partner">All school partner drafts</option>
-                <option value="all">All eligible leads</option>
+                {audiences.map((a) => (
+                  <option key={a.key} value={a.key}>
+                    {a.label} ({a.ready} ready{a.noEmail ? `, ${a.noEmail} need an email` : ""})
+                  </option>
+                ))}
+                <option value="all">Everyone ({leads.length})</option>
               </select>
               <p className="text-xs text-muted-foreground">
                 Step 1 only targets unsent leads. Already-sent leads are skipped automatically.
-                {campaign === "all" ? " Use All only when you want every unsent campaign." : ` Table is filtered to ${campaignLabel(campaign)}.`}
+                {campaign === "all"
+                  ? " Everyone means every unsent lead of every kind."
+                  : ` Table is filtered to ${campaignLabel(campaign)}.`}
               </p>
             </div>
             <div className="space-y-1.5">

@@ -276,7 +276,15 @@ async function selectTargets(supabase: SupabaseClient, step: number, campaign: s
     .eq("unsubscribed", false)
     .not("contact_email", "is", null);
 
-  if (campaign.startsWith("school_partner")) {
+  // "vertical:sports bar" — pick by WHO you are writing to.
+  //
+  // Campaigns used to be import batches ("school partner batch 3"), which is a
+  // fact about when data was loaded, not a choice anyone wants to make. The
+  // batch keys still work so old sends are reproducible, but nothing new should
+  // use them.
+  if (campaign.startsWith("vertical:")) {
+    q = q.eq("vertical", campaign.slice("vertical:".length));
+  } else if (campaign.startsWith("school_partner")) {
     q = q.eq("vertical", SCHOOL_PARTNER_VERTICAL);
   }
   // Batch labels live in `region` so each import can be sent independently
@@ -323,6 +331,9 @@ serve(async (req) => {
       "school_partner", "school_partner_batch_2",
       "school_partner_batch_3", "school_partner_batch_4",
     ]);
+    // Any vertical is a valid audience; they come from the data, so the list
+    // cannot be hardcoded here without going stale the next time one is added.
+    if (String(campaign).startsWith("vertical:")) KNOWN_CAMPAIGNS.add(String(campaign));
     const campaignKey = KNOWN_CAMPAIGNS.has(campaign) ? campaign : "all";
     const targets = await selectTargets(supabase, step, campaignKey);
 
