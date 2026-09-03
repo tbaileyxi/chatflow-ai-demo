@@ -612,24 +612,21 @@ serve(async (req) => {
       });
     }
 
-    // 3. Persist. Upsert rows with email (dedup), insert the rest.
-    const withEmailRows = rows.filter((r) => r.contact_email);
-    const withoutEmailRows = rows.filter((r) => !r.contact_email);
-
-    let stored = 0;
-    if (withEmailRows.length) {
-      const { data, error } = await supabase
-        .from("sponsor_leads")
-        .upsert(withEmailRows, { onConflict: "contact_email" })
-        .select();
-      if (error) throw new Error(`DB upsert failed: ${error.message}`);
-      stored += data?.length ?? 0;
-    }
-    if (withoutEmailRows.length) {
-      const { data, error } = await supabase.from("sponsor_leads").insert(withoutEmailRows).select();
-      if (error) throw new Error(`DB insert failed: ${error.message}`);
-      stored += data?.length ?? 0;
-    }
+    // 3. Persist.
+    //
+    // sponsor_leads has TWO unique indexes — one on contact_email, one on
+    // (company, market) — and a PostgREST upsert can only name one conflict
+    // target. So this used to upsert on contact_email and plain-insert the
+    // rest, and both halves broke on the index they were not watching: a
+    // company already on file for this market raised
+    // "duplicate key value violates unique constraint
+    // sponsor_leads_company_market_..." and took down the WHOLE search. One
+    // already-known bar, and a run over fifty of them returned nothing.
+    //
+    // Resolve against both indexes here instead, then update what exists and
+    // insert only what is genuinely new. Nothing that already exists is ever
+    // inserted, so there is no conflict left to lose the run to.
+    const stored = await persistLeads(supabase, rows);
 
     return json({
       vertical: canonicalVertical(v),
@@ -645,3 +642,82 @@ serve(async (req) => {
     return json({ error: e instanceof Error ? e.message : "Enrichment failed" }, 500);
   }
 });
+
+/**
+ * Write enriched leads without letting one already-known company lose the run.
+ *
+ * Batched throughout: two reads to find what is already on file, one upsert per
+ * 200 rows to update them (on the primary key, which cannot collide), one
+ * insert per 200 genuinely new rows.
+ */
+async function persistLeads(
+  supabase: { from: (t: string) => any },
+  rows: Record<string, unknown>[],
+): Promise<number> {
+  if (!rows.length) return 0;
+
+  const key = (company: unknown, market: unknown) =>
+    `${String(company ?? "").trim().toLowerCase()}|${String(market ?? "").trim().toLowerCase()}`;
+
+  // Two rows in one batch collide with each other as readily as with the table.
+  // Last wins — later rows carry the same enrichment, so it costs nothing.
+  const deduped = new Map<string, Record<string, unknown>>();
+  for (const r of rows) deduped.set(key(r.company, r.market), r);
+  const unique = [...deduped.values()];
+
+  const companies = [...new Set(unique.map((r) => String(r.company ?? "")).filter(Boolean))];
+  const emails = [...new Set(
+    unique.map((r) => String(r.contact_email ?? "").toLowerCase()).filter(Boolean),
+  )];
+
+  const idByKey = new Map<string, string>();
+  const idByEmail = new Map<string, string>();
+
+  for (let i = 0; i < companies.length; i += 200) {
+    const { data } = await supabase
+      .from("sponsor_leads")
+      .select("id, company, market, contact_email")
+      .in("company", companies.slice(i, i + 200));
+    for (const e of (data ?? []) as Record<string, string | null>[]) {
+      if (e.id) idByKey.set(key(e.company, e.market), e.id);
+      if (e.id && e.contact_email) idByEmail.set(e.contact_email.toLowerCase(), e.id);
+    }
+  }
+  for (let i = 0; i < emails.length; i += 200) {
+    const { data } = await supabase
+      .from("sponsor_leads")
+      .select("id, contact_email")
+      .in("contact_email", emails.slice(i, i + 200));
+    for (const e of (data ?? []) as Record<string, string | null>[]) {
+      if (e.id && e.contact_email) idByEmail.set(e.contact_email.toLowerCase(), e.id);
+    }
+  }
+
+  const updates: Record<string, unknown>[] = [];
+  const inserts: Record<string, unknown>[] = [];
+  for (const r of unique) {
+    const email = String(r.contact_email ?? "").toLowerCase();
+    const id = idByKey.get(key(r.company, r.market)) ?? (email ? idByEmail.get(email) : undefined);
+    if (id) updates.push({ ...r, id });
+    else inserts.push(r);
+  }
+
+  let touched = 0;
+  for (let i = 0; i < updates.length; i += 200) {
+    const { data, error } = await supabase
+      .from("sponsor_leads")
+      .upsert(updates.slice(i, i + 200), { onConflict: "id" })
+      .select("id");
+    if (error) throw new Error(`DB update failed: ${error.message}`);
+    touched += data?.length ?? 0;
+  }
+  for (let i = 0; i < inserts.length; i += 200) {
+    const { data, error } = await supabase
+      .from("sponsor_leads")
+      .insert(inserts.slice(i, i + 200))
+      .select("id");
+    if (error) throw new Error(`DB insert failed: ${error.message}`);
+    touched += data?.length ?? 0;
+  }
+  return touched;
+}

@@ -65,6 +65,50 @@ function slotName(lead: Lead): string {
   return (lead.school || lead.market || lead.region || "your local team").trim();
 }
 
+// "Texas" is an administrative fact. "Texas Longhorns" is what somebody calls
+// themselves at 11am on a Saturday, and the opener is asking them to feel
+// something, so it needs the nickname. The lead row only carries the school,
+// so teams is joined in once per run — 303 rows, one request for the whole
+// send, not one per email.
+//
+// Keyed by place AND by college-or-pro, because one place is not one team.
+// "Texas" is the Longhorns and the Rangers; a bar sponsoring the Longhorns
+// opening on "Every Texas Rangers fan group" is worse than sending nothing.
+// A lead carrying a school is a college lead, so it takes the NCAA row; a lead
+// carrying only a market takes the pro one.
+const NICKNAMES = new Map<string, { college?: string; pro?: string }>();
+
+async function loadNicknames(supabase: SupabaseClient): Promise<void> {
+  if (NICKNAMES.size) return;
+  const { data } = await supabase
+    .from("teams")
+    .select("city, name, league")
+    .eq("status", "active");
+  for (const t of (data ?? []) as { city: string | null; name: string | null; league: string | null }[]) {
+    const city = (t.city || "").trim().toLowerCase();
+    const nick = (t.name || "").trim();
+    if (!city || !nick) continue;
+    const slotKind = (t.league || "").toUpperCase() === "NCAA" ? "college" : "pro";
+    const entry = NICKNAMES.get(city) ?? {};
+    // First of a kind wins; a school fielding several pro-league sports still
+    // reads correctly because the nickname is shared across them.
+    if (!entry[slotKind]) entry[slotKind] = nick;
+    NICKNAMES.set(city, entry);
+  }
+}
+
+// "Texas Longhorns" when we can, "Texas" when we cannot, and never
+// "Texas Texas" for a place whose name already contains the nickname.
+function fanName(lead: Lead): string {
+  const slot = slotName(lead);
+  const entry = NICKNAMES.get(slot.toLowerCase());
+  if (!entry) return slot;
+  const nick = lead.school ? (entry.college ?? entry.pro) : (entry.pro ?? entry.college);
+  if (!nick) return slot;
+  if (slot.toLowerCase().includes(nick.toLowerCase())) return slot;
+  return `${slot} ${nick}`;
+}
+
 function fanGroup(lead: Lead): string {
   const slot = slotName(lead);
   return slot === "your local team"
@@ -164,7 +208,7 @@ function subject(step: number, lead: Lead): string {
 // when we actually have one, and is silently dropped when we do not.
 function signalLine(lead: Lead): string {
   const slot = slotName(lead);
-  const who = slot === "your local team" ? "Your town's" : `Every ${slot}`;
+  const who = slot === "your local team" ? "Your town's" : `Every ${fanName(lead)}`;
   const hook = `<p style="margin:0 0 18px 0;">${who} fan group is already watching together — `
     + `phones out, group chat going, everybody shouting at the same call. `
     + `<strong>${lead.company}</strong> can be one of the businesses powering those rooms all season.</p>`;
@@ -359,6 +403,7 @@ serve(async (req) => {
     // cannot be hardcoded here without going stale the next time one is added.
     if (String(campaign).startsWith("vertical:")) KNOWN_CAMPAIGNS.add(String(campaign));
     const campaignKey = KNOWN_CAMPAIGNS.has(campaign) ? campaign : "all";
+    await loadNicknames(supabase);
     const targets = await selectTargets(supabase, step, campaignKey, Array.isArray(ids) ? ids : undefined);
 
     // Step 1: skip companies whose domain was already contacted (dedup like emailed_global.csv).
