@@ -44,9 +44,13 @@ type Team = {
   name: string;
   league: string;
   logo_url: string | null;
-  sponsor: string | null;
-  sponsor_url: string | null;
+  /** Six positions. A name means taken, null means open. */
+  slots: (string | null)[];
 };
+
+// Six is a scoreboard. Unlimited is worth nothing again, which is the problem
+// the exclusive-at-$100 model already had.
+const SLOTS = 6;
 
 const LEAGUES = ['All', 'NCAA', 'NFL', 'NBA', 'MLB', 'NHL'] as const;
 const LEAGUE_LABEL: Record<string, string> = { NCAA: 'College' };
@@ -59,6 +63,7 @@ export default function Sponsor() {
   // three teams, and making them buy one at a time is three chances to stop.
   const [sel, setSel] = useState<string[]>([]);
   const [checkout, setCheckout] = useState(false);
+  const [openTeam, setOpenTeam] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -79,49 +84,46 @@ export default function Sponsor() {
           .order('city'),
         (supabase as any)
           .from('team_sponsors')
-          .select('team_id, brand_name, end_date')
+          .select('team_id, brand_name, end_date, slot')
           .eq('is_active', true),
       ]);
 
       const now = Date.now();
-      const byTeam = new Map<string, string>();
+      // Who holds which of the six. A team is no longer taken or open — it has
+      // slots, and the ring needs to know which ones are filled and by whom.
+      const byTeam = new Map<string, (string | null)[]>();
       for (const r of (live ?? []) as any[]) {
         if (r.end_date && new Date(r.end_date).getTime() < now) continue;
-        byTeam.set(r.team_id, r.brand_name);
+        const slots = byTeam.get(r.team_id) ?? Array(SLOTS).fill(null);
+        const i = r.slot && r.slot >= 1 && r.slot <= SLOTS ? r.slot - 1
+          : slots.findIndex((x: string | null) => x === null);
+        if (i >= 0) slots[i] = r.brand_name;
+        byTeam.set(r.team_id, slots);
       }
 
       setTeams(
         ((rows as any[]) ?? []).map((t) => ({
           ...t,
-          sponsor: byTeam.get(t.id) ?? null,
-          sponsor_url: null,
+          slots: byTeam.get(t.id) ?? Array(SLOTS).fill(null),
         })) as Team[],
       );
     })();
   }, []);
 
-  // Football first, because it is football season and the first card a buyer
-  // sees should be a team they might plausibly care about. Alphabetical by city
-  // opened the board on the Anaheim Ducks in September.
-  const LEAGUE_RANK: Record<string, number> = { NCAA: 0, NFL: 1, NBA: 2, NHL: 3, MLB: 4 };
+  const matches = useMemo(() => {
+    const n = q.trim().toLowerCase();
+    if (!n) return [];
+    return (teams ?? []).filter((t) =>
+      `${t.city} ${t.name}`.toLowerCase().includes(n),
+    );
+  }, [teams, q]);
 
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return (teams ?? [])
-      .filter((t) => {
-        if (league !== 'All' && t.league !== league) return false;
-        if (!needle) return true;
-        return `${t.city} ${t.name}`.toLowerCase().includes(needle);
-      })
-      .sort((a, b) => {
-        const r = (LEAGUE_RANK[a.league] ?? 9) - (LEAGUE_RANK[b.league] ?? 9);
-        if (r !== 0) return r;
-        return `${a.city} ${a.name}`.localeCompare(`${b.city} ${b.name}`);
-      });
-  }, [teams, league, q]);
+  const chosen = (teams ?? []).find((t) => t.id === openTeam) ?? null;
 
-  const taken = (teams ?? []).filter((t) => t.sponsor && t.sponsor.trim()).length;
-  const open = (teams ?? []).length - taken;
+  // Slots, not teams — there are six per team now, and "1,140 open" is a
+  // truer picture of the inventory than "190 teams".
+  const taken = (teams ?? []).reduce((n, t) => n + t.slots.filter(Boolean).length, 0);
+  const open = (teams ?? []).length * SLOTS - taken;
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white overflow-x-hidden">
@@ -139,14 +141,15 @@ export default function Sponsor() {
             it is so far under what local sponsorship costs that the number does
             the persuading and the copy just has to not get in the way. */}
         <h1 className="text-5xl sm:text-7xl font-black leading-[0.95] tracking-tight">
-          <span className="text-[#facc15]">$100</span> sponsors the
+          <span className="text-[#facc15]">$100</span> and you support
           <br />
-          digital tailgate for your team.
+          your team's fans all season.
         </h1>
         <p className="mt-6 text-lg leading-relaxed text-white/60 max-w-xl">
-          Your brand inside the group chats where that team's fans watch the
-          game — not beside them, in them. One brand per team, every room, all
-          season.
+          Side Huddle is the digital tailgate — the app fan groups use to watch
+          the game together. Your name sits in those rooms all season, as one of
+          six who back them. Not an advert beside the fans; a business behind
+          them.
         </p>
 
         {/* Real scarcity, not a countdown. One sponsor per team is a fact about
@@ -157,11 +160,11 @@ export default function Sponsor() {
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-black text-[#facc15]">{open}</span>
-              <span className="text-sm text-white/50">teams still open</span>
+              <span className="text-sm text-white/50">spots still open</span>
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-black text-white/30">{taken}</span>
-              <span className="text-sm text-white/50">already claimed</span>
+              <span className="text-sm text-white/50">already taken</span>
             </div>
             <a
               href="#board"
@@ -192,119 +195,64 @@ export default function Sponsor() {
       </section>
 
       {/* ── The board. This is the actual page. ── */}
-      <section id="board" className="px-6 pb-24 max-w-5xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Find your team…"
-            className="flex-1 rounded-full border border-white/15 bg-white/[0.04] px-5 py-3 text-base placeholder:text-white/30 focus:outline-none focus:border-[#facc15]/60"
-          />
-          <div className="flex gap-2 flex-wrap">
-            {LEAGUES.map((l) => (
-              <button
-                key={l}
-                onClick={() => setLeague(l)}
-                className={`rounded-full px-4 py-2 text-xs font-black transition-colors ${
-                  league === l
-                    ? 'bg-[#facc15] text-black'
-                    : 'border border-white/15 text-white/50 hover:text-white'
-                }`}
-              >
-                {LEAGUE_LABEL[l] ?? l}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* ── Find your team, then the ring ──
+          This was a wall of 195 rows, which is a list to be endured rather
+          than a thing to play with. Nobody scrolls to find themselves; they
+          type. And once a team is chosen the six positions sit around it, so
+          what is left is something you can see rather than a word. */}
+      <section id="board" className="px-6 pb-24 max-w-3xl mx-auto">
+        <p className="text-[11px] uppercase tracking-[0.2em] text-[#facc15] font-black mb-4 text-center">
+          See if your team is available
+        </p>
 
-        {!teams ? (
-          <p className="text-white/40 py-12 text-center">Loading teams…</p>
-        ) : filtered.length === 0 ? (
-          <p className="text-white/40 py-12 text-center">No teams match that.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {filtered.map((t) => {
-              const isTaken = !!(t.sponsor && t.sponsor.trim());
+        <input
+          value={q}
+          onChange={(e) => { setQ(e.target.value); setOpenTeam(null); }}
+          placeholder="Type your team — Browns, Ohio State, Yankees…"
+          className="w-full rounded-full border border-white/15 bg-white/[0.04] px-6 py-4 text-lg placeholder:text-white/30 focus:outline-none focus:border-[#facc15]/60"
+        />
+
+        {/* Matches, only while typing and only a handful. */}
+        {q.trim() && !openTeam ? (
+          <div className="mt-3 space-y-1">
+            {matches.slice(0, 6).map((t) => {
+              const left = t.slots.filter((x) => !x).length;
               return (
                 <button
                   key={t.id}
-                  disabled={isTaken}
-                  onClick={() =>
-                    setSel((prev) =>
-                      prev.includes(t.id)
-                        ? prev.filter((x) => x !== t.id)
-                        : [...prev, t.id],
-                    )
-                  }
-                  className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition-colors ${
-                    isTaken
-                      ? 'border-white/5 bg-white/[0.02] cursor-default'
-                      : sel.includes(t.id)
-                        ? 'border-[#facc15] bg-[#facc15]/10'
-                        : 'border-white/10 bg-white/[0.03] hover:border-[#facc15]/60'
-                  }`}
+                  onClick={() => { setOpenTeam(t.id); setQ(`${t.city} ${t.name}`); }}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-left hover:border-[#facc15]/60"
                 >
                   {t.logo_url ? (
-                    <img
-                      src={t.logo_url}
-                      alt=""
-                      className={`h-9 w-9 object-contain ${isTaken ? 'opacity-25' : ''}`}
-                    />
-                  ) : (
-                    <div className="h-9 w-9 rounded-full bg-white/5" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className={`text-sm font-black truncate ${isTaken ? 'text-white/30' : ''}`}
-                    >
-                      {t.city} {t.name}
-                    </p>
-                    <p className="text-xs text-white/35 truncate">
-                      {isTaken
-                        ? `Taken — ${t.sponsor}`
-                        : sel.includes(t.id)
-                          ? 'Selected'
-                          : `$${SEASON_PRICE} · open`}
-                    </p>
-                  </div>
+                    <img src={t.logo_url} alt="" className="h-8 w-8 object-contain" />
+                  ) : <div className="h-8 w-8 rounded-full bg-white/5" />}
+                  <span className="flex-1 text-sm font-black">{t.city} {t.name}</span>
+                  <span className={`text-xs font-black ${left ? 'text-[#facc15]' : 'text-white/30'}`}>
+                    {left ? `${left} of ${SLOTS} open` : 'full'}
+                  </span>
                 </button>
               );
             })}
-          </div>
-        )}
-      </section>
-
-      {/* Sticky, because the board is long and the decision happens while
-          scrolling it — a checkout button at the bottom of 193 teams is a
-          checkout button nobody reaches. */}
-      {sel.length > 0 && !checkout ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#111]/95 backdrop-blur px-6 py-4">
-          <div className="max-w-5xl mx-auto flex items-center gap-4">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-black">
-                {sel.length} team{sel.length > 1 ? 's' : ''} · $
-                {sel.length * SEASON_PRICE}
+            {matches.length === 0 ? (
+              <p className="py-6 text-center text-sm text-white/40">
+                No team matches that.
               </p>
-              <button
-                onClick={() => setSel([])}
-                className="text-xs text-white/40 hover:text-white/70"
-              >
-                Clear
-              </button>
-            </div>
-            <button
-              onClick={() => setCheckout(true)}
-              className="rounded-full bg-[#facc15] px-7 py-3 text-sm font-black text-black hover:opacity-90"
-            >
-              Continue
-            </button>
+            ) : null}
           </div>
-        </div>
-      ) : null}
+        ) : null}
+
+        {chosen ? <Ring team={chosen} selected={sel} onToggle={(id) =>
+          setSel((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])
+        } /> : null}
+      </section>
 
       {checkout ? (
         <Checkout
-          teams={(teams ?? []).filter((t) => sel.includes(t.id))}
+          picks={sel.map((k) => {
+            const [teamId, slot] = k.split(':');
+            const t = (teams ?? []).find((x) => x.id === teamId)!;
+            return { team: t, slot: Number(slot) };
+          }).filter((p) => p.team)}
           onClose={() => setCheckout(false)}
         />
       ) : null}
@@ -322,9 +270,16 @@ export default function Sponsor() {
  * about a future we cannot control yet, and scarcity language only works where
  * there is scarcity.
  */
-function Checkout({ teams, onClose }: { teams: Team[]; onClose: () => void }) {
-  const names = teams.map((t) => `${t.city} ${t.name}`);
-  const total = teams.length * SEASON_PRICE;
+function Checkout({
+  picks, onClose,
+}: {
+  picks: { team: Team; slot: number }[];
+  onClose: () => void;
+}) {
+  // A pick is a team AND a position, because six can be sold on one team and
+  // "the Browns" no longer identifies what was bought.
+  const names = picks.map((p) => `${p.team.city} ${p.team.name} (spot ${p.slot})`);
+  const total = picks.length * SEASON_PRICE;
   const list = names.join(', ');
 
   const [busy, setBusy] = useState(false);
@@ -345,10 +300,10 @@ function Checkout({ teams, onClose }: { teams: Team[]; onClose: () => void }) {
           body: {
             businessName: brand.trim(),
             website: site.trim(),
-            teams: teams.map((t) => ({
-              teamKey: t.id,
-              teamName: `${t.city} ${t.name}`,
-              league: t.league,
+            teams: picks.map((p) => ({
+              teamKey: `${p.team.id}:${p.slot}`,
+              teamName: `${p.team.city} ${p.team.name} (spot ${p.slot})`,
+              league: p.team.league,
             })),
           },
         },
@@ -471,7 +426,7 @@ function Placements() {
   const SPOTS = [
     {
       label: 'Top of every room',
-      note: 'Presented by your brand, under the team name, in every room for that team.',
+      note: '"Your brand supports these fans", on the board in every room for that team.',
       box: { top: '25.7%', left: '3%', width: '94%', height: '4.2%' },
     },
     {
@@ -566,12 +521,92 @@ function Placements() {
         </a>
 
         <p className="mt-5 text-sm leading-relaxed text-white/40">
-          One brand per team. Side Huddle is early and rooms are still filling —
+          Six sponsors per team, no more. Side Huddle is early and rooms are still filling —
           we would rather you knew that for $100 than found it out for $1,000.
           What you are buying is the first position on a team, and it stays yours
           for as long as you keep it.
         </p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The team, and the six positions around it.
+ *
+ * A list of 195 rows is something to be endured. A ring is something you look
+ * at: the fans are in the middle, the six who back them sit around, and what is
+ * left is visible rather than described. It is also the honest shape of the
+ * offer — the team is the point, the sponsors are the surround.
+ */
+function Ring({
+  team, selected, onToggle,
+}: {
+  team: Team;
+  selected: string[];
+  onToggle: (id: string) => void;
+}) {
+  const openCount = team.slots.filter((x) => !x).length;
+
+  return (
+    <div className="mt-10">
+      <div className="relative mx-auto aspect-square w-full max-w-[420px]">
+        {/* The fans, in the middle. */}
+        <div className="absolute left-1/2 top-1/2 flex h-[42%] w-[42%] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border border-white/10 bg-white/[0.04] p-3 text-center">
+          {team.logo_url ? (
+            <img src={team.logo_url} alt="" className="h-12 w-12 object-contain" />
+          ) : null}
+          <p className="mt-1 text-[11px] font-black uppercase leading-tight tracking-wider text-white/70">
+            {team.city} {team.name}
+          </p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-[#facc15]">
+            fans
+          </p>
+        </div>
+
+        {team.slots.map((holder, i) => {
+          // Six around a circle, starting at the top.
+          const angle = (i / SLOTS) * 2 * Math.PI - Math.PI / 2;
+          const x = 50 + 38 * Math.cos(angle);
+          const y = 50 + 38 * Math.sin(angle);
+          const id = `${team.id}:${i + 1}`;
+          const isSel = selected.includes(id);
+          return (
+            <button
+              key={i}
+              disabled={!!holder}
+              onClick={() => onToggle(id)}
+              style={{ left: `${x}%`, top: `${y}%` }}
+              className={`absolute flex h-[26%] w-[26%] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border p-2 text-center transition-colors ${
+                holder
+                  ? 'border-white/5 bg-white/[0.02] cursor-default'
+                  : isSel
+                    ? 'border-[#facc15] bg-[#facc15]/15'
+                    : 'border-dashed border-white/25 hover:border-[#facc15]/70'
+              }`}
+            >
+              {holder ? (
+                <span className="text-[10px] font-black leading-tight text-white/35">
+                  {holder}
+                </span>
+              ) : (
+                <>
+                  <span className={`text-[10px] font-black ${isSel ? 'text-[#facc15]' : 'text-white/50'}`}>
+                    {isSel ? 'yours' : 'open'}
+                  </span>
+                  <span className="text-[9px] text-white/30">${SEASON_PRICE}</span>
+                </>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="mt-6 text-center text-sm text-white/50">
+        {openCount === 0
+          ? `All six spots on ${team.city} ${team.name} are taken.`
+          : `${openCount} of ${SLOTS} spots open. Tap one.`}
+      </p>
     </div>
   );
 }
