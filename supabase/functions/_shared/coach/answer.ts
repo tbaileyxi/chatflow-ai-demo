@@ -225,7 +225,12 @@ export async function answerQuestion(input: AnswerInput): Promise<string> {
   }
 
   if (input.liveSearch && input.liveSearch.trim()) {
-    facts.push("LIVE FROM X (last 48h, reported — not your own knowledge):\n" + input.liveSearch.trim());
+    facts.push(
+      "LIVE FROM X (reported just now — not your own knowledge). If this " +
+      "carries a betting line, quote it as the line and say which book it is " +
+      "from; do NOT say there is no line when one is sitting right here:\n" +
+      input.liveSearch.trim(),
+    );
   }
   // The last turns go in for EVERY lane. The full room transcript is still a
   // room-lane thing, but a handful of recent lines is what makes "his", "that

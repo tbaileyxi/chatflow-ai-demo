@@ -307,12 +307,24 @@ serve(async (req) => {
       rosterFacts = formatRoster(rows, pos);
     }
 
+    // Asked "who's favored to win", the Coach answered "No line on this one"
+    // — true of our markets table and useless to the person asking, who can see
+    // the number on any phone in the room. The keyword gate did fire (SUBJECT
+    // matches "who's"), so a search happened; it just asked for NEWS about
+    // Colorado in a 48-hour window and got headlines, because nothing told it
+    // the question was about a betting line.
+    //
+    // An odds question is its own lane: it wants a specific number from a
+    // specific book, and the number moves, so the window is tighter than news.
+    const oddsQ = /\b(favou?rite|favou?red|spread|the line|lines|odds|money ?line|underdog|over\/under|over-under|o\/u|point ?spread|vegas|sportsbook|cover(ing|ed)?)\b/i
+      .test(question);
+
     let liveSearch = "";
     // Same blind spot the clip search had: an empty result could be a failed
     // call or a genuine miss, and they looked identical from outside. Reported
     // on the response so "the Coach says no clue" is a diagnosable sentence.
     const xDiag: Record<string, unknown> = { attempted: false };
-    if (LIVE_X && (wantsLive || currentLane || rosterQ) && ctx.teamName) {
+    if (LIVE_X && (wantsLive || currentLane || rosterQ || oddsQ) && ctx.teamName) {
       const sport = sportFor(ctx.league, (gameSnap as any)?.sportKey);
       const scope = sportScopeLine(ctx.teamName, sport);
 
@@ -324,15 +336,24 @@ serve(async (req) => {
           `and give the consensus from beat writers and camp reports, making ` +
           `clear it is consensus rather than an announcement. Prefer beat ` +
           `writers who cover this team and the program's own releases.`
+        : oddsQ
+        ? `${ctx.teamName} ${sport} — ${question}\n\n${scope}\n\n` +
+          `Give the CURRENT betting line for this specific game: the point ` +
+          `spread and which side is favoured, the moneyline, and the total. ` +
+          `Name the sportsbook and when the number was posted. If it has moved ` +
+          `off the open, say where it opened and where it is now. If no book ` +
+          `has hung this game yet, say exactly that — do not estimate a number.`
         : `${ctx.teamName} ${sport} — ${question}\n\n${scope}`;
 
       // A depth chart does not change daily, so a two-week window is the honest
       // one for it. News keeps the tight window that makes it news.
       const r = await searchX(q, {
         mode: rosterQ ? "reference" : "news",
-        recencyHours: rosterQ ? 336 : 48,
+        // A depth chart keeps two weeks. A line does not keep two days.
+        recencyHours: rosterQ ? 336 : oddsQ ? 24 : 48,
         maxTokens: rosterQ ? 900 : 700,
       });
+      xDiag.odds = oddsQ;
       xDiag.attempted = true;
       xDiag.roster = rosterQ;
       xDiag.ok = r.ok;
