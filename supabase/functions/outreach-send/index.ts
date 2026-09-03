@@ -151,16 +151,27 @@ function subject(step: number, lead: Lead): string {
   }
 }
 
-// The one line no other pitch in their inbox can write.
+// The opening line of a letter about Saturday.
 //
-// A bar loaded from chapter-db carries the fan club it already hosts and how
-// many people are in it — "Home of Northern Summit Browns Backers — 687
-// members". Leading with that is the difference between a cold email and a
-// letter about their own Sunday.
+// This used to lead on lead.sponsor_signal, which is whatever enrichment found.
+// When that is a fan fact — "Home of Northern Summit Browns Backers, 687
+// members" — it is the best sentence in the email. When it is what enrichment
+// usually returns, the letter opened "Parent/student customer base and strong
+// local referral value. That crowd is the reason I'm writing." Nobody sponsors
+// a team because of their referral value. It reads like a database talking.
+//
+// So the fans lead, always, by name. The business signal follows as evidence
+// when we actually have one, and is silently dropped when we do not.
 function signalLine(lead: Lead): string {
+  const slot = slotName(lead);
+  const who = slot === "your local team" ? "Your town's" : `Every ${slot}`;
+  const hook = `<p style="margin:0 0 18px 0;">${who} fan group is already watching together — `
+    + `phones out, group chat going, everybody shouting at the same call. `
+    + `<strong>${lead.company}</strong> can be one of the businesses powering those rooms all season.</p>`;
+
   const signal = (lead.sponsor_signal || "").trim();
-  if (!signal) return "";
-  return `<p style="margin:0 0 18px 0;">${signal}. That crowd is the reason I'm writing.</p>`;
+  if (!signal) return hook;
+  return hook + `<p style="margin:0 0 18px 0;">${signal} — that is exactly the crowd already in there.</p>`;
 }
 
 function body(step: number, lead: Lead): string {
@@ -192,7 +203,7 @@ function body(step: number, lead: Lead): string {
     <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
     ${signalLine(lead)}
     <p style="margin:0 0 18px 0;">Side Huddle is the digital tailgate — the app fan groups use to watch the game together. Live scores, big plays and highlights land in the room while they argue about the call.</p>
-    <p style="margin:0 0 18px 0;">${lead.company} would be one of six businesses backing the ${slot} huddles — your name on the board in every one of them, all season, in front of ${fans}.</p>
+    <p style="margin:0 0 18px 0;">Six businesses back the ${slot} huddles — your name on the board in every one of them, all season, in front of ${fans}.</p>
     <p style="margin:0 0 18px 0;">Not an advert beside the fans. A business behind them, the same way you would back a team at home.</p>
     <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season, paid once.</strong> No deposit, nothing owed later — less than one radio spot, and it runs every game instead of once. Six spots per team, no seventh.</p>
     ${cta("Claim the slot")}

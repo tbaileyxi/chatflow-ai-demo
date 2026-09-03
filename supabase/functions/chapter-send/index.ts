@@ -298,14 +298,16 @@ function body(step: number, c: Chapter): string {
   // than a gate. Anyone who installs lands in the live team room either way, so
   // nobody who ignores the P.S. hits an empty screen.
   //
-  // The angle is theirs, not ours. A chapter president is not looking for a
-  // group chat — they are trying to get people to turn up, and to reach members
-  // between game days without a dead text thread. That is the job. The room is
-  // just how it gets done.
+  // The angle is theirs, not ours — and "get people to turn up" was only ever
+  // half of them. A Browns backers club hosts a bar on Sunday; an alumni
+  // association does not, and opening on turnout read as a watch-party pitch to
+  // people who are not running one. What both actually want is a membership
+  // that stays attached to the team, together, in and out of game day. So the
+  // opener leads on that, and the venue line appears only when there is a venue.
   return shell(`
     <p style="margin:0 0 18px 0;">Hey ${greeting(c)},</p>
-    <p style="margin:0 0 18px 0;">Getting people to actually show up is the whole job, and a group text doesn't do it.</p>
-    <p style="margin:0 0 18px 0;">There's a ${orgShort} room for ${chapterRef(c)} — everyone in one place, the score and the ${orgShort} news landing on their own, and when you post "${c.venue ? c.venue : "the bar"}, 1pm" people actually see it.</p>
+    <p style="margin:0 0 18px 0;">Your members already care about every snap. They are just watching it apart — a hundred living rooms, a group text nobody reads.</p>
+    <p style="margin:0 0 18px 0;">There's a ${orgShort} room for ${chapterRef(c)}: a digital tailgate. Everybody together for the game, the score and the ${orgShort} news landing on their own${c.venue ? `, and when you post "${c.venue}, 1pm" people actually see it` : `, and the chapter still in one place between game days`}.</p>
     ${cta(`Get the app — free`, APP_STORE_URL)}
     <p style="margin:0 0 18px 0;">Ty</p>
     ${code ? `<p style="font-size:13.5px;color:#777;margin:0;border-top:1px solid #eee;padding-top:16px;">P.S. Want it named for ${who} with you running it? Code <b style="color:#111;letter-spacing:1px;">${code}</b> at signup.</p>` : ""}`);

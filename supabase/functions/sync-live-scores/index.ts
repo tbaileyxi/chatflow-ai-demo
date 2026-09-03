@@ -856,6 +856,30 @@ serve(async (req) => {
     }
 
     let gamesInserted = 0;
+
+    // Every odds_game_id this run will look at, fetched in one go.
+    //
+    // The check below used to be one HTTP request per ESPN game, inside the
+    // loop. That is O(games) PostgREST calls on a cron that runs all day, and
+    // it was invisible until football season opened at the end of August and
+    // the games-per-run multiplied: 6.3M single-row lookups, 61% of every API
+    // request the project made, and the bulk of a 6 GB egress overage. The
+    // same answer costs one request per 500 games instead.
+    const wantedOddsGameIds: string[] = [];
+    for (const [sp, egs] of allEspnGames.entries()) {
+      for (const eg of egs) wantedOddsGameIds.push(`espn-${sp}-${eg.id}`);
+    }
+    const knownOddsGameIds = new Set<string>();
+    for (let i = 0; i < wantedOddsGameIds.length; i += 500) {
+      const { data: known } = await supabase
+        .from('games')
+        .select('odds_game_id')
+        .in('odds_game_id', wantedOddsGameIds.slice(i, i + 500));
+      for (const r of (known ?? []) as { odds_game_id: string | null }[]) {
+        if (r.odds_game_id) knownOddsGameIds.add(r.odds_game_id);
+      }
+    }
+
     for (const [sport, espnGames] of allEspnGames.entries()) {
       const sportKey = SPORT_KEY_MAP[sport];
       const league = SPORT_TO_LEAGUE[sport];
@@ -907,12 +931,7 @@ serve(async (req) => {
         }
 
         const oddsGameId = `espn-${sport}-${eg.id}`;
-        const { data: existing } = await supabase
-          .from('games')
-          .select('id')
-          .eq('odds_game_id', oddsGameId)
-          .maybeSingle();
-        if (existing) continue;
+        if (knownOddsGameIds.has(oddsGameId)) continue;
 
         // The same game also arrives from the odds feed under ITS id — a 32-char
         // hash, nothing like `espn-…` — so matching on odds_game_id alone let us
