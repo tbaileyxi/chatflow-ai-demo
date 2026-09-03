@@ -59,6 +59,11 @@ export default function Sponsor() {
   const [teams, setTeams] = useState<Team[] | null>(null);
   const [league, setLeague] = useState<string>('All');
   const [q, setQ] = useState('');
+  // Whether the search box has been seeded with the sample team yet. The page
+  // should open on a worked example — a real team named in the box and its ring
+  // below — rather than an empty field the reader has to fill before the offer
+  // means anything. Seeded once, so it never fights the reader's own typing.
+  const [seeded, setSeeded] = useState(false);
   // A set, not one team. Somebody who owns three bars in three towns wants
   // three teams, and making them buy one at a time is three chances to stop.
   const [sel, setSel] = useState<string[]>([]);
@@ -134,6 +139,13 @@ export default function Sponsor() {
 
   const shown = chosen ?? sample;
 
+  useEffect(() => {
+    if (seeded || !sample) return;
+    setQ(`${sample.city} ${sample.name}`);
+    setOpenTeam(sample.id);
+    setSeeded(true);
+  }, [sample, seeded]);
+
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white overflow-x-hidden">
@@ -155,7 +167,7 @@ export default function Sponsor() {
           <br />
           your team's fans all season.
         </h1>
-        <p className="mt-6 text-lg leading-relaxed text-white/60 max-w-xl">
+        <p className="mt-6 text-lg leading-relaxed text-white/80 max-w-xl">
           Side Huddle is the digital tailgate — the app fan groups use to watch
           the game together. Your name sits in those rooms all season, as one of
           six who back them. Not an advert beside the fans; a business behind
@@ -166,10 +178,15 @@ export default function Sponsor() {
           href={APP_STORE_URL}
           target="_blank"
           rel="noopener"
-          className="mt-6 inline-flex items-center gap-2 text-sm font-black text-white/40 hover:text-white/70"
+          className="mt-6 inline-flex items-center gap-2 text-sm font-black text-white/60 hover:text-white/85"
         >
           See the app first →
         </a>
+      </section>
+
+      {/* ── The board, before the ask ── */}
+      <section className="px-6 pb-12 max-w-5xl mx-auto">
+        <TheDrop />
       </section>
 
       {/* ── Claim your team ──
@@ -187,7 +204,7 @@ export default function Sponsor() {
           value={q}
           onChange={(e) => { setQ(e.target.value); setOpenTeam(null); }}
           placeholder="Type your team — Browns, Ohio State, Yankees…"
-          className="mt-6 w-full rounded-full border border-white/15 bg-white/[0.04] px-6 py-4 text-lg placeholder:text-white/30 focus:outline-none focus:border-[#facc15]/60"
+          className="mt-6 w-full rounded-full border border-white/15 bg-white/[0.04] px-6 py-4 text-lg placeholder:text-white/50 focus:outline-none focus:border-[#facc15]/60"
         />
 
         {q.trim() && !openTeam ? (
@@ -204,14 +221,14 @@ export default function Sponsor() {
                     <img src={t.logo_url} alt="" className="h-8 w-8 object-contain" />
                   ) : <div className="h-8 w-8 rounded-full bg-white/5" />}
                   <span className="flex-1 text-sm font-black">{t.city} {t.name}</span>
-                  <span className={`text-xs font-black ${left ? 'text-[#facc15]' : 'text-white/30'}`}>
+                  <span className={`text-xs font-black ${left ? 'text-[#facc15]' : 'text-white/50'}`}>
                     {left ? `${left} of ${SLOTS} open` : 'full'}
                   </span>
                 </button>
               );
             })}
             {matches.length === 0 ? (
-              <p className="py-6 text-center text-sm text-white/40">
+              <p className="py-6 text-center text-sm text-white/60">
                 No team matches that.
               </p>
             ) : null}
@@ -224,7 +241,7 @@ export default function Sponsor() {
 
         <a
           href="#benefits"
-          className="mt-8 flex flex-col items-center gap-1 text-sm font-black text-white/50 hover:text-white"
+          className="mt-8 flex flex-col items-center gap-1 text-sm font-black text-white/70 hover:text-white"
         >
           See what you get
           <span aria-hidden className="text-lg leading-none">↓</span>
@@ -233,7 +250,9 @@ export default function Sponsor() {
 
       {/* ── What you get ── */}
       <section id="benefits" className="px-6 pb-16 max-w-5xl mx-auto">
-        <TheDrop />
+        <h2 className="mb-10 text-3xl sm:text-4xl font-black tracking-tight text-center">
+          See what you get
+        </h2>
         <Placements />
       </section>
 
@@ -331,12 +350,12 @@ function Checkout({
         <p className="text-lg font-black leading-tight mb-1">
           {names.length === 1 ? names[0] : `${names.length} teams`}
         </p>
-        <p className="text-xs text-white/40 mb-5">
+        <p className="text-xs text-white/60 mb-5">
           One sponsor per team · full season
         </p>
 
         {names.length > 1 ? (
-          <div className="mb-5 rounded-2xl bg-white/[0.04] p-4 text-sm text-white/70 space-y-1">
+          <div className="mb-5 rounded-2xl bg-white/[0.04] p-4 text-sm text-white/85 space-y-1">
             {names.map((n) => (
               <p key={n}>{n}</p>
             ))}
@@ -346,12 +365,12 @@ function Checkout({
         <div className="rounded-2xl bg-white/[0.04] p-5 mb-5">
           <p className="text-3xl font-black">
             ${total}
-            <span className="text-base font-bold text-white/40">
+            <span className="text-base font-bold text-white/60">
               {' '}
               / season{names.length > 1 ? ` · $${SEASON_PRICE} each` : ''}
             </span>
           </p>
-          <p className="mt-2 text-sm text-white/50">
+          <p className="mt-2 text-sm text-white/70">
             Paid once. Your name goes up when the payment clears and stays for
             the season.
           </p>
@@ -362,15 +381,15 @@ function Checkout({
             value={brand}
             onChange={(e) => setBrand(e.target.value)}
             placeholder="Business name"
-            className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-base placeholder:text-white/30 focus:outline-none focus:border-[#facc15]/60"
+            className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-base placeholder:text-white/50 focus:outline-none focus:border-[#facc15]/60"
           />
           <input
             value={site}
             onChange={(e) => setSite(e.target.value)}
             placeholder="Website"
-            className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-base placeholder:text-white/30 focus:outline-none focus:border-[#facc15]/60"
+            className="w-full rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-base placeholder:text-white/50 focus:outline-none focus:border-[#facc15]/60"
           />
-          <p className="text-xs text-white/35">
+          <p className="text-xs text-white/55">
             This is the name fans see in the room, and where tapping it takes
             them.
           </p>
@@ -392,7 +411,7 @@ function Checkout({
 
         <button
           onClick={onClose}
-          className="w-full mt-3 py-3 text-sm font-bold text-white/40 hover:text-white/70 transition-colors"
+          className="w-full mt-3 py-3 text-sm font-bold text-white/60 hover:text-white/85 transition-colors"
         >
           Back to the board
         </button>
@@ -411,7 +430,7 @@ function Checkout({
  */
 function TheDrop() {
   return (
-    <div className="mb-14">
+    <div>
       <p className="text-[11px] uppercase tracking-[0.2em] text-[#facc15] font-black mb-5">
         What it looks like
       </p>
@@ -429,7 +448,7 @@ function TheDrop() {
               decoding="async"
             />
           </div>
-          <p className="mt-3 text-xs text-white/30">
+          <p className="mt-3 text-xs text-white/50">
             Recorded in a Yankees room. TicketsR sponsors the Yankees.
           </p>
         </div>
@@ -438,12 +457,12 @@ function TheDrop() {
           <h3 className="text-2xl sm:text-3xl font-black leading-tight">
             It drops, like a board at the stadium
           </h3>
-          <p className="mt-4 text-base leading-relaxed text-white/60">
+          <p className="mt-4 text-base leading-relaxed text-white/80">
             A thin line with your name on it sits at the top of every room for
             your team, all season. Every so often it swells down over the score
             for three seconds, says who you are, and goes back up.
           </p>
-          <p className="mt-4 text-base leading-relaxed text-white/60">
+          <p className="mt-4 text-base leading-relaxed text-white/80">
             Over the score on purpose — that is the one place on the screen
             everybody is already looking. Briefly on purpose too. Nobody stays
             in a room that shouts at them.
@@ -517,7 +536,7 @@ function Placements() {
             }}
           />
         </div>
-        <p className="mt-3 text-xs text-white/30">
+        <p className="mt-3 text-xs text-white/50">
           A live room today. TicketsR sponsors the Yankees.
         </p>
       </div>
@@ -538,11 +557,11 @@ function Placements() {
                   : 'border-white/10 hover:border-white/25'
               }`}
             >
-              <p className={`text-base font-black ${n === i ? '' : 'text-white/50'}`}>
+              <p className={`text-base font-black ${n === i ? '' : 'text-white/70'}`}>
                 {sp.label}
               </p>
               {n === i ? (
-                <p className="mt-1 text-sm leading-relaxed text-white/60">{sp.note}</p>
+                <p className="mt-1 text-sm leading-relaxed text-white/80">{sp.note}</p>
               ) : null}
             </button>
           ))}
@@ -550,7 +569,7 @@ function Placements() {
 
         <div className="mt-4 rounded-2xl border border-white/10 p-4">
           <p className="text-base font-black">And on the team page</p>
-          <p className="mt-1 text-sm leading-relaxed text-white/60">
+          <p className="mt-1 text-sm leading-relaxed text-white/80">
             Your brand and a link to your site on the public page Google indexes
             for that team. A different screen from the one above — that is why it
             is not marked on it.
@@ -564,7 +583,7 @@ function Placements() {
           Claim your team — $100
         </a>
 
-        <p className="mt-5 text-sm leading-relaxed text-white/40">
+        <p className="mt-5 text-sm leading-relaxed text-white/60">
           Six sponsors per team, no more. Side Huddle is early and rooms are still filling —
           we would rather you knew that for $100 than found it out for $1,000.
           What you are buying is the first position on a team, and it stays yours
@@ -600,7 +619,7 @@ function Ring({
           {team.logo_url ? (
             <img src={team.logo_url} alt="" className="h-12 w-12 object-contain" />
           ) : null}
-          <p className="mt-1 text-[11px] font-black uppercase leading-tight tracking-wider text-white/70">
+          <p className="mt-1 text-[11px] font-black uppercase leading-tight tracking-wider text-white/85">
             {team.city} {team.name}
           </p>
           <p className="text-[10px] font-black uppercase tracking-widest text-[#facc15]">
@@ -630,15 +649,15 @@ function Ring({
               }`}
             >
               {holder ? (
-                <span className="text-[10px] font-black leading-tight text-white/35">
+                <span className="text-[10px] font-black leading-tight text-white/55">
                   {holder}
                 </span>
               ) : (
                 <>
-                  <span className={`text-[10px] font-black ${isSel ? 'text-[#facc15]' : 'text-white/50'}`}>
+                  <span className={`text-[10px] font-black ${isSel ? 'text-[#facc15]' : 'text-white/70'}`}>
                     {isSel ? 'yours' : 'open'}
                   </span>
-                  <span className="text-[9px] text-white/30">${SEASON_PRICE}</span>
+                  <span className="text-[9px] text-white/50">${SEASON_PRICE}</span>
                 </>
               )}
             </button>
@@ -646,7 +665,7 @@ function Ring({
         })}
       </div>
 
-      <p className="mt-6 text-center text-sm text-white/50">
+      <p className="mt-6 text-center text-sm text-white/70">
         {openCount === 0
           ? `All six spots on ${team.city} ${team.name} are taken.`
           : `${openCount} of ${SLOTS} spots open. Tap one.`}
