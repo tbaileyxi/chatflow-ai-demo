@@ -137,17 +137,17 @@ function subject(step: number, lead: Lead): string {
   if (isSchoolPartnerLead(lead)) {
     const huddle = huddleLabel(lead);
     switch (step) {
-      case 2: return `${huddle} slot`;
+      case 2: return `backing ${huddle} fans`;
       case 3: return `last note — ${huddle}`;
-      default: return `one sponsor slot — ${huddle} fans`;
+      default: return `back the ${huddle} fans`;
     }
   }
 
   const slot = slotName(lead);
   switch (step) {
-    case 2: return `${slot} slot`;
+    case 2: return `backing ${slot} fans`;
     case 3: return `last note — ${slot}`;
-    default: return `one sponsor slot — ${slot} fans`;
+    default: return `back the ${slot} fans`;
   }
 }
 
@@ -172,7 +172,7 @@ function body(step: number, lead: Lead): string {
   if (step === 2) {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${firstName(lead)} — quick follow-up.</p>
-      <p style="margin:0 0 18px 0;">One sponsor, every ${slot} huddle, all season. ${SEASON_PRICE} — that is the whole price.</p>
+      <p style="margin:0 0 18px 0;">One of six businesses backing the ${slot} huddles, all season. ${SEASON_PRICE} — that is the whole price.</p>
       ${cta("Claim the slot")}
       ${appLine()}`);
   }
@@ -180,7 +180,7 @@ function body(step: number, lead: Lead): string {
   if (step === 3) {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
-      <p style="margin:0 0 18px 0;">Last note on ${slot}. One brand gets to be the only one inside those huddles this season.</p>
+      <p style="margin:0 0 18px 0;">Last note on ${slot}. Six businesses get their name on those huddles this season, and the spots do not come back.</p>
       ${cta("Claim the slot")}
       ${appLine()}
       <p style="font-size:13px;color:#999;margin:0;">Not relevant? Reply "unsubscribe" and I won't follow up.</p>`);
@@ -192,9 +192,9 @@ function body(step: number, lead: Lead): string {
     <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
     ${signalLine(lead)}
     <p style="margin:0 0 18px 0;">Side Huddle is the digital tailgate — the app fan groups use to watch the game together. Live scores, big plays and highlights land in the room while they argue about the call.</p>
-    <p style="margin:0 0 18px 0;">${lead.company} would be the only sponsor in every ${slot} huddle — your name at the top of the room and on every update, all season, in front of ${fans}.</p>
-    <p style="margin:0 0 18px 0;">Those people are deciding where to watch on Saturday morning. This puts you in front of them at that moment, with a tap that goes straight to you.</p>
-    <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season, paid once.</strong> No deposit, nothing owed later — less than one radio spot, and it runs every game instead of once.</p>
+    <p style="margin:0 0 18px 0;">${lead.company} would be one of six businesses backing the ${slot} huddles — your name on the board in every one of them, all season, in front of ${fans}.</p>
+    <p style="margin:0 0 18px 0;">Not an advert beside the fans. A business behind them, the same way you would back a team at home.</p>
+    <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season, paid once.</strong> No deposit, nothing owed later — less than one radio spot, and it runs every game instead of once. Six spots per team, no seventh.</p>
     ${cta("Claim the slot")}
     ${appLine()}
     <p style="font-size:13px;color:#999;margin:0;">Price goes up each week until kickoff.</p>`);
@@ -207,7 +207,7 @@ function schoolPartnerBody(step: number, lead: Lead): string {
   if (step === 2) {
     return shell(`
       <p style="margin:0 0 18px 0;">Hi ${firstName(lead)} — quick follow-up.</p>
-      <p style="margin:0 0 18px 0;">One sponsor, every ${huddle} huddle, all season. ${SEASON_PRICE} — that is the whole price.</p>
+      <p style="margin:0 0 18px 0;">One of six businesses backing the ${huddle} huddles, all season. ${SEASON_PRICE} — that is the whole price.</p>
       ${cta("Claim the slot")}
       ${appLine()}`);
   }
