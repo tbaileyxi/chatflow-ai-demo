@@ -233,6 +233,7 @@ export default function Sponsor() {
 
       {/* ── What you get ── */}
       <section id="benefits" className="px-6 pb-16 max-w-5xl mx-auto">
+        <TheDrop />
         <Placements />
       </section>
 
@@ -395,6 +396,59 @@ function Checkout({
         >
           Back to the board
         </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The board, actually dropping.
+ *
+ * Every other claim on this page is a sentence. This is the thing itself,
+ * recorded off a real room on a real phone — which is the only argument that
+ * survives a bar owner asking "yeah, but what does it actually look like".
+ * It leads the section for that reason: motion before description.
+ */
+function TheDrop() {
+  return (
+    <div className="mb-14">
+      <p className="text-[11px] uppercase tracking-[0.2em] text-[#facc15] font-black mb-5">
+        What it looks like
+      </p>
+
+      <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+        <div>
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-black">
+            <img
+              src="/sponsor-drop.gif"
+              width={603}
+              height={260}
+              alt="The sponsor board dropping over the game bar in a Side Huddle room"
+              className="block w-full"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+          <p className="mt-3 text-xs text-white/30">
+            Recorded in a Yankees room. TicketsR sponsors the Yankees.
+          </p>
+        </div>
+
+        <div>
+          <h3 className="text-2xl sm:text-3xl font-black leading-tight">
+            It drops, like a board at the stadium
+          </h3>
+          <p className="mt-4 text-base leading-relaxed text-white/60">
+            A thin line with your name on it sits at the top of every room for
+            your team, all season. Every so often it swells down over the score
+            for three seconds, says who you are, and goes back up.
+          </p>
+          <p className="mt-4 text-base leading-relaxed text-white/60">
+            Over the score on purpose — that is the one place on the screen
+            everybody is already looking. Briefly on purpose too. Nobody stays
+            in a room that shouts at them.
+          </p>
+        </div>
       </div>
     </div>
   );

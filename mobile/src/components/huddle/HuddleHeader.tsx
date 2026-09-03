@@ -183,18 +183,31 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
     if (!sponsors || sponsors.length === 0) return;
 
     let cancelled = false;
+    const advances: ReturnType<typeof setTimeout>[] = [];
+
     const cycle = () => {
       if (cancelled) return;
+
+      // Purely visual, and often driving nothing: the board is only mounted
+      // when there is a game bar to drop over.
       Animated.sequence([
         Animated.timing(drop, { toValue: 1, duration: 420, useNativeDriver: true }),
         Animated.delay(3000),
         Animated.timing(drop, { toValue: 0, duration: 320, useNativeDriver: true }),
-      ]).start(({ finished }) => {
-        if (!finished || cancelled) return;
-        // Change WHILE retracted, so the next one arrives fresh rather than
-        // swapping in front of the reader.
-        setSlot((n) => (n + 1) % sponsors.length);
-      });
+      ]).start();
+
+      // Advance on our own clock, NOT off the animation's completion callback.
+      // Hanging it off the callback froze every gameless room on sponsor one —
+      // no game means no mounted board, so nothing ever reported finished and
+      // the slot never moved. Slots 2-6 were paid for and never named, in the
+      // rooms that outnumber game days. Still timed to land while the board is
+      // retracted, so the next name arrives fresh rather than swapping in
+      // front of the reader.
+      advances.push(
+        setTimeout(() => {
+          if (!cancelled) setSlot((n) => (n + 1) % sponsors.length);
+        }, 3800),
+      );
     };
 
     // Not immediately on open: the first thing in a room should be the room.
@@ -204,6 +217,7 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
       cancelled = true;
       clearTimeout(first);
       clearInterval(every);
+      advances.forEach(clearTimeout);
     };
   }, [sponsors?.length, drop]);
 
