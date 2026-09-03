@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, Text, Image, Pressable, Animated, Linking } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
@@ -16,7 +16,7 @@ import {
   type GameContext,
   type GameState,
 } from "@/hooks/useLiveGameContext";
-import { useTeamSponsor, logSponsorTap } from "@/hooks/useTeamSponsor";
+import { useTeamSponsors, logSponsorTap } from "@/hooks/useTeamSponsor";
 import { useAuth } from "@/hooks/useAuth";
 import type { HuddleDetails } from "@/hooks/useHuddleDetails";
 
@@ -167,7 +167,47 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
   const navigation = useNavigation();
   const { user } = useAuth();
   const { data: game } = useLiveGameContext(huddle.teamId);
-  const { data: sponsor } = useTeamSponsor(huddle.teamId);
+  const { data: sponsors } = useTeamSponsors(huddle.teamId);
+
+  // A stadium board does not sit there being read. It drops, holds, and goes
+  // back up, and the drop is the moment anybody actually sees it.
+  //
+  // So: a thin permanent line, and every so often it swells down over the score
+  // for three seconds with the sponsor's full line, then retracts. Over the
+  // score deliberately — that is the one place on this screen guaranteed to
+  // have the eye — but briefly, and never while a play is landing.
+  const [slot, setSlot] = useState(0);
+  const drop = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!sponsors || sponsors.length === 0) return;
+
+    let cancelled = false;
+    const cycle = () => {
+      if (cancelled) return;
+      Animated.sequence([
+        Animated.timing(drop, { toValue: 1, duration: 420, useNativeDriver: true }),
+        Animated.delay(3000),
+        Animated.timing(drop, { toValue: 0, duration: 320, useNativeDriver: true }),
+      ]).start(({ finished }) => {
+        if (!finished || cancelled) return;
+        // Change WHILE retracted, so the next one arrives fresh rather than
+        // swapping in front of the reader.
+        setSlot((n) => (n + 1) % sponsors.length);
+      });
+    };
+
+    // Not immediately on open: the first thing in a room should be the room.
+    const first = setTimeout(cycle, 8000);
+    const every = setInterval(cycle, 45000);
+    return () => {
+      cancelled = true;
+      clearTimeout(first);
+      clearInterval(every);
+    };
+  }, [sponsors?.length, drop]);
+
+  const sponsor = sponsors?.[slot % Math.max(sponsors.length || 1, 1)] ?? null;
 
   const displayName = huddle.isOfficialTeam
     ? huddle.teamName ?? huddle.name
@@ -270,19 +310,63 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
       {sponsor ? (
         <Pressable
           onPress={handleSponsorTap}
-          className="flex-row items-center justify-center gap-1.5 border-t border-border bg-muted/40 px-4 py-1"
+          className="flex-row items-center justify-center gap-2 border-t border-border bg-muted/40 px-4 py-1"
           hitSlop={4}
         >
           <Text className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            Presented by {sponsor.brandName}
+            {sponsor.brandName} supports this room
           </Text>
           <ExternalLink color={colors.mutedForeground} size={10} />
+          {/* Which of the six is showing. Dots rather than "3 of 6" because the
+              strip is furniture, not a control — and a sponsor who paid should
+              see that others exist without it being announced. */}
+          {sponsors && sponsors.length > 1 ? (
+            <View className="ml-1 flex-row items-center gap-1">
+              {sponsors.map((sp, i) => (
+                <View
+                  key={sp.id}
+                  className={`h-1 w-1 rounded-full ${
+                    i === slot % sponsors.length ? "bg-primary" : "bg-muted-foreground/30"
+                  }`}
+                />
+              ))}
+            </View>
+          ) : null}
         </Pressable>
       ) : null}
 
-      {/* Game day bar */}
+      {/* Game day bar, with the sponsor board dropping over it. */}
       {game && gameState !== "none" && (
-        <GameBar game={game} gameState={gameState} />
+        <View className="overflow-hidden">
+          <GameBar game={game} gameState={gameState} />
+          {sponsor ? (
+            <Animated.View
+              pointerEvents="none"
+              className="absolute inset-0 items-center justify-center bg-primary"
+              style={{
+                transform: [
+                  {
+                    translateY: drop.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-120, 0],
+                    }),
+                  },
+                ],
+              }}
+            >
+              {/* The line that says what this actually is. A local business is
+                  not buying an advert next to a fanbase — it is backing the
+                  people in the room, and that is the sentence that makes a bar
+                  owner say yes. */}
+              <Text className="text-sm font-black text-primary-foreground">
+                {sponsor.brandName}
+              </Text>
+              <Text className="text-[11px] font-bold text-primary-foreground/80">
+                supports {huddle.teamName ?? "these"} fans
+              </Text>
+            </Animated.View>
+          ) : null}
+        </View>
       )}
     </View>
   );
