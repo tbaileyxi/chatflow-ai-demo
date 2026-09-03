@@ -257,14 +257,9 @@ export default function PickSharePage() {
           {/* Download buttons */}
           <div className="flex flex-col gap-3">
             <a href={appStoreUrl(STORE_CAMPAIGN.pickShare)}
-              onClick={APP_STORE_URL === '#' ? e => e.preventDefault() : undefined}
-              className={`flex items-center justify-center gap-3 rounded-2xl py-4 font-semibold text-base transition-all
-                ${APP_STORE_URL === '#'
-                  ? 'bg-white/5 border border-white/10 text-white/40 cursor-not-allowed'
-                  : 'bg-[#FFD700] text-black hover:bg-yellow-300'}`}>
+              className="flex items-center justify-center gap-3 rounded-2xl py-4 font-semibold text-base transition-all bg-[#FFD700] text-black hover:bg-yellow-300">
               <AppleIcon />
               <span>Download on the App Store</span>
-              {APP_STORE_URL === '#' && <span className="text-xs bg-[#FFD700]/20 text-[#FFD700] px-2 py-0.5 rounded-full ml-1">Soon</span>}
             </a>
             
           </div>

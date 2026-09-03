@@ -136,9 +136,13 @@ export default function BrevoImport({ onDone }: { onDone?: () => void }) {
         if (Object.keys(patch).length === 0) continue;
 
         // The same address can be a chapter or a sponsor, so try both.
+        // Cast through any: chapter_leads and sponsor_leads post-date the
+        // generated types file, so the typed client refuses table names that
+        // exist perfectly well in the database.
+        const db = supabase as any;
         const [a, b] = await Promise.all([
-          supabase.from("chapter_leads").update(patch).eq("email", c.email).select("id"),
-          supabase.from("sponsor_leads").update(patch).eq("contact_email", c.email).select("id"),
+          db.from("chapter_leads").update(patch).eq("email", c.email).select("id"),
+          db.from("sponsor_leads").update(patch).eq("contact_email", c.email).select("id"),
         ]);
         if ((a.data?.length ?? 0) + (b.data?.length ?? 0) > 0) touched++;
       }

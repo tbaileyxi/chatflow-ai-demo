@@ -65,17 +65,31 @@ export default function HuddleInvitePage() {
         .eq('huddle_id', huddleRow.id);
 
       // Load top 5 members for leaderboard preview
+      // Names live on profiles, not on the membership row. This asked
+      // huddle_members for display_name, avatar_url and points — none of which
+      // are columns on it — so the query errored and the invite page has been
+      // quietly showing an empty member list to everyone who followed a share
+      // link.
       const { data: memberRows } = await supabase
         .from('huddle_members')
-        .select('display_name, avatar_url, points')
+        .select('user_id')
         .eq('huddle_id', huddleRow.id)
-        .order('points', { ascending: false })
+        .order('joined_at', { ascending: true })
         .limit(5);
 
-      const members: HuddleMember[] = (memberRows || []).map((m, i) => ({
-        display_name: m.display_name || 'Fan',
-        avatar_url: m.avatar_url,
-        points: m.points ?? 0,
+      const ids = (memberRows || []).map((m) => m.user_id);
+      const { data: profileRows } = ids.length
+        ? await supabase
+            .from('profiles')
+            .select('user_id, display_name, avatar_url')
+            .in('user_id', ids)
+        : { data: [] as { user_id: string; display_name: string | null; avatar_url: string | null }[] };
+
+      const byId = new Map((profileRows || []).map((p) => [p.user_id, p]));
+      const members: HuddleMember[] = ids.map((id, i) => ({
+        display_name: byId.get(id)?.display_name || 'Fan',
+        avatar_url: byId.get(id)?.avatar_url ?? null,
+        points: 0,
         rank: i + 1,
       }));
 
@@ -255,16 +269,10 @@ export default function HuddleInvitePage() {
             </p>
             <a
               href={appStoreUrl(STORE_CAMPAIGN.invite)}
-              onClick={APP_STORE_URL === '#' ? e => e.preventDefault() : undefined}
-              className={`flex items-center justify-center gap-3 rounded-2xl py-4 font-semibold text-base transition-all
-                ${APP_STORE_URL === '#'
-                  ? 'bg-white/5 border border-white/10 text-white/40 cursor-not-allowed'
-                  : 'bg-[#FFD700] text-black hover:bg-yellow-300'
-                }`}
+              className="flex items-center justify-center gap-3 rounded-2xl py-4 font-semibold text-base transition-all bg-[#FFD700] text-black hover:bg-yellow-300"
             >
               <AppleIcon />
               <span>Download on the App Store</span>
-              {APP_STORE_URL === '#' && <span className="text-xs bg-[#FFD700]/20 text-[#FFD700] px-2 py-0.5 rounded-full ml-1">Soon</span>}
             </a>
             
           </div>

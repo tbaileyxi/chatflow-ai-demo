@@ -344,7 +344,9 @@ export default function Outreach() {
       .sort((a, b) => b.ready - a.ready || b.noEmail - a.noEmail);
   }, [leads]);
   const [lastResult, setLastResult] = useState<SendResult | null>(null);
-  const [view, setView] = useState<"school" | "priority" | "all" | "contacted" | "followup">("school");
+  const [view, setView] = useState<
+    "school" | "business" | "priority" | "all" | "contacted" | "followup"
+  >("school");
   // The worklist opens by default. Everything else on this page is machinery —
   // campaigns, scores, filters — and machinery is not what anyone came to do.
   const [audience, setAudience] = useState<

@@ -12,8 +12,263 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      app_waitlist: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      arena_events: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          period_label: string | null
+          prob_a: number | null
+          score_a: number
+          score_b: number
+          side_a_label: string
+          side_b_label: string
+          slug: string
+          source: Json
+          starts_at: string
+          status: string
+          title: string
+          updated_at: string
+          winner: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          period_label?: string | null
+          prob_a?: number | null
+          score_a?: number
+          score_b?: number
+          side_a_label: string
+          side_b_label: string
+          slug: string
+          source?: Json
+          starts_at: string
+          status?: string
+          title: string
+          updated_at?: string
+          winner?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          period_label?: string | null
+          prob_a?: number | null
+          score_a?: number
+          score_b?: number
+          side_a_label?: string
+          side_b_label?: string
+          slug?: string
+          source?: Json
+          starts_at?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          winner?: string | null
+        }
+        Relationships: []
+      }
+      arena_follows: {
+        Row: {
+          created_at: string
+          followed: string
+          follower: string
+        }
+        Insert: {
+          created_at?: string
+          followed: string
+          follower: string
+        }
+        Update: {
+          created_at?: string
+          followed?: string
+          follower?: string
+        }
+        Relationships: []
+      }
+      arena_live_odds: {
+        Row: {
+          game_id: string
+          home_prob: number
+          pm_a_outcome: string | null
+          pm_condition: string | null
+          updated_at: string
+        }
+        Insert: {
+          game_id: string
+          home_prob: number
+          pm_a_outcome?: string | null
+          pm_condition?: string | null
+          updated_at?: string
+        }
+        Update: {
+          game_id?: string
+          home_prob?: number
+          pm_a_outcome?: string | null
+          pm_condition?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_live_odds_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: true
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_players: {
+        Row: {
+          avatar: string
+          bankroll: number
+          client_id: string
+          created_at: string
+          handle: string
+          last_claim_date: string | null
+          streak_days: number
+          updated_at: string
+        }
+        Insert: {
+          avatar?: string
+          bankroll?: number
+          client_id: string
+          created_at?: string
+          handle?: string
+          last_claim_date?: string | null
+          streak_days?: number
+          updated_at?: string
+        }
+        Update: {
+          avatar?: string
+          bankroll?: number
+          client_id?: string
+          created_at?: string
+          handle?: string
+          last_claim_date?: string | null
+          streak_days?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      arena_stakes: {
+        Row: {
+          amount: number
+          client_id: string
+          created_at: string
+          event_id: string | null
+          game_id: string | null
+          id: string
+          payout: number | null
+          settled: boolean
+          side: string
+        }
+        Insert: {
+          amount: number
+          client_id: string
+          created_at?: string
+          event_id?: string | null
+          game_id?: string | null
+          id?: string
+          payout?: number | null
+          settled?: boolean
+          side: string
+        }
+        Update: {
+          amount?: number
+          client_id?: string
+          created_at?: string
+          event_id?: string | null
+          game_id?: string | null
+          id?: string
+          payout?: number | null
+          settled?: boolean
+          side?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_stakes_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "arena_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_stakes_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_ticks: {
+        Row: {
+          created_at: string
+          id: number
+          prob: number
+          target: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          prob: number
+          target: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          prob?: number
+          target?: string
+        }
+        Relationships: []
+      }
       bears_trending: {
         Row: {
           author_username: string | null
@@ -88,6 +343,67 @@ export type Database = {
           },
         ]
       }
+      bot_emit_log: {
+        Row: {
+          created_at: string
+          excitement_score: number | null
+          facts: Json
+          huddle_id: string | null
+          id: string
+          message_text: string
+          mode: string
+          pushed: boolean
+          source_ref: string | null
+          team_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          excitement_score?: number | null
+          facts: Json
+          huddle_id?: string | null
+          id?: string
+          message_text: string
+          mode: string
+          pushed?: boolean
+          source_ref?: string | null
+          team_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          excitement_score?: number | null
+          facts?: Json
+          huddle_id?: string | null
+          id?: string
+          message_text?: string
+          mode?: string
+          pushed?: boolean
+          source_ref?: string | null
+          team_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_emit_log_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bot_emit_log_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bot_emit_log_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cash_mode_subscriptions: {
         Row: {
           created_at: string
@@ -123,6 +439,263 @@ export type Database = {
           venmo_username?: string | null
         }
         Relationships: []
+      }
+      chapter_leads: {
+        Row: {
+          address: string | null
+          bounce_kind: string | null
+          bounced: boolean
+          chapter_name: string
+          city: string | null
+          claim_code: string | null
+          claimed_at: string | null
+          claimed_huddle_id: string | null
+          clicked_app_store: boolean
+          clicked_at: string | null
+          contact_channel: string
+          country: string | null
+          created_at: string
+          dedupe_key: string
+          email: string | null
+          emailed: boolean
+          emailed_at: string | null
+          facebook: string | null
+          first_name: string | null
+          follow_up_date: string | null
+          id: string
+          instagram: string | null
+          last_error: string | null
+          last_touch: string | null
+          leader_name: string | null
+          leader_role: string | null
+          member_count: number | null
+          notes: string | null
+          opened_at: string | null
+          org: string
+          org_type: string
+          phone: string | null
+          score: number
+          sequence_step: number
+          source: string
+          source_url: string | null
+          state: string | null
+          status: string
+          twitter: string | null
+          unsubscribed: boolean
+          updated_at: string
+          venue: string | null
+          website: string | null
+          year_established: number | null
+          zip: string | null
+        }
+        Insert: {
+          address?: string | null
+          bounce_kind?: string | null
+          bounced?: boolean
+          chapter_name: string
+          city?: string | null
+          claim_code?: string | null
+          claimed_at?: string | null
+          claimed_huddle_id?: string | null
+          clicked_app_store?: boolean
+          clicked_at?: string | null
+          contact_channel?: string
+          country?: string | null
+          created_at?: string
+          dedupe_key: string
+          email?: string | null
+          emailed?: boolean
+          emailed_at?: string | null
+          facebook?: string | null
+          first_name?: string | null
+          follow_up_date?: string | null
+          id?: string
+          instagram?: string | null
+          last_error?: string | null
+          last_touch?: string | null
+          leader_name?: string | null
+          leader_role?: string | null
+          member_count?: number | null
+          notes?: string | null
+          opened_at?: string | null
+          org: string
+          org_type?: string
+          phone?: string | null
+          score?: number
+          sequence_step?: number
+          source: string
+          source_url?: string | null
+          state?: string | null
+          status?: string
+          twitter?: string | null
+          unsubscribed?: boolean
+          updated_at?: string
+          venue?: string | null
+          website?: string | null
+          year_established?: number | null
+          zip?: string | null
+        }
+        Update: {
+          address?: string | null
+          bounce_kind?: string | null
+          bounced?: boolean
+          chapter_name?: string
+          city?: string | null
+          claim_code?: string | null
+          claimed_at?: string | null
+          claimed_huddle_id?: string | null
+          clicked_app_store?: boolean
+          clicked_at?: string | null
+          contact_channel?: string
+          country?: string | null
+          created_at?: string
+          dedupe_key?: string
+          email?: string | null
+          emailed?: boolean
+          emailed_at?: string | null
+          facebook?: string | null
+          first_name?: string | null
+          follow_up_date?: string | null
+          id?: string
+          instagram?: string | null
+          last_error?: string | null
+          last_touch?: string | null
+          leader_name?: string | null
+          leader_role?: string | null
+          member_count?: number | null
+          notes?: string | null
+          opened_at?: string | null
+          org?: string
+          org_type?: string
+          phone?: string | null
+          score?: number
+          sequence_step?: number
+          source?: string
+          source_url?: string | null
+          state?: string | null
+          status?: string
+          twitter?: string | null
+          unsubscribed?: boolean
+          updated_at?: string
+          venue?: string | null
+          website?: string | null
+          year_established?: number | null
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chapter_leads_claimed_huddle_id_fkey"
+            columns: ["claimed_huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chapter_leads_claimed_huddle_id_fkey"
+            columns: ["claimed_huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_ask_log: {
+        Row: {
+          answer_message_id: string | null
+          created_at: string
+          huddle_id: string
+          id: string
+          lane: string | null
+          question: string
+          user_id: string
+        }
+        Insert: {
+          answer_message_id?: string | null
+          created_at?: string
+          huddle_id: string
+          id?: string
+          lane?: string | null
+          question: string
+          user_id: string
+        }
+        Update: {
+          answer_message_id?: string | null
+          created_at?: string
+          huddle_id?: string
+          id?: string
+          lane?: string | null
+          question?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_ask_log_answer_message_id_fkey"
+            columns: ["answer_message_id"]
+            isOneToOne: false
+            referencedRelation: "huddle_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_ask_log_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_ask_log_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_recap_log: {
+        Row: {
+          created_at: string
+          huddle_id: string
+          id: string
+          kind: string
+          message_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          huddle_id: string
+          id?: string
+          kind: string
+          message_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          huddle_id?: string
+          id?: string
+          kind?: string
+          message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_recap_log_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_recap_log_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_recap_log_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "huddle_messages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       content_admin_teams: {
         Row: {
@@ -198,6 +771,258 @@ export type Database = {
           },
         ]
       }
+      creator_leads: {
+        Row: {
+          avg_likes: number | null
+          best_post: string | null
+          bio: string | null
+          display_name: string | null
+          email: string | null
+          emailed: boolean
+          first_seen: string
+          followers: number | null
+          handle: string
+          huddle_id: string | null
+          id: string
+          last_seen: string
+          last_touch: string | null
+          likes_seen: number | null
+          notes: string | null
+          org: string | null
+          posts_seen: number | null
+          sequence_step: number
+          status: string
+          team_id: string | null
+          website: string | null
+        }
+        Insert: {
+          avg_likes?: number | null
+          best_post?: string | null
+          bio?: string | null
+          display_name?: string | null
+          email?: string | null
+          emailed?: boolean
+          first_seen?: string
+          followers?: number | null
+          handle: string
+          huddle_id?: string | null
+          id?: string
+          last_seen?: string
+          last_touch?: string | null
+          likes_seen?: number | null
+          notes?: string | null
+          org?: string | null
+          posts_seen?: number | null
+          sequence_step?: number
+          status?: string
+          team_id?: string | null
+          website?: string | null
+        }
+        Update: {
+          avg_likes?: number | null
+          best_post?: string | null
+          bio?: string | null
+          display_name?: string | null
+          email?: string | null
+          emailed?: boolean
+          first_seen?: string
+          followers?: number | null
+          handle?: string
+          huddle_id?: string | null
+          id?: string
+          last_seen?: string
+          last_touch?: string | null
+          likes_seen?: number | null
+          notes?: string | null
+          org?: string | null
+          posts_seen?: number | null
+          sequence_step?: number
+          status?: string
+          team_id?: string | null
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_leads_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_leads_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_leads_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_content: {
+        Row: {
+          author: string | null
+          content: string | null
+          engagement_score: number | null
+          event_id: string
+          external_id: string
+          id: string
+          media_urls: string[] | null
+          platform: string
+          pulled_at: string
+          source_id: string | null
+          url: string | null
+        }
+        Insert: {
+          author?: string | null
+          content?: string | null
+          engagement_score?: number | null
+          event_id: string
+          external_id: string
+          id?: string
+          media_urls?: string[] | null
+          platform: string
+          pulled_at?: string
+          source_id?: string | null
+          url?: string | null
+        }
+        Update: {
+          author?: string | null
+          content?: string | null
+          engagement_score?: number | null
+          event_id?: string
+          external_id?: string
+          id?: string
+          media_urls?: string[] | null
+          platform?: string
+          pulled_at?: string
+          source_id?: string | null
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_content_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_content_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "event_content_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_content_sources: {
+        Row: {
+          active: boolean
+          auto_discovered: boolean
+          confidence: number | null
+          created_at: string
+          event_id: string
+          id: string
+          platform: string
+          source_type: string
+          source_value: string
+        }
+        Insert: {
+          active?: boolean
+          auto_discovered?: boolean
+          confidence?: number | null
+          created_at?: string
+          event_id: string
+          id?: string
+          platform: string
+          source_type: string
+          source_value: string
+        }
+        Update: {
+          active?: boolean
+          auto_discovered?: boolean
+          confidence?: number | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          platform?: string
+          source_type?: string
+          source_value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_content_sources_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          content_daily_pull_hour: number
+          content_pulse_interval_minutes: number
+          created_at: string
+          description: string | null
+          ends_at: string
+          id: string
+          image_url: string | null
+          kalshi_market_ticker: string | null
+          kalshi_market_url: string | null
+          league: string | null
+          name: string
+          short_name: string | null
+          sport: string
+          starts_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          content_daily_pull_hour?: number
+          content_pulse_interval_minutes?: number
+          created_at?: string
+          description?: string | null
+          ends_at: string
+          id?: string
+          image_url?: string | null
+          kalshi_market_ticker?: string | null
+          kalshi_market_url?: string | null
+          league?: string | null
+          name: string
+          short_name?: string | null
+          sport: string
+          starts_at: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          content_daily_pull_hour?: number
+          content_pulse_interval_minutes?: number
+          created_at?: string
+          description?: string | null
+          ends_at?: string
+          id?: string
+          image_url?: string | null
+          kalshi_market_ticker?: string | null
+          kalshi_market_url?: string | null
+          league?: string | null
+          name?: string
+          short_name?: string | null
+          sport?: string
+          starts_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fade_ledgers: {
         Row: {
           created_at: string
@@ -246,6 +1071,13 @@ export type Database = {
             referencedRelation: "huddles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fade_ledgers_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
         ]
       }
       fade_season_stats: {
@@ -290,6 +1122,13 @@ export type Database = {
             referencedRelation: "huddles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fade_season_stats_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
         ]
       }
       fades: {
@@ -308,6 +1147,8 @@ export type Database = {
           line_description: string
           line_value: number
           locked_at: string | null
+          market_id: string | null
+          origin_message_id: string | null
           paid_confirmed_at: string | null
           paid_confirmed_by: string | null
           paid_marked_at: string | null
@@ -318,6 +1159,7 @@ export type Database = {
           sport: string
           stake: number
           status: string
+          total_target: string
           winner_id: string | null
         }
         Insert: {
@@ -335,6 +1177,8 @@ export type Database = {
           line_description: string
           line_value: number
           locked_at?: string | null
+          market_id?: string | null
+          origin_message_id?: string | null
           paid_confirmed_at?: string | null
           paid_confirmed_by?: string | null
           paid_marked_at?: string | null
@@ -345,6 +1189,7 @@ export type Database = {
           sport?: string
           stake?: number
           status?: string
+          total_target?: string
           winner_id?: string | null
         }
         Update: {
@@ -362,6 +1207,8 @@ export type Database = {
           line_description?: string
           line_value?: number
           locked_at?: string | null
+          market_id?: string | null
+          origin_message_id?: string | null
           paid_confirmed_at?: string | null
           paid_confirmed_by?: string | null
           paid_marked_at?: string | null
@@ -372,6 +1219,7 @@ export type Database = {
           sport?: string
           stake?: number
           status?: string
+          total_target?: string
           winner_id?: string | null
         }
         Relationships: [
@@ -382,7 +1230,58 @@ export type Database = {
             referencedRelation: "huddles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fades_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fades_market_id_fkey"
+            columns: ["market_id"]
+            isOneToOne: false
+            referencedRelation: "kalshi_markets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fades_origin_message_id_fkey"
+            columns: ["origin_message_id"]
+            isOneToOne: false
+            referencedRelation: "huddle_messages"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      friend_connections: {
+        Row: {
+          accepted_at: string | null
+          addressee_id: string
+          created_at: string
+          id: string
+          requester_id: string
+          source: string
+          status: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          addressee_id: string
+          created_at?: string
+          id?: string
+          requester_id: string
+          source?: string
+          status?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          addressee_id?: string
+          created_at?: string
+          id?: string
+          requester_id?: string
+          source?: string
+          status?: string
+        }
+        Relationships: []
       }
       game_states: {
         Row: {
@@ -432,6 +1331,7 @@ export type Database = {
           last_synced_at: string | null
           odds_game_id: string
           period: string | null
+          recap_posted_at: string | null
           sport_key: string
           start_time: string
           status: string
@@ -447,6 +1347,7 @@ export type Database = {
           last_synced_at?: string | null
           odds_game_id: string
           period?: string | null
+          recap_posted_at?: string | null
           sport_key: string
           start_time: string
           status?: string
@@ -462,6 +1363,7 @@ export type Database = {
           last_synced_at?: string | null
           odds_game_id?: string
           period?: string | null
+          recap_posted_at?: string | null
           sport_key?: string
           start_time?: string
           status?: string
@@ -480,6 +1382,148 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "teams"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      huddle_admin_nudge_log: {
+        Row: {
+          created_at: string
+          huddle_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          huddle_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          huddle_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "huddle_admin_nudge_log_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: true
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "huddle_admin_nudge_log_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: true
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      huddle_admins: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          huddle_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          huddle_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          huddle_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "huddle_admins_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "huddle_admins_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "huddle_admins_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "huddle_admins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      huddle_bans: {
+        Row: {
+          banned_by: string | null
+          created_at: string
+          huddle_id: string
+          id: string
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          banned_by?: string | null
+          created_at?: string
+          huddle_id: string
+          id?: string
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          banned_by?: string | null
+          created_at?: string
+          huddle_id?: string
+          id?: string
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "huddle_bans_banned_by_fkey"
+            columns: ["banned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "huddle_bans_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "huddle_bans_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "huddle_bans_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -517,6 +1561,45 @@ export type Database = {
             columns: ["huddle_id"]
             isOneToOne: true
             referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "huddle_chatbot_settings_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: true
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      huddle_event_subscriptions: {
+        Row: {
+          event_id: string
+          huddle_id: string
+          id: string
+          subscribed_at: string
+          subscribed_by: string
+        }
+        Insert: {
+          event_id: string
+          huddle_id: string
+          id?: string
+          subscribed_at?: string
+          subscribed_by: string
+        }
+        Update: {
+          event_id?: string
+          huddle_id?: string
+          id?: string
+          subscribed_at?: string
+          subscribed_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "huddle_event_subscriptions_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
             referencedColumns: ["id"]
           },
         ]
@@ -563,6 +1646,13 @@ export type Database = {
             referencedRelation: "huddles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "huddle_join_requests_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
         ]
       }
       huddle_member_subscriptions: {
@@ -607,6 +1697,13 @@ export type Database = {
             referencedRelation: "huddles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "huddle_member_subscriptions_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
         ]
       }
       huddle_members: {
@@ -642,7 +1739,44 @@ export type Database = {
             referencedRelation: "huddles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "huddle_members_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      huddle_members_seeded_backup: {
+        Row: {
+          backed_up_at: string | null
+          huddle_id: string | null
+          id: string | null
+          joined_at: string | null
+          last_read_at: string | null
+          last_seen_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          huddle_id?: string | null
+          id?: string | null
+          joined_at?: string | null
+          last_read_at?: string | null
+          last_seen_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          huddle_id?: string | null
+          id?: string | null
+          joined_at?: string | null
+          last_read_at?: string | null
+          last_seen_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       huddle_message_reactions: {
         Row: {
@@ -806,6 +1940,59 @@ export type Database = {
             referencedRelation: "huddles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "huddle_pickem_settings_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: true
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      huddle_pings: {
+        Row: {
+          created_at: string | null
+          game_id: string | null
+          huddle_id: string
+          id: string
+          sender_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          game_id?: string | null
+          huddle_id: string
+          id?: string
+          sender_id: string
+        }
+        Update: {
+          created_at?: string | null
+          game_id?: string | null
+          huddle_id?: string
+          id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "huddle_pings_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "huddle_pings_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "huddle_pings_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
         ]
       }
       huddle_pricing: {
@@ -839,6 +2026,13 @@ export type Database = {
             columns: ["huddle_id"]
             isOneToOne: true
             referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "huddle_pricing_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: true
+            referencedRelation: "huddles_with_official"
             referencedColumns: ["id"]
           },
         ]
@@ -885,6 +2079,13 @@ export type Database = {
             referencedRelation: "huddles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "huddle_subscriptions_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: true
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
         ]
       }
       huddles: {
@@ -899,11 +2100,15 @@ export type Database = {
           last_message_at: string | null
           member_count: number | null
           name: string
+          official_status: string
           owner_id: string
           parent_team_id: string | null
+          photo_url: string | null
           team_id: string
           updated_at: string
           verification_expires_at: string | null
+          website_url: string | null
+          x_handle: string | null
         }
         Insert: {
           bio?: string | null
@@ -916,11 +2121,15 @@ export type Database = {
           last_message_at?: string | null
           member_count?: number | null
           name: string
+          official_status?: string
           owner_id: string
           parent_team_id?: string | null
+          photo_url?: string | null
           team_id: string
           updated_at?: string
           verification_expires_at?: string | null
+          website_url?: string | null
+          x_handle?: string | null
         }
         Update: {
           bio?: string | null
@@ -933,11 +2142,15 @@ export type Database = {
           last_message_at?: string | null
           member_count?: number | null
           name?: string
+          official_status?: string
           owner_id?: string
           parent_team_id?: string | null
+          photo_url?: string | null
           team_id?: string
           updated_at?: string
           verification_expires_at?: string | null
+          website_url?: string | null
+          x_handle?: string | null
         }
         Relationships: [
           {
@@ -1024,6 +2237,13 @@ export type Database = {
             columns: ["huddle_id"]
             isOneToOne: false
             referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kalshi_markets_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
             referencedColumns: ["id"]
           },
           {
@@ -1236,7 +2456,85 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "notifications_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "notifications_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      outreach_teams: {
+        Row: {
+          added_at: string
+          team: string
+        }
+        Insert: {
+          added_at?: string
+          team: string
+        }
+        Update: {
+          added_at?: string
+          team?: string
+        }
+        Relationships: []
+      }
+      pending_clips: {
+        Row: {
+          attempts: number
+          created_at: string
+          game_provider_id: string
+          huddle_ids: string[]
+          id: string
+          opponent: string | null
+          play_key: string
+          play_text: string | null
+          scorer: string | null
+          search_after: string
+          status: string
+          team_id: string
+          team_name: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          game_provider_id: string
+          huddle_ids?: string[]
+          id?: string
+          opponent?: string | null
+          play_key: string
+          play_text?: string | null
+          scorer?: string | null
+          search_after: string
+          status?: string
+          team_id: string
+          team_name: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          game_provider_id?: string
+          huddle_ids?: string[]
+          id?: string
+          opponent?: string | null
+          play_key?: string
+          play_text?: string | null
+          scorer?: string | null
+          search_after?: string
+          status?: string
+          team_id?: string
+          team_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_clips_team_id_fkey"
             columns: ["team_id"]
             isOneToOne: false
             referencedRelation: "teams"
@@ -1396,6 +2694,13 @@ export type Database = {
             columns: ["huddle_id"]
             isOneToOne: false
             referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pickem_instances_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
             referencedColumns: ["id"]
           },
           {
@@ -1625,6 +2930,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "posts_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "posts_origin_team_id_fkey"
             columns: ["origin_team_id"]
             isOneToOne: false
@@ -1640,6 +2952,45 @@ export type Database = {
           },
         ]
       }
+      presence_notification_log: {
+        Row: {
+          huddle_id: string
+          id: string
+          notified_at: string
+          recipient_id: string | null
+          user_id: string
+        }
+        Insert: {
+          huddle_id: string
+          id?: string
+          notified_at?: string
+          recipient_id?: string | null
+          user_id: string
+        }
+        Update: {
+          huddle_id?: string
+          id?: string
+          notified_at?: string
+          recipient_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presence_notification_log_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presence_notification_log_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1649,15 +3000,20 @@ export type Database = {
           blocked_at: string | null
           created_at: string
           display_name: string | null
+          email_hash: string | null
+          expo_push_token: string | null
           founding_purchased_at: string | null
           founding_spot_number: number | null
           founding_tier: string | null
+          game_pings_enabled: boolean | null
           has_lifetime_verified_huddle_code: boolean | null
           id: string
+          is_app_admin: boolean
           is_founding_member: boolean | null
           is_premium: boolean | null
           last_login_at: string | null
           onboarding_completed: boolean
+          phone_hash: string | null
           phone_number: string | null
           premium_expires_at: string | null
           premium_since: string | null
@@ -1678,15 +3034,20 @@ export type Database = {
           blocked_at?: string | null
           created_at?: string
           display_name?: string | null
+          email_hash?: string | null
+          expo_push_token?: string | null
           founding_purchased_at?: string | null
           founding_spot_number?: number | null
           founding_tier?: string | null
+          game_pings_enabled?: boolean | null
           has_lifetime_verified_huddle_code?: boolean | null
           id?: string
+          is_app_admin?: boolean
           is_founding_member?: boolean | null
           is_premium?: boolean | null
           last_login_at?: string | null
           onboarding_completed?: boolean
+          phone_hash?: string | null
           phone_number?: string | null
           premium_expires_at?: string | null
           premium_since?: string | null
@@ -1707,15 +3068,20 @@ export type Database = {
           blocked_at?: string | null
           created_at?: string
           display_name?: string | null
+          email_hash?: string | null
+          expo_push_token?: string | null
           founding_purchased_at?: string | null
           founding_spot_number?: number | null
           founding_tier?: string | null
+          game_pings_enabled?: boolean | null
           has_lifetime_verified_huddle_code?: boolean | null
           id?: string
+          is_app_admin?: boolean
           is_founding_member?: boolean | null
           is_premium?: boolean | null
           last_login_at?: string | null
           onboarding_completed?: boolean
+          phone_hash?: string | null
           phone_number?: string | null
           premium_expires_at?: string | null
           premium_since?: string | null
@@ -1836,6 +3202,13 @@ export type Database = {
             referencedRelation: "huddles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pulse_runs_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
         ]
       }
       pulse_scheduler_state: {
@@ -1881,6 +3254,13 @@ export type Database = {
             columns: ["huddle_id"]
             isOneToOne: false
             referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reddit_daily_counts_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
             referencedColumns: ["id"]
           },
         ]
@@ -1964,6 +3344,154 @@ export type Database = {
           },
         ]
       }
+      room_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          expires_at: string | null
+          huddle_id: string
+          id: string
+          invite_code: string
+          invited_user_id: string | null
+          inviter_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+          huddle_id: string
+          id?: string
+          invite_code: string
+          invited_user_id?: string | null
+          inviter_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+          huddle_id?: string
+          id?: string
+          invite_code?: string
+          invited_user_id?: string | null
+          inviter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_invites_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_invites_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seen_events: {
+        Row: {
+          created_at: string
+          emitted: boolean
+          emitted_at: string | null
+          event_id: string
+          excitement_score: number | null
+          game_id: string
+          id: string
+          team_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          emitted?: boolean
+          emitted_at?: string | null
+          event_id: string
+          excitement_score?: number | null
+          game_id: string
+          id?: string
+          team_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          emitted?: boolean
+          emitted_at?: string | null
+          event_id?: string
+          excitement_score?: number | null
+          game_id?: string
+          id?: string
+          team_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seen_events_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seen_news: {
+        Row: {
+          category: string | null
+          cluster_size: number | null
+          created_at: string
+          emitted: boolean
+          emitted_at: string | null
+          entry_id: string
+          id: string
+          link: string
+          llm_score: number | null
+          published_at: string | null
+          source: string | null
+          team_id: string
+          title: string
+        }
+        Insert: {
+          category?: string | null
+          cluster_size?: number | null
+          created_at?: string
+          emitted?: boolean
+          emitted_at?: string | null
+          entry_id: string
+          id?: string
+          link: string
+          llm_score?: number | null
+          published_at?: string | null
+          source?: string | null
+          team_id: string
+          title: string
+        }
+        Update: {
+          category?: string | null
+          cluster_size?: number | null
+          created_at?: string
+          emitted?: boolean
+          emitted_at?: string | null
+          entry_id?: string
+          id?: string
+          link?: string
+          llm_score?: number | null
+          published_at?: string | null
+          source?: string | null
+          team_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seen_news_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shadow_bets: {
         Row: {
           chips_risked: number
@@ -2010,6 +3538,13 @@ export type Database = {
             columns: ["huddle_id"]
             isOneToOne: false
             referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shadow_bets_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
             referencedColumns: ["id"]
           },
           {
@@ -2097,6 +3632,318 @@ export type Database = {
           },
         ]
       }
+      sponsor_claims: {
+        Row: {
+          amount_paid_cents: number
+          balance_due_cents: number
+          balance_due_date: string | null
+          business_name: string | null
+          claimed_at: string | null
+          created_at: string
+          id: string
+          league: string
+          plan: string | null
+          reserved_at: string | null
+          sponsor_email: string | null
+          sponsor_phone: string | null
+          square_checkout_id: string | null
+          square_order_id: string | null
+          square_payment_id: string | null
+          status: string
+          team_key: string
+          team_name: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          amount_paid_cents?: number
+          balance_due_cents?: number
+          balance_due_date?: string | null
+          business_name?: string | null
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          league: string
+          plan?: string | null
+          reserved_at?: string | null
+          sponsor_email?: string | null
+          sponsor_phone?: string | null
+          square_checkout_id?: string | null
+          square_order_id?: string | null
+          square_payment_id?: string | null
+          status?: string
+          team_key: string
+          team_name: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          amount_paid_cents?: number
+          balance_due_cents?: number
+          balance_due_date?: string | null
+          business_name?: string | null
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          league?: string
+          plan?: string | null
+          reserved_at?: string | null
+          sponsor_email?: string | null
+          sponsor_phone?: string | null
+          square_checkout_id?: string | null
+          square_order_id?: string | null
+          square_payment_id?: string | null
+          status?: string
+          team_key?: string
+          team_name?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
+      sponsor_impressions: {
+        Row: {
+          created_at: string
+          huddle_id: string | null
+          id: string
+          kind: string
+          sponsor_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          huddle_id?: string | null
+          id?: string
+          kind?: string
+          sponsor_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          huddle_id?: string | null
+          id?: string
+          kind?: string
+          sponsor_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_impressions_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sponsor_impressions_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sponsor_impressions_sponsor_id_fkey"
+            columns: ["sponsor_id"]
+            isOneToOne: false
+            referencedRelation: "team_sponsors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sponsor_inquiries: {
+        Row: {
+          brand_name: string
+          bundle_size: number
+          contact_name: string
+          created_at: string
+          email: string
+          free_months: number
+          id: string
+          league: string
+          message: string | null
+          monthly_total: number
+          other_teams: string | null
+          phone: string | null
+          team_id: string | null
+          team_name: string
+          type: string
+        }
+        Insert: {
+          brand_name: string
+          bundle_size?: number
+          contact_name: string
+          created_at?: string
+          email: string
+          free_months?: number
+          id?: string
+          league: string
+          message?: string | null
+          monthly_total?: number
+          other_teams?: string | null
+          phone?: string | null
+          team_id?: string | null
+          team_name: string
+          type: string
+        }
+        Update: {
+          brand_name?: string
+          bundle_size?: number
+          contact_name?: string
+          created_at?: string
+          email?: string
+          free_months?: number
+          id?: string
+          league?: string
+          message?: string | null
+          monthly_total?: number
+          other_teams?: string | null
+          phone?: string | null
+          team_id?: string | null
+          team_name?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_inquiries_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sponsor_leads: {
+        Row: {
+          apollo_org_id: string | null
+          apollo_person_id: string | null
+          best_angle: string | null
+          best_package: string | null
+          bounce_kind: string | null
+          bounced: boolean
+          clicked_app_store: boolean
+          clicked_at: string | null
+          company: string
+          contact_email: string | null
+          contact_name: string | null
+          contact_title: string | null
+          created_at: string
+          distance_miles: number | null
+          domain: string | null
+          email_confidence: string | null
+          emailed: boolean
+          emailed_at: string | null
+          follow_up_date: string | null
+          id: string
+          instagram_handle: string | null
+          last_error: string | null
+          last_touch: string | null
+          linkedin_url: string | null
+          market: string | null
+          notes: string | null
+          opened_at: string | null
+          phone: string | null
+          priority: string | null
+          rating: number | null
+          region: string | null
+          review_count: number | null
+          school: string | null
+          sequence_step: number
+          sponsor_score: number | null
+          sponsor_signal: string | null
+          status: string
+          unsubscribed: boolean
+          updated_at: string
+          vertical: string
+          website: string | null
+        }
+        Insert: {
+          apollo_org_id?: string | null
+          apollo_person_id?: string | null
+          best_angle?: string | null
+          best_package?: string | null
+          bounce_kind?: string | null
+          bounced?: boolean
+          clicked_app_store?: boolean
+          clicked_at?: string | null
+          company: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_title?: string | null
+          created_at?: string
+          distance_miles?: number | null
+          domain?: string | null
+          email_confidence?: string | null
+          emailed?: boolean
+          emailed_at?: string | null
+          follow_up_date?: string | null
+          id?: string
+          instagram_handle?: string | null
+          last_error?: string | null
+          last_touch?: string | null
+          linkedin_url?: string | null
+          market?: string | null
+          notes?: string | null
+          opened_at?: string | null
+          phone?: string | null
+          priority?: string | null
+          rating?: number | null
+          region?: string | null
+          review_count?: number | null
+          school?: string | null
+          sequence_step?: number
+          sponsor_score?: number | null
+          sponsor_signal?: string | null
+          status?: string
+          unsubscribed?: boolean
+          updated_at?: string
+          vertical: string
+          website?: string | null
+        }
+        Update: {
+          apollo_org_id?: string | null
+          apollo_person_id?: string | null
+          best_angle?: string | null
+          best_package?: string | null
+          bounce_kind?: string | null
+          bounced?: boolean
+          clicked_app_store?: boolean
+          clicked_at?: string | null
+          company?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_title?: string | null
+          created_at?: string
+          distance_miles?: number | null
+          domain?: string | null
+          email_confidence?: string | null
+          emailed?: boolean
+          emailed_at?: string | null
+          follow_up_date?: string | null
+          id?: string
+          instagram_handle?: string | null
+          last_error?: string | null
+          last_touch?: string | null
+          linkedin_url?: string | null
+          market?: string | null
+          notes?: string | null
+          opened_at?: string | null
+          phone?: string | null
+          priority?: string | null
+          rating?: number | null
+          region?: string | null
+          review_count?: number | null
+          school?: string | null
+          sequence_step?: number
+          sponsor_score?: number | null
+          sponsor_signal?: string | null
+          status?: string
+          unsubscribed?: boolean
+          updated_at?: string
+          vertical?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       sponsor_reservations: {
         Row: {
           created_at: string
@@ -2143,6 +3990,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sponsor_reservations_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sponsor_teams: {
+        Row: {
+          brand_name: string | null
+          claimed_by: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          status: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          brand_name?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          brand_name?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_teams_team_id_fkey"
             columns: ["team_id"]
             isOneToOne: true
             referencedRelation: "teams"
@@ -2271,6 +4159,178 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          auto_renews: boolean
+          created_at: string
+          entitlement_id: string
+          huddle_id: string | null
+          id: string
+          original_transaction_id: string | null
+          period_end: string | null
+          period_start: string
+          product_id: string
+          raw_event: Json | null
+          rc_app_user_id: string | null
+          status: string
+          store: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_renews?: boolean
+          created_at?: string
+          entitlement_id: string
+          huddle_id?: string | null
+          id?: string
+          original_transaction_id?: string | null
+          period_end?: string | null
+          period_start: string
+          product_id: string
+          raw_event?: Json | null
+          rc_app_user_id?: string | null
+          status?: string
+          store?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_renews?: boolean
+          created_at?: string
+          entitlement_id?: string
+          huddle_id?: string | null
+          id?: string
+          original_transaction_id?: string | null
+          period_end?: string | null
+          period_start?: string
+          product_id?: string
+          raw_event?: Json | null
+          rc_app_user_id?: string | null
+          status?: string
+          store?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_huddle_id_fkey"
+            columns: ["huddle_id"]
+            isOneToOne: false
+            referencedRelation: "huddles_with_official"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_feeds: {
+        Row: {
+          created_at: string
+          feed_url: string
+          id: string
+          is_active: boolean
+          source_label: string | null
+          team_id: string
+        }
+        Insert: {
+          created_at?: string
+          feed_url: string
+          id?: string
+          is_active?: boolean
+          source_label?: string | null
+          team_id: string
+        }
+        Update: {
+          created_at?: string
+          feed_url?: string
+          id?: string
+          is_active?: boolean
+          source_label?: string | null
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_feeds_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_progress: {
+        Row: {
+          found: number
+          kind: string
+          searched_at: string
+          team: string
+        }
+        Insert: {
+          found?: number
+          kind: string
+          searched_at?: string
+          team: string
+        }
+        Update: {
+          found?: number
+          kind?: string
+          searched_at?: string
+          team?: string
+        }
+        Relationships: []
+      }
+      team_sponsors: {
+        Row: {
+          brand_name: string
+          created_at: string
+          end_date: string | null
+          id: string
+          is_active: boolean
+          link_url: string
+          logo_url: string | null
+          start_date: string
+          team_id: string
+          tier: number
+        }
+        Insert: {
+          brand_name: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          is_active?: boolean
+          link_url: string
+          logo_url?: string | null
+          start_date?: string
+          team_id: string
+          tier?: number
+        }
+        Update: {
+          brand_name?: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          is_active?: boolean
+          link_url?: string
+          logo_url?: string | null
+          start_date?: string
+          team_id?: string
+          tier?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_sponsors_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       team_subreddits: {
         Row: {
@@ -2630,6 +4690,7 @@ export type Database = {
         Row: {
           created_at: string | null
           is_premium: boolean | null
+          last_free_claim_at: string | null
           last_reset_at: string | null
           minimum_chips: number | null
           starting_chips: number | null
@@ -2643,6 +4704,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           is_premium?: boolean | null
+          last_free_claim_at?: string | null
           last_reset_at?: string | null
           minimum_chips?: number | null
           starting_chips?: number | null
@@ -2656,6 +4718,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           is_premium?: boolean | null
+          last_free_claim_at?: string | null
           last_reset_at?: string | null
           minimum_chips?: number | null
           starting_chips?: number | null
@@ -2691,25 +4754,227 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      huddles_with_official: {
+        Row: {
+          bio: string | null
+          created_at: string | null
+          event_id: string | null
+          id: string | null
+          is_official: boolean | null
+          is_official_team_huddle: boolean | null
+          is_private: boolean | null
+          is_verified: boolean | null
+          last_message_at: string | null
+          member_count: number | null
+          name: string | null
+          official_status: string | null
+          owner_id: string | null
+          parent_team_id: string | null
+          team_id: string | null
+          updated_at: string | null
+          verification_expires_at: string | null
+          website_url: string | null
+        }
+        Insert: {
+          bio?: string | null
+          created_at?: string | null
+          event_id?: string | null
+          id?: string | null
+          is_official?: never
+          is_official_team_huddle?: boolean | null
+          is_private?: boolean | null
+          is_verified?: boolean | null
+          last_message_at?: string | null
+          member_count?: number | null
+          name?: string | null
+          official_status?: string | null
+          owner_id?: string | null
+          parent_team_id?: string | null
+          team_id?: string | null
+          updated_at?: string | null
+          verification_expires_at?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          bio?: string | null
+          created_at?: string | null
+          event_id?: string | null
+          id?: string | null
+          is_official?: never
+          is_official_team_huddle?: boolean | null
+          is_private?: boolean | null
+          is_verified?: boolean | null
+          last_message_at?: string | null
+          member_count?: number | null
+          name?: string | null
+          official_status?: string | null
+          owner_id?: string | null
+          parent_team_id?: string | null
+          team_id?: string | null
+          updated_at?: string | null
+          verification_expires_at?: string | null
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "huddles_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "live_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "huddles_parent_team_id_fkey"
+            columns: ["parent_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "huddles_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sponsor_claim_status: {
+        Row: {
+          status: string | null
+          team_key: string | null
+        }
+        Insert: {
+          status?: string | null
+          team_key?: string | null
+        }
+        Update: {
+          status?: string | null
+          team_key?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      accept_fade: { Args: { p_fade_id: string }; Returns: Json }
+      accept_room_invite: {
+        Args: { p_invite_code: string }
+        Returns: {
+          already_member: boolean
+          huddle_id: string
+          inviter_id: string
+        }[]
+      }
+      activate_official_huddle: {
+        Args: { p_entitlement_id?: string; p_huddle_id: string }
+        Returns: {
+          huddle_id: string
+          status: string
+        }[]
+      }
       approve_huddle_join_request: {
         Args: { request_id: string }
         Returns: undefined
+      }
+      arena_claim_daily: {
+        Args: { p_client: string; p_day?: string; p_handle?: string }
+        Returns: Json
+      }
+      arena_place_stake: {
+        Args: {
+          p_amount: number
+          p_client: string
+          p_game: string
+          p_side: string
+        }
+        Returns: Json
+      }
+      arena_place_stake_v2: {
+        Args: {
+          p_amount: number
+          p_client: string
+          p_event?: string
+          p_game?: string
+          p_side: string
+        }
+        Returns: Json
+      }
+      arena_set_avatar: {
+        Args: { p_avatar: string; p_client: string }
+        Returns: undefined
+      }
+      arena_settle_event: { Args: { p_event: string }; Returns: Json }
+      arena_settle_game: { Args: { p_game: string }; Returns: Json }
+      arena_toggle_follow: {
+        Args: { p_client: string; p_target: string }
+        Returns: Json
       }
       calculate_post_vote_score: {
         Args: { post_uuid: string }
         Returns: number
       }
+      can_set_room_photo: { Args: { p_path: string }; Returns: boolean }
+      claim_chapter_huddle: {
+        Args: { p_code: string }
+        Returns: {
+          created: boolean
+          huddle_id: string
+          huddle_name: string
+        }[]
+      }
       claim_founding_spot: {
         Args: { p_promo_code: string; p_tier: string; p_user_id: string }
         Returns: number
+      }
+      claim_free_chips: { Args: never; Returns: Json }
+      cleanup_old_presence_notifications: { Args: never; Returns: undefined }
+      close_stale_live_games: { Args: never; Returns: number }
+      co_huddlers: {
+        Args: { p_limit?: number }
+        Returns: {
+          shared_huddles: number
+          user_id: string
+        }[]
+      }
+      connect_to: {
+        Args: { p_source?: string; p_user_id: string }
+        Returns: undefined
+      }
+      create_room_invite_code: {
+        Args: { p_huddle_id: string }
+        Returns: {
+          invite_code: string
+        }[]
       }
       delete_team_cascade: {
         Args: { team_id_input: string }
         Returns: undefined
       }
+      discoverable_huddles: {
+        Args: { p_limit?: number; p_search?: string }
+        Returns: {
+          bio: string
+          id: string
+          is_member: boolean
+          is_official: boolean
+          is_private: boolean
+          known_count: number
+          known_names: string[]
+          member_count: number
+          name: string
+          team_logo_url: string
+          team_name: string
+        }[]
+      }
+      expire_fades: { Args: never; Returns: number }
+      flip_huddle_official_status: {
+        Args: { p_huddle_id: string; p_status: string }
+        Returns: {
+          huddle_id: string
+          official_status: string
+        }[]
+      }
+      gen_claim_code: { Args: never; Returns: string }
       get_current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
@@ -2743,6 +5008,14 @@ export type Database = {
           expires_at: string
           is_verified: boolean
           status: string
+        }[]
+      }
+      get_invite_preview: {
+        Args: { p_invite_code: string }
+        Returns: {
+          huddle_name: string
+          inviter_name: string
+          member_count: number
         }[]
       }
       get_or_create_system_user: { Args: never; Returns: string }
@@ -2823,22 +5096,103 @@ export type Database = {
         }
         Returns: boolean
       }
+      hash_email: { Args: { p_email: string }; Returns: string }
       is_huddle_member: {
         Args: { _huddle_id: string; _user_id: string }
         Returns: boolean
+      }
+      join_team_huddle: {
+        Args: { p_team_id: string }
+        Returns: {
+          already_member: boolean
+          created: boolean
+          huddle_id: string
+        }[]
+      }
+      known_people: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          connected_at: string
+          display_name: string
+          source: string
+          user_id: string
+          username: string
+        }[]
+      }
+      match_contacts: {
+        Args: { p_hashes: string[] }
+        Returns: {
+          already_connected: boolean
+          avatar_url: string
+          display_name: string
+          matched_hash: string
+          user_id: string
+          username: string
+        }[]
       }
       place_shadow_bet: {
         Args: { p_huddle_id: string; p_market_id: string; p_position: string }
         Returns: Json
       }
+      post_fade:
+        | {
+            Args: {
+              p_away_team: string
+              p_fade_type: string
+              p_game_commence_time: string
+              p_game_id: string
+              p_home_team: string
+              p_huddle_id: string
+              p_line_description: string
+              p_line_value: number
+              p_sport: string
+              p_stake: number
+              p_total_target: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_away_team: string
+              p_fade_type: string
+              p_game_commence_time: string
+              p_game_id: string
+              p_home_team: string
+              p_huddle_id: string
+              p_line_description: string
+              p_line_value: number
+              p_market_id?: string
+              p_origin_message_id?: string
+              p_sport: string
+              p_stake: number
+              p_total_target: string
+            }
+            Returns: Json
+          }
       recalculate_entry_total: {
         Args: { _entry_id: string }
         Returns: undefined
       }
       reset_weekly_chips: { Args: never; Returns: number }
+      settle_fade: {
+        Args: { p_away_score: number; p_fade_id: string; p_home_score: number }
+        Returns: Json
+      }
+      settle_fade_by_market: { Args: { p_fade_id: string }; Returns: Json }
       settle_shadow_bets: {
         Args: { p_market_id: string; p_resolution: string }
         Returns: number
+      }
+      team_card_url: { Args: { p_team_id: string }; Returns: string }
+      upsert_fade_season: {
+        Args: {
+          p_huddle_id: string
+          p_points_delta: number
+          p_user_id: string
+          p_won: boolean
+        }
+        Returns: undefined
       }
     }
     Enums: {
@@ -2859,12 +5213,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2888,11 +5242,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2913,11 +5267,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2938,11 +5292,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2955,11 +5309,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2969,6 +5323,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "member", "huddle_owner", "content_admin"],
