@@ -5,11 +5,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "Side Huddle Sports",
   slug: "side-huddle-sports",
   scheme: "sidehuddle",
+  // 1.0.6 is now closed too — it shipped. Anything new needs 1.0.7.
+  //
   // A version is a "pre-release train", and Apple closes a train once that
   // version has been through review. 1.0.4 is closed: Transporter rejects any
   // build under it with "Invalid Pre-Release Train", no matter how high the
   // build number goes. New work needs a new version, not a new build.
-  version: "1.0.6",
+  version: "1.0.7",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "dark",
