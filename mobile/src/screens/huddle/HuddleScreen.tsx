@@ -188,7 +188,19 @@ export function HuddleScreen() {
 
   // Publish this room as the user's current location to the global lobby so it
   // surfaces in friends' "Friends Now" — and clear it on leave.
-  const { setCurrentHuddle } = useGlobalPresence();
+  const { setCurrentHuddle, presentUsers: friendsEverywhere } = useGlobalPresence();
+
+  // Somebody you know is in one of these rooms RIGHT NOW. That is the only
+  // reason to jump, and the pills were all rendered identically — a room with
+  // a friend in it looked exactly like a room that was empty.
+  const friendsByRoom = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const u of friendsEverywhere) {
+      if (!u.huddleId || u.huddleId === huddleId) continue;
+      m.set(u.huddleId, [...(m.get(u.huddleId) ?? []), u.displayName]);
+    }
+    return m;
+  }, [friendsEverywhere, huddleId]);
   useEffect(() => {
     setCurrentHuddle(huddleId, huddle?.name ?? null);
     return () => setCurrentHuddle(null);
@@ -205,6 +217,11 @@ export function HuddleScreen() {
   // core room-jumping loop; it previously existed only in the dev sandbox.
   const navigation = useNavigation();
   const { data: myHuddles } = useUserHuddles();
+  const { presentUsers: everyone } = useGlobalPresence();
+  const liveRoomIds = useMemo(
+    () => new Set((everyone ?? []).map((u) => u.huddleId).filter(Boolean) as string[]),
+    [everyone],
+  );
   const jumpRooms = useMemo(() => {
     if (!myHuddles) return [];
     // Jump is rooms-only: your private huddles with friends. Official team
@@ -216,8 +233,14 @@ export function HuddleScreen() {
       ? others.filter((h) => h.teamName && huddle?.teamName === h.teamName)
       : [];
     const rest = others.filter((h) => !sameTeam.includes(h));
-    return [...sameTeam, ...rest].slice(0, 8);
-  }, [myHuddles, huddleId, teamId, huddle?.teamName]);
+    // Rooms with somebody in them come first — the row is for jumping to
+    // people, and eight pills wide means the interesting one can fall off
+    // the end of the scroll.
+    const ordered = [...sameTeam, ...rest];
+    return ordered
+      .sort((a, b) => Number(liveRoomIds.has(b.id)) - Number(liveRoomIds.has(a.id)))
+      .slice(0, 8);
+  }, [myHuddles, huddleId, teamId, huddle?.teamName, liveRoomIds]);
 
   // Reply state
   const [replyTo, setReplyTo] = useState<{
@@ -433,10 +456,16 @@ export function HuddleScreen() {
             <Text className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
               Jump
             </Text>
-            {jumpRooms.map((room) => (
+            {jumpRooms.map((room) => {
+              const here = friendsByRoom.get(room.id);
+              return (
                 <Pressable
                   key={room.id}
-                  className="flex-row items-center gap-2 rounded-full border border-border bg-muted py-1.5 pl-2 pr-3 active:opacity-80"
+                  className={`flex-row items-center gap-2 rounded-full border py-1.5 pl-2 pr-3 active:opacity-80 ${
+                    here
+                      ? "border-primary bg-primary/15"
+                      : "border-border bg-muted"
+                  }`}
                   onPress={() =>
                     (navigation as any).navigate("Huddle", { huddleId: room.id })
                   }
@@ -449,16 +478,25 @@ export function HuddleScreen() {
                     />
                   ) : null}
                   <Text
-                    className="text-xs font-bold text-muted-foreground"
+                    className={`text-xs font-bold ${
+                      here ? "text-foreground" : "text-muted-foreground"
+                    }`}
                     numberOfLines={1}
                   >
                     {room.name}
                   </Text>
-                  {room.hasUnread ? (
+                  {here ? (
+                    // Say who, not just that somebody. A name is the thing
+                    // that makes you tap.
+                    <Text className="text-[10px] font-black text-primary" numberOfLines={1}>
+                      {here.length === 1 ? here[0] : `${here.length} here`}
+                    </Text>
+                  ) : room.hasUnread ? (
                     <View className="h-1.5 w-1.5 rounded-full bg-primary" />
                   ) : null}
                 </Pressable>
-              ))}
+              );
+            })}
           </ScrollView>
         </View>
         )}
