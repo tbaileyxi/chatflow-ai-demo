@@ -29,6 +29,18 @@ const corsHeaders = {
 };
 
 const SGO_BASE = "https://api.sportsgameodds.com/v2";
+
+// SGO bills per REQUEST, not per event, and this asked for ten events at a
+// time. That is the whole reason Colorado had no line for a game it was
+// playing the same evening: NCAAF paged four times, so the sync saw the first
+// forty college games SGO happened to return and nothing else. A Saturday is
+// sixty-plus. Every school past the fortieth silently had no line, no coach
+// answer and no fade card — which reads to a user as the feature being broken,
+// not as a budget decision.
+//
+// Raising the page size costs nothing. Same number of billed requests, ten
+// times the slate. Env-overridable in case SGO tightens its cap.
+const PAGE_SIZE = Math.max(1, Math.min(100, Number(Deno.env.get("ODDS_PAGE_SIZE") || 100)));
 // Budget note: SGO bills per request, and the old settings (48h window, 6 pages,
 // every 30 min) burned ~288 calls/day — enough to exhaust the plan in two days,
 // which is exactly what happened on 2026-06-26 and froze every line in the app.
@@ -55,9 +67,11 @@ const LEAGUES = (Deno.env.get("ODDS_LEAGUES") || "MLB,NFL,NCAAF")
   .split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
 
 // Per-league config. `pages` is the real cost knob: each page is one billed
-// request. MLB runs ~15 games a night, the NFL ~16 a week, but a college
-// Saturday is 60+, and we only care about the ~70 schools in our teams table,
-// so college needs to page deeper to find them.
+// request — but a page is now up to PAGE_SIZE events rather than ten, so these
+// numbers buy an entire slate instead of a corner of one. MLB runs ~15 games a
+// night, the NFL ~16 a week, a college Saturday is 60+, and the paging loop
+// still breaks the moment SGO stops returning a cursor, so a quiet day still
+// costs exactly one call per league.
 const LEAGUE_SPEC: Record<string, {
   dbLeague: string;
   scoreNoun: string;                                   // "runs" / "points"
@@ -214,7 +228,7 @@ Deno.serve(async (req) => {
       for (let page = 0; page < spec.pages; page++) {
         const url =
           `${SGO_BASE}/events/?leagueID=${league}&oddsAvailable=true&startsAfter=${startsAfter}` +
-          `&startsBefore=${startsBefore}&limit=10${cursor ? `&cursor=${cursor}` : ""}&apiKey=${SGO_KEY}`;
+          `&startsBefore=${startsBefore}&limit=${PAGE_SIZE}${cursor ? `&cursor=${cursor}` : ""}&apiKey=${SGO_KEY}`;
         const res = await fetch(url);
         apiCalls++;
         if (!res.ok) {
