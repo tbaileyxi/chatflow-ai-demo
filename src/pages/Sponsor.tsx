@@ -120,10 +120,20 @@ export default function Sponsor() {
 
   const chosen = (teams ?? []).find((t) => t.id === openTeam) ?? null;
 
-  // Slots, not teams — there are six per team now, and "1,140 open" is a
-  // truer picture of the inventory than "190 teams".
-  const taken = (teams ?? []).reduce((n, t) => n + t.slots.filter(Boolean).length, 0);
-  const open = (teams ?? []).length * SLOTS - taken;
+  // Something is always in the ring. An empty circle explains nothing, and the
+  // offer should be legible before anybody types. Prefers a team that has
+  // sponsors, so the taken/open split is visible rather than six empty rings.
+  const sample = useMemo(() => {
+    const all = teams ?? [];
+    return (
+      all.find((t) => t.slots.some(Boolean)) ??
+      all.find((t) => t.league === 'NFL') ??
+      all[0] ?? null
+    );
+  }, [teams]);
+
+  const shown = chosen ?? sample;
+
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white overflow-x-hidden">
@@ -152,29 +162,6 @@ export default function Sponsor() {
           them.
         </p>
 
-        {/* Real scarcity, not a countdown. One sponsor per team is a fact about
-            the product, and the board below proves it — a taken team is visibly
-            gone. Fake urgency is the thing every local owner has learned to
-            ignore. */}
-        {teams ? (
-          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-[#facc15]">{open}</span>
-              <span className="text-sm text-white/50">spots still open</span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-white/30">{taken}</span>
-              <span className="text-sm text-white/50">already taken</span>
-            </div>
-            <a
-              href="#board"
-              className="rounded-full bg-[#facc15] px-7 py-3.5 text-base font-black text-black hover:opacity-90 transition-opacity"
-            >
-              Claim your team →
-            </a>
-          </div>
-        ) : null}
-
         <a
           href={APP_STORE_URL}
           target="_blank"
@@ -185,34 +172,24 @@ export default function Sponsor() {
         </a>
       </section>
 
-      {/* ── The three placements, shown one at a time ──
-          Three bullet points asked the reader to picture three things at once
-          and picture them correctly. Cycling a highlight over the actual
-          screenshot shows each one where it really sits, which is both quicker
-          to understand and impossible to overstate. */}
-      <section className="px-6 pb-16 max-w-5xl mx-auto">
-        <Placements />
-      </section>
-
-      {/* ── The board. This is the actual page. ── */}
-      {/* ── Find your team, then the ring ──
-          This was a wall of 195 rows, which is a list to be endured rather
-          than a thing to play with. Nobody scrolls to find themselves; they
-          type. And once a team is chosen the six positions sit around it, so
-          what is left is something you can see rather than a word. */}
-      <section id="board" className="px-6 pb-24 max-w-3xl mx-auto">
-        <p className="text-[11px] uppercase tracking-[0.2em] text-[#facc15] font-black mb-4 text-center">
-          See if your team is available
-        </p>
+      {/* ── Claim your team ──
+          The counters that were here ("1,140 spots open") are gone. A big
+          number of things nobody has bought is not encouragement, it is
+          evidence — and zero taken on a team read as nobody wants this.
+          What replaces them is the thing itself: the search, and a real team
+          already in the ring so the offer is visible before anything is typed. */}
+      <section id="board" className="px-6 pb-8 max-w-3xl mx-auto">
+        <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-center">
+          Claim your team
+        </h2>
 
         <input
           value={q}
           onChange={(e) => { setQ(e.target.value); setOpenTeam(null); }}
           placeholder="Type your team — Browns, Ohio State, Yankees…"
-          className="w-full rounded-full border border-white/15 bg-white/[0.04] px-6 py-4 text-lg placeholder:text-white/30 focus:outline-none focus:border-[#facc15]/60"
+          className="mt-6 w-full rounded-full border border-white/15 bg-white/[0.04] px-6 py-4 text-lg placeholder:text-white/30 focus:outline-none focus:border-[#facc15]/60"
         />
 
-        {/* Matches, only while typing and only a handful. */}
         {q.trim() && !openTeam ? (
           <div className="mt-3 space-y-1">
             {matches.slice(0, 6).map((t) => {
@@ -241,9 +218,22 @@ export default function Sponsor() {
           </div>
         ) : null}
 
-        {chosen ? <Ring team={chosen} selected={sel} onToggle={(id) =>
+        {shown ? <Ring team={shown} selected={sel} onToggle={(id) =>
           setSel((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])
         } /> : null}
+
+        <a
+          href="#benefits"
+          className="mt-8 flex flex-col items-center gap-1 text-sm font-black text-white/50 hover:text-white"
+        >
+          See what you get
+          <span aria-hidden className="text-lg leading-none">↓</span>
+        </a>
+      </section>
+
+      {/* ── What you get ── */}
+      <section id="benefits" className="px-6 pb-16 max-w-5xl mx-auto">
+        <Placements />
       </section>
 
       {checkout ? (
