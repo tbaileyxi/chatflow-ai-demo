@@ -45,6 +45,7 @@ import {
   formatGameClock,
   getGameState,
 } from "@/hooks/useLiveGameContext";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
@@ -310,6 +311,9 @@ export function HuddleScreen() {
       .eq("user_id", user.id)
       .then(() => {});
   }, [user, huddleId, messages?.length]);
+
+  const [joining, setJoining] = useState(false);
+  const queryClient = useQueryClient();
 
   const scrollToBottom = useCallback(() => {
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -650,6 +654,50 @@ export function HuddleScreen() {
           />
         )}
         </View>
+
+        {/* Not a member: a way IN, rather than nothing.
+            The message box was simply not rendered for non-members, so
+            somebody who tapped "Jump in" from a friend's presence could read
+            the room and had no input, no explanation and no button — they
+            were "in" by every visible sign and mute. That is the bug people
+            hit when they were invited and gave up. */}
+        {user && !huddle.isMember && (
+          <View className="border-t border-border bg-background px-4 py-3">
+            <Text className="mb-2 text-center text-sm text-muted-foreground">
+              You're reading {huddle.name}. Join to chat.
+            </Text>
+            <Pressable
+              disabled={joining}
+              onPress={async () => {
+                setJoining(true);
+                try {
+                  const { error } = await supabase
+                    .from("huddle_members")
+                    .insert({ huddle_id: huddleId, user_id: user.id });
+                  // Already a member is not a failure — treat it as success
+                  // and let the refetch settle the truth.
+                  if (error && !String(error.code).startsWith("23505")) throw error;
+                  await queryClient.invalidateQueries({ queryKey: ["huddle-details", huddleId] });
+                  await queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
+                } catch (e) {
+                  Alert.alert(
+                    "Couldn't join",
+                    e instanceof Error && e.message.includes("row-level security")
+                      ? "This room is invite-only. Ask whoever runs it for a link."
+                      : e instanceof Error ? e.message : String(e),
+                  );
+                } finally {
+                  setJoining(false);
+                }
+              }}
+              className="rounded-full bg-primary py-3.5 active:opacity-80"
+            >
+              <Text className="text-center text-base font-black text-primary-foreground">
+                {joining ? "Joining…" : "Join this huddle"}
+              </Text>
+            </Pressable>
+          </View>
+        )}
 
         {user && huddle.isMember && (
           <>
