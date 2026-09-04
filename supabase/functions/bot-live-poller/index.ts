@@ -370,6 +370,34 @@ serve(async (req) => {
                   summary.posts += result.huddleIdsPosted.length;
                   summary.x_fallback_posts =
                     (summary.x_fallback_posts ?? 0) + result.huddleIdsPosted.length;
+
+                  // Queue the video too.
+                  //
+                  // Clips hang off gated plays, and a game ESPN serves no plays
+                  // for never produces one — so the room that most needed a
+                  // highlight (the one with no play feed at all) was the only
+                  // one guaranteed not to get one. A score is a score whether
+                  // or not ESPN told us about it, and processPendingClips does
+                  // not care where the row came from.
+                  //
+                  // Score changes only. An idle "still 7-7" update has no
+                  // highlight to find, and asking for one burns the budget on
+                  // a question with no answer.
+                  if (scoreIsNew && Deno.env.get("X_API_BEARER_TOKEN") && result.huddleIdsPosted.length > 0) {
+                    const delayMin = Number(Deno.env.get("XLIVE_DELAY_MIN") || 5);
+                    const { error: qErr } = await supabase.from("pending_clips").insert({
+                      game_provider_id: game.providerId,
+                      play_key: `xfallback:score:${scoreState}`,
+                      team_id: side.db.id,
+                      team_name: side.db.name,
+                      opponent: side.rival,
+                      scorer: null,
+                      play_text: r.text.slice(0, 300),
+                      huddle_ids: result.huddleIdsPosted,
+                      search_after: new Date(Date.now() + delayMin * 60000).toISOString(),
+                    });
+                    if (!qErr) summary.x_queued += 1;
+                  }
                 }
               }
             }
