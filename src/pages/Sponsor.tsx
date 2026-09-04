@@ -26,6 +26,25 @@ import { supabase } from '@/integrations/supabase/client';
 // negotiating again, and not negotiating is the entire point.
 const SEASON_PRICE = 100;
 
+// One business takes the whole team — all six positions, nobody beside them.
+//
+// $500 against six-at-$100 is a discount on paper and a different product in
+// practice: what is being bought is the absence of the other five, which is
+// the only thing a business that cares about its category can actually get
+// here.
+const EXCLUSIVE_PRICE = 500;
+
+// PASTE THE SQUARE LINK HERE once it exists.
+//
+// Empty is a supported state, not a broken one: with no link the button opens
+// an email instead, so the offer is live on the page the moment it is written
+// rather than waiting on a payment URL.
+const EXCLUSIVE_CHECKOUT_URL = '';
+const EXCLUSIVE_EMAIL =
+  'mailto:ty@sidehuddlesports.com' +
+  '?subject=Exclusive%20-%20one%20business%2C%20whole%20team' +
+  '&body=Which%20team%3A%20%0A%0AMy%20business%3A%20%0A';
+
 // So a bar owner can go and look at the thing before buying a place inside it.
 const APP_STORE_URL = 'https://apps.apple.com/us/app/id6777524558';
 
@@ -187,6 +206,7 @@ export default function Sponsor() {
       {/* ── The board, before the ask ── */}
       <section className="px-6 pb-12 max-w-5xl mx-auto">
         <TheDrop />
+        <Exclusive />
       </section>
 
       {/* ── Claim your team ──
@@ -416,6 +436,47 @@ function Checkout({
           Back to the board
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * One business, the whole team.
+ *
+ * Directly under the board, because the board is what makes it worth
+ * anything: having just watched a name drop over the score, the question
+ * "what if that were only ever mine" answers itself. Six-at-$100 is the
+ * default and this is the upgrade, so it sits close and reads short.
+ */
+function Exclusive() {
+  const live = EXCLUSIVE_CHECKOUT_URL.trim().length > 0;
+  return (
+    <div className="mt-12 rounded-3xl border border-[#facc15]/40 bg-[#facc15]/[0.06] p-7 sm:p-9">
+      <p className="text-[11px] uppercase tracking-[0.2em] text-[#facc15] font-black">
+        Get exclusive
+      </p>
+
+      <h3 className="mt-4 text-3xl sm:text-4xl font-black leading-tight">
+        <span className="text-[#facc15]">${EXCLUSIVE_PRICE}</span> takes all six.
+      </h3>
+
+      <p className="mt-4 max-w-xl text-base leading-relaxed text-white/80">
+        Every position on the team, the whole season, and nobody else on the
+        board beside you. No competitor buys the spot next to yours, because
+        there is no spot next to yours.
+      </p>
+
+      <a
+        href={live ? EXCLUSIVE_CHECKOUT_URL : EXCLUSIVE_EMAIL}
+        {...(live ? { target: '_blank', rel: 'noopener' } : {})}
+        className="mt-7 inline-block rounded-full bg-[#facc15] px-8 py-4 text-base font-black text-black hover:opacity-90"
+      >
+        {live ? `Take the whole team — $${EXCLUSIVE_PRICE}` : 'Ask about exclusive'}
+      </a>
+
+      <p className="mt-4 text-sm text-white/60">
+        One per team. Once a team is taken exclusively it comes off the board.
+      </p>
     </div>
   );
 }

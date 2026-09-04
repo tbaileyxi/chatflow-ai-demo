@@ -31,6 +31,13 @@ const SCHOOL_PARTNER_VERTICAL = "school partner";
 // is a second conversation, which is the one thing this price exists to avoid.
 const SEASON_PRICE = "$100";
 
+// The upgrade, offered once and briefly.
+//
+// Named in step 1 only, as a single line under the price. A business that
+// cares about its category will ask; one that does not should not have to
+// read two offers to find the cheap one.
+const EXCLUSIVE_PRICE = "$500";
+
 // Trademark posture: we describe who the fans are, never claim affiliation.
 // Never render a school or club mark, logo, or the word "official" beside one.
 const DISCLAIMER =
@@ -250,6 +257,7 @@ function body(step: number, lead: Lead): string {
     <p style="margin:0 0 18px 0;">Six businesses back the ${slot} huddles — your name on the board in every one of them, all season, in front of ${fans}.</p>
     <p style="margin:0 0 18px 0;">Not an advert beside the fans. A business behind them, the same way you would back a team at home.</p>
     <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season, paid once.</strong> No deposit, nothing owed later — less than one radio spot, and it runs every game instead of once. Six spots per team, no seventh.</p>
+    <p style="margin:0 0 18px 0;">Or <strong>${EXCLUSIVE_PRICE} takes all six</strong> — the whole team, the whole season, and no competitor on the board beside you. One business per team.</p>
     ${cta("Claim the slot")}
     ${appLine()}
     <p style="font-size:13px;color:#999;margin:0;">Price goes up each week until kickoff.</p>`);
@@ -285,6 +293,7 @@ function schoolPartnerBody(step: number, lead: Lead): string {
     <p style="margin:0 0 18px 0;">Side Huddle is the digital tailgate — AI-enhanced team chat where one fanbase splits into hundreds of small huddles, each with a bot pulling live scores, news and highlights into the room.</p>
     <p style="margin:0 0 18px 0;">We sell one sponsor per category. ${organization} would be the only one across every ${huddle} huddle.</p>
     <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season, paid once.</strong> No deposit and nothing owed later.</p>
+    <p style="margin:0 0 18px 0;">Or <strong>${EXCLUSIVE_PRICE} takes all six</strong> — every position on the team and nobody else on the board.</p>
     ${cta("Claim the slot")}
     ${appLine()}
     <p style="font-size:13px;color:#999;margin:0;">Price goes up each week until kickoff.</p>`);
