@@ -34,15 +34,13 @@ const SEASON_PRICE = 100;
 // here.
 const EXCLUSIVE_PRICE = 500;
 
-// The Square payment link for the exclusive tier.
+// Exclusive goes through create-sponsor-square-checkout, NOT the fixed Square
+// link it briefly pointed at.
 //
-// Empty stays a supported state: with no link the button opens an email
-// instead, so the offer never renders as a dead control.
-const EXCLUSIVE_CHECKOUT_URL = 'https://square.link/u/iq7jW1sF';
-const EXCLUSIVE_EMAIL =
-  'mailto:ty@sidehuddlesports.com' +
-  '?subject=Exclusive%20-%20one%20business%2C%20whole%20team' +
-  '&body=Which%20team%3A%20%0A%0AMy%20business%3A%20%0A';
+// A fixed $500 page takes the money and cannot say WHICH team it was for: the
+// order arrives as an anonymous amount and somebody has to go and ask. Routing
+// it puts the team on the order note and writes the claim row before the card
+// field is ever shown — the same guarantee the $100 flow already had.
 
 // So a bar owner can go and look at the thing before buying a place inside it.
 const APP_STORE_URL = 'https://apps.apple.com/us/app/id6777524558';
@@ -86,6 +84,9 @@ export default function Sponsor() {
   // three teams, and making them buy one at a time is three chances to stop.
   const [sel, setSel] = useState<string[]>([]);
   const [checkout, setCheckout] = useState(false);
+  // Exclusive is a MODE over the same board, not a separate flow. The reader
+  // still has to say which team, and the ring is already the thing that asks.
+  const [exclusive, setExclusive] = useState(false);
   const [openTeam, setOpenTeam] = useState<string | null>(null);
 
   useEffect(() => {
@@ -205,7 +206,13 @@ export default function Sponsor() {
       {/* ── The board, before the ask ── */}
       <section className="px-6 pb-12 max-w-5xl mx-auto">
         <TheDrop />
-        <Exclusive />
+        <Exclusive
+          onStart={() => {
+            setExclusive(true);
+            setSel([]);
+            document.getElementById('board')?.scrollIntoView({ behavior: 'smooth' });
+          }}
+        />
       </section>
 
       {/* ── Claim your team ──
@@ -254,6 +261,37 @@ export default function Sponsor() {
           </div>
         ) : null}
 
+        {exclusive && shown ? (
+          <div className="mt-6 rounded-2xl border border-[#facc15]/50 bg-[#facc15]/[0.07] p-5 text-center">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-[#facc15] font-black">
+              Exclusive
+            </p>
+            <p className="mt-3 text-lg font-black">
+              All six positions on the {shown.city} {shown.name}, and nobody beside you.
+            </p>
+            {shown.slots.some(Boolean) ? (
+              <p className="mt-3 text-sm leading-relaxed text-white/70">
+                {shown.slots.filter(Boolean).length} of the six are already taken on
+                this team, so it cannot be bought exclusively. Search another team,
+                or take a single position below.
+              </p>
+            ) : (
+              <button
+                onClick={() => setCheckout(true)}
+                className="mt-5 rounded-full bg-[#facc15] px-8 py-4 text-base font-black text-black hover:opacity-90"
+              >
+                Take the {shown.name} — ${EXCLUSIVE_PRICE}
+              </button>
+            )}
+            <button
+              onClick={() => setExclusive(false)}
+              className="mt-4 block w-full text-sm font-black text-white/60 hover:text-white"
+            >
+              Just one position instead
+            </button>
+          </div>
+        ) : null}
+
         {shown ? <Ring team={shown} selected={sel} onToggle={(id) =>
           setSel((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])
         } /> : null}
@@ -275,7 +313,13 @@ export default function Sponsor() {
         <Placements />
       </section>
 
-      {checkout ? (
+      {checkout && exclusive && shown ? (
+        <Checkout
+          exclusive
+          picks={[{ team: shown, slot: 0 }]}
+          onClose={() => setCheckout(false)}
+        />
+      ) : checkout ? (
         <Checkout
           picks={sel.map((k) => {
             const [teamId, slot] = k.split(':');
@@ -300,15 +344,23 @@ export default function Sponsor() {
  * there is scarcity.
  */
 function Checkout({
-  picks, onClose,
+  picks, onClose, exclusive = false,
 }: {
   picks: { team: Team; slot: number }[];
   onClose: () => void;
+  /** All six positions on each team, rather than the listed ones. */
+  exclusive?: boolean;
 }) {
   // A pick is a team AND a position, because six can be sold on one team and
-  // "the Browns" no longer identifies what was bought.
-  const names = picks.map((p) => `${p.team.city} ${p.team.name} (spot ${p.slot})`);
-  const total = picks.length * SEASON_PRICE;
+  // "the Browns" no longer identifies what was bought. Exclusive is the one
+  // case where the position is meaningless — it is all of them — so the team
+  // alone names it.
+  const names = picks.map((p) =>
+    exclusive
+      ? `${p.team.city} ${p.team.name} (all six)`
+      : `${p.team.city} ${p.team.name} (spot ${p.slot})`,
+  );
+  const total = picks.length * (exclusive ? EXCLUSIVE_PRICE : SEASON_PRICE);
   const list = names.join(', ');
 
   const [busy, setBusy] = useState(false);
@@ -329,9 +381,14 @@ function Checkout({
           body: {
             businessName: brand.trim(),
             website: site.trim(),
+            exclusive,
             teams: picks.map((p) => ({
-              teamKey: `${p.team.id}:${p.slot}`,
-              teamName: `${p.team.city} ${p.team.name} (spot ${p.slot})`,
+              // The claim is keyed on the TEAM when it is exclusive, so it
+              // cannot collide with a single-position claim on the same team.
+              teamKey: exclusive ? `${p.team.id}:all` : `${p.team.id}:${p.slot}`,
+              teamName: exclusive
+                ? `${p.team.city} ${p.team.name} (all six)`
+                : `${p.team.city} ${p.team.name} (spot ${p.slot})`,
               league: p.team.league,
             })),
           },
@@ -447,8 +504,7 @@ function Checkout({
  * "what if that were only ever mine" answers itself. Six-at-$100 is the
  * default and this is the upgrade, so it sits close and reads short.
  */
-function Exclusive() {
-  const live = EXCLUSIVE_CHECKOUT_URL.trim().length > 0;
+function Exclusive({ onStart }: { onStart: () => void }) {
   return (
     <div className="mt-12 rounded-3xl border border-[#facc15]/40 bg-[#facc15]/[0.06] p-7 sm:p-9">
       <p className="text-[11px] uppercase tracking-[0.2em] text-[#facc15] font-black">
@@ -465,13 +521,12 @@ function Exclusive() {
         there is no spot next to yours.
       </p>
 
-      <a
-        href={live ? EXCLUSIVE_CHECKOUT_URL : EXCLUSIVE_EMAIL}
-        {...(live ? { target: '_blank', rel: 'noopener' } : {})}
+      <button
+        onClick={onStart}
         className="mt-7 inline-block rounded-full bg-[#facc15] px-8 py-4 text-base font-black text-black hover:opacity-90"
       >
-        {live ? `Take the whole team — $${EXCLUSIVE_PRICE}` : 'Ask about exclusive'}
-      </a>
+        Take the whole team — ${EXCLUSIVE_PRICE}
+      </button>
 
       <p className="mt-4 text-sm text-white/60">
         One per team. Once a team is taken exclusively it comes off the board.

@@ -33,10 +33,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SEASON_PRICE_CENTS = 10000; // $100 per team per season, paid in full
+const SEASON_PRICE_CENTS = 10000;    // $100 for one of six positions
+const EXCLUSIVE_PRICE_CENTS = 50000; // $500 for the whole team, nobody beside you
 
-function totalCents(count: number) {
-  return count * SEASON_PRICE_CENTS;
+function totalCents(count: number, exclusive: boolean) {
+  return count * (exclusive ? EXCLUSIVE_PRICE_CENTS : SEASON_PRICE_CENTS);
 }
 
 serve(async (req) => {
@@ -49,7 +50,13 @@ serve(async (req) => {
     });
 
   try {
-    const { teams, businessName, website } = await req.json();
+    // Exclusive rides the same path as a single slot rather than a fixed
+    // Square link. A fixed link takes $500 and cannot say WHICH team it was
+    // for — the order arrives as an anonymous amount and somebody has to go
+    // and ask. Here the team is on the order note and the claim row exists
+    // before the card field is ever shown, exactly as it is for $100.
+    const { teams, businessName, website, exclusive } = await req.json();
+    const isExclusive = exclusive === true;
     if (!Array.isArray(teams) || teams.length === 0) {
       return json({ error: "Select at least one team." }, 400);
     }
@@ -106,13 +113,17 @@ serve(async (req) => {
     }
 
     const count = cleanTeams.length;
-    const total = totalCents(count);
+    const total = totalCents(count, isExclusive);
 
     const teamNames: string[] = cleanTeams.map((team) => team.teamName);
     const teamList = teamNames.join(", ");
-    const productName = count === 1
-      ? `Side Huddle sponsor — ${teamNames[0]} (season)`
-      : `Side Huddle sponsor — ${count} teams (season)`;
+    const productName = isExclusive
+      ? (count === 1
+          ? `Side Huddle EXCLUSIVE — ${teamNames[0]} (all six, season)`
+          : `Side Huddle EXCLUSIVE — ${count} teams (all six each, season)`)
+      : (count === 1
+          ? `Side Huddle sponsor — ${teamNames[0]} (season)`
+          : `Side Huddle sponsor — ${count} teams (season)`);
 
     const origin = req.headers.get("origin") || "https://sidehuddlesports.com";
 
@@ -137,7 +148,7 @@ serve(async (req) => {
         // Team list is recorded on the order note so you can see what was bought.
         // The teams ride on the order note, so a payment is always matchable
         // to the slots it bought without asking the buyer to say it twice.
-        payment_note: `season · ${teamList}`.slice(0, 500),
+        payment_note: `${isExclusive ? "EXCLUSIVE (all six)" : "season"} · ${teamList}`.slice(0, 500),
       }),
     });
 
@@ -159,7 +170,7 @@ serve(async (req) => {
       team_name: team.teamName,
       league: team.league,
       status: "open",
-      plan: "full",
+      plan: isExclusive ? "exclusive" : "full",
       business_name: brand,
       website: siteUrl,
       amount_paid_cents: 0,   // set by square-webhook when the payment lands
