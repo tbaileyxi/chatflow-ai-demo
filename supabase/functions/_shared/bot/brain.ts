@@ -63,8 +63,49 @@ export function gateEvents(allPlaysChronological: PlayEvent[]): GatedEvent[] {
       runHome = runHome; // intentional no-op — only scoring plays reset
     }
 
-    // Only scoring plays are emission candidates.
-    if (!play.pointsScored || play.pointsScored <= 0) {
+    // Scoring plays are candidates — and so are the handful of non-scoring
+    // plays a room reacts to anyway.
+    //
+    // This was scoring-only, which meant that in a scoreless game the bot said
+    // NOTHING. Colorado kicked off at Georgia Tech and eight minutes of live
+    // football produced 1,311 plays, 0 posts, because the score was 0-0. That
+    // is exactly the stretch when a room is loudest and the app was silent.
+    //
+    // Deliberately narrow: a turnover, a turnover on downs, a safety, or a
+    // genuinely long play. These are rare and loud. Everything else — first
+    // downs, punts, incompletions — stays quiet, because a bot that narrates
+    // every snap gets muted and then it never gets to say the thing that
+    // mattered.
+    const moment = !play.pointsScored || play.pointsScored <= 0
+      ? bigNonScoringMoment(play, game.league)
+      : null;
+
+    if ((!play.pointsScored || play.pointsScored <= 0) && !moment) {
+      lastLeader = leader;
+      continue;
+    }
+
+    if (moment) {
+      // No points changed hands, so there is no scoring side. Attribute to the
+      // team the provider credits with the play, falling back to home, and let
+      // the description carry the story.
+      const mTeam = play.scoringTeamProviderId === game.away.providerId
+        ? game.away
+        : game.home;
+      const mRival = mTeam === game.home ? game.away : game.home;
+      out.push({
+        play,
+        facts: {
+          event: moment.note,
+          scoreLine: scoreLineText(game, play.scoreAfter),
+          gameTime: gameTimeText(play, game.league),
+          play: (play.description || "").slice(0, 200) || undefined,
+          excitementScore: moment.weight,
+        } as InGameFacts,
+        team: mTeam,
+        rival: mRival,
+        shouldPush: false,
+      });
       lastLeader = leader;
       continue;
     }
@@ -242,4 +283,33 @@ function gameTimeText(play: PlayEvent, league: League): string {
     return `P${play.period}`;
   })();
   return play.clock ? `${play.clock} ${periodLabel}` : periodLabel;
+}
+
+/**
+ * The non-scoring plays worth interrupting a conversation for.
+ *
+ * Football only. Basketball scores every possession and baseball turns over
+ * every half-inning, so those sports already have plenty for the gate to chew
+ * on; gridiron can go a quarter without points and still be gripping.
+ */
+function bigNonScoringMoment(
+  play: PlayEvent,
+  league: string,
+): { note: string; weight: number } | null {
+  if (league !== "NFL" && league !== "NCAAF") return null;
+  const t = `${play.rawType ?? ""} ${play.description ?? ""}`.toLowerCase();
+  if (!t.trim()) return null;
+
+  // A turnover is a possession and the room knows it instantly.
+  if (/\bintercept(ed|ion)\b/.test(t)) return { note: "Interception", weight: 85 };
+  if (/fumble/.test(t) && /(recovered|forced)/.test(t)) return { note: "Fumble", weight: 80 };
+  if (/turnover on downs/.test(t)) return { note: "Turnover on downs", weight: 75 };
+  if (/\bsafety\b/.test(t)) return { note: "Safety", weight: 80 };
+
+  // A long play empties a couch whether or not it reaches the end zone.
+  const yards = /\bfor (\d{1,3}) yard/.exec(t);
+  if (yards && Number(yards[1]) >= 40) {
+    return { note: `${yards[1]}-yard play`, weight: 70 };
+  }
+  return null;
 }

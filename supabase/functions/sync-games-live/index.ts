@@ -220,6 +220,26 @@ serve(async (req) => {
 
     console.log(`Upserted ${gamesUpserted} games`);
 
+    // A live game showing "0:00".
+    //
+    // This job flips a game to in_progress on TIME — kickoff has passed — but
+    // it carries no clock, so the row keeps whatever the last sync left there.
+    // Before a game starts that value is "0:00", and the room header renders
+    // [period, clock], where a truthy "0:00" beats the "Live" fallback. Colorado
+    // kicked off under a weather delay and the scoreboard read 0:00 as though a
+    // quarter had ended.
+    //
+    // Null it and the header falls back to "Live", which is the true statement
+    // we can make. Self-correcting: the moment ESPN reports a running clock,
+    // sync-live-scores writes it and this stops matching.
+    const { error: clockErr } = await supabase
+      .from('games')
+      .update({ clock: null })
+      .eq('status', 'in_progress')
+      .eq('clock', '0:00')
+      .is('period', null);
+    if (clockErr) console.error('clock reset failed:', clockErr.message);
+
     // Now update teams_live_state based on current games
     const now = new Date();
 
