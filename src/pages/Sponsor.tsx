@@ -34,12 +34,11 @@ const SEASON_PRICE = 100;
 // here.
 const EXCLUSIVE_PRICE = 500;
 
-// PASTE THE SQUARE LINK HERE once it exists.
+// The Square payment link for the exclusive tier.
 //
-// Empty is a supported state, not a broken one: with no link the button opens
-// an email instead, so the offer is live on the page the moment it is written
-// rather than waiting on a payment URL.
-const EXCLUSIVE_CHECKOUT_URL = '';
+// Empty stays a supported state: with no link the button opens an email
+// instead, so the offer never renders as a dead control.
+const EXCLUSIVE_CHECKOUT_URL = 'https://square.link/u/iq7jW1sF';
 const EXCLUSIVE_EMAIL =
   'mailto:ty@sidehuddlesports.com' +
   '?subject=Exclusive%20-%20one%20business%2C%20whole%20team' +
