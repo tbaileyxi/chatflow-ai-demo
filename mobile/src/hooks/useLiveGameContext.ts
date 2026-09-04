@@ -95,6 +95,24 @@ function getRefetchInterval(data: GameContext | null | undefined): number | fals
   return 15 * 60 * 1000;
 }
 
+/**
+ * The game a room is currently following, by team.
+ *
+ * Everything below this used to re-decide, on EVERY poll, which fixture a room
+ * should be showing — and a room can therefore change its mind mid-game. That
+ * is how Buff Crew, with Colorado 7-7 in the second quarter, ended up
+ * advertising next Saturday against Weber State: one poll landed in a moment
+ * where the live branch had not matched yet, the upcoming branch had, and the
+ * header simply moved on.
+ *
+ * A room follows a game. Once it is on one, it stays on it until that game is
+ * final — no poll gets to wander off to next week while people are watching
+ * this one.
+ */
+const followedGame = new Map<string, string>();
+
+const FINISHED = ["final", "completed", "closed"];
+
 export function useLiveGameContext(teamId: string | undefined) {
   return useQuery({
     queryKey: ["live-game-context", teamId],
@@ -102,6 +120,25 @@ export function useLiveGameContext(teamId: string | undefined) {
     refetchInterval: (query) => getRefetchInterval(query.state.data),
     queryFn: async (): Promise<GameContext | null> => {
       if (!teamId) return null;
+
+      // Stay on the game we are already following, refetched so the score and
+      // clock stay live. Released once it finishes, or if it somehow goes
+      // stale enough that it cannot still be in progress.
+      const following = followedGame.get(teamId);
+      if (following) {
+        const { data: still } = await supabase
+          .from("games")
+          .select("*")
+          .eq("id", following)
+          .maybeSingle();
+        const startedMs = still ? Date.parse(still.start_time) : 0;
+        const usable =
+          still &&
+          !FINISHED.includes(String(still.status).toLowerCase()) &&
+          startedMs > Date.now() - 9 * 60 * 60 * 1000;
+        if (usable) return await resolveGame(still);
+        followedGame.delete(teamId);
+      }
 
       // Look for in-progress game first
       const { data: liveGame } = await supabase
@@ -126,7 +163,10 @@ export function useLiveGameContext(teamId: string | undefined) {
         .limit(1)
         .maybeSingle();
 
-      if (liveGame) return await resolveGame(liveGame);
+      if (liveGame) {
+        followedGame.set(teamId, liveGame.id);
+        return await resolveGame(liveGame);
+      }
 
       // A game that has KICKED OFF but is not marked in_progress.
       //
@@ -155,7 +195,10 @@ export function useLiveGameContext(teamId: string | undefined) {
         .limit(1)
         .maybeSingle();
 
-      if (startedGame) return await resolveGame(startedGame);
+      if (startedGame) {
+        followedGame.set(teamId, startedGame.id);
+        return await resolveGame(startedGame);
+      }
 
       // Look for upcoming game. Keep this wide so offseason/next scheduled
       // games can still appear in room headers.
