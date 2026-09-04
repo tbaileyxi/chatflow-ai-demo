@@ -100,6 +100,9 @@ serve(async (req) => {
     excitement_seen: [] as number[], // scores of plays we emitted, to sanity-check the clip bar
     targets_built: 0,
     skipped_not_covered: 0,
+    // Games where ESPN served a live clock but zero plays, and what we did.
+    x_fallback_attempts: 0,
+    x_fallback_posts: 0,
     covered_targets: 0,
     plays_scoring: 0,      // plays the provider says put points on the board
     gate_candidates: 0,    // what gateEvents returned, BEFORE dedupe
@@ -243,6 +246,91 @@ serve(async (req) => {
 
         const plays = await provider.gameEvents(game.providerId, league);
         summary.plays_fetched += plays.length;
+
+        // ESPN can serve a live game's score and clock and NO plays at all.
+        //
+        // Colorado at Georgia Tech played a full first quarter — a missed field
+        // goal, a turnover, a goal-line stop — while this endpoint returned
+        // count: 0, and five other live games returned 41 to 145 plays from the
+        // identical call. The bot cannot filter what it never receives, so the
+        // room sat silent through the loudest part of the night and looked
+        // broken to everybody in it.
+        //
+        // When the play feed is empty on a game somebody actually has a room
+        // for, ask X what is happening rather than saying nothing. Rate-limited
+        // hard: one post per game per eight-minute bucket, and only while the
+        // feed stays empty — the moment ESPN starts serving plays, the normal
+        // path takes over and this stops firing.
+        if (plays.length === 0) {
+          // Resolve to OUR team rows the same way the scoring path does.
+          // game.home/away are TeamSide, whose Supabase id is `teamId` and not
+          // `id` — reading `.id` off them silently yields undefined and the
+          // coverage check can then never match anything.
+          const sides = [
+            {
+              db: lookupTeam(game.home?.fullName, game.home?.name, teamIndex, league),
+              rival: game.away?.fullName ?? game.away?.name ?? "",
+            },
+            {
+              db: lookupTeam(game.away?.fullName, game.away?.name, teamIndex, league),
+              rival: game.home?.fullName ?? game.home?.name ?? "",
+            },
+          ].filter((x: any) => x.db?.id && coveredTeams.has(x.db.id)) as any[];
+          if (sides.length > 0) {
+            const bucket = Math.floor(Date.now() / (8 * 60 * 1000));
+            const fbKey = `xfallback:${bucket}`;
+            const { error: fbSeenErr } = await supabase
+              .from("seen_events")
+              .insert({
+                game_id: game.providerId,
+                event_id: fbKey,
+                team_id: sides[0].db.id,
+                emitted: true,
+                emitted_at: new Date().toISOString(),
+              });
+            // unique_violation means this bucket is already covered.
+            if (!fbSeenErr) {
+              summary.x_fallback_attempts = (summary.x_fallback_attempts ?? 0) + 1;
+              const label = `${game.away?.fullName ?? game.away?.name} at ${game.home?.fullName ?? game.home?.name}`;
+              const r = await searchX(
+                `${label} — college football, in progress right now. What has ` +
+                `actually happened in this game so far: scoring, turnovers, ` +
+                `missed kicks, fourth-down stops, injuries. Report only what is ` +
+                `being said about THIS game tonight, most recent first. If you ` +
+                `cannot find anything about it, say exactly that.`,
+                { mode: "news", recencyHours: 6, maxTokens: 500 },
+              );
+              if (r.ok && r.text && r.text.trim().length > 40) {
+                for (const side of sides) {
+                  const voiced = await generateMessage({
+                    persona: defaultPersona(side.db.name, league),
+                    mode: "in_game",
+                    team: side.db.name,
+                    rival: side.rival,
+                    facts: {
+                      event: "Live update",
+                      gameTime: `${game.away?.name} at ${game.home?.name}`,
+                      play: r.text.slice(0, 600),
+                    } as any,
+                  });
+                  const result = await publish({
+                    client: supabase,
+                    teamId: side.db.id,
+                    teamName: side.db.name,
+                    mode: "in_game",
+                    message: voiced.message,
+                    facts: { event: "Live update" } as any,
+                    shouldPush: false,
+                  });
+                  summary.posts += result.huddleIdsPosted.length;
+                  summary.x_fallback_posts =
+                    (summary.x_fallback_posts ?? 0) + result.huddleIdsPosted.length;
+                }
+              }
+            }
+          }
+        }
+
         if (plays.length === 0) continue;
 
         // NARRATE ONLY THE GAME WE THINK WE ARE NARRATING.
