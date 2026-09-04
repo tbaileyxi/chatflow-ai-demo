@@ -293,15 +293,29 @@ export async function getGameSnapshot(
   const lastFinal = data.find(
     (g) => String(g.status) === "final" && Date.parse(g.start_time) <= now,
   );
+
+  // Kicked off, not final, and the status column has not caught up. Asked
+  // during a weather delay at Georgia Tech, the Coach answered about Weber
+  // State the following Saturday: the game in front of everyone matched none
+  // of live / lastFinal / nextUp, because "scheduled" with a start time three
+  // minutes old is a state nobody wrote a branch for. It is not a weather
+  // case — every game passes through it between kickoff and the next sync.
+  const started = data.find(
+    (g) =>
+      !["final", "completed", "closed"].includes(String(g.status)) &&
+      Date.parse(g.start_time) <= now &&
+      Date.parse(g.start_time) > now - 9 * 60 * 60 * 1000,
+  );
+
   const nextUp = [...data]
     .reverse()
     .find((g) => String(g.status) === "scheduled" && Date.parse(g.start_time) > now);
 
-  const g = live ?? lastFinal ?? nextUp;
+  const g = live ?? started ?? lastFinal ?? nextUp;
   if (!g) return null;
 
   const teamNames = await resolveTeamNames(supabase, [g.home_team_id, g.away_team_id]);
-  const state: GameSnapshot["state"] = live
+  const state: GameSnapshot["state"] = (live || started)
     ? "live"
     : g === lastFinal
       ? "postgame"

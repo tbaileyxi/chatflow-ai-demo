@@ -33,6 +33,10 @@ export function getGameState(game: GameContext | null): GameState {
   if (status === "in_progress" || status === "live") return "live";
   if (status === "final" || status === "completed" || status === "closed")
     return "postgame";
+  // Kickoff has passed and nobody has called it final. Treating that as
+  // "pregame" renders a countdown to a time in the past, which is how a
+  // delayed game came to look like a scheduling error.
+  if (Date.parse(game.startTime) <= Date.now()) return "live";
   return "pregame";
 }
 
@@ -42,8 +46,15 @@ export function formatGameClock(game: GameContext): string {
   if (state === "live") {
     const parts: string[] = [];
     if (game.period) parts.push(game.period);
-    if (game.clock) parts.push(game.clock);
-    return parts.length > 0 ? parts.join(" - ") : "Live";
+    // "0:00" is what the feed holds before a game actually starts ticking, and
+    // showing it next to a delayed kickoff reads as a finished quarter.
+    if (game.clock && game.clock !== "0:00") parts.push(game.clock);
+    if (parts.length > 0) return parts.join(" - ");
+    // Started, nothing scored, no clock running: the honest words for a
+    // weather hold or a late kick, rather than a confident "Live".
+    const status = game.status.toLowerCase();
+    if (status === "in_progress" || status === "live") return "Live";
+    return "Underway - awaiting first snap";
   }
 
   if (state === "postgame") return "Final";
@@ -116,6 +127,35 @@ export function useLiveGameContext(teamId: string | undefined) {
         .maybeSingle();
 
       if (liveGame) return await resolveGame(liveGame);
+
+      // A game that has KICKED OFF but is not marked in_progress.
+      //
+      // This is the hole every game falls through. Colorado kicked at 8pm into
+      // a weather delay; at 8:03 the row still said "scheduled" with a start
+      // time three minutes in the past, so the live branch missed it (wrong
+      // status) and the upcoming branch missed it (start_time < now) and the
+      // header jumped to NEXT SATURDAY while the room was watching this one.
+      //
+      // Weather made it obvious, but it is not a weather bug: there is a gap
+      // between kickoff and the sync flipping the status on EVERY game, and
+      // for the length of that gap the scoreboard advertises the wrong fixture.
+      // A game that started within the last nine hours and is not final is the
+      // game this room is watching, whatever the status column currently says.
+      const { data: startedGame } = await supabase
+        .from("games")
+        .select("*")
+        .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+        .not("status", "in", '("final","completed","closed")')
+        .gte(
+          "start_time",
+          new Date(Date.now() - 9 * 60 * 60 * 1000).toISOString(),
+        )
+        .lte("start_time", new Date().toISOString())
+        .order("start_time", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (startedGame) return await resolveGame(startedGame);
 
       // Look for upcoming game. Keep this wide so offseason/next scheduled
       // games can still appear in room headers.
