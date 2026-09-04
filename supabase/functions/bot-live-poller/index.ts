@@ -277,19 +277,30 @@ serve(async (req) => {
             },
           ].filter((x: any) => x.db?.id && coveredTeams.has(x.db.id)) as any[];
           if (sides.length > 0) {
+            // Two reasons to speak, and the scoreline is the urgent one.
+            //
+            // A pure time bucket meant Georgia Tech could score and the room
+            // heard nothing for eight minutes, which is the opposite of the
+            // point. So: post whenever the SCORE has changed since we last
+            // spoke, and otherwise at most once per eight minutes so a long
+            // scoreless stretch still gets a word.
             const bucket = Math.floor(Date.now() / (8 * 60 * 1000));
-            const fbKey = `xfallback:${bucket}`;
-            const { error: fbSeenErr } = await supabase
-              .from("seen_events")
-              .insert({
-                game_id: game.providerId,
-                event_id: fbKey,
-                team_id: sides[0].db.id,
-                emitted: true,
-                emitted_at: new Date().toISOString(),
-              });
-            // unique_violation means this bucket is already covered.
-            if (!fbSeenErr) {
+            const scoreState = `${game.away?.score ?? 0}-${game.home?.score ?? 0}`;
+            let claimed = false;
+            for (const fbKey of [`xfallback:score:${scoreState}`, `xfallback:idle:${bucket}`]) {
+              const { error: fbSeenErr } = await supabase
+                .from("seen_events")
+                .insert({
+                  game_id: game.providerId,
+                  event_id: fbKey,
+                  team_id: sides[0].db.id,
+                  emitted: true,
+                  emitted_at: new Date().toISOString(),
+                });
+              // unique_violation means this key is already covered.
+              if (!fbSeenErr) { claimed = true; break; }
+            }
+            if (claimed) {
               summary.x_fallback_attempts = (summary.x_fallback_attempts ?? 0) + 1;
               const label = `${game.away?.fullName ?? game.away?.name} at ${game.home?.fullName ?? game.home?.name}`;
               const r = await searchX(
