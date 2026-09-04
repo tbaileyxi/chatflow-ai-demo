@@ -284,21 +284,55 @@ serve(async (req) => {
             // point. So: post whenever the SCORE has changed since we last
             // spoke, and otherwise at most once per eight minutes so a long
             // scoreless stretch still gets a word.
-            const bucket = Math.floor(Date.now() / (8 * 60 * 1000));
+            // ONE reason to speak per cycle, and never twice for the same thing.
+            //
+            // This tried the scoreline key and then FELL THROUGH to a time
+            // bucket when the scoreline was already claimed — so the same
+            // kickoff return got narrated three separate times in one room,
+            // each poll finding the score key taken and posting on the timer
+            // instead. A bot that repeats itself is worse than one that is
+            // quiet.
+            //
+            // So: a new scoreline speaks immediately. Otherwise nothing is
+            // said unless the room has heard nothing about this game for ten
+            // minutes. The floor applies to BOTH paths, so no combination of
+            // keys can produce two posts back to back.
             const scoreState = `${game.away?.score ?? 0}-${game.home?.score ?? 0}`;
-            let claimed = false;
-            for (const fbKey of [`xfallback:score:${scoreState}`, `xfallback:idle:${bucket}`]) {
-              const { error: fbSeenErr } = await supabase
+            const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+            const { data: recentFb } = await supabase
+              .from("seen_events")
+              .select("id")
+              .eq("game_id", game.providerId)
+              .like("event_id", "xfallback:%")
+              .gte("emitted_at", tenMinAgo)
+              .limit(1);
+            const spokeRecently = (recentFb ?? []).length > 0;
+
+            // Claiming the scoreline tells us whether this score is new to us.
+            const { error: scoreClaimErr } = await supabase
+              .from("seen_events")
+              .insert({
+                game_id: game.providerId,
+                event_id: `xfallback:score:${scoreState}`,
+                team_id: sides[0].db.id,
+                emitted: true,
+                emitted_at: new Date().toISOString(),
+              });
+            const scoreIsNew = !scoreClaimErr;
+
+            let claimed = scoreIsNew;
+            if (!scoreIsNew && !spokeRecently) {
+              const bucket = Math.floor(Date.now() / (10 * 60 * 1000));
+              const { error: idleErr } = await supabase
                 .from("seen_events")
                 .insert({
                   game_id: game.providerId,
-                  event_id: fbKey,
+                  event_id: `xfallback:idle:${bucket}`,
                   team_id: sides[0].db.id,
                   emitted: true,
                   emitted_at: new Date().toISOString(),
                 });
-              // unique_violation means this key is already covered.
-              if (!fbSeenErr) { claimed = true; break; }
+              claimed = !idleErr;
             }
             if (claimed) {
               summary.x_fallback_attempts = (summary.x_fallback_attempts ?? 0) + 1;
