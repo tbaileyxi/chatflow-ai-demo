@@ -35,7 +35,10 @@ export function PhoneEntryScreen() {
   const [countryCode, setCountryCode] = useState("+1");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [authMethod, setAuthMethod] = useState<"email" | "sms">("email");
+  // SMS is the default now that Twilio Verify is wired up. Email stays
+  // reachable because every account created before this shipped is keyed to
+  // an email address — dropping it would lock those people out.
+  const [authMethod, setAuthMethod] = useState<"email" | "sms">("sms");
   const [loading, setLoading] = useState(false);
   const [showCodes, setShowCodes] = useState(false);
 
@@ -138,15 +141,14 @@ export function PhoneEntryScreen() {
 
             <View className="px-8 pt-8">
               <Text className="text-3xl font-black text-foreground">
-                Sign in
+                {authMethod === "sms" ? "What's your number?" : "Sign in"}
               </Text>
               <Text className="mt-2 text-base leading-6 text-muted-foreground">
-                Use an email code to sign in. Phone can stay on your profile
-                until SMS is ready.
+                {authMethod === "sms"
+                  ? "One text with a code. No password, ever — and it's how your friends find you."
+                  : "We'll email you a code."}
               </Text>
 
-              {/* SMS isn't live yet — sign-in is email-only. Restore the
-                  email/SMS toggle here once SMS sending works. */}
               <View className="mt-6 gap-4">
                 {authMethod === "email" && (
                   <Input
@@ -213,6 +215,23 @@ export function PhoneEntryScreen() {
                   </View>
                 ) : null}
               </View>
+
+              {/* Everyone who signed up before SMS went live has an email
+                  account and no phone on it, so this has to stay reachable. */}
+              <Pressable
+                className="mt-6 py-2 active:opacity-60"
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setShowCodes(false);
+                  setAuthMethod(authMethod === "sms" ? "email" : "sms");
+                }}
+              >
+                <Text className="text-sm font-bold text-primary">
+                  {authMethod === "sms"
+                    ? "Signed up with an email? Use that instead"
+                    : "Use my phone number instead"}
+                </Text>
+              </Pressable>
             </View>
           </ScrollView>
 
@@ -230,8 +249,8 @@ export function PhoneEntryScreen() {
               {loading
                 ? "Sending..."
                 : authMethod === "email"
-                  ? "Send Email Code"
-                  : "Send SMS Code"}
+                  ? "Email me a code"
+                  : "Text me a code"}
             </Button>
           </View>
         </Pressable>
