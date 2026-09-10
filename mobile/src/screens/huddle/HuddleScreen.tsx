@@ -34,6 +34,7 @@ import { HuddleHeader } from "@/components/huddle/HuddleHeader";
 import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
 import { PresenceBar } from "@/components/huddle/PresenceBar";
 import { ReactionRail, FloatingReactions } from "@/components/huddle/ReactionRail";
+import { PregameStrip } from "@/components/huddle/PregameStrip";
 import { FadeButton } from "@/components/huddle/FadeButton";
 import { PingButton } from "@/components/huddle/PingButton";
 import { ChatMessage } from "@/components/huddle/ChatMessage";
@@ -731,6 +732,17 @@ export function HuddleScreen() {
                 meaning "something is happening right now". */}
             {pingGameState === "live" ? (
               <ReactionRail onReact={sendReaction} />
+            ) : null}
+            {/* Before kickoff the room gets a different question instead of a
+                live screen with the numbers missing. Gated on `settleable`
+                because the ESPN fallback path invents an "espn-…" id that has
+                no row in `games`, and the RSVP table keys off a real one. */}
+            {pingGameState === "pregame" && liveGame?.settleable ? (
+              <PregameStrip
+                huddleId={huddleId}
+                gameId={liveGame.id}
+                startTime={liveGame.startTime}
+              />
             ) : null}
           <MessageInput
             onSend={handleSend}
