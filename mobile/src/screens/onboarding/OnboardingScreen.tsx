@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
   View,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -355,6 +356,38 @@ export function OnboardingScreen() {
                   </Text>
                 </Pressable>
               )}
+
+              {/* App Store guideline 1.2 wants the terms AGREED to, not merely
+                  available somewhere — a reviewer walks the signup looking for
+                  exactly this line. It sits on the name step because that is
+                  the moment an account actually comes into existence.
+
+                  The zero-tolerance clause it points at is the other half, and
+                  it has to be live at /terms before submitting. See
+                  APP_STORE_UGC.md. */}
+              {onProfileStep ? (
+                <Text className="px-2 text-center text-[11px] leading-4 text-muted-foreground">
+                  By continuing you agree to the{" "}
+                  <Text
+                    className="font-bold text-primary"
+                    onPress={() =>
+                      Linking.openURL("https://www.sidehuddlesports.com/terms")
+                    }
+                  >
+                    Terms
+                  </Text>{" "}
+                  and{" "}
+                  <Text
+                    className="font-bold text-primary"
+                    onPress={() =>
+                      Linking.openURL("https://www.sidehuddlesports.com/privacy")
+                    }
+                  >
+                    Privacy Policy
+                  </Text>
+                  . Side Huddle has zero tolerance for objectionable content.
+                </Text>
+              ) : null}
               {/* Not for invited users. They start at the name step, so Back
                   would rewind them into the marketing slides they were
                   deliberately skipped past — offering to show someone a pitch
