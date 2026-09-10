@@ -28,6 +28,7 @@ import { useHuddleDetails } from "@/hooks/useHuddleDetails";
 import { useHuddleMessages, type HuddleMessage } from "@/hooks/useHuddleMessages";
 import { useMessageReactions, useToggleReaction } from "@/hooks/useMessageReactions";
 import { useHuddlePresence } from "@/hooks/useHuddlePresence";
+import { useHuddleMembers } from "@/hooks/useHuddleMembers";
 import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { HuddleHeader } from "@/components/huddle/HuddleHeader";
 import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
@@ -199,6 +200,12 @@ export function HuddleScreen() {
     setCurrentHuddle(huddleId, huddle?.name ?? null);
     return () => setCurrentHuddle(null);
   }, [huddleId, huddle?.name, setCurrentHuddle]);
+
+  // Everyone in the room, not just whoever is looking at it right now. The
+  // presence row shows both — lit for here, dimmed for not — because "nobody
+  // else is in here" and "this room has nobody else in it" are different
+  // facts, and only one of them is a reason to invite somebody.
+  const { data: roomMembers } = useHuddleMembers(huddleId, huddle?.ownerId ?? "");
 
   // Prediction markets for this huddle's team
   const teamId = huddle?.teamId;
@@ -461,7 +468,11 @@ export function HuddleScreen() {
             entry point is now a chip in the presence bar. */}
         <PresenceBar
           users={presentUsers}
+          members={roomMembers}
           entryBanner={entryBanner}
+          onSeeAll={() =>
+            (navigation as any).navigate("HuddleSettings", { huddleId })
+          }
           rightSlot={
             <View className="flex-row items-center gap-2">
               {/* ONE control, still not two — but it has to be the one that
