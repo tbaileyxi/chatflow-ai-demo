@@ -5,6 +5,7 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -13,6 +14,8 @@ import {
 } from "react-native";
 import { Check, UserPlus } from "lucide-react-native";
 import { useContactMatch } from "@/hooks/useContactMatch";
+import { useProfile } from "@/hooks/useProfile";
+import { createRoomAndShare } from "@/lib/invite";
 import { colors } from "@/theme/colors";
 
 function Monogram({ name, size = 40 }: { name: string; size?: number }) {
@@ -29,7 +32,9 @@ function Monogram({ name, size = 40 }: { name: string; size?: number }) {
 
 export function FindYourPeople({ onDone }: { onDone?: () => void }) {
   const { state, matches, run, connect } = useContactMatch();
+  const { data: profile } = useProfile();
   const [busy, setBusy] = useState<string | null>(null);
+  const [inviting, setInviting] = useState(false);
 
   const handleConnect = async (userId: string) => {
     setBusy(userId);
@@ -110,23 +115,69 @@ export function FindYourPeople({ onDone }: { onDone?: () => void }) {
   }
 
   // state === "done"
+  // The cold start. This used to say "invite someone with a link" and then
+  // offer only a Continue button — naming the one action that changes anything
+  // and not providing it. There was no link to give, either: a brand-new user
+  // owns no room, and an earlier version sent the bare homepage, which is why
+  // invites never converted.
+  //
+  // Now the invite makes the room. It's the only honest screen here: the app
+  // has no value for one person, so everything except "bring somebody" is a
+  // holding pattern, and saying so is better than dressing one up.
   if (matches.length === 0) {
     return (
       <View>
         <Text className="text-2xl font-black text-foreground">
-          Nobody yet.
+          Nobody you know is here yet.
         </Text>
         <Text className="mt-3 text-base leading-6 text-muted-foreground">
-          None of your contacts are here so far. Invite someone with a link and
-          you will not be watching alone.
+          None of your contacts are on Side Huddle so far. That's normal this
+          early — the app is one person until it's two.
         </Text>
+
+        <View className="mt-6 flex-row gap-2">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <View
+              key={i}
+              className="h-11 w-11 items-center justify-center rounded-full border border-dashed border-border"
+            >
+              <Text className="text-lg text-muted-foreground">+</Text>
+            </View>
+          ))}
+        </View>
+
+        <Pressable
+          disabled={inviting}
+          onPress={async () => {
+            setInviting(true);
+            const result = await createRoomAndShare(profile?.displayName);
+            setInviting(false);
+            if (!result.ok) {
+              Alert.alert(
+                "Couldn't make an invite",
+                "Try again in a moment, or skip and do it from your room.",
+              );
+              return;
+            }
+            // Onward either way. Whether they actually hit send in the share
+            // sheet is not something to hold onboarding hostage over — the
+            // room exists now regardless, so there's somewhere to land.
+            onDone?.();
+          }}
+          className="mt-7 rounded-full bg-primary px-5 py-4 active:opacity-80"
+        >
+          <Text className="text-center text-base font-black text-primary-foreground">
+            {inviting ? "One moment..." : "Text someone the link"}
+          </Text>
+          <Text className="mt-0.5 text-center text-xs font-bold text-primary-foreground/70">
+            One person is all it takes
+          </Text>
+        </Pressable>
+
         {onDone ? (
-          <Pressable
-            onPress={onDone}
-            className="mt-8 rounded-full bg-primary px-5 py-4 active:opacity-80"
-          >
-            <Text className="text-center text-base font-black text-primary-foreground">
-              Continue
+          <Pressable onPress={onDone} className="mt-4 py-2 active:opacity-70">
+            <Text className="text-center text-sm font-black text-muted-foreground">
+              I'll do it later
             </Text>
           </Pressable>
         ) : null}
