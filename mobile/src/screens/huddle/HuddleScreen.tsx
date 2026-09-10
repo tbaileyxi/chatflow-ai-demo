@@ -40,6 +40,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { DEV_ROOMS_STORAGE_KEY, getDevTeamById } from "@/config/devData";
 import { LogOut, MoreVertical, Pin, UserPlus, User } from "lucide-react-native";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
+import { useRoomSwipe } from "@/hooks/useRoomSwipe";
 import {
   useLiveGameContext,
   formatGameClock,
@@ -188,19 +189,12 @@ export function HuddleScreen() {
 
   // Publish this room as the user's current location to the global lobby so it
   // surfaces in friends' "Friends Now" — and clear it on leave.
-  const { setCurrentHuddle, presentUsers: friendsEverywhere } = useGlobalPresence();
+  const { setCurrentHuddle } = useGlobalPresence();
 
-  // Somebody you know is in one of these rooms RIGHT NOW. That is the only
-  // reason to jump, and the pills were all rendered identically — a room with
-  // a friend in it looked exactly like a room that was empty.
-  const friendsByRoom = useMemo(() => {
-    const m = new Map<string, string[]>();
-    for (const u of friendsEverywhere) {
-      if (!u.huddleId || u.huddleId === huddleId) continue;
-      m.set(u.huddleId, [...(m.get(u.huddleId) ?? []), u.displayName]);
-    }
-    return m;
-  }, [friendsEverywhere, huddleId]);
+  // A per-room map of which friends are in it used to live here, to put names
+  // on the JUMP pills. The pills are gone and a swipe has nowhere to show a
+  // name, so it went with them — liveRoomIds below already carries the part
+  // that still matters, which is ordering rooms with somebody in them first.
   useEffect(() => {
     setCurrentHuddle(huddleId, huddle?.name ?? null);
     return () => setCurrentHuddle(null);
@@ -241,6 +235,22 @@ export function HuddleScreen() {
       .sort((a, b) => Number(liveRoomIds.has(b.id)) - Number(liveRoomIds.has(a.id)))
       .slice(0, 8);
   }, [myHuddles, huddleId, teamId, huddle?.teamName, liveRoomIds]);
+
+  // Swipe sideways between those same rooms, in that same order. Current room
+  // sits at index 0, so a left swipe lands on the most relevant other room —
+  // same team if there is one, somebody-in-it before empty.
+  const swipeRoomIds = useMemo(
+    () => [huddleId, ...jumpRooms.map((r) => r.id)],
+    [huddleId, jumpRooms],
+  );
+  const swipeHandlers = useRoomSwipe({
+    roomIds: swipeRoomIds,
+    currentId: huddleId,
+    onNavigate: (id) =>
+      // replace, not push: swiping through six rooms should not build a
+      // six-deep back stack that takes six taps to escape.
+      (navigation as any).replace("Huddle", { huddleId: id }),
+  });
 
   // Reply state
   const [replyTo, setReplyTo] = useState<{
@@ -440,66 +450,11 @@ export function HuddleScreen() {
       >
         <HuddleHeader huddle={huddle} onInvite={() => setShowInvite(true)} />
 
-        {/* JUMP — your other rooms. Row hidden entirely when there are none. */}
-        {jumpRooms.length > 0 && (
-        <View className="border-b border-border bg-background">
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              alignItems: "center",
-              gap: 8,
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-            }}
-          >
-            <Text className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-              Jump
-            </Text>
-            {jumpRooms.map((room) => {
-              const here = friendsByRoom.get(room.id);
-              return (
-                <Pressable
-                  key={room.id}
-                  className={`flex-row items-center gap-2 rounded-full border py-1.5 pl-2 pr-3 active:opacity-80 ${
-                    here
-                      ? "border-primary bg-primary/15"
-                      : "border-border bg-muted"
-                  }`}
-                  onPress={() =>
-                    (navigation as any).navigate("Huddle", { huddleId: room.id })
-                  }
-                >
-                  {room.teamLogoUrl ? (
-                    <Image
-                      source={{ uri: room.teamLogoUrl }}
-                      className="h-5 w-5 rounded-full"
-                      resizeMode="cover"
-                    />
-                  ) : null}
-                  <Text
-                    className={`text-xs font-bold ${
-                      here ? "text-foreground" : "text-muted-foreground"
-                    }`}
-                    numberOfLines={1}
-                  >
-                    {room.name}
-                  </Text>
-                  {here ? (
-                    // Say who, not just that somebody. A name is the thing
-                    // that makes you tap.
-                    <Text className="text-[10px] font-black text-primary" numberOfLines={1}>
-                      {here.length === 1 ? here[0] : `${here.length} here`}
-                    </Text>
-                  ) : room.hasUnread ? (
-                    <View className="h-1.5 w-1.5 rounded-full bg-primary" />
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-        )}
+        {/* The JUMP rail used to be here: a horizontal strip of room pills
+            costing ~40px of every room on every screen, whether or not anybody
+            wanted to leave. Moving between rooms is navigation, not furniture,
+            so it's a swipe now — see useRoomSwipe, wired to the thread below.
+            Same rooms, same order, zero pixels until you use it. */}
 
         {/* Fades live in the chat as cards. The rail that used to sit here ate
             the top of every room even when there was nothing to take, so the
@@ -545,7 +500,7 @@ export function HuddleScreen() {
             (ChatMessage uses bg-card / bg-primary), but the day separators,
             the empty state and the timestamps sit directly on the background,
             and a bright tailgate photo turns those into nothing. */}
-        <View className="flex-1">
+        <View className="flex-1" {...swipeHandlers}>
           {huddle.photoUrl ? (
             <>
               <Image

@@ -3,10 +3,8 @@ import { View, Text, Image, Pressable, Animated, Linking } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
   ChevronLeft,
-  Users,
   MoreVertical,
   ShieldCheck,
-  ExternalLink,
   UserPlus,
 } from "lucide-react-native";
 import { colors } from "@/theme/colors";
@@ -49,7 +47,7 @@ function PulsingDot() {
 
   return (
     <Animated.View
-      style={{ opacity, width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444" }}
+      style={{ opacity, width: 6, height: 6, borderRadius: 3, backgroundColor: "#EF4444" }}
     />
   );
 }
@@ -71,75 +69,15 @@ function formatNextGameDate(dateStr: string): string {
   const diffDays = Math.round((gameDay.getTime() - today.getTime()) / 86400000);
 
   const time = formatStartTime(dateStr);
-  if (diffDays === 0) return `Today at ${time}`;
-  if (diffDays === 1) return `Tomorrow at ${time}`;
+  if (diffDays === 0) return `Today ${time}`;
+  if (diffDays === 1) return `Tomorrow ${time}`;
   const dayStr = date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
   });
-  return `${dayStr} at ${time}`;
+  return `${dayStr} ${time}`;
 }
-
-// One compact, centered strip for all game states — no full-row labels,
-// no left-aligned score. Time/status rides as small text under the line.
-function GameBar({
-  game,
-  gameState,
-}: {
-  game: GameContext;
-  gameState: GameState;
-}) {
-  if (gameState === "live") {
-    return (
-      <View className="items-center bg-destructive/10 px-4 py-1.5">
-        <View className="flex-row items-center gap-2">
-          <PulsingDot />
-          <Text className="text-sm font-bold text-foreground">
-            {sides(game).away}{" "}
-            <Text className="font-black">{game.awayScore ?? 0}</Text>
-            <Text className="text-muted-foreground">  —  </Text>
-            {sides(game).home}{" "}
-            <Text className="font-black">{game.homeScore ?? 0}</Text>
-          </Text>
-        </View>
-        <Text className="text-[11px] text-muted-foreground">
-          {[game.period, game.clock].filter(Boolean).join(" · ") || "Live"}
-        </Text>
-      </View>
-    );
-  }
-
-  if (gameState === "postgame") {
-    return (
-      <View className="items-center bg-muted/40 px-4 py-1.5">
-        <Text className="text-sm font-bold text-foreground">
-          {sides(game).away}{" "}
-          <Text className="font-black">{game.awayScore ?? 0}</Text>
-          <Text className="text-muted-foreground">  —  </Text>
-          {sides(game).home}{" "}
-          <Text className="font-black">{game.homeScore ?? 0}</Text>
-        </Text>
-        <Text className="text-[11px] text-muted-foreground">Final</Text>
-      </View>
-    );
-  }
-
-  // Pregame
-  return (
-    <View className="items-center bg-primary/5 px-4 py-1.5">
-      <Text className="text-sm font-semibold text-foreground">
-        {sides(game).away}
-        <Text className="text-muted-foreground">  @  </Text>
-        {sides(game).home}
-      </Text>
-      <Text className="text-[11px] text-muted-foreground">
-        {formatNextGameDate(game.startTime)}
-      </Text>
-    </View>
-  );
-}
-
 
 /**
  * "Tigers at Tigers" is a correct scoreboard and a broken-looking one.
@@ -163,6 +101,51 @@ function sides(game: {
   };
 }
 
+/**
+ * The game, as ONE line under the room's name.
+ *
+ * It used to be a full-width bar of its own, stacked under a sponsor strip,
+ * stacked under the header row — three bands of chrome before a single message.
+ * The score matters, but it is context for the conversation, not the subject of
+ * the screen, and it does not deserve its own storey.
+ */
+function ScoreLine({ game, gameState }: { game: GameContext; gameState: GameState }) {
+  const { away, home } = sides(game);
+
+  if (gameState === "live") {
+    return (
+      <View className="mt-0.5 flex-row items-center gap-1.5">
+        <PulsingDot />
+        <Text className="text-[11px] font-bold text-foreground" numberOfLines={1}>
+          {away} <Text className="font-black">{game.awayScore ?? 0}</Text>
+          <Text className="text-muted-foreground"> · </Text>
+          {home} <Text className="font-black">{game.homeScore ?? 0}</Text>
+        </Text>
+        <Text className="text-[10px] font-bold text-primary" numberOfLines={1}>
+          {[game.period, game.clock].filter(Boolean).join(" ") || "LIVE"}
+        </Text>
+      </View>
+    );
+  }
+
+  if (gameState === "postgame") {
+    return (
+      <Text className="mt-0.5 text-[11px] text-muted-foreground" numberOfLines={1}>
+        {away} <Text className="font-bold text-foreground">{game.awayScore ?? 0}</Text>
+        {" · "}
+        {home} <Text className="font-bold text-foreground">{game.homeScore ?? 0}</Text>
+        <Text className="font-bold text-success"> FINAL</Text>
+      </Text>
+    );
+  }
+
+  return (
+    <Text className="mt-0.5 text-[11px] text-muted-foreground" numberOfLines={1}>
+      {away} at {home} · {formatNextGameDate(game.startTime)}
+    </Text>
+  );
+}
+
 export function HuddleHeader({ huddle, onInvite }: Props) {
   const navigation = useNavigation();
   const { user } = useAuth();
@@ -171,11 +154,6 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
 
   // A stadium board does not sit there being read. It drops, holds, and goes
   // back up, and the drop is the moment anybody actually sees it.
-  //
-  // So: a thin permanent line, and every so often it swells down over the score
-  // for three seconds with the sponsor's full line, then retracts. Over the
-  // score deliberately — that is the one place on this screen guaranteed to
-  // have the eye — but briefly, and never while a play is landing.
   const [slot, setSlot] = useState(0);
   const drop = useRef(new Animated.Value(0)).current;
 
@@ -188,8 +166,6 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
     const cycle = () => {
       if (cancelled) return;
 
-      // Purely visual, and often driving nothing: the board is only mounted
-      // when there is a game bar to drop over.
       Animated.sequence([
         Animated.timing(drop, { toValue: 1, duration: 420, useNativeDriver: true }),
         Animated.delay(3000),
@@ -200,9 +176,7 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
       // Hanging it off the callback froze every gameless room on sponsor one —
       // no game means no mounted board, so nothing ever reported finished and
       // the slot never moved. Slots 2-6 were paid for and never named, in the
-      // rooms that outnumber game days. Still timed to land while the board is
-      // retracted, so the next name arrives fresh rather than swapping in
-      // front of the reader.
+      // rooms that outnumber game days.
       advances.push(
         setTimeout(() => {
           if (!cancelled) setSlot((n) => (n + 1) % sponsors.length);
@@ -228,6 +202,7 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
     : huddle.name;
 
   const gameState = getGameState(game ?? null);
+  const hasGame = !!game && gameState !== "none";
 
   const handleSponsorTap = () => {
     if (!sponsor) return;
@@ -241,9 +216,7 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
 
   return (
     <View className="border-b border-border bg-background">
-      {/* Main header row */}
-      <View className="flex-row items-center gap-3 px-4 py-3">
-        {/* Back */}
+      <View className="flex-row items-center gap-3 px-4 py-2.5">
         <Pressable
           onPress={() => navigation.goBack()}
           className="active:opacity-60"
@@ -252,8 +225,7 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
           <ChevronLeft color={colors.foreground} size={24} />
         </Pressable>
 
-        {/* Team logo */}
-        <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-muted">
+        <View className="h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-muted">
           {huddle.teamLogoUrl ? (
             <Image
               source={{ uri: huddle.teamLogoUrl }}
@@ -267,44 +239,76 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
           )}
         </View>
 
-        {/* Name + info */}
+        {/* The room's NAME is the permanent first line and the score is the
+            small one under it — never the other way round. You can swipe
+            between rooms mid-game, and if the score took the top line then
+            the one thing that changes when you arrive somewhere new would be
+            a number, leaving you with no idea which room you landed in. */}
         <Pressable
-          className="flex-1 gap-0.5"
+          className="flex-1"
           onPress={() =>
             navigation.navigate("HuddleSettings", { huddleId: huddle.id })
           }
         >
-          {/* Member count sits INLINE with the name, not on its own line. A
-              whole row of header height to say "1 member" is the least
-              interesting fact in the room, and it pushed the game bar and the
-              chat down on every screen. */}
-          <View className="flex-row items-center gap-2">
-            <Text className="shrink text-lg font-black text-foreground" numberOfLines={1}>
+          <View className="flex-row items-center gap-1.5">
+            <Text
+              className="shrink text-base font-black text-foreground"
+              numberOfLines={1}
+            >
               {displayName}
             </Text>
             {huddle.isVerified ? (
-              <ShieldCheck color={colors.primary} size={15} />
+              <ShieldCheck color={colors.primary} size={14} />
             ) : null}
-            <View className="flex-row items-center gap-0.5">
-              <Users color={colors.mutedForeground} size={11} />
-              <Text className="text-xs text-muted-foreground">{huddle.memberCount}</Text>
-            </View>
-            {/* The Coach pill was here. Removed: it sat inside the Pressable
-                that opens settings, so tapping the one thing that looked like
-                a person opened a settings screen — and it ate enough width to
-                truncate the room's own name. The Coach announces itself by
-                answering; it does not need furniture that misfires. */}
+          </View>
+
+          <View className="overflow-hidden">
+            {hasGame ? (
+              <ScoreLine game={game!} gameState={gameState} />
+            ) : (
+              <Text className="mt-0.5 text-[11px] text-muted-foreground">
+                {huddle.memberCount}{" "}
+                {huddle.memberCount === 1 ? "member" : "members"}
+              </Text>
+            )}
+
+            {/* The sponsor board drops over this line rather than owning a
+                strip of its own. Same three seconds, same paid moment, one
+                fewer band of chrome the other ninety-five percent of the
+                time. */}
+            {sponsor ? (
+              <Animated.View
+                pointerEvents="none"
+                className="absolute inset-0 justify-center"
+                style={{
+                  transform: [
+                    {
+                      translateY: drop.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-40, 0],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <Text className="text-[11px] font-black text-primary" numberOfLines={1}>
+                  {sponsor.brandName}
+                  <Text className="font-bold text-muted-foreground">
+                    {"  "}supports {huddle.teamName ?? "these"} fans
+                  </Text>
+                </Text>
+              </Animated.View>
+            ) : null}
           </View>
         </Pressable>
 
-        {/* Invite — primary action, always one tap from the header. */}
         {onInvite ? (
           <Pressable
             onPress={onInvite}
-            className="h-10 w-10 items-center justify-center rounded-full bg-primary active:opacity-80"
+            className="h-9 w-9 items-center justify-center rounded-full bg-primary active:opacity-80"
             hitSlop={8}
           >
-            <UserPlus color={colors.primaryForeground} size={18} />
+            <UserPlus color={colors.primaryForeground} size={17} />
           </Pressable>
         ) : null}
 
@@ -312,76 +316,27 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
           onPress={() =>
             navigation.navigate("HuddleSettings", { huddleId: huddle.id })
           }
-          className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
+          className="h-9 w-9 items-center justify-center rounded-full active:bg-muted"
           hitSlop={8}
         >
-          <MoreVertical color={colors.mutedForeground} size={22} />
+          <MoreVertical color={colors.mutedForeground} size={20} />
         </Pressable>
       </View>
 
-      {/* Sponsor whisper line — only when a real sponsor is attached.
-          No placeholder: empty slots stay invisible. */}
-      {sponsor ? (
+      {/* Sponsors with no game to drop over still need to be seen, so a room
+          that isn't on a game day keeps the quiet credit line. Tappable —
+          the drop above is not, because it moves. */}
+      {sponsor && !hasGame ? (
         <Pressable
           onPress={handleSponsorTap}
-          className="flex-row items-center justify-center gap-2 border-t border-border bg-muted/40 px-4 py-1"
+          className="items-center border-t border-border bg-muted/30 py-1"
           hitSlop={4}
         >
           <Text className="text-[10px] uppercase tracking-widest text-muted-foreground">
             {sponsor.brandName} supports this room
           </Text>
-          <ExternalLink color={colors.mutedForeground} size={10} />
-          {/* Which of the six is showing. Dots rather than "3 of 6" because the
-              strip is furniture, not a control — and a sponsor who paid should
-              see that others exist without it being announced. */}
-          {sponsors && sponsors.length > 1 ? (
-            <View className="ml-1 flex-row items-center gap-1">
-              {sponsors.map((sp, i) => (
-                <View
-                  key={sp.id}
-                  className={`h-1 w-1 rounded-full ${
-                    i === slot % sponsors.length ? "bg-primary" : "bg-muted-foreground/30"
-                  }`}
-                />
-              ))}
-            </View>
-          ) : null}
         </Pressable>
       ) : null}
-
-      {/* Game day bar, with the sponsor board dropping over it. */}
-      {game && gameState !== "none" && (
-        <View className="overflow-hidden">
-          <GameBar game={game} gameState={gameState} />
-          {sponsor ? (
-            <Animated.View
-              pointerEvents="none"
-              className="absolute inset-0 items-center justify-center bg-primary"
-              style={{
-                transform: [
-                  {
-                    translateY: drop.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-120, 0],
-                    }),
-                  },
-                ],
-              }}
-            >
-              {/* The line that says what this actually is. A local business is
-                  not buying an advert next to a fanbase — it is backing the
-                  people in the room, and that is the sentence that makes a bar
-                  owner say yes. */}
-              <Text className="text-sm font-black text-primary-foreground">
-                {sponsor.brandName}
-              </Text>
-              <Text className="text-[11px] font-bold text-primary-foreground/80">
-                supports {huddle.teamName ?? "these"} fans
-              </Text>
-            </Animated.View>
-          ) : null}
-        </View>
-      )}
     </View>
   );
 }
