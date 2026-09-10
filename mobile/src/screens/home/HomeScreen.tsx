@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Linking,
@@ -27,6 +27,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useInAppNotifications } from "@/hooks/useInAppNotifications";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
+import { useRoomGames } from "@/hooks/useRoomGames";
 import { useKnownPeople } from "@/hooks/useFriends";
 import { useAutoContactMatch } from "@/hooks/useAutoContactMatch";
 import { useContactMatch } from "@/hooks/useContactMatch";
@@ -389,6 +390,23 @@ function YourRoomsSection() {
   const { data: huddles, isLoading } = useUserHuddles();
   const rooms = (huddles ?? []).filter((huddle) => !huddle.isOfficialTeam);
 
+  // The game each room is about — ONE query for every room, not one per room.
+  const { data: gamesByTeam } = useRoomGames(rooms.map((r) => r.teamId));
+
+  // Who is in which room right now, from the presence channel the app already
+  // runs. This is the half the list never had: it could say a room has three
+  // members and not that one of them is in it at this second.
+  const { presentUsers } = useGlobalPresence();
+  const hereByRoom = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const u of presentUsers) {
+      if (!u.huddleId) continue;
+      const first = (u.displayName ?? "Someone").split(/\s+/)[0];
+      m.set(u.huddleId, [...(m.get(u.huddleId) ?? []), first]);
+    }
+    return m;
+  }, [presentUsers]);
+
   return (
     <View className="px-4">
       <View className="mb-3 flex-row items-center justify-between">
@@ -398,8 +416,11 @@ function YourRoomsSection() {
             Your Rooms
           </Text>
         </View>
+        {/* Was "+ New". You don't decide to make a room, you decide to bring
+            somebody — and the room exists because of that. Same destination
+            for now; the word is what changes what people expect of it. */}
         <Pressable onPress={() => navigation.navigate("CreateSideHuddle")}>
-          <Text className="text-sm font-black text-primary">+ New</Text>
+          <Text className="text-sm font-black text-primary">＋ Invite</Text>
         </Pressable>
       </View>
 
@@ -414,6 +435,8 @@ function YourRoomsSection() {
             <HuddleCard
               key={room.id}
               huddle={room}
+              game={room.teamId ? gamesByTeam?.get(room.teamId) : undefined}
+              hereNow={hereByRoom.get(room.id)}
               onPress={() =>
                 navigation.navigate("Huddle", {
                   huddleId: room.id,
