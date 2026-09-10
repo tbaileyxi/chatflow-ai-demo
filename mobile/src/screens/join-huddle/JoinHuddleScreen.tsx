@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useHuddleDetails } from "@/hooks/useHuddleDetails";
+import { backfillIfEmpty } from "@/lib/roomContent";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -94,6 +95,15 @@ export function JoinHuddleScreen() {
       Alert.alert("Error", "Failed to join Side Huddle.");
       return;
     }
+
+    // Furnish the room if nothing has ever been said in it. Backfill used to
+    // run only at creation, so a room made months ago and never used stayed a
+    // blank screen for whoever finally walked in — which is the worst possible
+    // first impression and the exact thing that makes the app feel dead.
+    //
+    // Awaited so the messages are there before the room opens; a room that
+    // fills in a second later reads as a glitch.
+    await backfillIfEmpty(huddleId, huddle.teamId);
 
     queryClient.invalidateQueries({ queryKey: ["huddle-details", huddleId] });
     queryClient.invalidateQueries({ queryKey: ["user-huddles"] });

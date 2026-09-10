@@ -25,11 +25,54 @@ export interface PublishResult {
   pushed: boolean;
 }
 
+/**
+ * Does this team have any huddle with a person in it?
+ *
+ * publish() already refuses to write into empty rooms, but by the time it runs
+ * the LLM call has been made and paid for. Callers should check this BEFORE
+ * generating a message so a team nobody is watching costs nothing at all —
+ * the Anthropic balance has been drained to zero once already, and 84% of this
+ * engine's fan-out was aimed at rooms with no members.
+ */
+export async function teamHasOccupiedHuddles(
+  client: SupabaseClient,
+  teamId: string,
+): Promise<boolean> {
+  const { data: huddles } = await client
+    .from("huddles")
+    .select("id")
+    .eq("team_id", teamId);
+  const ids = (huddles ?? []).map((h: { id: string }) => h.id);
+  if (ids.length === 0) return false;
+
+  const { count } = await client
+    .from("huddle_members")
+    .select("huddle_id", { count: "exact", head: true })
+    .in("huddle_id", ids);
+
+  return (count ?? 0) > 0;
+}
+
 export async function publish(input: PublishInput): Promise<PublishResult> {
   const { client, teamId, mode, facts, excitementScore, sourceRef, shouldPush } = input;
 
-  // 1. Resolve every huddle attached to this team. One bot output -> N huddles.
-  const { data: huddles, error: huddlesErr } = await client
+  // 1. Resolve every huddle attached to this team that somebody is actually in.
+  //
+  // This used to fan out to EVERY huddle carrying the team id, which includes
+  // ~195 auto-created official team rooms with nobody in them — so roughly 300
+  // messages a day were being written, LLM-generated and paid for, into rooms
+  // no human could ever see. Ninety-four percent of all messages in the product
+  // came from this loop talking to an empty house.
+  //
+  // Membership is checked against huddle_members rather than huddles.member_count
+  // because that column is denormalised and maintained by hand in several places
+  // (create sets 1, approve increments, leave decrements) — trusting it would
+  // silence a real room the moment any one of those drifted.
+  //
+  // A room that gains its first member is furnished on the way in by
+  // backfillIfEmpty() on the client, so gating here doesn't leave newcomers
+  // staring at a blank screen.
+  const { data: allHuddles, error: huddlesErr } = await client
     .from("huddles")
     .select("id")
     .eq("team_id", teamId);
@@ -37,9 +80,36 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
     console.error("[publisher] huddle lookup failed", huddlesErr);
     return { huddleIdsPosted: [], pushed: false };
   }
-  if (!huddles || huddles.length === 0) {
+  if (!allHuddles || allHuddles.length === 0) {
     console.log(`[publisher] no huddles for team ${teamId} — skip`);
     return { huddleIdsPosted: [], pushed: false };
+  }
+
+  const allIds = allHuddles.map((h: { id: string }) => h.id);
+  const { data: memberRows, error: memberErr } = await client
+    .from("huddle_members")
+    .select("huddle_id")
+    .in("huddle_id", allIds);
+  if (memberErr) {
+    console.error("[publisher] membership lookup failed", memberErr);
+    return { huddleIdsPosted: [], pushed: false };
+  }
+
+  const occupied = new Set(
+    (memberRows ?? []).map((m: { huddle_id: string }) => m.huddle_id),
+  );
+  const huddles = allHuddles.filter((h: { id: string }) => occupied.has(h.id));
+
+  if (huddles.length === 0) {
+    console.log(
+      `[publisher] team ${teamId}: ${allIds.length} huddle(s), none with members — skip`,
+    );
+    return { huddleIdsPosted: [], pushed: false };
+  }
+  if (huddles.length < allIds.length) {
+    console.log(
+      `[publisher] team ${teamId}: posting to ${huddles.length} of ${allIds.length} huddles (rest are empty)`,
+    );
   }
 
   // 2. System user for the bot.

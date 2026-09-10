@@ -35,6 +35,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ScreenWrapper } from "@/components/ui/screen-wrapper";
 import { colors } from "@/theme/colors";
 import { useRoomPhoto } from "@/hooks/useRoomPhoto";
+import { backfillIfEmpty } from "@/lib/roomContent";
 import type { RootStackParamList } from "@/navigation/types";
 
 type Route = RouteProp<RootStackParamList, "HuddleSettings">;
@@ -224,6 +225,10 @@ export function HuddleSettingsScreen() {
       .from("huddles")
       .update({ member_count: huddle.memberCount + 1 })
       .eq("id", huddleId);
+    // Same reason as the invite-link join: whoever was just let in shouldn't
+    // arrive at a blank room. No-ops if anything has been said in here.
+    await backfillIfEmpty(huddleId, huddle.teamId);
+
     setJoinRequests((current) => current.filter((item) => item.id !== request.id));
     queryClient.invalidateQueries({ queryKey: ["huddle-members", huddleId] });
     queryClient.invalidateQueries({ queryKey: ["huddle-details", huddleId] });
@@ -331,17 +336,101 @@ export function HuddleSettingsScreen() {
     ]);
   };
 
-  const ownerLeaveHuddle = () => {
+  /**
+   * The owner leaving used to delete the room and every message in it, with no
+   * other option. In a room with eight other people that means one person
+   * walking away destroys everybody else's history — and an owner who simply
+   * wants out had no way to take it that wasn't destructive.
+   *
+   * Now it hands over. Ownership goes to whoever has been in the room longest
+   * after the owner, which is the closest thing to "the next most invested
+   * person" the data actually knows. Deleting is still available, separately,
+   * as a deliberate act rather than a side effect of leaving.
+   */
+  const ownerLeaveHuddle = async () => {
+    if (!user) return;
+
+    const { data: heirs } = await supabase
+      .from("huddle_members")
+      .select("user_id, joined_at")
+      .eq("huddle_id", huddleId)
+      .neq("user_id", user.id)
+      .order("joined_at", { ascending: true })
+      .limit(1);
+
+    const heir = heirs?.[0];
+
+    // Last one out really does turn off the lights — there is nobody to hand
+    // an empty room to, and keeping it would just be litter.
+    if (!heir) {
+      Alert.alert(
+        "Leave Side Huddle",
+        `You're the only one in ${huddle.name}. Leaving deletes it.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Leave & delete",
+            style: "destructive",
+            onPress: async () => {
+              await supabase.from("huddles").delete().eq("id", huddleId);
+              queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
+              navigation.navigate("MainTabs", { screen: "Home" });
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    const { data: heirProfile } = await supabase
+      .from("profiles")
+      .select("display_name, username")
+      .eq("user_id", heir.user_id)
+      .maybeSingle();
+
+    const heirName =
+      heirProfile?.display_name ?? heirProfile?.username ?? "the next member";
+
     Alert.alert(
       "Leave Side Huddle",
-      "You are the creator. Leaving will delete this Side Huddle and all messages.",
+      `${heirName} will take over ${huddle.name}. The room and its messages stay.`,
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Leave & Delete",
-          style: "destructive",
+          text: "Leave & hand over",
           onPress: async () => {
-            await supabase.from("huddles").delete().eq("id", huddleId);
+            const { error: handoverError } = await supabase
+              .from("huddles")
+              .update({ owner_id: heir.user_id })
+              .eq("id", huddleId);
+
+            // Don't leave until the handover lands, or the room is orphaned —
+            // owned by someone who isn't in it and administrable by nobody.
+            if (handoverError) {
+              Alert.alert(
+                "Couldn't hand over",
+                "The room still belongs to you. Try again in a moment.",
+              );
+              return;
+            }
+
+            await supabase
+              .from("huddle_members")
+              .delete()
+              .eq("huddle_id", huddleId)
+              .eq("user_id", user.id);
+
+            supabase.functions
+              .invoke("send-push-notification", {
+                body: {
+                  user_ids: [heir.user_id],
+                  notification_type: "join_request",
+                  title: `${huddle.name} is yours now`,
+                  body: "The previous owner left and handed it to you.",
+                },
+              })
+              .catch(() => {});
+
             queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
             navigation.navigate("MainTabs", { screen: "Home" });
           },

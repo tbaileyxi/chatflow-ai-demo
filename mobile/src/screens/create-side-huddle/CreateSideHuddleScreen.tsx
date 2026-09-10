@@ -21,6 +21,8 @@ import { ChevronLeft, Check, Lock, Search, Radio } from "lucide-react-native";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { followTeam } from "@/lib/follows";
+import { backfillTeamContent } from "@/lib/roomContent";
 import {
   DEV_ROOMS_STORAGE_KEY,
   DEV_TEAMS,
@@ -68,72 +70,6 @@ function useTeamsList() {
       }));
     },
   });
-}
-
-// Returns the system bot's user_id when it could be learned from the copied
-// rows, so the caller can post the admin welcome without a second RPC.
-async function backfillTeamContent(
-  newHuddleId: string,
-  teamId: string,
-): Promise<string | null> {
-  try {
-    // Find the official team huddle
-    const { data: officialHuddle } = await supabase
-      .from("huddles")
-      .select("id")
-      .eq("team_id", teamId)
-      .eq("is_official_team_huddle", true)
-      .maybeSingle();
-
-    if (!officialHuddle) return null;
-
-    // Get last 24h of bot messages from official huddle
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { data: botMessages } = await supabase
-      .from("huddle_messages")
-      .select("user_id, content, media_url, media_type, message_type, is_bot_message, is_team_agent_message, created_at")
-      .eq("huddle_id", officialHuddle.id)
-      .eq("is_bot_message", true)
-      .gte("created_at", cutoff)
-      .order("created_at", { ascending: true })
-      .limit(20);
-
-    if (!botMessages || botMessages.length === 0) return null;
-
-    // Copy messages into the new huddle.
-    //
-    // is_team_agent_message MUST be true here. The INSERT policy on
-    // huddle_messages is:
-    //     (is_team_agent_message = true) OR (auth.uid() = user_id AND ...)
-    // These rows carry the SYSTEM bot's user_id, not ours, so the second branch
-    // can never pass. Copying the source row's flag (which is false on every
-    // bot-v2 post — the publisher doesn't set it) meant the whole batch was
-    // silently rejected by RLS and every new room came up empty.
-    const inserts = botMessages.map((m) => ({
-      huddle_id: newHuddleId,
-      user_id: m.user_id,
-      content: m.content,
-      media_url: m.media_url,
-      media_type: m.media_type,
-      message_type: m.message_type,
-      is_bot_message: true,
-      is_team_agent_message: true,
-      created_at: m.created_at,
-    }));
-
-    // The error was never read before, which is why the RLS rejection above
-    // went unnoticed. Log it.
-    const { error: copyError } = await supabase
-      .from("huddle_messages")
-      .insert(inserts);
-    if (copyError) console.warn("Backfill insert rejected:", copyError);
-
-    return botMessages[0]?.user_id ?? null;
-  } catch (err) {
-    // Non-critical — don't block huddle creation if backfill fails
-    console.warn("Backfill failed:", err);
-  }
-  return null;
 }
 
 /**
@@ -254,6 +190,15 @@ export function CreateSideHuddleScreen() {
         navigation.navigate("MainTabs" as any);
         return;
       }
+
+      // You cannot own a room for a team you don't follow. Enforced by making
+      // it true rather than by refusing: picking a team here IS an expression
+      // of interest, so blocking with "follow this team first" would be asking
+      // the user to say the same thing twice.
+      //
+      // The invariant this buys: every huddle's team is followed by whoever
+      // created it, so a room's team always means something.
+      await followTeam(selectedTeamId);
 
       const { data, error } = await supabase
         .from("huddles")

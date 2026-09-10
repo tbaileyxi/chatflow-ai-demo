@@ -14,6 +14,8 @@ export type UserHuddle = {
   isVerified: boolean;
   isOfficialTeam: boolean;
   isPrivate: boolean;
+  /** Needed to resolve which game the room is about — see useRoomGames. */
+  teamId: string | null;
   teamName: string | null;
   teamCity: string | null;
   teamLogoUrl: string | null;
@@ -44,6 +46,7 @@ export function useUserHuddles() {
           isVerified: false,
           isOfficialTeam: false,
           isPrivate: room.accessMode === "private",
+          teamId: room.teamId ?? null,
           teamName: room.teamName ?? null,
           teamCity: room.teamCity ?? null,
           teamLogoUrl: room.teamLogoUrl ?? null,
@@ -63,7 +66,7 @@ export function useUserHuddles() {
           last_read_at,
           huddles (
             id, name, member_count, last_message_at,
-            owner_id, is_verified, is_official_team_huddle, is_private,
+            owner_id, is_verified, is_official_team_huddle, is_private, team_id,
             teams!team_id (name, city, logo_url)
           )
         `,
@@ -130,6 +133,7 @@ export function useUserHuddles() {
             isVerified: h.is_verified ?? false,
             isOfficialTeam: h.is_official_team_huddle ?? false,
             isPrivate: h.is_private ?? false,
+            teamId: h.team_id ?? null,
             teamName: team?.name ?? null,
             teamCity: team?.city ?? null,
             teamLogoUrl: team?.logo_url ?? null,

@@ -20,6 +20,7 @@ import {
 } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { followTeam } from "@/lib/follows";
 import { colors } from "@/theme/colors";
 
 type Team = {
@@ -82,6 +83,16 @@ export function TeamPicker({
   const join = async (teamId: string) => {
     setJoining(teamId);
     try {
+      // Record the follow before joining anything. Picking a team here used to
+      // ONLY call join_team_huddle, which put you in that team's room and left
+      // user_follows empty — so the app had no record of which teams anyone
+      // cared about, and every feature that wanted to know (game ranking,
+      // multi-team profiles, who to suggest a room with) had nothing to read.
+      //
+      // Best-effort on purpose: a failure here must not block onboarding, and
+      // the join below is still what gets the user somewhere.
+      await followTeam(teamId);
+
       const { data, error } = await (supabase.rpc as any)("join_team_huddle", {
         p_team_id: teamId,
       });
