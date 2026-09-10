@@ -8,8 +8,20 @@ import {
   Image,
   Animated,
   Keyboard,
+  Modal,
 } from "react-native";
-import { Send, X, Camera, ImageIcon, Mic, Square } from "lucide-react-native";
+import {
+  Send,
+  X,
+  Camera,
+  ImageIcon,
+  Mic,
+  Square,
+  Plus,
+  Sparkles,
+  BarChart3,
+  HelpCircle,
+} from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Audio } from "expo-av";
 import { colors } from "@/theme/colors";
@@ -36,11 +48,10 @@ type Props = {
   mentionables?: Mentionable[];
 };
 
-// The Coach is always first in the @ list. This is the whole entry point for
-// the answerable Coach: there is no room in the composer for another icon
-// (camera, image, mic, input, send already fills the row) and no room in the
-// header (back, logo, title, invite, overflow). A mention costs zero pixels
-// until you type "@".
+// The Coach is always first in the @ list. Typing "@" is still the fast path
+// for anyone who knows it — but it is no longer the ONLY path: collapsing
+// camera, library and mic into the ＋ freed the room this comment used to say
+// didn't exist, and Ask Coach now sits at the top of that sheet.
 const COACH_MENTION: Mentionable = {
   key: "coach",
   label: "coach",
@@ -69,6 +80,7 @@ export function MessageInput({
 }: Props) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [showPlus, setShowPlus] = useState(false);
   const [media, setMedia] = useState<MediaAttachment | null>(null);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -244,6 +256,46 @@ export function MessageInput({
     onTypingChange?.(next.trim().length > 0);
   };
 
+  // Everything the ＋ opens. Camera, library and voice were three permanent
+  // icons; the Coach had no icon at all and could only be reached by knowing
+  // to type "@". One button, and the Coach is finally visible.
+  //
+  // Poll and Trivia are listed and inert. They're modes somebody activates,
+  // and showing where they'll live costs nothing while building them properly
+  // is its own piece of work — an empty menu teaches nobody what this button
+  // is for.
+  const plusActions: {
+    key: string;
+    label: string;
+    sub: string;
+    Icon: any;
+    run?: () => void;
+    soon?: boolean;
+  }[] = [
+    {
+      key: "coach",
+      label: "Ask Coach",
+      sub: "About the game, or this room",
+      Icon: Sparkles,
+      run: () => {
+        const next = text.trim() ? `${text.trim()} @coach ` : "@coach ";
+        setText(next);
+        onTypingChange?.(true);
+      },
+    },
+    { key: "photo", label: "Take a photo", sub: "Camera", Icon: Camera, run: takePhoto },
+    {
+      key: "library",
+      label: "From your library",
+      sub: "Photos",
+      Icon: ImageIcon,
+      run: pickFromLibrary,
+    },
+    { key: "voice", label: "Voice message", sub: "Hold to talk", Icon: Mic, run: startRecording },
+    { key: "poll", label: "Poll", sub: "Ask the room", Icon: BarChart3, soon: true },
+    { key: "trivia", label: "Trivia", sub: "Start a round", Icon: HelpCircle, soon: true },
+  ];
+
   const canSend = (text.trim() || media) && !sending && !disabled;
 
   return (
@@ -390,28 +442,21 @@ export function MessageInput({
             </View>
           )}
 
-        <View className="flex-row items-end gap-1.5 px-3 py-3">
-          {/* Media action icons */}
+        <View className="flex-row items-end gap-2 px-3 py-3">
+          {/* Camera, library and mic were three separate 40px icons sitting
+              permanently in front of the text field. Collapsing them into one
+              ＋ is what makes room for everything else that wants to be here —
+              the Coach especially, which until now had no visible entry point
+              at all and could only be found by knowing to type "@". */}
           <Pressable
-            onPress={takePhoto}
-            className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
+            onPress={() => {
+              Keyboard.dismiss();
+              setShowPlus(true);
+            }}
+            className="h-10 w-10 items-center justify-center rounded-full bg-muted active:opacity-70"
             hitSlop={4}
           >
-            <Camera color={colors.mutedForeground} size={20} />
-          </Pressable>
-          <Pressable
-            onPress={pickFromLibrary}
-            className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
-            hitSlop={4}
-          >
-            <ImageIcon color={colors.mutedForeground} size={20} />
-          </Pressable>
-          <Pressable
-            onPress={startRecording}
-            className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
-            hitSlop={4}
-          >
-            <Mic color={colors.mutedForeground} size={20} />
+            <Plus color={colors.foreground} size={22} />
           </Pressable>
 
           {/* Text input */}
@@ -446,6 +491,69 @@ export function MessageInput({
         </View>
         </>
       )}
+
+      <Modal
+        visible={showPlus}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPlus(false)}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/60"
+          onPress={() => setShowPlus(false)}
+        >
+          {/* Stops a tap inside the sheet from closing it. */}
+          <Pressable
+            onPress={() => {}}
+            className="rounded-t-3xl border-t border-border bg-card px-4 pb-8 pt-3"
+          >
+            <View className="mb-3 h-1 w-9 self-center rounded-full bg-muted" />
+
+            {plusActions.map((a) => (
+              <Pressable
+                key={a.key}
+                disabled={a.soon}
+                onPress={() => {
+                  setShowPlus(false);
+                  a.run?.();
+                }}
+                className="flex-row items-center gap-3 py-3 active:opacity-70"
+                style={a.soon ? { opacity: 0.4 } : undefined}
+              >
+                <View
+                  className={
+                    a.key === "coach"
+                      ? "h-10 w-10 items-center justify-center rounded-xl bg-primary"
+                      : "h-10 w-10 items-center justify-center rounded-xl bg-muted"
+                  }
+                >
+                  <a.Icon
+                    color={
+                      a.key === "coach"
+                        ? colors.primaryForeground
+                        : colors.foreground
+                    }
+                    size={19}
+                  />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-base font-bold text-foreground">
+                    {a.label}
+                  </Text>
+                  <Text className="mt-0.5 text-xs text-muted-foreground">
+                    {a.sub}
+                  </Text>
+                </View>
+                {a.soon ? (
+                  <Text className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    Soon
+                  </Text>
+                ) : null}
+              </Pressable>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
