@@ -8,11 +8,31 @@ export type PresenceUser = {
   avatarUrl: string | null;
 };
 
+/**
+ * A reaction somebody just fired, in flight.
+ *
+ * Deliberately NOT a message. Rail taps are cheap and there are hundreds of
+ * them in a close fourth quarter — writing each one to huddle_messages would
+ * bury the conversation under its own applause. They ride the presence
+ * channel instead, exist for the few seconds they're on screen, and are gone.
+ *
+ * Face videos are the opposite and DO persist: rare, effortful, and the best
+ * thing the room will ever produce. Cheap vanishes, expensive stays.
+ */
+export type LiveReaction = {
+  id: string;
+  emoji: string;
+  userId: string;
+  displayName: string;
+};
+
 export function useHuddlePresence(huddleId: string) {
   const { user } = useAuth();
   const [presentUsers, setPresentUsers] = useState<PresenceUser[]>([]);
   const [typingUsers, setTypingUsers] = useState<PresenceUser[]>([]);
   const [entryBanner, setEntryBanner] = useState<string | null>(null);
+  const [liveReactions, setLiveReactions] = useState<LiveReaction[]>([]);
+  const reactionTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const bannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -36,7 +56,27 @@ export function useHuddlePresence(huddleId: string) {
     });
     channelRef.current = channel;
 
+    // A reaction lives for as long as its animation, then removes itself.
+    // Capped so a hammered rail can't grow an unbounded array of emoji that
+    // every render then walks.
+    const pushReaction = (r: LiveReaction) => {
+      setLiveReactions((current) => [...current.slice(-11), r]);
+      reactionTimeoutsRef.current.push(
+        setTimeout(() => {
+          setLiveReactions((current) => current.filter((x) => x.id !== r.id));
+        }, 4200),
+      );
+    };
+
     channel
+      .on("broadcast", { event: "reaction" }, ({ payload }) => {
+        const r = payload as LiveReaction;
+        // Broadcast echoes back to the sender on this channel config, and the
+        // sender already rendered their own on tap — showing it twice makes
+        // one thumb look like two people.
+        if (!r?.emoji || r.userId === user.id) return;
+        pushReaction(r);
+      })
       .on("broadcast", { event: "typing" }, ({ payload }) => {
           const typing = payload as PresenceUser & { isTyping?: boolean };
           if (!typing.userId || typing.userId === user.id) return;
@@ -161,7 +201,10 @@ export function useHuddlePresence(huddleId: string) {
       if (bannerTimeoutRef.current) clearTimeout(bannerTimeoutRef.current);
       Object.values(typingTimeoutsRef.current).forEach(clearTimeout);
       typingTimeoutsRef.current = {};
+      reactionTimeoutsRef.current.forEach(clearTimeout);
+      reactionTimeoutsRef.current = [];
       setTypingUsers([]);
+      setLiveReactions([]);
       channelRef.current = null;
       supabase.removeChannel(channel);
     };
@@ -186,5 +229,40 @@ export function useHuddlePresence(huddleId: string) {
     [user?.id],
   );
 
-  return { presentUsers, typingUsers, entryBanner, clearBanner, sendTyping };
+  const sendReaction = useCallback(
+    (emoji: string) => {
+      if (!user) return;
+      const mine: LiveReaction = {
+        id: `${user.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        emoji,
+        userId: user.id,
+        displayName: displayNameRef.current,
+      };
+
+      // Render your own immediately rather than waiting for the round trip.
+      // A reaction that appears 200ms after your thumb doesn't feel like you
+      // did it, and this is the one gesture in the app that has to feel
+      // instant.
+      setLiveReactions((current) => [...current.slice(-11), mine]);
+      const t = setTimeout(() => {
+        setLiveReactions((current) => current.filter((x) => x.id !== mine.id));
+      }, 4200);
+      reactionTimeoutsRef.current.push(t);
+
+      channelRef.current
+        ?.send({ type: "broadcast", event: "reaction", payload: mine })
+        .catch(() => {});
+    },
+    [user?.id],
+  );
+
+  return {
+    presentUsers,
+    typingUsers,
+    entryBanner,
+    clearBanner,
+    sendTyping,
+    liveReactions,
+    sendReaction,
+  };
 }

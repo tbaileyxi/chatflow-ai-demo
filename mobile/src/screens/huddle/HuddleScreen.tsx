@@ -33,6 +33,7 @@ import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { HuddleHeader } from "@/components/huddle/HuddleHeader";
 import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
 import { PresenceBar } from "@/components/huddle/PresenceBar";
+import { ReactionRail, FloatingReactions } from "@/components/huddle/ReactionRail";
 import { FadeButton } from "@/components/huddle/FadeButton";
 import { PingButton } from "@/components/huddle/PingButton";
 import { ChatMessage } from "@/components/huddle/ChatMessage";
@@ -185,8 +186,14 @@ export function HuddleScreen() {
     loadingMore,
   } = useHuddleMessages(huddleId);
   const flatListRef = useRef<FlatList<ListItem>>(null);
-  const { presentUsers, typingUsers, entryBanner, sendTyping } =
-    useHuddlePresence(huddleId);
+  const {
+    presentUsers,
+    typingUsers,
+    entryBanner,
+    sendTyping,
+    liveReactions,
+    sendReaction,
+  } = useHuddlePresence(huddleId);
 
   // Publish this room as the user's current location to the global lobby so it
   // surfaces in friends' "Friends Now" — and clear it on leave.
@@ -657,6 +664,13 @@ export function HuddleScreen() {
             }}
           />
         )}
+
+        {/* Reactions in flight, over the thread and under nothing. They write
+            no message — a close fourth quarter produces hundreds of these and
+            recording each one would bury the conversation under its own
+            applause. Everyone in the room sees them at the same moment, and
+            in four seconds they're gone. */}
+        <FloatingReactions reactions={liveReactions} />
         </View>
 
         {/* Not a member: a way IN, rather than nothing.
@@ -712,6 +726,12 @@ export function HuddleScreen() {
               </Text>
             )}
             {coachThinking && <CoachThinking />}
+            {/* Only while a game is on. Out of season these are four buttons
+                reacting to nothing, and a rail that's always there stops
+                meaning "something is happening right now". */}
+            {pingGameState === "live" ? (
+              <ReactionRail onReact={sendReaction} />
+            ) : null}
           <MessageInput
             onSend={handleSend}
             replyTo={replyTo}
