@@ -1,13 +1,20 @@
-// Pick your team → land in that team's open room.
-//
-// This is the "arrived without an invite" path. Before it existed, an uninvited
-// signup finished onboarding with zero rooms: nothing on Home, nothing in
-// search (which is friend-scoped), nobody to talk to. Joining the team room
-// gives them somewhere real to land on their first run.
-//
-// join_team_huddle() creates the room if that team doesn't have one yet, so
-// this works whether or not the team rooms exist in the data.
-
+/**
+ * Pick the teams you follow. Plural, on purpose.
+ *
+ * This used to be single-pick and did something quite different: tapping a
+ * team called join_team_huddle(), which dropped you into that team's official
+ * Community room — a room with, on average, nobody in it. So the one screen
+ * that asks what you care about answered by putting you somewhere empty, and
+ * recorded your answer nowhere.
+ *
+ * Now it writes user_follows and joins nothing. Rooms get made later, from a
+ * game or from an invite, where there are people. Following is the lightweight
+ * thing: it says which games matter to you and which rooms should find you,
+ * and you can follow a team you have no room in.
+ *
+ * Doubles as the edit surface — it loads your current follows pre-selected, so
+ * the same component works from a profile as it does in onboarding.
+ */
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -18,10 +25,10 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { followTeam } from "@/lib/follows";
+import { Button } from "@/components/ui/button";
 import { colors } from "@/theme/colors";
+import { followTeam, getFollowedTeamIds, unfollowTeam } from "@/lib/follows";
 
 type Team = {
   id: string;
@@ -32,29 +39,42 @@ type Team = {
 };
 
 export function TeamPicker({
-  onJoined,
+  onDone,
   onSkip,
+  title = "Who do you watch?",
+  subtitle = "Pick as many as you like. This decides which games find you, and which team's voice you hear in a room.",
+  ctaLabel = "Continue",
 }: {
-  onJoined: (huddleId: string) => void;
+  onDone: () => void;
   onSkip?: () => void;
+  title?: string;
+  subtitle?: string;
+  ctaLabel?: string;
 }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [joining, setJoining] = useState<string | null>(null);
-  const queryClient = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // What they followed when the screen opened, so Continue can work out what
+  // actually changed rather than rewriting every row every time.
+  const [initial, setInitial] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("teams")
-        .select("id, name, city, logo_url, league")
-        .eq("status", "active")
-        .order("name");
+      const [teamsRes, followed] = await Promise.all([
+        supabase
+          .from("teams")
+          .select("id, name, city, logo_url, league")
+          .eq("status", "active")
+          .order("name"),
+        getFollowedTeamIds(),
+      ]);
       if (cancelled) return;
+
       setTeams(
-        (data ?? []).map((t: any) => ({
+        (teamsRes.data ?? []).map((t: any) => ({
           id: t.id,
           name: t.name,
           city: t.city ?? null,
@@ -62,6 +82,9 @@ export function TeamPicker({
           league: t.league ?? null,
         })),
       );
+      const already = new Set(followed);
+      setSelected(already);
+      setInitial(already);
       setLoading(false);
     })();
     return () => {
@@ -80,43 +103,73 @@ export function TeamPicker({
     );
   }, [teams, search]);
 
-  const join = async (teamId: string) => {
-    setJoining(teamId);
-    try {
-      // Record the follow before joining anything. Picking a team here used to
-      // ONLY call join_team_huddle, which put you in that team's room and left
-      // user_follows empty — so the app had no record of which teams anyone
-      // cared about, and every feature that wanted to know (game ranking,
-      // multi-team profiles, who to suggest a room with) had nothing to read.
-      //
-      // Best-effort on purpose: a failure here must not block onboarding, and
-      // the join below is still what gets the user somewhere.
-      await followTeam(teamId);
+  const chosen = useMemo(
+    () => teams.filter((t) => selected.has(t.id)),
+    [teams, selected],
+  );
 
-      const { data, error } = await (supabase.rpc as any)("join_team_huddle", {
-        p_team_id: teamId,
-      });
-      if (error) throw error;
-      const row = Array.isArray(data) ? data[0] : data;
-      await queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
-      onJoined(row?.huddle_id ?? "");
+  const toggle = (teamId: string) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(teamId)) next.delete(teamId);
+      else next.add(teamId);
+      return next;
+    });
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const added = [...selected].filter((id) => !initial.has(id));
+      const removed = [...initial].filter((id) => !selected.has(id));
+      await Promise.all([
+        ...added.map((id) => followTeam(id)),
+        ...removed.map((id) => unfollowTeam(id)),
+      ]);
     } catch (err) {
-      console.warn("[team-picker] join failed", err);
-      // Don't strand them in onboarding over this.
-      onSkip?.();
+      // Never strand someone in onboarding over this — they can fix their
+      // teams later from a profile, but there is no later if they're stuck.
+      console.warn("[team-picker] save failed", err);
     } finally {
-      setJoining(null);
+      setSaving(false);
+      onDone();
     }
   };
 
   return (
     <View>
       <Text className="text-4xl font-black leading-tight text-foreground">
-        Who do you follow?
+        {title}
       </Text>
       <Text className="mt-3 text-lg leading-7 text-muted-foreground">
-        We'll drop you in that team's room so you have somewhere to land.
+        {subtitle}
       </Text>
+
+      {chosen.length > 0 ? (
+        <View className="mt-4 flex-row flex-wrap gap-2">
+          {chosen.map((t) => (
+            <Pressable
+              key={t.id}
+              onPress={() => toggle(t.id)}
+              className="flex-row items-center gap-2 rounded-full border border-primary/40 bg-primary/10 py-1.5 pl-1.5 pr-3 active:opacity-70"
+            >
+              <View className="h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-muted">
+                {t.logoUrl ? (
+                  <Image source={{ uri: t.logoUrl }} className="h-full w-full" resizeMode="cover" />
+                ) : (
+                  <Text className="text-[10px] font-bold text-muted-foreground">
+                    {t.name.charAt(0)}
+                  </Text>
+                )}
+              </View>
+              <Text className="text-xs font-bold text-foreground" numberOfLines={1}>
+                {t.name}
+              </Text>
+              <Text className="text-xs font-bold text-primary">×</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       <TextInput
         value={search}
@@ -124,7 +177,7 @@ export function TeamPicker({
         placeholder="Search teams"
         placeholderTextColor={colors.mutedForeground}
         autoCorrect={false}
-        className="mt-5 rounded-xl border border-border bg-muted px-4 py-3 text-foreground"
+        className="mt-4 rounded-xl border border-border bg-muted px-4 py-3 text-foreground"
         style={{ color: colors.foreground }}
       />
 
@@ -133,41 +186,62 @@ export function TeamPicker({
           <ActivityIndicator color={colors.primary} />
         </View>
       ) : (
-        <ScrollView style={{ maxHeight: 300 }} className="mt-3" keyboardShouldPersistTaps="handled">
+        <ScrollView
+          style={{ maxHeight: 280 }}
+          className="mt-3"
+          keyboardShouldPersistTaps="handled"
+        >
           <View className="gap-1">
-            {filtered.map((t) => (
-              <Pressable
-                key={t.id}
-                onPress={() => join(t.id)}
-                disabled={!!joining}
-                className="flex-row items-center gap-3 rounded-xl px-2 py-2.5 active:bg-muted/40"
-              >
-                <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-muted">
-                  {t.logoUrl ? (
-                    <Image
-                      source={{ uri: t.logoUrl }}
-                      className="h-full w-full"
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <Text className="text-sm font-bold text-muted-foreground">
-                      {t.name.charAt(0)}
+            {filtered.map((t) => {
+              const on = selected.has(t.id);
+              return (
+                <Pressable
+                  key={t.id}
+                  onPress={() => toggle(t.id)}
+                  className="flex-row items-center gap-3 rounded-xl px-2 py-2.5 active:bg-muted/40"
+                >
+                  <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-muted">
+                    {t.logoUrl ? (
+                      <Image
+                        source={{ uri: t.logoUrl }}
+                        className="h-full w-full"
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Text className="text-sm font-bold text-muted-foreground">
+                        {t.name.charAt(0)}
+                      </Text>
+                    )}
+                  </View>
+                  <View className="flex-1">
+                    <Text
+                      className="text-base font-bold text-foreground"
+                      numberOfLines={1}
+                    >
+                      {t.city ? `${t.city} ${t.name}` : t.name}
                     </Text>
-                  )}
-                </View>
-                <View className="flex-1">
-                  <Text className="text-base font-bold text-foreground" numberOfLines={1}>
-                    {t.city ? `${t.city} ${t.name}` : t.name}
-                  </Text>
-                  {t.league ? (
-                    <Text className="text-xs text-muted-foreground">{t.league}</Text>
-                  ) : null}
-                </View>
-                {joining === t.id ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : null}
-              </Pressable>
-            ))}
+                    {t.league ? (
+                      <Text className="text-xs text-muted-foreground">
+                        {t.league}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View
+                    className={
+                      on
+                        ? "h-6 w-6 items-center justify-center rounded-full bg-primary"
+                        : "h-6 w-6 rounded-full border border-border"
+                    }
+                  >
+                    {on ? (
+                      <Text className="text-xs font-black text-primary-foreground">
+                        ✓
+                      </Text>
+                    ) : null}
+                  </View>
+                </Pressable>
+              );
+            })}
 
             {filtered.length === 0 ? (
               <Text className="py-8 text-center text-sm text-muted-foreground">
@@ -178,8 +252,18 @@ export function TeamPicker({
         </ScrollView>
       )}
 
+      <View className="mt-4">
+        <Button size="lg" onPress={save} disabled={saving || selected.size === 0}>
+          {saving
+            ? "Saving..."
+            : selected.size === 0
+              ? ctaLabel
+              : `${ctaLabel} with ${selected.size}`}
+        </Button>
+      </View>
+
       {onSkip ? (
-        <Pressable onPress={onSkip} className="mt-4 py-2 active:opacity-70">
+        <Pressable onPress={onSkip} className="mt-3 py-2 active:opacity-70">
           <Text className="text-center text-sm font-black text-muted-foreground">
             Skip for now
           </Text>

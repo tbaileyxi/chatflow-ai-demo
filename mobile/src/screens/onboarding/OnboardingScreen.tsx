@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { FindYourPeople } from "@/components/profile/FindYourPeople";
 import { ClaimRoomBox } from "@/components/onboarding/ClaimRoomBox";
 import { TeamPicker } from "@/components/profile/TeamPicker";
+import { peekPendingInvite } from "@/hooks/useInviteHandler";
 import { colors } from "@/theme/colors";
 
 // Phone is stored ONLY as a match key so people who already have your number
@@ -56,6 +57,33 @@ export function OnboardingScreen() {
       body: "Pick a team or event, invite people, and the room stays hidden from strangers.",
     },
   ];
+
+  // Someone a friend invited is not a cold visitor and shouldn't be treated
+  // like one. They arrived because a specific person wanted them in a specific
+  // room, and every screen between the tap and that room is a chance to lose
+  // them — so an invited user gets ONE question, their name, and then goes
+  // straight in. Teams and contacts can be asked for later, from inside a room
+  // with people in it, which is a far better place to ask from.
+  //
+  // Peeked, not taken: RootNavigator still redeems the code once
+  // onboarding_completed flips.
+  const [invited, setInvited] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const code = await peekPendingInvite();
+      if (cancelled || !code) return;
+      setInvited(true);
+      // Skip the marketing slides — they came for a room, not a pitch.
+      setStep(slides.length);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // slides.length is a constant; this runs once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Slides, then: name/phone → pick a team → find your people.
   const profileStep = slides.length;
@@ -111,6 +139,15 @@ export function OnboardingScreen() {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["profile"] });
+
+      // Invited: that was the only question. Finishing here flips
+      // onboarding_completed, which is what lets RootNavigator redeem the
+      // pending code and drop them into the room they were sent to.
+      if (invited) {
+        await enterApp();
+        return;
+      }
+
       setStep(teamStep);
     } finally {
       setSaving(false);
@@ -152,7 +189,13 @@ export function OnboardingScreen() {
     }
   };
 
-  const primaryLabel = saving ? "Saving..." : onProfileStep ? "Continue" : "Next";
+  const primaryLabel = saving
+    ? "Saving..."
+    : onProfileStep
+      ? invited
+        ? "Take me in"
+        : "Continue"
+      : "Next";
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -177,13 +220,16 @@ export function OnboardingScreen() {
                   <FindYourPeople onDone={enterApp} />
                 ) : onTeamStep ? (
                   <>
-                    {/* No skip. Picking a team joins that team's community
-                        room, and skipping landed people in the app with no room
-                        and nobody in it — 59 of the first 72 accounts, and a
-                        person with no room has nothing to open and nothing to
-                        invite anyone to. Choosing a team is the cheapest thing
-                        we ask for and the only one that makes the app work. */}
-                    <TeamPicker onJoined={() => setStep(contactsStep)} />
+                    {/* No skip. This no longer joins anything — it records
+                        which teams you follow, and rooms get made later from a
+                        game or an invite where there are actually people. But
+                        it still can't be skipped: follows are what decide which
+                        games surface, which rooms find you, and which team's
+                        voice talks in a room you make. Skip it and the app has
+                        nothing to work with. (59 of the first 72 accounts
+                        skipped the old version and landed with no room and
+                        nobody in it.) */}
+                    <TeamPicker onDone={() => setStep(contactsStep)} />
                     {/* A president with a code does not want the generic team
                         room — he wants his chapter's, which does not exist until
                         he claims it. Sits under the team picker because that is
@@ -201,6 +247,15 @@ export function OnboardingScreen() {
                     <Text className="text-4xl font-black leading-tight text-foreground">
                       What should we call you?
                     </Text>
+                    {/* Invited people are one tap from a room full of people
+                        who already know them. Saying so makes this read as
+                        walking through a door rather than filling in a form. */}
+                    {invited ? (
+                      <Text className="mt-3 text-lg leading-7 text-muted-foreground">
+                        Last thing — this is the name on every message you send.
+                        Then you're in.
+                      </Text>
+                    ) : null}
 
                     <TextInput
                       value={name}
@@ -253,7 +308,14 @@ export function OnboardingScreen() {
                   </>
                 )}
 
-                <View className="mt-10 flex-row gap-2">
+                {/* Hidden for invited users: they have exactly one step, and
+                    five dots with the third lit would say "you're 3 of 5" to
+                    someone who is actually one tap from done. */}
+                <View
+                  className="mt-10 flex-row gap-2"
+                  style={invited ? { opacity: 0 } : undefined}
+                  pointerEvents="none"
+                >
                   {[
                     ...slides,
                     { title: "__profile__" },
@@ -293,7 +355,11 @@ export function OnboardingScreen() {
                   </Text>
                 </Pressable>
               )}
-              {step > 0 ? (
+              {/* Not for invited users. They start at the name step, so Back
+                  would rewind them into the marketing slides they were
+                  deliberately skipped past — offering to show someone a pitch
+                  for a product they've already decided to join. */}
+              {step > 0 && !invited ? (
                 <Pressable
                   className="rounded-full px-5 py-3 active:opacity-80"
                   disabled={saving}

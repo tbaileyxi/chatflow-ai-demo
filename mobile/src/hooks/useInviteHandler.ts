@@ -55,6 +55,19 @@ export async function takePendingInvite(): Promise<string | null> {
 }
 
 /**
+ * Is there an invite waiting, without consuming it?
+ *
+ * Onboarding needs to know it's dealing with someone a friend sent, so it can
+ * ask for a name and get out of the way instead of running the full sequence.
+ * It must NOT consume the code — RootNavigator still redeems it once
+ * onboarding_completed flips, and taking it here would drop the invite on the
+ * floor and land them on Home instead of in the room they were invited to.
+ */
+export async function peekPendingInvite(): Promise<string | null> {
+  return AsyncStorage.getItem(PENDING_INVITE_KEY);
+}
+
+/**
  * Accepts an invite code and navigates to the resulting huddle.
  * Safe to call from any signed-in surface.
  */
