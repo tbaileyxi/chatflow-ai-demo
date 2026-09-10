@@ -28,6 +28,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useInAppNotifications } from "@/hooks/useInAppNotifications";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { useRoomGames } from "@/hooks/useRoomGames";
+import { GamesStrip } from "@/components/home/GamesStrip";
 import { useKnownPeople } from "@/hooks/useFriends";
 import { useAutoContactMatch } from "@/hooks/useAutoContactMatch";
 import { useContactMatch } from "@/hooks/useContactMatch";
@@ -535,6 +536,10 @@ export function HomeScreen() {
       >
         <CompleteProfileCard />
         <FriendsNowSection />
+        {/* Who's around, then what's on, then where you'd go. The strip
+            removes itself entirely when nothing is playing — in July, Home is
+            just your rooms. */}
+        <GamesStrip />
         <YourRoomsSection />
       </ScrollView>
 

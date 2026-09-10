@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { NotificationSettings } from "@/components/profile/NotificationSettings";
 import { FindYourPeople } from "@/components/profile/FindYourPeople";
+import { RoomsYouRun } from "@/components/profile/RoomsYouRun";
 import { Separator } from "@/components/ui/separator";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ScreenWrapper } from "@/components/ui/screen-wrapper";
@@ -487,6 +488,35 @@ export function ProfileScreen() {
         </Card>
 
         <Separator />
+
+        {/* Rooms you run, and whether anybody is waiting to get in. Join
+            requests have worked for months with nowhere to see them — the
+            count comes to you now instead of sitting in a settings screen you
+            had to know to open. */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Rooms you run</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RoomsYouRun />
+          </CardContent>
+        </Card>
+
+        {/* Your record. Was a tab; a pick is an argument you have inside a
+            room, not a reason to open the app, so it lives here now. */}
+        <Card>
+          <CardContent className="pt-4">
+            <Pressable
+              onPress={() => navigation.navigate("Ledger" as any)}
+              className="flex-row items-center justify-between active:opacity-70"
+            >
+              <Text className="text-base font-bold text-foreground">
+                Your picks
+              </Text>
+              <Text className="text-sm text-muted-foreground">›</Text>
+            </Pressable>
+          </CardContent>
+        </Card>
 
         {/* Find your people — reachable again after onboarding, because the
             answer changes every time somebody new signs up. */}

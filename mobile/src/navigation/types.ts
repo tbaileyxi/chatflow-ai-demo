@@ -1,11 +1,13 @@
 import type { NavigatorScreenParams } from "@react-navigation/native";
 
 // Bottom tab screens
+// Three tabs. Picks lost its slot: it's something you do inside a room, not a
+// reason to open the app, and putting it in the tab bar pulled people OUT of
+// the room to look at a list. The screen still exists — it's pushed from
+// Profile now, where your own record belongs.
 export type TabParamList = {
   Home: undefined;
-  Teams: undefined;
   Search: undefined;
-  Ledger: { huddleId?: string; huddleName?: string } | undefined;
   Profile: undefined;
 };
 
@@ -36,6 +38,7 @@ export type RootStackParamList = {
   Admin: undefined;
   Settings: undefined;
   FAQ: undefined;
+  Ledger: { huddleId?: string; huddleName?: string } | undefined;
   Sponsor: undefined;
   MessagePost: { id: string };
   PublicProfile: { userId: string; knownAs?: string };

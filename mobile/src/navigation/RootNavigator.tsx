@@ -16,6 +16,7 @@ import { colors } from "@/theme/colors";
 import { TabNavigator } from "./TabNavigator";
 import { AuthNavigator } from "./AuthNavigator";
 import { OnboardingScreen } from "@/screens/onboarding/OnboardingScreen";
+import { LedgerScreen } from "@/screens/ledger/LedgerScreen";
 import { HuddleScreen } from "@/screens/huddle/HuddleScreen";
 import { HuddleSettingsScreen } from "@/screens/huddle-settings/HuddleSettingsScreen";
 import { HuddleCoachSettingsScreen } from "@/screens/huddle-settings/HuddleCoachSettingsScreen";
@@ -141,6 +142,10 @@ export function RootNavigator() {
             name="CreateSideHuddle"
             component={CreateSideHuddleScreen}
             options={{ animation: "slide_from_bottom" }}
+          />
+          <Stack.Screen
+            name="Ledger"
+            component={LedgerScreen}
           />
           <Stack.Screen
             name="FAQ"

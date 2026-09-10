@@ -1,9 +1,8 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Home, Newspaper, Search, Target, User } from "lucide-react-native";
+import { Home, Search, User } from "lucide-react-native";
 import { colors } from "@/theme/colors";
 import { HomeScreen } from "@/screens/home/HomeScreen";
 import { HuddleSearchScreen } from "@/screens/huddle-search/HuddleSearchScreen";
-import { LedgerScreen } from "@/screens/ledger/LedgerScreen";
 import { ProfileScreen } from "@/screens/profile/ProfileScreen";
 import type { TabParamList } from "./types";
 
@@ -44,16 +43,12 @@ export function TabNavigator() {
           ),
         }}
       />
-      <Tab.Screen
-        name="Ledger"
-        component={LedgerScreen}
-        options={{
-          title: "Picks",
-          tabBarIcon: ({ color, size }) => (
-            <Target color={color} size={size} />
-          ),
-        }}
-      />
+      {/* Picks tab removed: broken, and structurally wrong even when it
+          worked. A pick is an argument you have inside a room while a game is
+          on — surfacing it as a separate board pulled people out of the room
+          to look at a list of things they'd already said. The card format
+          lives in the thread and in the ＋ instead, and your own record moved
+          to Profile, which is where a record belongs. */}
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}

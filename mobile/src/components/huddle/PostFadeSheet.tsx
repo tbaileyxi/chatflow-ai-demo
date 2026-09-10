@@ -215,10 +215,12 @@ export function PostFadeSheet({
                 <Pressable
                   onPress={() => {
                     onClose();
-                    // The sheet lives inside a stack screen, and Ledger is a tab under
-                    // MainTabs — a bare navigate("Ledger") does not cross that
-                    // boundary. HuddleSettingsScreen already reaches Home this way.
-                    navigation.navigate("MainTabs", { screen: "Ledger" });
+                    // Ledger used to be a tab under MainTabs, so this had to
+                    // cross that boundary. It's a root stack screen now — the
+                    // Picks tab was removed — so it pushes directly, and the
+                    // room stays underneath instead of being swapped out for
+                    // a tab.
+                    navigation.navigate("Ledger" as never);
                   }}
                   className="mt-3 items-center rounded-xl border border-border px-4 py-3"
                 >
