@@ -1,9 +1,29 @@
 import { useRef, useState, useCallback } from "react";
-import { View, Text, Image, Pressable, Share, Modal, Dimensions, Linking } from "react-native";
+import {
+  View,
+  Text,
+  Image,
+  Pressable,
+  Share,
+  Modal,
+  Dimensions,
+  Linking,
+  Alert,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { MessageSquareReply, Share2, X, Play, Pause, Mic } from "lucide-react-native";
+import {
+  MessageSquareReply,
+  Share2,
+  X,
+  Play,
+  Pause,
+  Mic,
+  Flag,
+  Trash2,
+} from "lucide-react-native";
 import { Audio, Video, ResizeMode } from "expo-av";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import { colors } from "@/theme/colors";
 import { FadeCardInMessage } from "@/components/huddle/FadeCardInMessage";
 import { PulseBubble } from "@/components/huddle/PulseBubble";
@@ -245,6 +265,74 @@ export function ChatMessage({
   const handlePickReaction = (emoji: string) => {
     onReact?.(emoji);
     setShowPicker(false);
+  };
+
+  /**
+   * Report, block, or remove — the three things guideline 1.2 asks for.
+   *
+   * All of them one long-press from the content itself. Blocking is
+   * user-level and enforced by RLS (see RUN_THIS_UGC_POLICY.sql): a client
+   * filter is a suggestion, a policy is an answer.
+   */
+  const handleReport = () => {
+    setShowPicker(false);
+    setTimeout(() => {
+      Alert.alert(
+        "Report this?",
+        `We'll review it. You can also block ${displayName} so you never see them again, in any room.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Report",
+            style: "destructive",
+            onPress: async () => {
+              const { data: auth } = await supabase.auth.getUser();
+              if (!auth?.user) return;
+              await supabase.from("message_reports").insert({
+                message_id: message.id,
+                huddle_id: huddleId,
+                reporter_id: auth.user.id,
+                reported_user_id: message.userId,
+                reason: "objectionable",
+              });
+              Alert.alert("Reported", "Thanks — we'll take a look.");
+            },
+          },
+          {
+            text: `Block ${displayName}`,
+            style: "destructive",
+            onPress: async () => {
+              const { data: auth } = await supabase.auth.getUser();
+              if (!auth?.user) return;
+              await supabase.from("user_blocks").insert({
+                blocker_id: auth.user.id,
+                blocked_id: message.userId,
+              });
+              Alert.alert(
+                "Blocked",
+                `You won't see ${displayName} anywhere in Side Huddle.`,
+              );
+            },
+          },
+        ],
+      );
+    }, 250);
+  };
+
+  const handleDeleteOwn = () => {
+    setShowPicker(false);
+    setTimeout(() => {
+      Alert.alert("Delete this message?", "It'll be gone for everyone.", [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            await supabase.from("huddle_messages").delete().eq("id", message.id);
+          },
+        },
+      ]);
+    }, 250);
   };
 
   const handleShare = () => {
@@ -548,6 +636,34 @@ export function ChatMessage({
                     // box.
                     shouldPlay
                   />
+
+                  {/* The proof of what caused the face.
+                      The design asked for front and back cameras at once, so
+                      the clip would carry a shot of the TV. No simultaneous
+                      multi-cam exists in this stack — but filming the screen
+                      was never the point, PROVING what you reacted to was, and
+                      the app already knows the score to the second. So it's
+                      rendered from data: sharper than a phone pointed across a
+                      room, and free.
+
+                      Captured at record time, not read at render time. Looking
+                      it up later would relabel every old reaction with the
+                      final score and destroy the only thing that makes them
+                      worth keeping. */}
+                  {message.messageType === "face_reaction" && message.content ? (
+                    <View
+                      className="absolute bottom-2 left-2 right-2 rounded-lg px-2 py-1"
+                      style={{ backgroundColor: "rgba(0,0,0,0.62)" }}
+                      pointerEvents="none"
+                    >
+                      <Text
+                        className="text-[10px] font-black tracking-wide text-white"
+                        numberOfLines={1}
+                      >
+                        {message.content}
+                      </Text>
+                    </View>
+                  ) : null}
                 </Pressable>
               )}
 
@@ -621,6 +737,34 @@ export function ChatMessage({
             >
               <Share2 color={colors.mutedForeground} size={20} />
             </Pressable>
+
+            {/* App Store guideline 1.2: an app carrying user content needs
+                reporting, blocking and removal reachable FROM the content —
+                not buried in a settings screen nobody opens. Every message
+                already long-presses to this menu, so it belongs here.
+
+                Your own message gets delete instead; you don't report
+                yourself. */}
+            {!message.isBotMessage ? (
+              <>
+                <View className="mx-0.5 h-6 w-px bg-border" />
+                {isOwnMessage ? (
+                  <Pressable
+                    onPress={handleDeleteOwn}
+                    className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
+                  >
+                    <Trash2 color={colors.destructive} size={19} />
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={handleReport}
+                    className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
+                  >
+                    <Flag color={colors.destructive} size={19} />
+                  </Pressable>
+                )}
+              </>
+            ) : null}
           </Pressable>
         </Pressable>
       </Modal>

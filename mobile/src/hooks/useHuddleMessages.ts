@@ -233,8 +233,12 @@ export function useHuddleMessages(huddleId: string) {
       content: string,
       userId: string,
       replyToId?: string,
-      media?: { uri: string; type: "image" | "audio" },
+      media?: { uri: string; type: "image" | "audio" | "video" },
       notifContext?: { senderName: string; huddleName: string },
+      // Set for anything that isn't a plain message. face_reaction is the one
+      // that matters here: it tells the renderer that `content` is the score
+      // at the moment of recording, not something the person typed.
+      messageType?: string,
     ) => {
       let mediaUrl: string | null = null;
       let mediaType: string | null = null;
@@ -242,7 +246,8 @@ export function useHuddleMessages(huddleId: string) {
       // Upload media to Supabase storage if provided
       if (media) {
         try {
-          const ext = media.type === "audio" ? "m4a" : "jpg";
+          const ext =
+            media.type === "audio" ? "m4a" : media.type === "video" ? "mp4" : "jpg";
           const fileName = `${huddleId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
           const base64 = await FileSystem.readAsStringAsync(media.uri, {
             encoding: FileSystem.EncodingType.Base64,
@@ -253,7 +258,12 @@ export function useHuddleMessages(huddleId: string) {
           const { error: uploadError } = await supabase.storage
             .from("huddle-media")
             .upload(fileName, bytes.buffer as ArrayBuffer, {
-              contentType: media.type === "audio" ? "audio/m4a" : "image/jpeg",
+              contentType:
+                media.type === "audio"
+                  ? "audio/m4a"
+                  : media.type === "video"
+                    ? "video/mp4"
+                    : "image/jpeg",
               upsert: false,
             });
 
@@ -280,6 +290,7 @@ export function useHuddleMessages(huddleId: string) {
         content,
         ...(replyToId ? { reply_to_id: replyToId } : {}),
         ...(mediaUrl ? { media_url: mediaUrl, media_type: mediaType } : {}),
+        ...(messageType ? { message_type: messageType } : {}),
       });
 
       // Fire push notification (edge function handles 30-min throttle)

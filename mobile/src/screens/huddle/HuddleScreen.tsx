@@ -35,6 +35,10 @@ import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
 import { PresenceBar } from "@/components/huddle/PresenceBar";
 import { ReactionRail, FloatingReactions } from "@/components/huddle/ReactionRail";
 import { PregameStrip } from "@/components/huddle/PregameStrip";
+import {
+  captureFaceReaction,
+  gameContextLabel,
+} from "@/lib/faceReaction";
 import { FadeButton } from "@/components/huddle/FadeButton";
 import { PingButton } from "@/components/huddle/PingButton";
 import { ChatMessage } from "@/components/huddle/ChatMessage";
@@ -418,10 +422,49 @@ export function HuddleScreen() {
     );
   }
 
+  /**
+   * Record a short video of your face and post it with the score burned on.
+   *
+   * The score is captured HERE, at record time, and travels as the message's
+   * content. Reading it at render time later would relabel every old reaction
+   * with the final score — which would quietly destroy the only reason these
+   * are worth keeping.
+   */
+  const handleFaceReaction = useCallback(async () => {
+    const label = gameContextLabel(liveGame ?? null);
+    const shot = await captureFaceReaction(label);
+    if (!shot) return;
+
+    const { error } = await sendMessage(
+      shot.context ?? "",
+      undefined,
+      { uri: shot.uri, type: "video" },
+      {
+        senderName: profile?.displayName ?? profile?.username ?? "Someone",
+        huddleName: huddle?.name ?? "",
+      },
+      "face_reaction",
+    );
+
+    if (error) {
+      // The server-side ceiling is 20 an hour and the client cannot argue
+      // with it, so say what happened rather than "failed to send".
+      const msg = String((error as any)?.message ?? "");
+      Alert.alert(
+        msg.includes("rate_limit") ? "Slow down a second" : "Couldn't post that",
+        msg.includes("rate_limit")
+          ? "That's a lot of reactions in an hour. Try again shortly."
+          : "Try again in a moment.",
+      );
+      return;
+    }
+    scrollToBottom();
+  }, [liveGame, sendMessage, profile, huddle?.name]);
+
   const handleSend = async (
     content: string,
     replyToId?: string,
-    media?: { uri: string; type: "image" | "audio" },
+    media?: { uri: string; type: "image" | "audio" | "video" },
   ) => {
     if (!user) return { error: new Error("Not authenticated") };
     const senderName = profile?.displayName ?? profile?.username ?? "Someone";
@@ -751,6 +794,9 @@ export function HuddleScreen() {
             onFocus={scrollToBottom}
             onTypingChange={sendTyping}
             mentionables={mentionables}
+            onFaceReaction={
+              pingGameState === "live" ? handleFaceReaction : undefined
+            }
           />
           </>
         )}
@@ -1228,7 +1274,7 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
   const handleSend = async (
     content: string,
     replyToId?: string,
-    media?: { uri: string; type: "image" | "audio" },
+    media?: { uri: string; type: "image" | "audio" | "video" },
   ) => {
     const nextMessage = {
       id: `own-${Date.now()}`,

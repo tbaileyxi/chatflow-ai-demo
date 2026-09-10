@@ -21,6 +21,7 @@ import {
   Sparkles,
   BarChart3,
   HelpCircle,
+  Video,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Audio } from "expo-av";
@@ -28,7 +29,7 @@ import { colors } from "@/theme/colors";
 
 type MediaAttachment = {
   uri: string;
-  type: "image" | "audio";
+  type: "image" | "audio" | "video";
 };
 
 export type Mentionable = { key: string; label: string; sublabel?: string };
@@ -46,6 +47,9 @@ type Props = {
   onTypingChange?: (isTyping: boolean) => void;
   /** Room members, for the @ autocomplete. Coach is pinned above these. */
   mentionables?: Mentionable[];
+  /** Records a short video of your face. Only passed while a game is live —
+      a "reaction" out of season is reacting to nothing. */
+  onFaceReaction?: () => void;
 };
 
 // The Coach is always first in the @ list. Typing "@" is still the fast path
@@ -77,6 +81,7 @@ export function MessageInput({
   onFocus,
   onTypingChange,
   mentionables = [],
+  onFaceReaction,
 }: Props) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
