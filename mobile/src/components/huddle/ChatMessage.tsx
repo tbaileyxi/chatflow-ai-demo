@@ -306,16 +306,17 @@ export function ChatMessage({
             // the same sender (consecutive grouping). Full padding on the
             // first message of a chain.
             isGroupedWithPrev ? "pb-0.5 pt-0" : "gap-1 py-2",
-            isOwnMessage ? "items-end" : "items-start",
+            // Everyone sits on the left, including you. Right-aligned bubbles
+            // are a two-person convention: in a room of eight they turn the
+            // thread into a zigzag and halve the usable width for no gain,
+            // since the name already says who spoke.
+            "items-start",
             isReply ? "pl-14 pr-4" : "px-4",
           )}
           style={isReply ? { borderLeftWidth: 2, borderLeftColor: colors.primary + "40", marginLeft: 16 } : undefined}
         >
           <View
-            className={cn(
-              "flex-row gap-2.5",
-              isOwnMessage && "flex-row-reverse",
-            )}
+            className={cn("flex-row gap-2.5")}
           >
             {/* Avatar — hidden on consecutive same-sender messages so chains
                 look like a single voice without the repeated circle. */}
@@ -352,10 +353,24 @@ export function ChatMessage({
             )}
 
             {/* Bubble */}
-            <View className={cn("max-w-[75%] gap-1", isOwnMessage && "items-end")}>
+            {/* Was max-w-[75%] and end-aligned for your own messages. Full
+                width now: with nothing right-aligned there is no facing edge
+                to leave room for, and a long message shouldn't wrap early to
+                preserve a gutter nobody is using. */}
+            <View className="flex-1 gap-1">
               {!message.isBotMessage && !isGroupedWithPrev ? (
                 <View className="flex-row items-center gap-2">
-                  <Text className="text-sm font-semibold text-muted-foreground">
+                  {/* With the bubbles gone this is the only thing marking where
+                      one message stops and the next starts, so it carries more
+                      weight than it used to — and your own name is gold, which
+                      is how you find yourself in a fast-moving room now that
+                      nothing is right-aligned. */}
+                  <Text
+                    className={cn(
+                      "text-[13px] font-black",
+                      isOwnMessage ? "text-primary" : "text-foreground",
+                    )}
+                  >
                     {displayName}
                   </Text>
                   <Text className="text-sm text-muted-foreground">
@@ -407,18 +422,22 @@ export function ChatMessage({
                   message.content === "🎤 Voice message") ? null : (
                 <View
                   className={cn(
-                    "rounded-2xl",
-                    // Replies render tighter so they read as secondary to the
-                    // message they answer.
-                    isReply ? "px-3 py-1.5" : "px-4 py-2.5",
-                    isOwnMessage
-                      ? "bg-primary"
-                      : message.isBotMessage
-                        ? "bg-card"
-                        : "bg-muted",
+                    // A person's words sit on the room, not in a container.
+                    // Bubbles were doing a job the name above already does —
+                    // saying where one message ends and the next begins — and
+                    // charging ~24px of horizontal padding per message for it.
+                    // The bot keeps its card and gold rule, because THAT
+                    // distinction is real: it separates a machine from the
+                    // people, which is worth spending chrome on.
+                    message.isBotMessage && "rounded-2xl bg-card",
+                    message.isBotMessage
+                      ? isReply
+                        ? "px-3 py-1.5"
+                        : "px-4 py-2.5"
+                      : "py-0.5",
                   )}
                   style={
-                    message.isBotMessage && !isOwnMessage
+                    message.isBotMessage
                       ? { borderLeftWidth: 3, borderLeftColor: colors.primary }
                       : undefined
                   }
@@ -429,9 +448,12 @@ export function ChatMessage({
                         <Text
                           className={isReply ? "text-sm" : "text-base"}
                           style={{
-                            color: isOwnMessage
-                              ? colors.primaryForeground
-                              : colors.foreground,
+                            // Was primaryForeground for your own messages —
+                            // dark ink meant to sit on the gold bubble. With
+                            // the bubble gone that is near-invisible on the
+                            // room's background.
+                            color: colors.foreground,
+                            lineHeight: isReply ? 19 : 22,
                           }}
                         >
                           {message.content}
