@@ -286,13 +286,27 @@ serve(async (req) => {
     // seeded rooms alive on the strength of news — the gate would have been
     // citing itself. The tell was 57, 56, 31 and 30 rooms sharing one exact
     // date. People don't talk in synchronised batches; pollers do.
-    const { data: liveHuddles } = await supabase
-      .from("huddles")
-      .select("team_id, member_count, is_official_team_huddle")
-      .gte("member_count", 1)
-      .or("is_official_team_huddle.is.false,is_official_team_huddle.is.null");
+    // Membership is counted from huddle_members, not huddles.member_count.
+    // That column is denormalised and maintained by hand in several places
+    // (create sets 1, approve increments, leave decrements) — one drift and a
+    // real room goes silent, or an empty one keeps getting written to.
+    //
+    // Official rooms are no longer excluded either. Ten of them have people in
+    // them, and those people were getting no news at all: the exclusion was
+    // aimed at the ~195 seeded rooms nobody joined, which the membership test
+    // already removes on its own.
+    const [membersRes, roomsRes] = await Promise.all([
+      supabase.from("huddle_members").select("huddle_id"),
+      supabase.from("huddles").select("id, team_id").not("team_id", "is", null),
+    ]);
+    const occupiedHuddleIds = new Set(
+      (membersRes.data ?? []).map((m: any) => m.huddle_id),
+    );
     const audience = new Set(
-      (liveHuddles ?? []).map((h: any) => h.team_id).filter(Boolean),
+      (roomsRes.data ?? [])
+        .filter((r: any) => occupiedHuddleIds.has(r.id))
+        .map((r: any) => r.team_id)
+        .filter(Boolean),
     );
 
     const TEAMS_PER_RUN = Number(Deno.env.get("NEWS_TEAMS_PER_RUN") || 6);

@@ -178,15 +178,32 @@ serve(async (req) => {
 
     summary.leagues = await resolveLeagues(supabase);
 
-    // Only cover teams somebody made a room for. This polled every team with
-    // any huddle, which meant 195 seeded Community rooms — 88 live plays in a
-    // day, none of them in a room a person had opened.
-    const { data: ownRooms } = await supabase
-      .from("huddles")
-      .select("team_id")
-      .not("team_id", "is", null)
-      .or("is_official_team_huddle.is.false,is_official_team_huddle.is.null");
-    const coveredTeams = new Set((ownRooms ?? []).map((r: any) => r.team_id));
+    // Only cover teams that have a room somebody is actually IN.
+    //
+    // This used to poll every team with any huddle at all — 195 seeded
+    // Community rooms, 88 live plays a day into rooms nobody had opened. The
+    // first fix narrowed it to teams with a non-official room, which helped
+    // but was wrong in both directions: it still covered user rooms with zero
+    // members, and it EXCLUDED official rooms that people had genuinely
+    // joined, so anyone sitting in a team's Community room got no live
+    // narration at all.
+    //
+    // Membership is the honest test, and it's the same one publish() applies
+    // before writing. Checking it here means a team nobody is watching never
+    // reaches the model, so it costs nothing rather than costing a generation
+    // that gets thrown away.
+    const [membersRes, roomsRes] = await Promise.all([
+      supabase.from("huddle_members").select("huddle_id"),
+      supabase.from("huddles").select("id, team_id").not("team_id", "is", null),
+    ]);
+    const occupiedHuddleIds = new Set(
+      (membersRes.data ?? []).map((m: any) => m.huddle_id),
+    );
+    const coveredTeams = new Set(
+      (roomsRes.data ?? [])
+        .filter((r: any) => occupiedHuddleIds.has(r.id))
+        .map((r: any) => r.team_id),
+    );
     summary.covered_teams = coveredTeams.size;
     // The clip posts as the same bot that narrated the play.
     const { data: botUserId } = await supabase.rpc("get_or_create_system_user");
