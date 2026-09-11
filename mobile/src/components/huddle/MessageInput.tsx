@@ -288,6 +288,24 @@ export function MessageInput({
         onTypingChange?.(true);
       },
     },
+    // Only while a game is live — a reaction to nothing is just a selfie, and
+    // the score chip it burns in has nothing to say before kickoff. The prop
+    // arrives undefined the rest of the time and the row simply isn't there.
+    //
+    // It was declared and destructured and never put in this list, so Phase
+    // 4's whole feature had no way in: the capture code shipped, the upload
+    // shipped, the renderer shipped, and nothing could reach any of it.
+    ...(onFaceReaction
+      ? [
+          {
+            key: "face",
+            label: "React with your face",
+            sub: "10 seconds, with the score on it",
+            Icon: Video,
+            run: onFaceReaction,
+          },
+        ]
+      : []),
     { key: "photo", label: "Take a photo", sub: "Camera", Icon: Camera, run: takePhoto },
     {
       key: "library",

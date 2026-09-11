@@ -92,7 +92,11 @@ export function useTeamHuddles(teamIds: string[]) {
         // a solution to it. The row still exists — the bot writes to it and
         // the /t/ landing pages read it — it just isn't offered as somewhere
         // to go.
-        if (h.is_team_room && !h.is_member) continue;
+        //
+        // Membership is not the exception it looked like: following a team
+        // auto-joins you to its community room, so "hide the ones you haven't
+        // joined" hid nothing at all. They go regardless.
+        if (h.is_team_room) continue;
         const row: TeamHuddle = {
           id: h.id,
           name: h.name,
