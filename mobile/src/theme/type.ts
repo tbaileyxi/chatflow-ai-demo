@@ -1,128 +1,168 @@
 import { Platform, type TextStyle } from "react-native";
 
 /**
- * The type system. One place that decides what a heading is.
+ * The type system, taken from the design studies rather than invented.
  *
- * WHY THIS EXISTS. Every screen was picking its own size and weight inline —
- * 151 uses of font-black, 126 of font-bold, sizes from text-[9] to text-5xl,
- * and no custom face loaded at all. The app rendered in system San Francisco
- * throughout, which is why the built screens never looked like the design: the
- * structure changed and the voice never did.
+ * THE FACES ARE NOT A CHOICE I GET TO MAKE. They are in the renderings:
+ * Outfit for display, Manrope for interface, DM Mono for data. An earlier
+ * version of this file used Archivo and JetBrains Mono because I picked them
+ * myself, and that is the single reason the built screens didn't look like the
+ * design — the structure was right, the voice was somebody else's.
  *
- * TWO FACES, DOING DIFFERENT JOBS.
+ * WHAT EACH ONE IS FOR.
  *
- * Archivo is the voice. A grotesque that holds up at 900 without turning into
- * a slab, which matters because this app shouts — scores, names, THAT'S THE
- * GAME — and a face that softens at heavy weights makes shouting look
- * apologetic.
+ * Outfit is the display face: geometric, heavy, and it holds a shout. It is
+ * used sparingly — wordmarks, screen titles, a score, a message somebody typed
+ * in capitals. Everything else is Manrope.
  *
- * JetBrains Mono is the instrument panel: eyebrows, clocks, scores, counts,
- * anything a broadcast graphic would set. Monospaced digits are the real
- * reason — a clock in a proportional face jitters as it counts down, and a
- * column of scores never lines up.
+ * Manrope is the interface and the thread. It is what people read.
+ *
+ * DM Mono is the instrument panel: eyebrows, clocks, scores, counts. The
+ * monospaced digits are the reason — a clock in a proportional face jitters as
+ * it counts down and a column of scores never lines up.
+ *
+ * SIZES COME FROM THE RENDERINGS TOO. A message is 14.5px and a shout is 19px,
+ * because that is what "Before, During, After" sets them at. I had guessed 19
+ * and 27 and made the thread look like a children's book.
  *
  * Never set fontWeight alongside these. iOS synthesises weight when a family
- * and a weight disagree, and a synthesised 900 on a face that already has one
+ * and a weight disagree, and a synthesised bold on a face that already has one
  * looks like a smear. The family IS the weight.
  */
 
 export const fonts = {
-  display: "Archivo_900Black",
-  bold: "Archivo_700Bold",
-  semibold: "Archivo_600SemiBold",
-  medium: "Archivo_500Medium",
-  regular: "Archivo_400Regular",
-  mono: "JetBrainsMono_500Medium",
-  monoBold: "JetBrainsMono_700Bold",
+  display: "Outfit_800ExtraBold",
+  displayBold: "Outfit_700Bold",
+  displaySemi: "Outfit_600SemiBold",
+
+  extrabold: "Manrope_800ExtraBold",
+  bold: "Manrope_700Bold",
+  semibold: "Manrope_600SemiBold",
+  medium: "Manrope_500Medium",
+  regular: "Manrope_400Regular",
+
+  mono: "DMMono_400Regular",
+  monoMedium: "DMMono_500Medium",
 } as const;
 
-/**
- * A scale, not a pile of numbers. Each step is a job.
- *
- * The jumps are deliberately large between display and body: a room is scanned,
- * not read, and near-adjacent sizes read as a mistake rather than a hierarchy.
- */
 export const type = {
-  /** The one thing on screen that is the screen. Home's wordmark, a score. */
+  /** The wordmark, and nothing else on a screen. */
   display: {
     fontFamily: fonts.display,
     fontSize: 30,
-    lineHeight: 34,
-    letterSpacing: -0.8,
+    lineHeight: 33,
+    letterSpacing: -0.75,
   },
   /** Screen titles. */
   title: {
     fontFamily: fonts.display,
-    fontSize: 22,
-    lineHeight: 26,
-    letterSpacing: -0.4,
+    fontSize: 21,
+    lineHeight: 25,
+    letterSpacing: -0.42,
   },
-  /** A room name, a person's name above what they said. */
+  /** A room name, a section heading. */
   heading: {
-    fontFamily: fonts.bold,
+    fontFamily: fonts.extrabold,
     fontSize: 16,
     lineHeight: 21,
-    letterSpacing: -0.2,
+    letterSpacing: -0.16,
   },
-  /** What people actually say. The most-rendered style in the app. */
+  /**
+   * WHAT PEOPLE SAY. 14.5 in the rendering — dense on purpose, because with no
+   * bubbles the density costs nothing and a room is a lot of short lines.
+   */
+  message: {
+    fontFamily: fonts.regular,
+    fontSize: 14.5,
+    lineHeight: 21,
+  },
+  /**
+   * A SHOUT. Someone typed in capitals and meant it.
+   *
+   * 19px and heavy — noticeably bigger than a sentence, not a different
+   * document. "THAT'S THE GAME" is the loudest thing in the thread and it
+   * should look it without taking the screen over.
+   */
+  shout: {
+    fontFamily: fonts.extrabold,
+    fontSize: 19,
+    lineHeight: 24,
+    letterSpacing: -0.19,
+  },
+  /** A person's name above what they said. Small, heavy, in their colour. */
+  speaker: {
+    fontFamily: fonts.extrabold,
+    fontSize: 11,
+    lineHeight: 14,
+    letterSpacing: 0.11,
+  },
   body: {
     fontFamily: fonts.regular,
-    fontSize: 15,
+    fontSize: 14.5,
     lineHeight: 21,
   },
   bodyStrong: {
-    fontFamily: fonts.semibold,
-    fontSize: 15,
+    fontFamily: fonts.bold,
+    fontSize: 14.5,
     lineHeight: 21,
   },
-  /** Second lines: who's in a room, when a game starts. */
   caption: {
     fontFamily: fonts.regular,
-    fontSize: 13,
+    fontSize: 12.5,
     lineHeight: 17,
   },
   captionStrong: {
-    fontFamily: fonts.medium,
-    fontSize: 13,
+    fontFamily: fonts.semibold,
+    fontSize: 12.5,
     lineHeight: 17,
   },
   /**
-   * SECTION LABELS. Mono, uppercase, tracked out — the broadcast lower-third
-   * convention, and the thing that makes a screen read as designed rather than
-   * assembled. Always paired with `textTransform: "uppercase"`.
+   * SECTION LABELS. Mono, uppercase, tracked far out — the broadcast
+   * lower-third convention, and the thing that makes a screen read as designed
+   * rather than assembled.
    */
   eyebrow: {
-    fontFamily: fonts.monoBold,
-    fontSize: 11,
-    lineHeight: 14,
-    letterSpacing: 1.6,
+    fontFamily: fonts.monoMedium,
+    fontSize: 10,
+    lineHeight: 13,
+    letterSpacing: 1.7,
     textTransform: "uppercase",
   },
-  /** Clocks, scores, counts. Tabular by construction. */
+  /** Clocks, scores, counts, timestamps. */
   data: {
     fontFamily: fonts.mono,
-    fontSize: 12,
-    lineHeight: 16,
-    letterSpacing: 0.2,
+    fontSize: 11,
+    lineHeight: 15,
+    letterSpacing: 0.1,
   },
   dataStrong: {
-    fontFamily: fonts.monoBold,
-    fontSize: 13,
-    lineHeight: 17,
-    letterSpacing: 0.2,
+    fontFamily: fonts.monoMedium,
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: 0.1,
   },
-  /** Buttons. */
+  /**
+   * A SCORELINE. The only digits allowed to be loud, and tabular so they don't
+   * shuffle sideways as they change.
+   */
+  score: {
+    fontFamily: fonts.display,
+    fontSize: 14,
+    lineHeight: 17,
+    letterSpacing: -0.14,
+    fontVariant: ["tabular-nums"],
+  },
   button: {
     fontFamily: fonts.bold,
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 14.5,
+    lineHeight: 19,
     letterSpacing: -0.1,
   },
 } satisfies Record<string, TextStyle>;
 
 /**
- * Spacing steps. Four-point grid, named by intent rather than size so a row
- * gap and a section gap can't drift apart screen to screen.
+ * Spacing steps. Four-point grid, named by intent rather than size so a row gap
+ * and a section gap can't drift apart screen to screen.
  */
 export const space = {
   hair: 2,
@@ -134,18 +174,15 @@ export const space = {
   section: 32,
 } as const;
 
+/** From the renderings: 15 on a reaction tile, 13 on a card, 26 on a composer. */
 export const radius = {
   chip: 999,
-  control: 12,
-  card: 16,
-  sheet: 24,
+  control: 13,
+  tile: 15,
+  card: 14,
+  sheet: 26,
 } as const;
 
-/**
- * Shadows are for the one thing that floats, not for every card. Android
- * elevation and iOS shadow are different enough that a shared helper is the
- * only way they stay in step.
- */
 export const lift = Platform.select({
   ios: {
     shadowColor: "#000",

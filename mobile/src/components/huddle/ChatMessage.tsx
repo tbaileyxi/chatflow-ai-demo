@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { blockUser, reportMessage } from "@/lib/moderation";
 import { shareMedia } from "@/lib/shareMedia";
+import { personColor } from "@/lib/personColor";
 import { colors } from "@/theme/colors";
 import { FadeCardInMessage } from "@/components/huddle/FadeCardInMessage";
 import { PulseBubble } from "@/components/huddle/PulseBubble";
@@ -252,6 +253,30 @@ export function ChatMessage({
         ? "@coach"
       : message.displayName ?? message.username ?? "User";
   const initial = message.isBotMessage ? "SH" : displayName.charAt(0).toUpperCase();
+
+  /**
+   * Everybody gets a colour, and it follows them: the ring on their avatar and
+   * their name are the same. In five people arguing about a game, knowing who
+   * is talking at a glance IS the interface — you should track a conversation
+   * by colour before reading a word of it.
+   */
+  const who = message.isBotMessage
+    ? colors.primary
+    : personColor(message.userId, isOwnMessage);
+
+  /**
+   * A SHOUT. Someone typed in capitals and meant it, and rendering THAT'S THE
+   * GAME at the same size as "ok" flattens the one moment a room exists for.
+   *
+   * Needs letters, needs length — "OK" and "LOL" are not shouting, they are
+   * abbreviations, and setting them at 27pt would be a joke at their expense.
+   */
+  const isShout = (() => {
+    const t = (message.content ?? "").trim();
+    if (t.length < 6 || t.length > 60) return false;
+    if (!/[A-Za-z]/.test(t)) return false;
+    return t === t.toUpperCase() && /[A-Z]{4,}/.test(t);
+  })();
   const navigation = useNavigation<any>();
 
   const handleDoubleTap = () => {
@@ -417,10 +442,8 @@ export function ChatMessage({
                     knownAs: displayName,
                   })
                 }
-                className={cn(
-                  "h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-muted",
-                  message.isBotMessage && "border-2 border-primary",
-                )}
+                className="h-9 w-9 items-center justify-center overflow-hidden rounded-full"
+                style={{ backgroundColor: message.avatarUrl ? colors.muted : who }}
               >
                 {message.avatarUrl ? (
                   <Image
@@ -428,7 +451,7 @@ export function ChatMessage({
                     className="h-full w-full"
                   />
                 ) : (
-                  <Type variant="captionStrong" tone="muted">
+                  <Type variant="speaker" style={{ color: "#000000", fontSize: 12 }}>
                     {initial}
                   </Type>
                 )}
@@ -448,14 +471,9 @@ export function ChatMessage({
                       weight than it used to — and your own name is gold, which
                       is how you find yourself in a fast-moving room now that
                       nothing is right-aligned. */}
-                  <Text
-                    className={cn(
-                      "text-[13px] font-black",
-                      isOwnMessage ? "text-primary" : "text-foreground",
-                    )}
-                  >
+                  <Type variant="speaker" style={{ color: who }}>
                     {displayName}
-                  </Text>
+                  </Type>
                   <Type variant="caption" tone="muted">
                     {formatTime(message.createdAt)}
                   </Type>
