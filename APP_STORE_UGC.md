@@ -137,3 +137,21 @@ deleted the message, or the problem was the profile itself, there was no route
 at all — and the profile is where a reviewer looks first. Both now sit on
 `PublicProfileScreen`, and `message_reports.message_id` is nullable so a report
 can name a person rather than a message (`RUN_THIS_NEXT.sql`).
+
+
+---
+
+## Retention — corrected 2026-09-11
+
+The Terms used to say media was "stored for up to 90 days and then deleted
+automatically." **Nothing in the codebase ever did that** — no TTL, no cleanup
+job. A published promise to delete that we did not keep is worse than no
+promise at all, and worse than the reverse.
+
+The product decision is that a huddle should become a memory of the event
+rather than evaporate, so the text now matches the behaviour: nothing expires,
+and removal is by hand — your own messages, an owner or admin removing anything
+in their room, or account deletion taking your messages with it.
+
+**If a retention window is ever wanted, build the job first and change the text
+second.**
