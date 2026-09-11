@@ -1,5 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, Pressable, Text, View } from "react-native";
+import { colors } from "@/theme/colors";
+import { radius } from "@/theme/type";
 import type { LiveReaction } from "@/hooks/useHuddlePresence";
 
 /**
@@ -29,10 +31,25 @@ export function ReactionRail({
   onReact: (emoji: string) => void;
   disabled?: boolean;
 }) {
+  // The rendering shows one tile lit. It is the last one you used — a room has
+  // a mood, and yours is usually the same emoji four times in a row.
+  const [armed, setArmed] = useState<string>(RAIL_EMOJIS[0]);
   return (
-    <View className="flex-row gap-2 px-3 pb-1 pt-2">
+    /* 50px tall and a quarter of the width each, per the rendering: nothing
+       you tap lives at the top of the screen, and these are the most-tapped
+       controls in the app. */
+    <View style={{ flexDirection: "row", gap: 7, paddingHorizontal: 12, paddingBottom: 4, paddingTop: 4 }}>
       {RAIL_EMOJIS.map((e) => (
-        <RailButton key={e} emoji={e} onPress={() => onReact(e)} disabled={disabled} />
+        <RailButton
+          key={e}
+          emoji={e}
+          armed={e === armed}
+          onPress={() => {
+            setArmed(e);
+            onReact(e);
+          }}
+          disabled={disabled}
+        />
       ))}
     </View>
   );
@@ -42,10 +59,13 @@ function RailButton({
   emoji,
   onPress,
   disabled,
+  armed,
 }: {
   emoji: string;
   onPress: () => void;
   disabled?: boolean;
+  /** The one you reached for last, carrying gold. */
+  armed?: boolean;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -75,10 +95,17 @@ function RailButton({
     <Pressable
       onPress={fire}
       disabled={disabled}
-      className="h-12 flex-1 items-center justify-center rounded-2xl border border-border bg-card active:opacity-70"
-      style={disabled ? { opacity: 0.4 } : undefined}
+      className="flex-1 items-center justify-center active:opacity-70"
+      style={{
+        height: 50,
+        borderRadius: radius.tile,
+        borderWidth: 1,
+        borderColor: armed ? colors.primary : "#24242A",
+        backgroundColor: armed ? "rgba(245,197,24,0.14)" : colors.card,
+        opacity: disabled ? 0.4 : 1,
+      }}
     >
-      <Animated.Text style={{ fontSize: 24, transform: [{ scale }] }}>
+      <Animated.Text style={{ fontSize: 22, transform: [{ scale }] }}>
         {emoji}
       </Animated.Text>
     </Pressable>

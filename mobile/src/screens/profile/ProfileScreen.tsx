@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { View, Text, Image, Alert, Pressable, Keyboard, Linking } from "react-native";
+import { Alert, Image, Keyboard, Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import {
@@ -28,6 +28,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { NotificationSettings } from "@/components/profile/NotificationSettings";
 import { FindYourPeople } from "@/components/profile/FindYourPeople";
 import { RoomsYouRun } from "@/components/profile/RoomsYouRun";
+import { ProfileHeader } from "@/components/profile/ProfileHeader";
+import { TeamPicker } from "@/components/profile/TeamPicker";
 import { Separator } from "@/components/ui/separator";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ScreenWrapper } from "@/components/ui/screen-wrapper";
@@ -81,6 +83,9 @@ export function ProfileScreen() {
   const [bio, setBio] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  // Teams are editable from here now — the picker used to live only in
+  // onboarding, so after day one you could never add or drop one.
+  const [editingTeams, setEditingTeams] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -282,6 +287,22 @@ export function ProfileScreen() {
     return `${Math.floor(diffHours / 24)}d`;
   };
 
+  if (editingTeams) {
+    return (
+      <ScreenWrapper>
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+          <TeamPicker
+            title="Your teams"
+            subtitle="Add or drop as many as you like. This decides which rooms find you and which bot talks in them."
+            ctaLabel="Done"
+            onDone={() => setEditingTeams(false)}
+            onSkip={() => setEditingTeams(false)}
+          />
+        </ScrollView>
+      </ScreenWrapper>
+    );
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
       <ScreenWrapper scroll className="gap-4 pt-2">
@@ -295,35 +316,23 @@ export function ProfileScreen() {
           )}
         </View>
 
-        {/* Avatar */}
-        <View className="items-center gap-2 py-4">
-          <Pressable
-            className="h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-muted active:opacity-80"
-            onPress={handlePickAvatar}
-            disabled={uploadingAvatar}
-          >
-            {profile?.avatarUrl ? (
-              <Image
-                source={{ uri: profile.avatarUrl }}
-                className="h-full w-full"
-                resizeMode="cover"
-              />
-            ) : (
-              <Type variant="display" tone="muted">
-                {initial}
-              </Type>
-            )}
-            <View className="absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-primary">
-              <Camera color={colors.primaryForeground} size={16} />
-            </View>
-          </Pressable>
-          <Type variant="captionStrong" tone="primary">
-            {uploadingAvatar ? "Uploading..." : "Tap photo to upload"}
+        {/* Built to the "Getting in, getting people" rendering: avatar with the
+            pencil on it, name, handle, TEAMS AS CHIPS with ＋ Add, and three
+            counts that mean you have a place here. The old block was a big
+            circle and the words "Tap photo to upload". */}
+        <ProfileHeader
+          displayName={displayName || profile?.displayName || ""}
+          username={username || profile?.username || null}
+          avatarUrl={profile?.avatarUrl ?? null}
+          joinedAt={(profile as any)?.createdAt ?? null}
+          onEdit={handlePickAvatar}
+          onAddTeams={() => setEditingTeams(true)}
+        />
+        {uploadingAvatar ? (
+          <Type center variant="caption" tone="primary" className="mt-2">
+            Uploading…
           </Type>
-          <Type variant="caption" tone="muted">
-            {user?.phone ?? user?.email ?? ""}
-          </Type>
-        </View>
+        ) : null}
 
         {OFFICIAL_HUDDLES_ENABLED && (
           <Card className="border-primary/25 bg-primary/5">
