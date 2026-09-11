@@ -5,7 +5,6 @@ import {
   Animated,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,14 +18,26 @@ import type { RootStackParamList } from "@/navigation/types";
 
 type Route = RouteProp<RootStackParamList, "DualCam">;
 
+/** Hold past this and the button latches, so you can let go and reframe. */
+const LOCK_AFTER_MS = 1200;
+/** Below this a press is a tap, not a very short film. */
+const TAP_MS = 350;
+
 /**
- * Both cameras, ten seconds, hold to record.
+ * Both cameras. Tap for a photo, hold to record.
  *
- * The back camera is the frame and your face sits in the corner — the same
+ * WHY IT LATCHES. Holding a button while pointing a phone at a television is a
+ * two-hand job, and the moment worth filming is exactly the one you need both
+ * hands to line up for. So a hold past 1.2 seconds locks: let go, frame the
+ * shot, tap again to stop. Short holds still behave the way every camera app
+ * has trained people — press, film, release — because that is what a
+ * three-second reaction wants.
+ *
+ * The back camera is the frame and your face sits in the corner, the same
  * arrangement the recorder composites, so what you line up is what you get.
  *
  * The score line sits under the preview rather than over it. It is burned into
- * the message, not the video: rendering it as part of the frame would bake a
+ * the message, not the video: rendering it into the frame would bake a
  * scoreboard into a file we cannot correct if the feed was wrong, and it would
  * be unreadable at thumbnail size anyway.
  */
@@ -37,9 +48,27 @@ export function DualCamScreen() {
 
   const [ready, setReady] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [locked, setLocked] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const ring = useRef(new Animated.Value(0)).current;
+  const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressedAt = useRef(0);
+  // Interval and timeout callbacks close over the render that created them, so
+  // the live values have to live in refs rather than state.
+  const recordingRef = useRef(false);
+  const lockedRef = useRef(false);
+
+  const clearTimers = () => {
+    if (timer.current) {
+      clearInterval(timer.current);
+      timer.current = null;
+    }
+    if (lockTimer.current) {
+      clearTimeout(lockTimer.current);
+      lockTimer.current = null;
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -54,63 +83,122 @@ export function DualCamScreen() {
         );
         return;
       }
-      setReady(true);
+      // Bring the session up before anybody touches anything. A tap has to
+      // produce a photo immediately, and a camera that only starts on first
+      // press misses the thing the press was for.
+      await DualCam.prepare();
+      if (alive) setReady(true);
     })();
 
     return () => {
       alive = false;
-      if (timer.current) clearInterval(timer.current);
+      clearTimers();
       // Two live camera inputs is the most expensive thing this app can leave
       // running. Never rely on the screen unmounting quietly.
       DualCam.dismiss();
     };
   }, [navigation]);
 
-  const finish = useCallback(async () => {
-    if (timer.current) {
-      clearInterval(timer.current);
-      timer.current = null;
-    }
+  const hand = useCallback(
+    (uri: string, isVideo: boolean) => {
+      route.params?.onCapture?.({ uri, context: gameContext, isVideo });
+      navigation.goBack();
+    },
+    [gameContext, navigation, route.params],
+  );
+
+  const stopRecording = useCallback(async () => {
+    clearTimers();
+    recordingRef.current = false;
+    lockedRef.current = false;
     setRecording(false);
-    ring.stopAnimation();
-    ring.setValue(0);
+    setLocked(false);
 
     try {
       const { uri } = await DualCam.stop();
-      route.params?.onCapture?.({ uri, context: gameContext });
-      navigation.goBack();
+      hand(uri, true);
     } catch (err: any) {
       Alert.alert("Couldn't save that", err?.message ?? "Try again in a moment.");
     }
-  }, [gameContext, navigation, ring, route.params]);
+  }, [hand]);
 
-  const begin = useCallback(async () => {
-    if (recording || !ready) return;
+  const takePhoto = useCallback(async () => {
+    try {
+      const uri = await DualCam.capturePhoto();
+      hand(uri, false);
+    } catch (err: any) {
+      Alert.alert("Couldn't take that", err?.message ?? "Try again in a moment.");
+    }
+  }, [hand]);
+
+  const beginRecording = useCallback(async () => {
     try {
       await DualCam.start();
     } catch (err: any) {
       Alert.alert("Couldn't start", err?.message ?? "Try again in a moment.");
       return;
     }
-
+    recordingRef.current = true;
     setRecording(true);
     setElapsed(0);
-
-    Animated.timing(ring, {
-      toValue: 1,
-      duration: MAX_SECONDS * 1000,
-      useNativeDriver: false,
-    }).start();
 
     timer.current = setInterval(() => {
       setElapsed((n) => {
         const next = n + 0.1;
-        // Stop ourselves at the cap rather than trusting a finger to let go.
-        if (next >= MAX_SECONDS) finish();
+        // Stop ourselves at the cap rather than trusting a finger to let go —
+        // a latched recording has no finger on it at all.
+        if (next >= MAX_SECONDS) void stopRecording();
         return next;
       });
     }, 100);
-  }, [finish, ready, recording, ring]);
+  }, [stopRecording]);
+
+  const onPressIn = useCallback(() => {
+    if (!ready) return;
+    // While latched the next press means stop, handled in onPress.
+    if (lockedRef.current) return;
+
+    pressedAt.current = Date.now();
+    lockTimer.current = setTimeout(() => {
+      if (recordingRef.current) {
+        lockedRef.current = true;
+        setLocked(true);
+      }
+    }, LOCK_AFTER_MS);
+
+    void beginRecording();
+  }, [beginRecording, ready]);
+
+  const onPressOut = useCallback(() => {
+    if (!ready) return;
+    if (lockedRef.current) return; // hands-free; wait for the stop tap
+
+    if (lockTimer.current) {
+      clearTimeout(lockTimer.current);
+      lockTimer.current = null;
+    }
+
+    const held = Date.now() - pressedAt.current;
+
+    // A quick press is a photo, not a quarter-second film. Recording starts on
+    // press-down either way — waiting to find out which it was would miss the
+    // first moment of every clip — so a tap throws that fragment away.
+    if (held < TAP_MS) {
+      clearTimers();
+      recordingRef.current = false;
+      setRecording(false);
+      DualCam.stop().catch(() => {});
+      void takePhoto();
+      return;
+    }
+
+    void stopRecording();
+  }, [ready, stopRecording, takePhoto]);
+
+  const onPress = useCallback(() => {
+    // Only meaningful while latched: the tap that ends a hands-free recording.
+    if (lockedRef.current) void stopRecording();
+  }, [stopRecording]);
 
   return (
     <SafeAreaView className="flex-1 bg-black" edges={["top", "bottom"]}>
@@ -134,25 +222,31 @@ export function DualCamScreen() {
         {gameContext ? (
           <View className="absolute bottom-44 left-0 right-0 items-center px-6">
             <View className="rounded-full bg-black/70 px-4 py-2">
-              <Type variant="dataStrong">
-                {gameContext}
-              </Type>
+              <Type variant="dataStrong">{gameContext}</Type>
             </View>
           </View>
         ) : null}
 
         <View className="absolute bottom-0 left-0 right-0 items-center pb-10">
-          <Type variant={recording ? "dataStrong" : "captionStrong"} tone="muted" className="mb-3">
-            {recording
-              ? `${Math.min(elapsed, MAX_SECONDS).toFixed(1)}s`
-              : `Hold to record · ${MAX_SECONDS}s max`}
+          <Type
+            variant={recording ? "dataStrong" : "captionStrong"}
+            tone={locked ? "primary" : "muted"}
+            className="mb-3"
+          >
+            {locked
+              ? `${Math.min(elapsed, MAX_SECONDS).toFixed(1)}s · tap to stop`
+              : recording
+                ? `${Math.min(elapsed, MAX_SECONDS).toFixed(1)}s`
+                : "Tap for a photo · hold to record"}
           </Type>
 
           <Pressable
-            onPressIn={begin}
-            onPressOut={() => recording && finish()}
+            onPressIn={onPressIn}
+            onPressOut={onPressOut}
+            onPress={onPress}
             disabled={!ready}
-            className="h-20 w-20 items-center justify-center rounded-full border-4 border-white/80"
+            className="h-20 w-20 items-center justify-center rounded-full border-4"
+            style={{ borderColor: locked ? colors.primary : "rgba(255,255,255,0.8)" }}
           >
             <Animated.View
               style={{

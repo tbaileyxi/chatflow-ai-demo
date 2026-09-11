@@ -29,6 +29,19 @@ public class DualCamModule: Module {
       return ["camera": camera, "microphone": microphone]
     }
 
+    /// Brings the session up without recording, so a tap-for-photo works
+    /// before anybody has held the button.
+    AsyncFunction("prepare") { () -> Bool in
+      guard DualCamRecorder.isSupported else { return false }
+      if self.recorder == nil {
+        let recorder = DualCamRecorder()
+        try recorder.configure()
+        recorder.startSession()
+        self.recorder = recorder
+      }
+      return true
+    }
+
     AsyncFunction("start") { () -> String in
       guard DualCamRecorder.isSupported else {
         throw Exception(name: "ERR_UNSUPPORTED", description: "This iPhone can't record both cameras at once.")
@@ -43,6 +56,20 @@ public class DualCamModule: Module {
 
       let url = try recorder.startRecording()
       return url.absoluteString
+    }
+
+    /// A tap. One composited frame as a JPEG, same framing as the clip.
+    AsyncFunction("capturePhoto") { (promise: Promise) in
+      guard let recorder = self.recorder else {
+        promise.reject("ERR_NOT_READY", "Camera isn't running.")
+        return
+      }
+      recorder.capturePhoto { result in
+        switch result {
+        case .success(let url): promise.resolve(url.absoluteString)
+        case .failure(let error): promise.reject("ERR_PHOTO_FAILED", error.localizedDescription)
+        }
+      }
     }
 
     AsyncFunction("stop") { (promise: Promise) in

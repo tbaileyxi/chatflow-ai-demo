@@ -66,6 +66,11 @@ final class DualCamRecorder: NSObject {
 
   /// The newest front frame, drawn into the next back frame that arrives.
   private var latestFrontImage: CIImage?
+  /// The newest back frame, kept so a still can be taken without spinning up a
+  /// separate AVCapturePhotoOutput. A photo here is one composited frame of the
+  /// same thing the preview is already showing, which is also the only way the
+  /// still and the clip can be guaranteed to look alike.
+  private var latestBackImage: CIImage?
 
   private let ciContext = CIContext(options: [.cacheIntermediates: false])
 
@@ -260,6 +265,46 @@ final class DualCamRecorder: NSObject {
     }
   }
 
+  /**
+   A still: one composited frame, written as a JPEG.
+
+   Taken off the video data output rather than a separate AVCapturePhotoOutput.
+   A photo output would give a higher-resolution frame, but it would also be a
+   different framing from the preview and from the clip — a still and a video of
+   the same moment ought to look like the same moment, and on a multi-cam
+   session a third output is more contention for a session already running two.
+   */
+  func capturePhoto(completion: @escaping (Result<URL, Error>) -> Void) {
+    bufferQueue.async { [weak self] in
+      guard let self, let back = self.latestBackImage else {
+        completion(.failure(RecorderError.notRecording))
+        return
+      }
+
+      let frame = self.composite(back: back, front: self.latestFrontImage)
+      guard let cg = self.ciContext.createCGImage(frame, from: CGRect(origin: .zero, size: self.renderSize)) else {
+        completion(.failure(RecorderError.configurationFailed("Couldn't render the photo.")))
+        return
+      }
+
+      let image = UIImage(cgImage: cg)
+      let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("reaction-\(UUID().uuidString).jpg")
+
+      guard let data = image.jpegData(compressionQuality: 0.9) else {
+        completion(.failure(RecorderError.configurationFailed("Couldn't encode the photo.")))
+        return
+      }
+
+      do {
+        try data.write(to: url)
+        completion(.success(url))
+      } catch {
+        completion(.failure(error))
+      }
+    }
+  }
+
   // MARK: - Composite
 
   /**
@@ -326,6 +371,10 @@ extension DualCamRecorder: AVCaptureVideoDataOutputSampleBufferDelegate,
       guard let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
       latestFrontImage = CIImage(cvPixelBuffer: pixels)
       return
+    }
+
+    if output === backOutput, let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) {
+      latestBackImage = CIImage(cvPixelBuffer: pixels)
     }
 
     guard isWriting, let writer, writer.status == .writing else { return }

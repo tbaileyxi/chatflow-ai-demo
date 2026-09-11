@@ -12,6 +12,10 @@ import type { ViewProps } from "react-native";
 type DualCamNativeModule = {
   isSupported(): boolean;
   requestPermissions(): Promise<{ camera: boolean; microphone: boolean }>;
+  /** Brings the session up without recording, so a tap works immediately. */
+  prepare(): Promise<boolean>;
+  /** One composited frame as a JPEG. Resolves with its file URI. */
+  capturePhoto(): Promise<string>;
   /** Begins writing. Resolves with the file URI it will write to. */
   start(): Promise<string>;
   /** Finishes the file. Resolves with the final URI and its size on disk. */
@@ -42,6 +46,11 @@ export const DualCam = {
   },
   requestPermissions: () =>
     native?.requestPermissions() ?? Promise.resolve({ camera: false, microphone: false }),
+  prepare: () => native?.prepare() ?? Promise.resolve(false),
+  capturePhoto: () => {
+    if (!native) return Promise.reject(new Error("Camera isn't available on this device."));
+    return native.capturePhoto();
+  },
   start: () => {
     if (!native) return Promise.reject(new Error("Dual camera isn't available on this device."));
     return native.start();

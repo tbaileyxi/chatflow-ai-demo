@@ -288,7 +288,7 @@ export function HuddleScreen() {
    * with the final score — which would quietly destroy the only reason these
    * are worth keeping.
    */
-  const postFaceReaction = useCallback(async (shot: { uri: string; context: string | null }) => {
+  const postFaceReaction = useCallback(async (shot: { uri: string; context: string | null; isVideo?: boolean }) => {
     if (!user) return;
 
     // Positional, and the signature is
@@ -300,7 +300,7 @@ export function HuddleScreen() {
       shot.context ?? "",
       user.id,
       undefined,
-      { uri: shot.uri, type: "video" },
+      { uri: shot.uri, type: shot.isVideo === false ? "image" : "video" },
       {
         senderName: profile?.displayName ?? profile?.username ?? "Someone",
         huddleName: huddle?.name ?? "",
@@ -334,7 +334,7 @@ export function HuddleScreen() {
     if (DualCam.isSupported()) {
       navigation.navigate("DualCam", {
         gameContext: label,
-        onCapture: (shot: { uri: string; context: string | null }) => {
+        onCapture: (shot: { uri: string; context: string | null; isVideo: boolean }) => {
           void postFaceReaction(shot);
         },
       });

@@ -46,7 +46,7 @@ export type RootStackParamList = {
   DualCam: {
     /** Score line at the moment of recording, burned into the message. */
     gameContext: string | null;
-    onCapture?: (shot: { uri: string; context: string | null }) => void;
+    onCapture?: (shot: { uri: string; context: string | null; isVideo: boolean }) => void;
   };
 };
 
