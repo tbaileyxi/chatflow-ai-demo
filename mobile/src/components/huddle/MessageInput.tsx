@@ -270,6 +270,9 @@ export function MessageInput({
   // and showing where they'll live costs nothing while building them properly
   // is its own piece of work — an empty menu teaches nobody what this button
   // is for.
+  // Ask Coach and the camera both have permanent buttons in the row now, so
+  // neither is listed here. A sheet row that duplicates a visible button is the
+  // two-doors-to-one-place problem that got the Coach tab removed.
   const plusActions: {
     key: string;
     label: string;
@@ -279,43 +282,12 @@ export function MessageInput({
     soon?: boolean;
   }[] = [
     {
-      key: "coach",
-      label: "Ask Coach",
-      sub: "About the game, or this room",
-      Icon: Sparkles,
-      run: () => {
-        const next = text.trim() ? `${text.trim()} @coach ` : "@coach ";
-        setText(next);
-        onTypingChange?.(true);
-      },
-    },
-    // Only while a game is live — a reaction to nothing is just a selfie, and
-    // the score chip it burns in has nothing to say before kickoff. The prop
-    // arrives undefined the rest of the time and the row simply isn't there.
-    //
-    // It was declared and destructured and never put in this list, so Phase
-    // 4's whole feature had no way in: the capture code shipped, the upload
-    // shipped, the renderer shipped, and nothing could reach any of it.
-    ...(onFaceReaction
-      ? [
-          {
-            key: "face",
-            label: "React with your face",
-            sub: "10 seconds, with the score on it",
-            Icon: Video,
-            run: onFaceReaction,
-          },
-        ]
-      : []),
-    { key: "photo", label: "Take a photo", sub: "Camera", Icon: Camera, run: takePhoto },
-    {
       key: "library",
       label: "From your library",
       sub: "Photos",
       Icon: ImageIcon,
       run: pickFromLibrary,
     },
-    { key: "voice", label: "Voice message", sub: "Hold to talk", Icon: Mic, run: startRecording },
     { key: "poll", label: "Poll", sub: "Ask the room", Icon: BarChart3, soon: true },
     { key: "trivia", label: "Trivia", sub: "Start a round", Icon: HelpCircle, soon: true },
   ];
@@ -471,15 +443,42 @@ export function MessageInput({
               ＋ is what makes room for everything else that wants to be here —
               the Coach especially, which until now had no visible entry point
               at all and could only be found by knowing to type "@". */}
+          {/* THE CAMERA, BIG, ON THE LEFT. The rendering's ◉ — a white disc,
+              the most prominent thing in the row, because capture is the point
+              of being in a room with a game on.
+
+              It was a ＋ opening a sheet, which put the camera three taps and a
+              menu away from a moment that lasts two seconds. Tap for a photo,
+              hold to record — the same gesture as the capture screen itself.
+
+              Long-press-and-hold on the ＋ still reaches the rest (library,
+              poll, trivia) via the small chevron beside it. */}
+          <Pressable
+            onPress={onFaceReaction ?? takePhoto}
+            onLongPress={() => {
+              Keyboard.dismiss();
+              setShowPlus(true);
+            }}
+            delayLongPress={260}
+            className="h-11 w-11 items-center justify-center rounded-full active:opacity-80"
+            style={{ backgroundColor: colors.foreground }}
+            hitSlop={4}
+          >
+            <Camera color="#000000" size={20} />
+          </Pressable>
+
+          {/* The rest of the ＋ sheet is still reachable, just no longer the
+              first thing your thumb lands on. */}
           <Pressable
             onPress={() => {
               Keyboard.dismiss();
               setShowPlus(true);
             }}
-            className="h-10 w-10 items-center justify-center rounded-full bg-muted active:opacity-70"
-            hitSlop={4}
+            className="h-8 w-8 items-center justify-center rounded-full active:opacity-70"
+            style={{ backgroundColor: colors.muted }}
+            hitSlop={6}
           >
-            <Plus color={colors.foreground} size={22} />
+            <Plus color={colors.mutedForeground} size={16} />
           </Pressable>
 
           {/* Text input */}
@@ -502,14 +501,39 @@ export function MessageInput({
             onBlur={() => onTypingChange?.(false)}
           />
 
-          {/* Send button */}
+          {/* ＋ · text · RECORD, and the record button becomes Send once there
+              is something to send.
+
+              A Send button greyed out at 40% is the most common state of this
+              row and it does nothing — meanwhile the voice note, which is the
+              fastest way to say something while a game is on, was three taps
+              down inside the ＋ sheet. One button, and it is always the one
+              that applies. */}
           <Pressable
-            className="h-10 w-10 items-center justify-center rounded-full bg-primary active:opacity-80"
-            onPress={handleSend}
-            disabled={!canSend}
-            style={{ opacity: canSend ? 1 : 0.4 }}
+            className="h-10 w-10 items-center justify-center rounded-full active:opacity-80"
+            onPress={
+              canSend
+                ? handleSend
+                : () => {
+                    const next = text.trim() ? `${text.trim()} @coach ` : "@coach ";
+                    setText(next);
+                    onTypingChange?.(true);
+                  }
+            }
+            disabled={disabled}
+            style={{
+              backgroundColor: canSend ? colors.primary : "rgba(245,197,24,0.14)",
+              borderWidth: canSend ? 0 : 1,
+              borderColor: "rgba(245,197,24,0.4)",
+            }}
           >
-            <Send color={colors.primaryForeground} size={18} />
+            {canSend ? (
+              <Send color={colors.primaryForeground} size={18} />
+            ) : (
+              <Type variant="dataStrong" tone="primary" style={{ fontSize: 15 }}>
+                @
+              </Type>
+            )}
           </Pressable>
         </View>
         </>
