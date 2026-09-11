@@ -13,7 +13,11 @@
 -- A private room you are not in never appears. That matches huddle_messages,
 -- where anon read of a public room's chat is the browsing feature.
 
-CREATE OR REPLACE FUNCTION public.huddles_for_teams(
+-- CREATE OR REPLACE cannot change a function's return type, and this one
+-- gained is_team_room after it was first run. Drop, then recreate.
+DROP FUNCTION IF EXISTS public.huddles_for_teams(uuid[], integer);
+
+CREATE FUNCTION public.huddles_for_teams(
   p_team_ids uuid[],
   p_limit    integer DEFAULT 60
 )
