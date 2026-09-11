@@ -161,19 +161,18 @@ function TeamBlock({
               so it sits with the team rather than being repeated on every
               room underneath it. */}
           {game ? (
-            <Text
-              className={cn(
-                "mt-0.5 text-[11px]",
-                live ? "font-bold text-primary" : "text-muted-foreground",
-              )}
+            <Type
+              variant={live ? "dataStrong" : "caption"}
+              tone={live ? "primary" : "muted"}
+              className="mt-0.5"
               numberOfLines={1}
             >
               {live
                 ? `◆ ${game.us.name} ${game.us.score ?? 0} · ${game.them.name} ${game.them.score ?? 0}`
                 : `${game.us.name} ${game.isHome ? "vs" : "at"} ${game.them.name}`}
-            </Text>
+            </Type>
           ) : team.league ? (
-            <Type variant="data" tone="muted" className="mt-0.5">
+            <Type variant="caption" tone="muted" className="mt-0.5">
               {team.league}
             </Type>
           ) : null}

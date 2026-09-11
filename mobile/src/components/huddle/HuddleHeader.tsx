@@ -131,17 +131,20 @@ function ScoreLine({ game, gameState }: { game: GameContext; gameState: GameStat
 
   if (gameState === "postgame") {
     return (
-      <Type variant="data" tone="muted" className="mt-0.5" numberOfLines={1}>
-        {away} <Type variant="bodyStrong">{game.awayScore ?? 0}</Type>
+      <Type variant="caption" tone="muted" className="mt-0.5" numberOfLines={1}>
+        {away} <Type variant="dataStrong">{game.awayScore ?? 0}</Type>
         {" · "}
-        {home} <Type variant="bodyStrong">{game.homeScore ?? 0}</Type>
-        <Type variant="bodyStrong" tone="success"> FINAL</Type>
+        {home} <Type variant="dataStrong">{game.homeScore ?? 0}</Type>
+        <Type variant="dataStrong" tone="success"> FINAL</Type>
       </Type>
     );
   }
 
+  // Caption, not data. Live state is numbers and belongs in mono; this line is
+  // two team names and a date, and mono made it wide enough to clip mid-date
+  // in the header pill — "Sun, Se…".
   return (
-    <Type variant="data" tone="muted" className="mt-0.5" numberOfLines={1}>
+    <Type variant="caption" tone="muted" className="mt-0.5" numberOfLines={1}>
       {away} at {home} · {formatNextGameDate(game.startTime)}
     </Type>
   );

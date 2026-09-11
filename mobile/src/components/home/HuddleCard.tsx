@@ -112,18 +112,14 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
             gameOn ? "bg-muted/60" : "border border-dashed border-border",
           )}
         >
-          <Type variant="data" tone="muted" className="shrink"
-            
-            numberOfLines={1}>
+          <Type variant="caption" tone="muted" className="shrink" numberOfLines={1}>
             {gameOn ? (
               <>
-                <Type variant="bodyStrong">
-                  {game.us.name} {game.us.score ?? 0}
-                </Type>
+                <Type variant="bodyStrong">{game.us.name} </Type>
+                <Type variant="dataStrong">{game.us.score ?? 0}</Type>
                 {" · "}
-                <Type variant="bodyStrong">
-                  {game.them.name} {game.them.score ?? 0}
-                </Type>
+                <Type variant="bodyStrong">{game.them.name} </Type>
+                <Type variant="dataStrong">{game.them.score ?? 0}</Type>
               </>
             ) : (
               `${game.us.name} ${game.isHome ? "vs" : "at"} ${game.them.name}`

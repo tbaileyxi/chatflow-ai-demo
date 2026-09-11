@@ -153,8 +153,11 @@ export function PresenceBar({
                   {overflow > 0 ? `+${overflow}` : "•••"}
                 </Type>
               </View>
+              {/* "All", not "See all". Mono is wider than the sans this used
+                  to be and the column is 44px — the longer label rendered as
+                  "See…", which reads like a bug rather than a link. */}
               <Type variant="dataStrong" tone="primary" className="mt-1" numberOfLines={1}>
-                See all
+                All
               </Type>
             </Pressable>
           ) : null}

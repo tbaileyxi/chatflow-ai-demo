@@ -136,9 +136,7 @@ function Row({
 }) {
   return (
     <View className="flex-row items-center gap-1.5">
-      <Type variant="data" tone="muted" className="shrink"
-        
-        numberOfLines={1}>
+      <Type variant="caption" tone="muted" className="shrink" numberOfLines={1}>
         {name}
       </Type>
       {live ? (
