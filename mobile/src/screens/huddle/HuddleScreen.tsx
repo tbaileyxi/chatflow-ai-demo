@@ -271,6 +271,59 @@ export function HuddleScreen() {
       (navigation as any).replace("Huddle", { huddleId: id }),
   });
 
+  /**
+   * MUST STAY ABOVE THE EARLY RETURNS. This is a hook, and the two guards
+   * below return before reaching this point while the room is still loading.
+   * Defined underneath them, it ran on the second render and not the first —
+   * "Rendered more hooks than during the previous render", which killed the
+   * app every single time you opened a room.
+   *
+   * Record a short video of your face and post it with the score burned on.
+   *
+   * The score is captured HERE, at record time, and travels as the message's
+   * content. Reading it at render time later would relabel every old reaction
+   * with the final score — which would quietly destroy the only reason these
+   * are worth keeping.
+   */
+  const handleFaceReaction = useCallback(async () => {
+    const label = gameContextLabel(liveGame ?? null);
+    const shot = await captureFaceReaction(label);
+    if (!shot) return;
+
+    if (!user) return;
+
+    // Positional, and the signature is
+    //   (content, userId, replyToId?, media?, notifContext?, messageType?)
+    // Every argument here used to be one place to the left: undefined went in
+    // as userId, the media object landed in replyToId, and "face_reaction"
+    // arrived as notifContext. Face reactions could never have posted.
+    const { error } = await sendMessage(
+      shot.context ?? "",
+      user.id,
+      undefined,
+      { uri: shot.uri, type: "video" },
+      {
+        senderName: profile?.displayName ?? profile?.username ?? "Someone",
+        huddleName: huddle?.name ?? "",
+      },
+      "face_reaction",
+    );
+
+    if (error) {
+      // The server-side ceiling is 20 an hour and the client cannot argue
+      // with it, so say what happened rather than "failed to send".
+      const msg = String((error as any)?.message ?? "");
+      Alert.alert(
+        msg.includes("rate_limit") ? "Slow down a second" : "Couldn't post that",
+        msg.includes("rate_limit")
+          ? "That's a lot of reactions in an hour. Try again shortly."
+          : "Try again in a moment.",
+      );
+      return;
+    }
+    scrollToBottom();
+  }, [liveGame, sendMessage, profile, huddle?.name, user]);
+
   // Reply state
   const [replyTo, setReplyTo] = useState<{
     id: string;
@@ -422,44 +475,6 @@ export function HuddleScreen() {
     );
   }
 
-  /**
-   * Record a short video of your face and post it with the score burned on.
-   *
-   * The score is captured HERE, at record time, and travels as the message's
-   * content. Reading it at render time later would relabel every old reaction
-   * with the final score — which would quietly destroy the only reason these
-   * are worth keeping.
-   */
-  const handleFaceReaction = useCallback(async () => {
-    const label = gameContextLabel(liveGame ?? null);
-    const shot = await captureFaceReaction(label);
-    if (!shot) return;
-
-    const { error } = await sendMessage(
-      shot.context ?? "",
-      undefined,
-      { uri: shot.uri, type: "video" },
-      {
-        senderName: profile?.displayName ?? profile?.username ?? "Someone",
-        huddleName: huddle?.name ?? "",
-      },
-      "face_reaction",
-    );
-
-    if (error) {
-      // The server-side ceiling is 20 an hour and the client cannot argue
-      // with it, so say what happened rather than "failed to send".
-      const msg = String((error as any)?.message ?? "");
-      Alert.alert(
-        msg.includes("rate_limit") ? "Slow down a second" : "Couldn't post that",
-        msg.includes("rate_limit")
-          ? "That's a lot of reactions in an hour. Try again shortly."
-          : "Try again in a moment.",
-      );
-      return;
-    }
-    scrollToBottom();
-  }, [liveGame, sendMessage, profile, huddle?.name]);
 
   const handleSend = async (
     content: string,
@@ -498,52 +513,6 @@ export function HuddleScreen() {
     }, 300);
     return result;
   };
-
-  /**
-   * Nothing renders until the room exists.
-   *
-   * THIS IS WHY OPENING A ROOM CRASHED. HuddleHeader takes a HuddleDetails,
-   * not an optional one, and dereferences huddle.teamId on its first line —
-   * but useHuddleDetails returns undefined for the first frame, every time.
-   * So every room open threw "Cannot read property 'teamId' of undefined"
-   * before the query ever came back.
-   *
-   * The screen half-guarded already (huddle?.memberCount above) and had
-   * huddleLoading sitting unused. The guard belongs here rather than as
-   * optional chaining sprinkled through the header: the header is correct to
-   * demand a room, and a room screen with no room has nothing to draw.
-   *
-   * A type check would have caught this at the call site. It could not run —
-   * see the iCloud note in memory.
-   */
-  if (!huddle) {
-    return (
-      <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-        <View className="flex-1 items-center justify-center">
-          {huddleLoading ? (
-            <ActivityIndicator color={colors.primary} />
-          ) : (
-            <>
-              <Text className="text-base font-black text-foreground">
-                This room isn't available
-              </Text>
-              <Text className="mt-1 text-sm text-muted-foreground">
-                It may have been deleted, or you were removed from it.
-              </Text>
-              <Pressable
-                onPress={() => navigation.goBack()}
-                className="mt-5 rounded-xl bg-primary px-5 py-2.5 active:opacity-80"
-              >
-                <Text className="text-sm font-black text-primary-foreground">
-                  Go back
-                </Text>
-              </Pressable>
-            </>
-          )}
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
@@ -871,7 +840,9 @@ type DevRoomMessage = {
   isSystem?: boolean;
   botType?: "news" | "prediction";
   mediaUri?: string;
-  mediaType?: "image" | "audio";
+  // "video" belongs here as well — face reactions are videos, and
+  // leaving it out made the local echo reject its own message.
+  mediaType?: "image" | "audio" | "video";
   replies?: { id: string; author: string; content: string; isOwn?: boolean }[];
   time?: string;
 };

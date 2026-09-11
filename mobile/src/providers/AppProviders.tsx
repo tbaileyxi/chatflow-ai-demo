@@ -55,11 +55,13 @@ const linking: LinkingOptions<RootStackParamList> = {
       MainTabs: {
         screens: {
           Home: "",
-              Ledger: "ledger",
+          Teams: "teams",
+          Search: "search",
           Profile: "profile",
         },
       },
       Auth: "auth",
+      Ledger: "ledger",
       Huddle: "huddle/:huddleId",
       EventLobby: "events/:eventId",
       HuddleSettings: "huddle/:huddleId/settings",

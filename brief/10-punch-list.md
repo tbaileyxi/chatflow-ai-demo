@@ -61,7 +61,42 @@ the field asks for a number you just gave.
 
 ---
 
-## 4. Scoreboard drop-down timing
+## 4. The restyle only landed on half the app
+
+**Raised 2026-09-11 on device.** The cleaner type and spacing went into the
+screens that were rewritten and nowhere else, so the app reads as two designs
+stitched together — new work next to the old look, same session, same flow.
+
+Not a list of screens to patch one at a time. It needs the type scale, weights,
+spacing and control shapes pulled into shared primitives and applied
+everywhere, so there is one place that decides what a heading or a card looks
+like instead of each screen deciding for itself.
+
+Known-old so far: onboarding slides 1, 2, 5 · the raster SH logo in a white
+rounded square at the top of every onboarding slide · Start a room · Profile.
+
+---
+
+## 5. Info.plist background modes are missing
+
+Off the simulator console: the app implements
+`application:didReceiveRemoteNotification:fetchCompletionHandler:` and
+`application:performFetchWithCompletionHandler:` but declares neither
+`remote-notification` nor `fetch` in UIBackgroundModes.
+
+**Silent push does not work.** For a chat app that is not cosmetic.
+
+---
+
+## 6. Turn on react-hooks/rules-of-hooks
+
+Two crashes in a row would have been caught for free by static checking — the
+room crash was a useCallback below an early return, which this rule flags
+outright.
+
+---
+
+## 7. Scoreboard drop-down timing
 
 Raised during Phase 3, deferred until seen in action. The sponsor board drops
 over the score line in `HuddleHeader`; user wants to retune the timing after
