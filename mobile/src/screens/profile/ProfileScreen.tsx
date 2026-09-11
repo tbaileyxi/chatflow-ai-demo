@@ -272,9 +272,9 @@ export function ProfileScreen() {
       return;
     }
 
-    if (notification.type.includes("kalshi") || notification.type.includes("pick")) {
-      navigation.navigate("Ledger" as any);
-    }
+    // Pick and kalshi notifications used to open the ledger. Nothing to open
+    // now — old ones just do nothing rather than landing somebody on a dead
+    // screen.
   };
 
   const formatNotificationTime = (createdAt: string | null) => {
@@ -511,21 +511,10 @@ export function ProfileScreen() {
           </CardContent>
         </Card>
 
-        {/* Your record. Was a tab; a pick is an argument you have inside a
-            room, not a reason to open the app, so it lives here now. */}
-        <Card>
-          <CardContent className="pt-4">
-            <Pressable
-              onPress={() => navigation.navigate("Ledger" as any)}
-              className="flex-row items-center justify-between active:opacity-70"
-            >
-              <Type variant="bodyStrong">
-                Your picks
-              </Type>
-              <Type variant="caption" tone="muted">›</Type>
-            </Pressable>
-          </CardContent>
-        </Card>
+        {/* Picks are gone. The mechanic was retired and this row was the
+            last way in — a record of something nobody can do any more. Polls
+            and trivia are the direction instead. LedgerScreen stays in the tree
+            so the work is recoverable. */}
 
         {/* Find your people — reachable again after onboarding, because the
             answer changes every time somebody new signs up. */}

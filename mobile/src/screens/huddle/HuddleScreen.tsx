@@ -564,19 +564,13 @@ export function HuddleScreen() {
           }
           rightSlot={
             <View className="flex-row items-center gap-2">
-              {/* ONE control, still not two — but it has to be the one that
-                  DOES something. This slot used to hold a link to the Picks
-                  tab, which left no way anywhere in the app to *start* a fade:
-                  FadeButton and PostFadeSheet were written, then orphaned, and
-                  the mechanic survived only on bot-posted cards. FadeButton is
-                  the better chip anyway — it badges the props still waiting on
-                  a taker, so the room can see there is something to take. The
-                  Picks tab is still one tap away in the tab bar. */}
-              <FadeButton
-                huddleId={huddleId}
-                game={liveGame ?? null}
-                gameState={pingGameState}
-              />
+              {/* Fade is gone from the room. It was retired as a mechanic and
+                  this chip was the last surface still offering it — a button
+                  that starts something nobody is going to finish. Polls and
+                  trivia are the direction instead, and they sit in the ＋ as
+                  coming rather than pretending to work. FadeButton and
+                  PostFadeSheet stay in the tree, unmounted, so the work is
+                  recoverable if the mechanic comes back. */}
               {pingGameState !== "none" ? (
                 <PingButton
                   huddleId={huddleId}
