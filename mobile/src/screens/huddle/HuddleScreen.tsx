@@ -499,6 +499,52 @@ export function HuddleScreen() {
     return result;
   };
 
+  /**
+   * Nothing renders until the room exists.
+   *
+   * THIS IS WHY OPENING A ROOM CRASHED. HuddleHeader takes a HuddleDetails,
+   * not an optional one, and dereferences huddle.teamId on its first line —
+   * but useHuddleDetails returns undefined for the first frame, every time.
+   * So every room open threw "Cannot read property 'teamId' of undefined"
+   * before the query ever came back.
+   *
+   * The screen half-guarded already (huddle?.memberCount above) and had
+   * huddleLoading sitting unused. The guard belongs here rather than as
+   * optional chaining sprinkled through the header: the header is correct to
+   * demand a room, and a room screen with no room has nothing to draw.
+   *
+   * A type check would have caught this at the call site. It could not run —
+   * see the iCloud note in memory.
+   */
+  if (!huddle) {
+    return (
+      <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
+        <View className="flex-1 items-center justify-center">
+          {huddleLoading ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <>
+              <Text className="text-base font-black text-foreground">
+                This room isn't available
+              </Text>
+              <Text className="mt-1 text-sm text-muted-foreground">
+                It may have been deleted, or you were removed from it.
+              </Text>
+              <Pressable
+                onPress={() => navigation.goBack()}
+                className="mt-5 rounded-xl bg-primary px-5 py-2.5 active:opacity-80"
+              >
+                <Text className="text-sm font-black text-primary-foreground">
+                  Go back
+                </Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
       <KeyboardAvoidingView
