@@ -55,6 +55,7 @@ import {
 } from "@/hooks/useLiveGameContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { DualCam } from "../../../modules/dual-cam";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
 import { CoachThinking } from "@/components/huddle/CoachThinking";
@@ -285,11 +286,7 @@ export function HuddleScreen() {
    * with the final score — which would quietly destroy the only reason these
    * are worth keeping.
    */
-  const handleFaceReaction = useCallback(async () => {
-    const label = gameContextLabel(liveGame ?? null);
-    const shot = await captureFaceReaction(label);
-    if (!shot) return;
-
+  const postFaceReaction = useCallback(async (shot: { uri: string; context: string | null }) => {
     if (!user) return;
 
     // Positional, and the signature is
@@ -323,6 +320,30 @@ export function HuddleScreen() {
     }
     scrollToBottom();
   }, [liveGame, sendMessage, profile, huddle?.name, user]);
+
+  const handleFaceReaction = useCallback(async () => {
+    const label = gameContextLabel(liveGame ?? null);
+
+    // Both cameras where the hardware allows it (A12 and newer), front-only
+    // everywhere else. The dual path hands its clip back through a callback
+    // because it lives on its own screen — it needs the whole display to frame
+    // a shot, and a modal that returns a value is the cheapest way to do that
+    // without lifting recording state into this already large component.
+    if (DualCam.isSupported()) {
+      navigation.navigate("DualCam", {
+        gameContext: label,
+        onCapture: (shot: { uri: string; context: string | null }) => {
+          void postFaceReaction(shot);
+        },
+      });
+      return;
+    }
+
+    const shot = await captureFaceReaction(label);
+    if (!shot) return;
+    await postFaceReaction(shot);
+  }, [liveGame, navigation, postFaceReaction]);
+
 
   // Reply state
   const [replyTo, setReplyTo] = useState<{

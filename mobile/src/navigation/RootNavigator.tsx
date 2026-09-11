@@ -24,6 +24,7 @@ import { AdminScreen } from "@/screens/admin/AdminScreen";
 import { EventLobbyScreen } from "@/screens/event-lobby/EventLobbyScreen";
 import { HuddleSearchScreen } from "@/screens/huddle-search/HuddleSearchScreen";
 import { JoinHuddleScreen } from "@/screens/join-huddle/JoinHuddleScreen";
+import { DualCamScreen } from "@/screens/dual-cam/DualCamScreen";
 import { CreateSideHuddleScreen } from "@/screens/create-side-huddle/CreateSideHuddleScreen";
 import { FAQScreen } from "@/screens/faq/FAQScreen";
 import PublicProfileScreen from "@/screens/public-profile/PublicProfileScreen";
@@ -137,6 +138,11 @@ export function RootNavigator() {
             name="JoinHuddle"
             component={JoinHuddleScreen}
             options={{ animation: "slide_from_right" }}
+          />
+          <Stack.Screen
+            name="DualCam"
+            component={DualCamScreen}
+            options={{ presentation: "fullScreenModal", animation: "fade" }}
           />
           <Stack.Screen
             name="CreateSideHuddle"

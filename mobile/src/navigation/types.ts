@@ -43,6 +43,11 @@ export type RootStackParamList = {
   Sponsor: undefined;
   MessagePost: { id: string };
   PublicProfile: { userId: string; knownAs?: string };
+  DualCam: {
+    /** Score line at the moment of recording, burned into the message. */
+    gameContext: string | null;
+    onCapture?: (shot: { uri: string; context: string | null }) => void;
+  };
 };
 
 // Type helper for useNavigation
