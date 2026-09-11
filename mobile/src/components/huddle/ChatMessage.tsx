@@ -12,20 +12,22 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
-  MessageSquareReply,
-  Share2,
-  X,
-  Play,
-  Pause,
-  Mic,
   Flag,
+  MessageSquareReply,
+  Mic,
+  Pause,
+  Play,
+  Share2,
+  Share2 as ShareIcon,
   Trash2,
+  X,
 } from "lucide-react-native";
 import { Audio, Video, ResizeMode } from "expo-av";
 import { Type } from "@/components/ui/Type";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { blockUser, reportMessage } from "@/lib/moderation";
+import { shareMedia } from "@/lib/shareMedia";
 import { colors } from "@/theme/colors";
 import { FadeCardInMessage } from "@/components/huddle/FadeCardInMessage";
 import { PulseBubble } from "@/components/huddle/PulseBubble";
@@ -605,6 +607,22 @@ export function ChatMessage({
                     style={{ width: 230, height: 230 }}
                     resizeMode="cover"
                   />
+
+                  {/* One button, the OS sheet behind it. The person just made
+                      something they feel strongly about; a menu of four choices
+                      is where that feeling goes to die. Instagram, Messages,
+                      AirDrop and Save Image are already on the sheet, in the
+                      order this particular person uses them. */}
+                  <Pressable
+                    onPress={() =>
+                      shareMedia({ url: message.mediaUrl!, type: message.mediaType })
+                    }
+                    hitSlop={8}
+                    className="absolute right-2 top-3 h-8 w-8 items-center justify-center rounded-full active:opacity-70"
+                    style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
+                  >
+                    <ShareIcon color="#FFFFFF" size={15} />
+                  </Pressable>
                 </Pressable>
               )}
 
@@ -656,6 +674,22 @@ export function ChatMessage({
                       </Type>
                     </View>
                   ) : null}
+
+                  {/* One button, the OS sheet behind it. The person just made
+                      something they feel strongly about; a menu of four choices
+                      is where that feeling goes to die. Instagram, Messages,
+                      AirDrop and Save Image are already on the sheet, in the
+                      order this particular person uses them. */}
+                  <Pressable
+                    onPress={() =>
+                      shareMedia({ url: message.mediaUrl!, type: message.mediaType })
+                    }
+                    hitSlop={8}
+                    className="absolute right-2 top-3 h-8 w-8 items-center justify-center rounded-full active:opacity-70"
+                    style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
+                  >
+                    <ShareIcon color="#FFFFFF" size={15} />
+                  </Pressable>
                 </Pressable>
               )}
 

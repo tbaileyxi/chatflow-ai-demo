@@ -19,6 +19,8 @@ type DualCamNativeModule = {
   /** Tears down the capture session. Two live cameras is the most expensive
    *  thing this app can leave running — always call this on unmount. */
   dismiss(): void;
+  /** Returns a copy with the Side Huddle mark burned in. Original untouched. */
+  composeShareAsset(uri: string, isVideo: boolean): Promise<string>;
 };
 
 // Loading the module throws on a build that predates it, and on Android. A
@@ -49,6 +51,10 @@ export const DualCam = {
     return native.stop();
   },
   dismiss: () => native?.dismiss(),
+  composeShareAsset: (uri: string, isVideo: boolean) => {
+    if (!native) return Promise.reject(new Error("Sharing isn't available on this build."));
+    return native.composeShareAsset(uri, isVideo);
+  },
 };
 
 export type DualCamPreviewProps = ViewProps & { active?: boolean };

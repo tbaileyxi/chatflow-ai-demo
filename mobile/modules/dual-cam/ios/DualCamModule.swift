@@ -73,6 +73,34 @@ public class DualCamModule: Module {
       self.recorder = nil
     }
 
+    /**
+     Returns a COPY of a photo or video with the Side Huddle mark on it, for
+     sharing outward. The original is never touched — the version in the thread
+     stays clean, because a watermark shown to the room is an advert aimed at
+     people who already installed the app.
+     */
+    AsyncFunction("composeShareAsset") { (uri: String, isVideo: Bool, promise: Promise) in
+      guard let url = URL(string: uri) else {
+        promise.reject("ERR_BAD_URI", "Couldn't read that file.")
+        return
+      }
+
+      if isVideo {
+        ShareComposer.compose(videoAt: url) { result in
+          switch result {
+          case .success(let out): promise.resolve(out.absoluteString)
+          case .failure(let error): promise.reject("ERR_COMPOSE_FAILED", error.localizedDescription)
+          }
+        }
+      } else {
+        do {
+          promise.resolve(try ShareComposer.compose(imageAt: url).absoluteString)
+        } catch {
+          promise.reject("ERR_COMPOSE_FAILED", error.localizedDescription)
+        }
+      }
+    }
+
     View(DualCamPreviewView.self) {
       Prop("active") { (view: DualCamPreviewView, active: Bool) in
         view.setActive(active, recorder: self.recorder)
