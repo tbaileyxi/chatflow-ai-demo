@@ -1,5 +1,6 @@
 import { Pressable, View, Text, Image } from "react-native";
 import { Crown, Lock } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { cn } from "@/lib/utils";
 import { colors } from "@/theme/colors";
 import type { UserHuddle } from "@/hooks/useUserHuddles";
@@ -65,15 +66,13 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
 
         <View className="min-w-0 flex-1">
           <View className="flex-row items-center gap-2">
-            <Text
-              className={cn(
-                "shrink text-base text-foreground",
-                huddle.hasUnread ? "font-black" : "font-bold",
-              )}
+            <Type
+              variant={huddle.hasUnread ? "title" : "heading"}
+              style={{ flexShrink: 1, fontSize: 17 }}
               numberOfLines={1}
             >
               {huddle.name}
-            </Text>
+            </Type>
             {huddle.roomRole === "owner" ? (
               <Crown color={colors.primary} size={12} />
             ) : null}
@@ -85,22 +84,15 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
           {/* Two indicators, never one. Either can be true without the other. */}
           <View className="mt-1 flex-row flex-wrap items-center gap-x-3 gap-y-0.5">
             {here.length > 0 ? (
-              <Text
-                className="text-[10px] font-bold text-success"
-                numberOfLines={1}
-              >
+              <Type variant="data" tone="success" numberOfLines={1}>
                 ● {here.slice(0, 2).join(", ")}
                 {here.length > 2 ? ` +${here.length - 2}` : ""} in
-              </Text>
+              </Type>
             ) : (
-              <Text className="text-[10px] text-muted-foreground">
-                ○ nobody in
-              </Text>
+              <Type variant="data" tone="tertiary">○ nobody in</Type>
             )}
             {gameOn ? (
-              <Text className="text-[10px] font-bold text-primary">
-                ◆ game on
-              </Text>
+              <Type variant="data" tone="primary">◆ game on</Type>
             ) : null}
           </View>
         </View>
@@ -138,14 +130,13 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
               `${game.us.name} ${game.isHome ? "vs" : "at"} ${game.them.name}`
             )}
           </Text>
-          <Text
-            className={cn(
-              "ml-auto text-[10px] font-bold",
-              gameOn ? "text-primary" : "text-muted-foreground",
-            )}
+          <Type
+            variant="dataStrong"
+            tone={gameOn ? "primary" : "muted"}
+            style={{ marginLeft: "auto" }}
           >
             {gameOn ? game.statusLabel : formatWhen(game.startTime)}
-          </Text>
+          </Type>
         </View>
       ) : null}
 
@@ -154,17 +145,19 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
           something, and it says so at exactly the time it's true. */}
       {gameOn && nobodyHome ? (
         <View className="mt-2 rounded-lg bg-primary/10 px-2.5 py-1.5">
-          <Text className="text-[11px] font-bold text-primary">
+          <Type variant="captionStrong" tone="primary">
             ◆ Nobody's in here yet — go first
-          </Text>
+          </Type>
         </View>
       ) : huddle.latestMessage ? (
-        <Text
-          className="mt-2 text-xs text-muted-foreground"
+        <Type
+          variant="caption"
+          tone="muted"
+          style={{ marginTop: 8 }}
           numberOfLines={1}
         >
           {huddle.latestMessage}
-        </Text>
+        </Type>
       ) : null}
     </Pressable>
   );

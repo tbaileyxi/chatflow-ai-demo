@@ -34,6 +34,7 @@ import { useAutoContactMatch } from "@/hooks/useAutoContactMatch";
 import { useContactMatch } from "@/hooks/useContactMatch";
 import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { supabase } from "@/integrations/supabase/client";
+import { Eyebrow, Type } from "@/components/ui/Type";
 import { colors } from "@/theme/colors";
 
 function initials(name: string) {
@@ -220,9 +221,7 @@ function FriendsNowSection() {
           <View
             className={`h-2 w-2 rounded-full ${anyLive ? "bg-primary" : "bg-muted-foreground"}`}
           />
-          <Text className="text-sm font-black uppercase tracking-widest text-foreground">
-            Friends Now
-          </Text>
+          <Eyebrow tone="default">Friends Now</Eyebrow>
         </View>
         <Pressable className="flex-row items-center gap-1" onPress={inviteFriends}>
           <UserPlus color={colors.primary} size={14} />
@@ -459,9 +458,7 @@ function YourRoomsSection() {
       <View className="mb-3 flex-row items-center justify-between">
         <View className="flex-row items-center gap-2">
           <Users color={colors.primary} size={17} />
-          <Text className="text-sm font-black uppercase tracking-widest text-foreground">
-            Your Rooms
-          </Text>
+          <Eyebrow tone="default">Your Rooms</Eyebrow>
         </View>
         {/* Was "+ New". You don't decide to make a room, you decide to bring
             somebody — and the room exists because of that. Same destination
@@ -564,13 +561,11 @@ export function HomeScreen() {
         <View>
           <View className="flex-row items-center gap-2">
             <Radio color={colors.primary} size={18} />
-            <Text className="text-3xl font-black text-foreground">
-              Side Huddle
-            </Text>
+            <Type variant="display">Side Huddle</Type>
           </View>
-          <Text className="mt-1 text-sm text-muted-foreground">
+          <Type variant="caption" tone="muted" style={{ marginTop: 2 }}>
             Friend rooms only. No public room directory.
-          </Text>
+          </Type>
         </View>
 
         <Pressable
