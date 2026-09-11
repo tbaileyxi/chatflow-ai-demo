@@ -84,10 +84,11 @@ const Terms = () => {
               and nothing beyond that.
             </p>
             <p className="mt-2">
-              Photos, voice notes, and video reactions are stored for up to 90
-              days and then deleted automatically. Text messages remain until you
-              or the huddle’s owner delete them, or until your account is
-              deleted.
+              What you post stays in the huddle until you delete it. Nothing
+              expires on its own. You can remove any message you posted by
+              pressing and holding it; the owner and admins of a huddle can
+              remove anything in that huddle; and deleting your account removes
+              your messages with it.
             </p>
           </Section>
 
