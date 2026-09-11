@@ -155,11 +155,20 @@ export function useRoomGames(teamIds: (string | null | undefined)[]) {
       const teams = teamsRes.data ?? [];
 
       const teamById = new Map(teams.map((t: any) => [t.id, t]));
+      /**
+       * Nickname, not city.
+       *
+       * City reads fine on a broadcast because a logo sits next to it. Here
+       * there is no logo, and "Los Angeles" is the Angels, the Dodgers, the
+       * Rams, the Chargers, the Lakers or the Clippers — a scoreline nobody
+       * can resolve. Nicknames are unique inside a single game, which is the
+       * only place two of these ever appear together.
+       */
       const nameFor = (id: string | null) => {
         if (!id) return "TBD";
         const t = teamById.get(id) as any;
         if (!t) return "TBD";
-        return (t.city || t.name || "TBD").toString();
+        return (t.name || t.city || "TBD").toString();
       };
 
       for (const teamId of ids) {
