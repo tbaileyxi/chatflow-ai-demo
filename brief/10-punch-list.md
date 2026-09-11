@@ -4,9 +4,9 @@ Things we agreed on AFTER the 2026-09-10 build. Not started.
 
 ---
 
-## 1. Kill the Teams tab — back to three
+## 1. POSSIBLY kill the Teams tab — back to three
 
-**Decided 2026-09-10.** The tab was justified on "find team rooms you aren't
+**Leaning that way as of 2026-09-10, not decided — see how it feels on device first.** The tab was justified on "find team rooms you aren't
 in." That job isn't wanted: a Browns room full of strangers is the empty-room
 problem, not a fix for it. The one case worth finding — a verified or
 creator-run room — is already in Search, which includes official and paid
