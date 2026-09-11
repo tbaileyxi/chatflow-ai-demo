@@ -1,11 +1,13 @@
-import { View, Text, Image, Pressable, ScrollView } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, View, Text, Image, Pressable, ScrollView } from "react-native";
 import { useRoute, useNavigation, type RouteProp } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, Users } from "lucide-react-native";
+import { ChevronLeft, Flag, Users } from "lucide-react-native";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ScreenWrapper } from "@/components/ui/screen-wrapper";
+import { blockUser, isBlocked, reportUser, unblockUser } from "@/lib/moderation";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
 
@@ -32,6 +34,23 @@ export default function PublicProfileScreen() {
   // Passed by the caller when it has one — the roster knows what YOU have this
   // person saved as, which beats a display name of "User" every time.
   const knownAs = route.params?.knownAs ?? null;
+
+  // Whether YOU have blocked THEM. Read once on open rather than joined into
+  // the profile query: blocking is rare, and a person who is blocked should
+  // still load normally with the button flipped, not fail to load.
+  const [blocked, setBlocked] = useState(false);
+  const isSelf = !!user && user.id === userId;
+
+  useEffect(() => {
+    if (!userId || isSelf) return;
+    let alive = true;
+    isBlocked(userId).then((b) => {
+      if (alive) setBlocked(b);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [userId, isSelf]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["public-profile", userId, user?.id],
@@ -68,6 +87,60 @@ export default function PublicProfileScreen() {
       return { profile: p, rooms };
     },
   });
+
+  const handleBlockToggle = (label: string) => {
+    if (!userId) return;
+
+    if (blocked) {
+      Alert.alert("Unblock " + label + "?", "You'll see their messages again.", [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Unblock",
+          onPress: async () => {
+            if (await unblockUser(userId)) setBlocked(false);
+          },
+        },
+      ]);
+      return;
+    }
+
+    Alert.alert(
+      "Block " + label + "?",
+      "You won't see them anywhere in Side Huddle, in any room. They aren't told.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: async () => {
+            if (await blockUser(userId)) {
+              setBlocked(true);
+              Alert.alert("Blocked", "You won't see " + label + " again.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleReport = (label: string) => {
+    if (!userId) return;
+    Alert.alert(
+      "Report " + label + "?",
+      "We review every report within 24 hours.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Report",
+          style: "destructive",
+          onPress: async () => {
+            await reportUser({ userId });
+            Alert.alert("Reported", "Thanks — we'll take a look.");
+          },
+        },
+      ],
+    );
+  };
 
   const p = data?.profile as any;
   // "User" is what the database calls somebody who never finished onboarding.
@@ -148,6 +221,49 @@ export default function PublicProfileScreen() {
 
             {joined ? (
               <Text className="mt-3 text-xs text-muted-foreground">Joined {joined}</Text>
+            ) : null}
+
+            {/* Block and report live HERE, not only behind a long-press on
+                something they said. If they deleted the message, or the
+                problem is the profile itself, the long-press route doesn't
+                exist — and that's the route a reviewer is looking for. */}
+            {!isSelf ? (
+              <View className="mt-5 flex-row items-center gap-2">
+                <Pressable
+                  onPress={() => handleBlockToggle(name)}
+                  className={
+                    blocked
+                      ? "rounded-full border border-border px-4 py-2 active:opacity-70"
+                      : "rounded-full border border-destructive px-4 py-2 active:opacity-70"
+                  }
+                >
+                  <Text
+                    className={
+                      blocked
+                        ? "text-xs font-black text-muted-foreground"
+                        : "text-xs font-black text-destructive"
+                    }
+                  >
+                    {blocked ? "Unblock" : "Block"}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => handleReport(name)}
+                  className="flex-row items-center gap-1.5 rounded-full border border-border px-4 py-2 active:opacity-70"
+                >
+                  <Flag color={colors.mutedForeground} size={12} />
+                  <Text className="text-xs font-black text-muted-foreground">
+                    Report
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {blocked ? (
+              <Text className="mt-3 px-6 text-center text-xs text-muted-foreground">
+                You've blocked {name}. Their messages are hidden from you
+                everywhere.
+              </Text>
             ) : null}
           </View>
 

@@ -24,6 +24,7 @@ import {
 import { Audio, Video, ResizeMode } from "expo-av";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { blockUser, reportMessage } from "@/lib/moderation";
 import { colors } from "@/theme/colors";
 import { FadeCardInMessage } from "@/components/huddle/FadeCardInMessage";
 import { PulseBubble } from "@/components/huddle/PulseBubble";
@@ -286,14 +287,10 @@ export function ChatMessage({
             text: "Report",
             style: "destructive",
             onPress: async () => {
-              const { data: auth } = await supabase.auth.getUser();
-              if (!auth?.user) return;
-              await supabase.from("message_reports").insert({
-                message_id: message.id,
-                huddle_id: huddleId,
-                reporter_id: auth.user.id,
-                reported_user_id: message.userId,
-                reason: "objectionable",
+              await reportMessage({
+                messageId: message.id,
+                huddleId,
+                reportedUserId: message.userId,
               });
               Alert.alert("Reported", "Thanks — we'll take a look.");
             },
@@ -302,12 +299,7 @@ export function ChatMessage({
             text: `Block ${displayName}`,
             style: "destructive",
             onPress: async () => {
-              const { data: auth } = await supabase.auth.getUser();
-              if (!auth?.user) return;
-              await supabase.from("user_blocks").insert({
-                blocker_id: auth.user.id,
-                blocked_id: message.userId,
-              });
+              await blockUser(message.userId);
               Alert.alert(
                 "Blocked",
                 `You won't see ${displayName} anywhere in Side Huddle.`,

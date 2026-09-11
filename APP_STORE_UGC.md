@@ -22,10 +22,15 @@ reporting and blocking will fail silently, which reviewers do test.
 
 ## What is NOT done — publish before submitting
 
-### 1. Terms with a zero-tolerance clause
+### 1. Terms with a zero-tolerance clause — ✅ DONE 2026-09-10
 
-Apple wants this in writing, reachable from the app and from the App Store
-listing. Add to your terms at `sidehuddlesports.com/terms`:
+Published at `/terms` (`src/pages/Terms.tsx`), linked from the site footer and
+in the sitemap. **Note there are now two legal documents and they are not
+interchangeable:** `EULA_URL` is Apple's standard licence, required on the
+subscription paywall under 3.1.2(c); `TOS_URL` is ours and carries the clause
+below. Pointing the signup agreement at Apple's EULA would fail review.
+
+The published wording:
 
 > **Objectionable content and abusive behaviour**
 >
@@ -55,8 +60,9 @@ Continue button on the name step of onboarding:
 
 > By continuing you agree to the Terms and Privacy Policy.
 
-with both words tappable. **Not built yet** — it's a small change to
-`OnboardingScreen`, and it's the one Apple checks by walking the signup.
+with both words tappable. **✅ DONE** — on the name step of `OnboardingScreen`,
+which is the moment the account comes into existence, and the step Apple checks
+by walking the signup.
 
 ### 3. App Store Connect review notes
 
@@ -111,13 +117,23 @@ moderation above in place is the intent of the rating, not a risk to it.
 
 ```
 1. Run RUN_THIS_UGC_POLICY.sql          ← done
-2. Run RUN_THIS_GAME_RSVP.sql           ← still outstanding
-3. Publish /terms with the clause above
-4. Add the agreement line to onboarding
-5. Seed the reviewer account
-6. Paste the review notes
-7. Submit
+2. Run RUN_THIS_GAME_RSVP.sql           ← done
+3. Publish /terms with the clause above ← done (deploy the web app)
+4. Add the agreement line to onboarding ← done
+5. Run RUN_THIS_NEXT.sql                ← OUTSTANDING
+6. Seed the reviewer account            ← OUTSTANDING
+7. Paste the review notes               ← OUTSTANDING
+8. Submit
 ```
 
-Steps 3 and 4 are the ones that get you rejected if skipped, and they're the
-two nobody remembers because they aren't code.
+**Deploying the web app is part of step 3.** The page exists in the repo; until
+it is live at `sidehuddlesports.com/terms` the signup screen still links to a
+404, which is the same rejection as not having written it.
+
+### Blocking and reporting a PERSON — added 2026-09-10
+
+Block and report used to hang only off a long-press on a message. If the person
+deleted the message, or the problem was the profile itself, there was no route
+at all — and the profile is where a reviewer looks first. Both now sit on
+`PublicProfileScreen`, and `message_reports.message_id` is nullable so a report
+can name a person rather than a message (`RUN_THIS_NEXT.sql`).
