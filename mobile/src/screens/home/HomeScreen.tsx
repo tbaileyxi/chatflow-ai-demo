@@ -222,7 +222,7 @@ function FriendsNowSection() {
           <View
             className={`h-2 w-2 rounded-full ${anyLive ? "bg-primary" : "bg-muted-foreground"}`}
           />
-          <Eyebrow tone="default">Friends Now</Eyebrow>
+          <Eyebrow tone="tertiary">Friends</Eyebrow>
         </View>
         <Pressable className="flex-row items-center gap-1" onPress={inviteFriends}>
           <UserPlus color={colors.primary} size={14} />
@@ -327,11 +327,11 @@ function FriendsNowSection() {
               style={f.isLive ? undefined : { opacity: 0.45 }}
             >
               <View
-                className={
-                  f.isLive
-                    ? "rounded-full border-2 border-success p-0.5"
-                    : "rounded-full border-2 border-transparent p-0.5"
-                }
+                className="rounded-full p-0.5"
+                style={{
+                  borderWidth: 2,
+                  borderColor: f.isLive ? colors.primary : "transparent",
+                }}
               >
                 {f.avatarUrl ? (
                   <Image
@@ -342,21 +342,20 @@ function FriendsNowSection() {
                   <MonogramAvatar name={f.name} size={56} />
                 )}
               </View>
-              <Type variant="captionStrong" className="mt-1.5 text-center"
-                
-                numberOfLines={1}>
+              <Type center variant="captionStrong" className="mt-1.5" numberOfLines={1}>
                 {f.name.split(/\s+/)[0]}
               </Type>
-              <Text
-                className={
-                  f.isLive
-                    ? "text-center text-[10px] font-bold text-success"
-                    : "text-center text-[10px] text-muted-foreground"
-                }
+              {/* WHERE, not whether. "watching" said nothing the ring hadn't
+                  already said — the room name is the reason to tap the tile. */}
+              <Type
+                center
+                variant="data"
+                tone={f.isLive ? "primary" : "tertiary"}
                 numberOfLines={1}
+                style={{ fontSize: 9 }}
               >
-                {f.isLive ? "watching" : "not watching"}
-              </Text>
+                {f.isLive ? (f.huddleName ?? "watching") : "·"}
+              </Type>
             </Pressable>
           ))}
 
@@ -458,7 +457,7 @@ function YourRoomsSection() {
       <View className="mb-3 flex-row items-center justify-between">
         <View className="flex-row items-center gap-2">
           <Users color={colors.primary} size={17} />
-          <Eyebrow tone="default">Your Rooms</Eyebrow>
+          <Eyebrow tone="tertiary">Your huddles</Eyebrow>
         </View>
         {/* Was "+ New". You don't decide to make a room, you decide to bring
             somebody — and the room exists because of that. Same destination
