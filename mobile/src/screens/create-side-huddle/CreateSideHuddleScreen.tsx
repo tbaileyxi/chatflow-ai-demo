@@ -17,7 +17,14 @@ import {
   type RouteProp,
 } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Check, Lock, Search, Radio } from "lucide-react-native";
+import {
+  Check,
+  ChevronLeft,
+  Globe,
+  Lock,
+  Radio,
+  Search,
+} from "lucide-react-native";
 import { Type } from "@/components/ui/Type";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -142,7 +149,12 @@ export function CreateSideHuddleScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   // Off by default: an open room is the norm, and discovery is already scoped
   // to people you know. This is for someone who wants the door locked too.
-  const [askToJoin, setAskToJoin] = useState(false);
+  // Private by default. The line under the name field promised "only people
+  // you invite can join" while this defaulted to false, so every room made
+  // from this screen was public and the screen said otherwise. Home's own
+  // subtitle is "Friend rooms only. No public room directory." — that is the
+  // product's position, and the default now matches it.
+  const [askToJoin, setAskToJoin] = useState(true);
 
   const filtered = teams?.filter((t) => {
     if (filterLeague && t.league.toUpperCase() !== filterLeague) return false;
@@ -345,10 +357,18 @@ export function CreateSideHuddleScreen() {
               className="h-14 text-lg font-bold"
             />
           </View>
+          {/* Follows the toggle at the bottom of the screen rather than
+              stating one thing while the control says another. */}
           <View className="mt-1.5 flex-row items-center gap-1.5">
-            <Lock color={colors.mutedForeground} size={12} />
+            {askToJoin ? (
+              <Lock color={colors.mutedForeground} size={12} />
+            ) : (
+              <Globe color={colors.mutedForeground} size={12} />
+            )}
             <Type variant="caption" tone="muted">
-              Private — only people you invite can join.
+              {askToJoin
+                ? "Private — only people you invite can join."
+                : "Open — anyone with the link can walk in."}
             </Type>
           </View>
 
@@ -479,6 +499,14 @@ export function CreateSideHuddleScreen() {
                 </View>
                 <Type center variant="caption" numberOfLines={1}>
                   {team.name}
+                </Type>
+                {/* Nicknames are not unique. Baylor and Chicago both render as
+                    "Bears", and so do the Wildcats, Tigers and Eagles of a
+                    dozen schools — two identical tiles side by side, told apart
+                    only by a logo at 40px. The city disambiguates, and the
+                    league catches the rest. */}
+                <Type center variant="data" tone="tertiary" numberOfLines={1}>
+                  {team.city || team.league || ""}
                 </Type>
               </Pressable>
             );

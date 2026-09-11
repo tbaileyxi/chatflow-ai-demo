@@ -26,7 +26,7 @@ row.
 
 ---
 
-## 2. "Start a room" is a form, and it shouldn't be
+## 2. "Start a room" is a form, and it shouldn't be — PARTLY DONE
 
 **Raised 2026-09-10 on device.** Naming a room and picking a team from a grid
 of 300 is a setup wizard standing between you and the thing you came for. The
@@ -35,10 +35,11 @@ a side effect of "get in and go", not a form you fill out first.
 
 Also wrong on that screen, seen on device:
 
-- The helper line says **"Private — only people you invite can join"** while the
-  Private toggle directly below it is **OFF**. One of them is lying.
-- Two teams both render as **"Bears"** (Baylor and Chicago) with nothing to tell
-  them apart. Same for any shared nickname. See [[live-game-vocabulary-traps]].
+- ~~The helper line promised private while the toggle defaulted to public.~~
+  **Fixed 2026-09-11** — the toggle defaults to private, matching Home's own
+  "Friend rooms only", and the line follows the toggle instead of contradicting it.
+- ~~Two teams both render as "Bears".~~ **Fixed 2026-09-11** — tiles carry the
+  city, falling back to the league. See [[live-game-vocabulary-traps]].
 - The share-invite prompt fires **immediately on create**, before there is
   anything in the room to invite somebody to.
 
@@ -48,16 +49,21 @@ change living in room settings where they belong.
 
 ---
 
-## 3. Onboarding slides 1, 2 and 5 are the old deck
+## 3. Onboarding slides 1, 2 and 5 are the old deck — DONE 2026-09-11
 
 The ripple opener is new, then it hands straight back to five marketing slides
 with a raster SH logo in a white rounded square, generic icon tiles and dot
 pagination. Slides 3 (name) and 4 (teams) were rebuilt; 1, 2 and 5 were not.
 This is what reads as "the design is still old".
 
-Slide 3 also still says **"Phone number (optional) — We never text you.
-Ever."** That predates SMS sign-in. You are now texted a code to get in, and
-the field asks for a number you just gave.
+~~Slide 3 said "Phone number (optional) — We never text you. Ever."~~ **Fixed** —
+the field is hidden entirely for anyone who signed in by SMS, since they gave
+the number a screen ago, and the copy no longer denies the texting the sign-in
+flow depends on.
+
+**Fixed:** the raster SH logo is now a drawn mark (RippleGlyph) matching the
+opener and the favicon; the generic icon-in-a-rounded-square tile is gone; the
+step is labelled in the same mono eyebrow used everywhere else.
 
 ---
 
