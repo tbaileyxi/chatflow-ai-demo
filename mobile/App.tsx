@@ -1,9 +1,6 @@
 import "./global.css";
 
-import { useEffect } from "react";
-import { View } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import {
   Archivo_400Regular,
@@ -18,15 +15,28 @@ import {
 } from "@expo-google-fonts/jetbrains-mono";
 import { AppProviders } from "@/providers/AppProviders";
 import { RootNavigator } from "@/navigation/RootNavigator";
-import { colors } from "@/theme/colors";
 
-// Hold the splash until the faces are in memory. Without this the first frame
-// renders in system San Francisco and then reflows when Archivo arrives — the
-// whole app visibly jumps, which reads as a bug rather than a load.
-SplashScreen.preventAutoHideAsync().catch(() => {});
-
+/**
+ * NOTHING BLOCKS THE APP FROM RENDERING.
+ *
+ * The first version of this held the UI behind `useFonts` so the type wouldn't
+ * reflow when Archivo arrived. That shipped a build that never got past a black
+ * screen: expo-font was installed at the wrong major version for this SDK
+ * (npm install instead of npx expo install), so the native module never came
+ * up, `loaded` never turned true, `error` never fired either — and the gate had
+ * no way out.
+ *
+ * The lesson is not "pin the version". It is that a loading gate with no
+ * timeout and no failure path turns any problem underneath it into a dead app.
+ * React Native falls back to the system face for a family it can't find, so the
+ * worst case without the gate is a brief reflow and, if fonts are genuinely
+ * broken, an app that looks wrong and still works.
+ *
+ * useFonts is still called — it loads them and re-renders when they land. Its
+ * result is deliberately ignored.
+ */
 export default function App() {
-  const [fontsReady, fontError] = useFonts({
+  useFonts({
     Archivo_400Regular,
     Archivo_500Medium,
     Archivo_600SemiBold,
@@ -35,19 +45,6 @@ export default function App() {
     JetBrainsMono_500Medium,
     JetBrainsMono_700Bold,
   });
-
-  // A font that fails to load must not hold the app hostage. React Native
-  // falls back to the system face for any family it can't find, so the app
-  // still works — it just looks wrong, which beats a permanent splash screen.
-  const ready = fontsReady || !!fontError;
-
-  useEffect(() => {
-    if (ready) SplashScreen.hideAsync().catch(() => {});
-  }, [ready]);
-
-  if (!ready) {
-    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
-  }
 
   return (
     <AppProviders>
