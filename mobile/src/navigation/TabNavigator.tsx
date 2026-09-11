@@ -1,8 +1,8 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Home, Search, Shield, User } from "lucide-react-native";
+import { Home, Radio, Search, User } from "lucide-react-native";
 import { colors } from "@/theme/colors";
 import { HomeScreen } from "@/screens/home/HomeScreen";
-import { TeamsScreen } from "@/screens/teams/TeamsScreen";
+import { GamesScreen } from "@/screens/games/GamesScreen";
 import { HuddleSearchScreen } from "@/screens/huddle-search/HuddleSearchScreen";
 import { ProfileScreen } from "@/screens/profile/ProfileScreen";
 import type { TabParamList } from "./types";
@@ -31,22 +31,25 @@ export function TabNavigator() {
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
-      {/* Teams, back as of 2026-09-10 — but NOT the tab that was removed on
-          2026-08-13. That one was a news feed, and it was cut for competing
-          with the chat instead of feeding it. That reasoning still holds:
-          nothing here is a feed.
+      {/* Games, replacing Teams as of 2026-09-11.
+          
+          Teams listed your own rooms grouped by team, and Home already does
+          that. The one thing that made it distinct was OTHER people's rooms
+          for your team — and those were the community rooms we cut, because a
+          shelf of empty rooms with team logos on them is the problem the tab
+          was meant to solve rather than a solution to it. What was left was a
+          second view of Home costing a tab.
 
-          This is a directory. Teams you follow, and under each one the rooms
-          that exist for it — including the ones you are not in, which is the
-          only place in the app you can see those. It exists because following
-          became real: `user_follows` is written at onboarding and gates room
-          creation, and until now there was no screen to add a team, drop one,
-          or even find out which ones you had picked. */}
+          Games carries what exists nowhere else: the whole slate. It is also
+          the answer to the complaint this product started from — there are
+          games on that aren't your team's, and there was nowhere to go.
+
+          Your teams live on Profile now, as chips with an ＋ Add. */}
       <Tab.Screen
-        name="Teams"
-        component={TeamsScreen}
+        name="Games"
+        component={GamesScreen}
         options={{
-          tabBarIcon: ({ color, size }) => <Shield color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <Radio color={color} size={size} />,
         }}
       />
       <Tab.Screen

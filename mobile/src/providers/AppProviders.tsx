@@ -55,7 +55,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       MainTabs: {
         screens: {
           Home: "",
-          Teams: "teams",
+          Games: "games",
           Search: "search",
           Profile: "profile",
         },
