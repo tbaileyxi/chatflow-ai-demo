@@ -21,6 +21,7 @@ import { FindYourPeople } from "@/components/profile/FindYourPeople";
 import { ClaimRoomBox } from "@/components/onboarding/ClaimRoomBox";
 import { TeamPicker } from "@/components/profile/TeamPicker";
 import { peekPendingInvite } from "@/hooks/useInviteHandler";
+import { PRIVACY_URL, TOS_URL } from "@/lib/legal";
 import { colors } from "@/theme/colors";
 
 // Phone is stored ONLY as a match key so people who already have your number
@@ -371,7 +372,7 @@ export function OnboardingScreen() {
                   <Text
                     className="font-bold text-primary"
                     onPress={() =>
-                      Linking.openURL("https://www.sidehuddlesports.com/terms")
+                      Linking.openURL(TOS_URL)
                     }
                   >
                     Terms
@@ -380,7 +381,7 @@ export function OnboardingScreen() {
                   <Text
                     className="font-bold text-primary"
                     onPress={() =>
-                      Linking.openURL("https://www.sidehuddlesports.com/privacy")
+                      Linking.openURL(PRIVACY_URL)
                     }
                   >
                     Privacy Policy

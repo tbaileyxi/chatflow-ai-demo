@@ -15,8 +15,10 @@ import shLogo from '@/assets/sh-logo-updated.png';
 // same URL already cited in the App Store description after the 3.1.2(c)
 // rejection. Do not swap this for a self-written terms page without also
 // changing the License Agreement setting in App Store Connect.
-export const TERMS_URL =
+export const EULA_URL =
   'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+/** @deprecated Apple's licence. Our terms of service live at /terms. */
+export const TERMS_URL = EULA_URL;
 export const SUPPORT_EMAIL = 'support@sidehuddlesports.com';
 
 export function SiteNav() {
@@ -92,13 +94,19 @@ export function SiteFooter() {
           <Link to="/privacy" className="hover:text-white/60 transition-colors">
             Privacy
           </Link>
+          <Link to="/terms" className="hover:text-white/60 transition-colors">
+            Terms
+          </Link>
+          {/* Apple's standard licence, separate from our terms of service
+              above. A reviewer following "Terms" must land on the document
+              carrying the zero-tolerance clause, not on this one. */}
           <a
-            href={TERMS_URL}
+            href={EULA_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-white/60 transition-colors"
           >
-            Terms
+            Licence
           </a>
           <a
             href="https://x.com/sidehuddlesports"

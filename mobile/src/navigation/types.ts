@@ -7,6 +7,7 @@ import type { NavigatorScreenParams } from "@react-navigation/native";
 // Profile now, where your own record belongs.
 export type TabParamList = {
   Home: undefined;
+  Teams: undefined;
   Search: undefined;
   Profile: undefined;
 };

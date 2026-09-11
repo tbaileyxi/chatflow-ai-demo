@@ -15,6 +15,7 @@ import Sponsor from "./pages/Sponsor";
 import SponsorAdmin from "./pages/SponsorAdmin";
 import Outreach from "./pages/Outreach";
 import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 import FAQ from "./pages/FAQ";
 import Contact from "./pages/Contact";
 import TeamLanding from "./pages/TeamLanding";
@@ -78,6 +79,7 @@ const AppContent = () => {
         <Route path="/teams" element={<TeamsIndex />} />
         <Route path="/t/:slug" element={<TeamLanding />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
         <Route path="/faq" element={<FAQ />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="*" element={<Navigate to="/" replace />} />
