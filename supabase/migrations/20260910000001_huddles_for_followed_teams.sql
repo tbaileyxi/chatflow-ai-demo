@@ -25,6 +25,7 @@ RETURNS TABLE (
   member_count  integer,
   is_private    boolean,
   is_official   boolean,
+  is_team_room  boolean,
   is_member     boolean,
   last_message_at timestamptz,
   known_names   text[],
@@ -62,7 +63,12 @@ AS $$
     h.team_id,
     COALESCE(h.member_count, 0)::integer,
     COALESCE(h.is_private, false),
+    -- Two different things that were one flag. "Official" is the badge a paid
+    -- or verified room wears. "Team room" is the auto-created community room
+    -- for a team, which is a different animal and gets filtered out of the
+    -- Teams tab — one per followed team, none of them with anybody in them.
     (COALESCE(h.is_official_team_huddle, false) OR h.official_status = 'active'),
+    COALESCE(h.is_official_team_huddle, false),
     EXISTS (
       SELECT 1 FROM public.huddle_members hm2
       WHERE hm2.huddle_id = h.id AND hm2.user_id = (SELECT uid FROM me)

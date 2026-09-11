@@ -18,6 +18,8 @@ export type TeamHuddle = {
   memberCount: number;
   isPrivate: boolean;
   isOfficial: boolean;
+  /** The team's auto-created community room, as opposed to a paid/verified one. */
+  isTeamRoom: boolean;
   isMember: boolean;
   lastMessageAt: string | null;
   knownNames: string[];
@@ -84,6 +86,13 @@ export function useTeamHuddles(teamIds: string[]) {
       }
 
       for (const h of (data ?? []) as any[]) {
+        // The team's community room is cut. There is exactly one per team,
+        // it is empty in almost every case, and a shelf of empty rooms with
+        // team logos on them is the problem this tab was meant to solve, not
+        // a solution to it. The row still exists — the bot writes to it and
+        // the /t/ landing pages read it — it just isn't offered as somewhere
+        // to go.
+        if (h.is_team_room && !h.is_member) continue;
         const row: TeamHuddle = {
           id: h.id,
           name: h.name,
@@ -92,6 +101,7 @@ export function useTeamHuddles(teamIds: string[]) {
           memberCount: h.member_count ?? 0,
           isPrivate: !!h.is_private,
           isOfficial: !!h.is_official,
+          isTeamRoom: !!h.is_team_room,
           isMember: !!h.is_member,
           lastMessageAt: h.last_message_at ?? null,
           knownNames: (h.known_names ?? []) as string[],

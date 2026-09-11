@@ -33,6 +33,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ScreenWrapper } from "@/components/ui/screen-wrapper";
+import { blockUser, reportUser } from "@/lib/moderation";
 import { colors } from "@/theme/colors";
 import { useRoomPhoto } from "@/hooks/useRoomPhoto";
 import { backfillIfEmpty } from "@/lib/roomContent";
@@ -280,6 +281,79 @@ export function HuddleSettingsScreen() {
       .select("user_id, created_at, profiles!user_id (display_name, username, avatar_url)")
       .eq("huddle_id", huddleId);
     setAdmins(adminRows ?? []);
+  };
+
+  /**
+   * Tap anyone in the roster.
+   *
+   * Reporting and blocking used to live only behind a long-press on a message
+   * and on the person's profile page. Nobody opens a profile to report
+   * somebody — you look at the list of who is in the room and act on the name.
+   * That is also where an admin already works, so the two sit together.
+   *
+   * Open to every member, not just admins: blocking is a personal wall, and
+   * needing permission to stop seeing someone would defeat it.
+   */
+  const openMemberActions = (memberId: string, name: string) => {
+    if (memberId === user?.id) {
+      navigation.navigate("Profile" as never);
+      return;
+    }
+
+    Alert.alert(name, undefined, [
+      {
+        text: "View profile",
+        onPress: () =>
+          (navigation as any).navigate("PublicProfile", {
+            userId: memberId,
+            knownAs: name,
+          }),
+      },
+      {
+        text: "Report",
+        style: "destructive",
+        onPress: () => {
+          Alert.alert(
+            `Report ${name}?`,
+            "We review every report within 24 hours.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Report",
+                style: "destructive",
+                onPress: async () => {
+                  await reportUser({ userId: memberId });
+                  Alert.alert("Reported", "Thanks — we'll take a look.");
+                },
+              },
+            ],
+          );
+        },
+      },
+      {
+        text: `Block ${name}`,
+        style: "destructive",
+        onPress: () => {
+          Alert.alert(
+            `Block ${name}?`,
+            "You won't see them anywhere in Side Huddle, in any room. They aren't told.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Block",
+                style: "destructive",
+                onPress: async () => {
+                  if (await blockUser(memberId)) {
+                    Alert.alert("Blocked", `You won't see ${name} again.`);
+                  }
+                },
+              },
+            ],
+          );
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
   };
 
   const removeMember = (memberId: string, name: string, ban = false) => {
@@ -801,9 +875,15 @@ export function HuddleSettingsScreen() {
           </CardHeader>
           <CardContent className="gap-2">
             {members?.map((m) => (
-              <View
+              <Pressable
                 key={m.userId}
-                className="flex-row items-center gap-3 py-1.5"
+                onPress={() =>
+                  openMemberActions(
+                    m.userId,
+                    m.displayName ?? m.username ?? "This member",
+                  )
+                }
+                className="flex-row items-center gap-3 py-1.5 active:opacity-70"
               >
                 <View className="h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-muted">
                   {m.avatarUrl ? (
@@ -852,7 +932,7 @@ export function HuddleSettingsScreen() {
                     </Pressable>
                   </View>
                 )}
-              </View>
+              </Pressable>
             ))}
           </CardContent>
         </Card>
