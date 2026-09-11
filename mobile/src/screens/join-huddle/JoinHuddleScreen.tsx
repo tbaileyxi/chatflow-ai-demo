@@ -3,6 +3,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation, type RouteProp } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
 import { Users, MessageSquare } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -133,42 +134,42 @@ export function JoinHuddleScreen() {
                   resizeMode="cover"
                 />
               ) : (
-                <Text className="text-2xl font-bold text-muted-foreground">
+                <Type variant="title" tone="muted">
                   {displayName.charAt(0)}
-                </Text>
+                </Type>
               )}
             </View>
 
-            <Text className="text-xl font-bold text-foreground">
+            <Type variant="title">
               {displayName}
-            </Text>
+            </Type>
 
             {huddle.teamCity && huddle.teamName && (
-              <Text className="text-sm text-muted-foreground">
+              <Type variant="caption" tone="muted">
                 {huddle.teamCity} {huddle.teamName}
-              </Text>
+              </Type>
             )}
 
             {/* Stats */}
             <View className="flex-row items-center gap-4">
               <View className="flex-row items-center gap-1">
                 <Users color={colors.mutedForeground} size={14} />
-                <Text className="text-sm text-muted-foreground">
+                <Type variant="caption" tone="muted">
                   {pluralize(huddle.memberCount, "member")}
-                </Text>
+                </Type>
               </View>
               <View className="flex-row items-center gap-1">
                 <MessageSquare color={colors.success} size={14} />
-                <Text className="text-sm text-success">Active chat</Text>
+                <Type variant="caption" tone="success">Active chat</Type>
               </View>
             </View>
 
             {/* Action */}
             {huddle.isMember ? (
               <View className="w-full gap-2">
-                <Text className="text-center text-sm text-muted-foreground">
+                <Type variant="caption" tone="muted" className="text-center">
                   You're already a member
-                </Text>
+                </Type>
                 <Button
                   size="lg"
                   onPress={() =>
@@ -180,9 +181,9 @@ export function JoinHuddleScreen() {
               </View>
             ) : huddle.isPrivate ? (
               <View className="w-full gap-2">
-                <Text className="text-center text-sm text-muted-foreground">
+                <Type variant="caption" tone="muted" className="text-center">
                   This room is private. The owner lets people in.
-                </Text>
+                </Type>
                 <Button size="lg" className="w-full" onPress={handleJoin}>
                   Ask to join
                 </Button>

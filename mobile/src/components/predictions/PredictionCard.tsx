@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { View, Text, Pressable, ActivityIndicator, Alert } from "react-native";
 import { Check, X, Clock, Lock, TrendingUp, TrendingDown } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { cn } from "@/lib/utils";
 import { marketSides } from "@/lib/marketSides";
 import { colors } from "@/theme/colors";
@@ -202,14 +203,14 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
 
   return (
     <View className={cn("rounded-lg border-2 p-3 gap-2", borderStyle, bgStyle)}>
-      <Text className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+      <Type variant="eyebrow" tone="muted">
         {sides.eyebrow}
-      </Text>
-      <Text className="-mt-1 text-base font-black text-foreground">{sides.headline}</Text>
+      </Type>
+      <Type variant="heading" className="-mt-1">{sides.headline}</Type>
       {market.metadata?.away && market.metadata?.home && (
-        <Text className="-mt-1 text-xs text-muted-foreground">
+        <Type variant="caption" tone="muted" className="-mt-1">
           {market.metadata.away} @ {market.metadata.home}
-        </Text>
+        </Type>
       )}
 
       {/* Resolved State */}
@@ -257,7 +258,7 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
         // Both sides styled identically. Green-vs-red read as right-vs-wrong on
         // a card whose whole point is that neither side is the safe one.
         <View className="gap-1.5">
-          <Text className="text-xs text-muted-foreground">Pick a side</Text>
+          <Type variant="caption" tone="muted">Pick a side</Type>
           <View className="flex-row gap-2">
             {([
               { pos: "YES" as const, label: sides.yesLabel, cost: yesCost },
@@ -273,18 +274,17 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
                   <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
                   <>
-                    <Text
-                      className="text-sm font-black text-success"
+                    <Type variant="captionStrong" tone="success"
+                      
                       numberOfLines={2}
                       adjustsFontSizeToFit
                       minimumFontScale={0.7}
-                      style={{ textAlign: "center" }}
-                    >
+                      style={{ textAlign: "center" }}>
                       {s.label}
-                    </Text>
-                    <Text className="text-[11px] font-medium text-muted-foreground">
+                    </Type>
+                    <Type variant="data" tone="muted">
                       {s.cost} chips
-                    </Text>
+                    </Type>
                   </>
                 )}
               </Pressable>
@@ -297,7 +297,7 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
       {!isResolved && isLocked && !userBet && (
         <View className="flex-row items-center gap-2">
           <Lock color={colors.accent} size={14} />
-          <Text className="text-sm text-accent">Game underway — picks closed</Text>
+          <Type variant="caption" className="text-accent">Game underway — picks closed</Type>
         </View>
       )}
 
@@ -324,9 +324,9 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
           {stats.total > 0 && (
             <View className="gap-1">
               <View className="flex-row justify-between">
-                <Text className="text-xs text-muted-foreground">
+                <Type variant="caption" tone="muted">
                   {leanPct}% took {leanLabel} ({stats.total} picks)
-                </Text>
+                </Type>
               </View>
               {Math.abs(divergence) >= 3 && (
                 <View className="flex-row items-center gap-1">
@@ -364,9 +364,9 @@ export function PredictionCard({ market, huddleId }: PredictionCardProps) {
       {!isResolved && market.event_start_time && (
         <View className="flex-row items-center gap-1">
           <Clock color={colors.mutedForeground} size={12} />
-          <Text className="text-xs text-muted-foreground">
+          <Type variant="caption" tone="muted">
             {timeUntil(market.event_start_time)}
-          </Text>
+          </Type>
         </View>
       )}
     </View>

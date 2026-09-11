@@ -1,5 +1,6 @@
 import { View, Text } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { Type } from "@/components/ui/Type";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HuddleCard } from "./HuddleCard";
 import { useUserHuddles, type UserHuddle } from "@/hooks/useUserHuddles";
@@ -11,7 +12,7 @@ export function YourHuddlesSection() {
   if (isLoading) {
     return (
       <View className="gap-3">
-        <Text className="text-lg font-bold text-foreground">Your Huddles</Text>
+        <Type variant="heading">Your Huddles</Type>
         <Skeleton className="h-20 w-full" />
         <Skeleton className="h-20 w-full" />
       </View>
@@ -32,7 +33,7 @@ export function YourHuddlesSection() {
 
   return (
     <View className="gap-4">
-      <Text className="text-lg font-bold text-foreground">Your Huddles</Text>
+      <Type variant="heading">Your Huddles</Type>
 
       {publicHuddles.length > 0 && (
         <HuddleGroup label="Public" huddles={publicHuddles} onPress={navigateToHuddle} />
@@ -58,9 +59,9 @@ function HuddleGroup({
 }) {
   return (
     <View className="gap-2">
-      <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <Type variant="eyebrow" tone="muted" className="tracking-wider">
         {label}
-      </Text>
+      </Type>
       {huddles.map((h) => (
         <HuddleCard key={h.id} huddle={h} onPress={() => onPress(h)} />
       ))}

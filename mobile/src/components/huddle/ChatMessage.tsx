@@ -22,6 +22,7 @@ import {
   Trash2,
 } from "lucide-react-native";
 import { Audio, Video, ResizeMode } from "expo-av";
+import { Type } from "@/components/ui/Type";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { blockUser, reportMessage } from "@/lib/moderation";
@@ -105,9 +106,9 @@ function AudioBubble({ uri }: { uri: string }) {
             style={{ width: `${Math.max(progress * 100, 2)}%` }}
           />
         </View>
-        <Text className="text-xs text-muted-foreground">
+        <Type variant="caption" tone="muted">
           {duration > 0 ? formatMs(playing ? position : duration) : "Voice message"}
-        </Text>
+        </Type>
       </View>
       <Mic color={colors.primary} size={14} />
     </Pressable>
@@ -425,9 +426,9 @@ export function ChatMessage({
                     className="h-full w-full"
                   />
                 ) : (
-                  <Text className="text-sm font-bold text-muted-foreground">
+                  <Type variant="captionStrong" tone="muted">
                     {initial}
-                  </Text>
+                  </Type>
                 )}
               </Pressable>
             )}
@@ -453,9 +454,9 @@ export function ChatMessage({
                   >
                     {displayName}
                   </Text>
-                  <Text className="text-sm text-muted-foreground">
+                  <Type variant="caption" tone="muted">
                     {formatTime(message.createdAt)}
-                  </Text>
+                  </Type>
                 </View>
               ) : null}
 
@@ -463,12 +464,12 @@ export function ChatMessage({
                   directly above (redundant). */}
               {replyTo && !hideReplyQuote && (
                 <View className="rounded-xl border-l-2 border-primary/50 bg-muted px-3 py-1.5 mb-1">
-                  <Text className="text-xs font-semibold text-primary" numberOfLines={1}>
+                  <Type variant="captionStrong" tone="primary"  numberOfLines={1}>
                     {replyTo.displayName}
-                  </Text>
-                  <Text className="text-xs text-muted-foreground" numberOfLines={2}>
+                  </Type>
+                  <Type variant="caption" tone="muted"  numberOfLines={2}>
                     {replyTo.content}
-                  </Text>
+                  </Type>
                 </View>
               )}
 
@@ -478,9 +479,9 @@ export function ChatMessage({
                   className="rounded-2xl bg-card px-3 py-2.5"
                   style={{ borderLeftWidth: 3, borderLeftColor: colors.primary }}
                 >
-                  <Text className="mb-1 text-base text-foreground">
+                  <Type variant="body" className="mb-1">
                     {cleanBotContent(message.content)}
-                  </Text>
+                  </Type>
                   <YouTubeEmbed videoId={youTubeId} />
                 </View>
               ) : isAdminWelcome ? (
@@ -545,9 +546,9 @@ export function ChatMessage({
                     );
                     return (
                       <>
-                        <Text className="text-base" style={{ color: colors.foreground }}>
+                        <Type variant="body"  style={{ color: colors.foreground }}>
                           {body}
-                        </Text>
+                        </Type>
                         {sponsor ? (
                           <Text
                             style={{
@@ -574,9 +575,9 @@ export function ChatMessage({
                       hitSlop={6}
                       className="mt-1.5 self-start"
                     >
-                      <Text className="text-[10px] text-muted-foreground/70">
+                      <Type variant="data" className="text-muted-foreground/70">
                         {outletName(message.embedCode)} ↗
-                      </Text>
+                      </Type>
                     </Pressable>
                   ) : null}
                 </View>
@@ -648,12 +649,11 @@ export function ChatMessage({
                       style={{ backgroundColor: "rgba(0,0,0,0.62)" }}
                       pointerEvents="none"
                     >
-                      <Text
-                        className="text-[10px] font-black tracking-wide text-white"
-                        numberOfLines={1}
-                      >
+                      <Type variant="dataStrong"
+                        
+                        numberOfLines={1}>
                         {message.content}
-                      </Text>
+                      </Type>
                     </View>
                   ) : null}
                 </Pressable>
@@ -678,8 +678,8 @@ export function ChatMessage({
                       )}
                       onPress={() => onReact?.(r.emoji)}
                     >
-                      <Text className="text-sm text-foreground">{r.emoji}</Text>
-                      <Text className="text-sm text-muted-foreground">{r.count}</Text>
+                      <Type variant="caption">{r.emoji}</Type>
+                      <Type variant="caption" tone="muted">{r.count}</Type>
                     </Pressable>
                   ))}
                 </View>
@@ -713,7 +713,7 @@ export function ChatMessage({
                 onPress={() => handlePickReaction(emoji)}
                 className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
               >
-                <Text className="text-lg font-bold text-foreground">{emoji}</Text>
+                <Type variant="heading">{emoji}</Type>
               </Pressable>
             ))}
             <View className="mx-0.5 h-6 w-px bg-border" />

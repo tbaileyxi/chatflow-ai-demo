@@ -1,5 +1,6 @@
 import { View, Text, Image, Animated, Pressable, ScrollView } from "react-native";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { Type } from "@/components/ui/Type";
 import { colors } from "@/theme/colors";
 import type { PresenceUser } from "@/hooks/useHuddlePresence";
 import type { HuddleMember } from "@/hooks/useHuddleMembers";
@@ -123,9 +124,9 @@ export function PresenceBar({
                       resizeMode="cover"
                     />
                   ) : (
-                    <Text className="text-[11px] font-bold text-muted-foreground">
+                    <Type variant="dataStrong" tone="muted">
                       {f.name.charAt(0).toUpperCase()}
-                    </Text>
+                    </Type>
                   )}
                 </View>
               </View>
@@ -148,13 +149,13 @@ export function PresenceBar({
               className="w-11 items-center active:opacity-70"
             >
               <View className="h-8 w-8 items-center justify-center rounded-full border border-border bg-muted">
-                <Text className="text-[10px] font-black text-primary">
+                <Type variant="dataStrong" tone="primary">
                   {overflow > 0 ? `+${overflow}` : "•••"}
-                </Text>
+                </Type>
               </View>
-              <Text className="mt-1 text-[9px] font-bold text-primary" numberOfLines={1}>
+              <Type variant="dataStrong" tone="primary" className="mt-1" numberOfLines={1}>
                 See all
-              </Text>
+              </Type>
             </Pressable>
           ) : null}
         </ScrollView>
@@ -179,9 +180,9 @@ export function PresenceBar({
             className="mx-4 my-1 items-center rounded-full px-4 py-1.5"
             style={{ backgroundColor: colors.primary }}
           >
-            <Text className="text-xs font-semibold text-primary-foreground">
+            <Type variant="captionStrong" tone="onPrimary">
               {entryBanner}
-            </Text>
+            </Type>
           </View>
         </Animated.View>
       )}

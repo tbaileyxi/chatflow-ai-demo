@@ -5,6 +5,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Bot, CalendarDays, Plus, Users } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { DEV_ROOMS_STORAGE_KEY } from "@/config/devData";
 import { FEATURED_EVENTS, getFeaturedEventById } from "@/config/featuredEvents";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,9 +32,9 @@ function AvatarStack({ names }: { names: string[] }) {
           className="h-9 w-9 items-center justify-center rounded-full border-2 border-card bg-muted"
           style={index > 0 ? { marginLeft: -9 } : undefined}
         >
-          <Text className="text-xs font-black text-foreground">
+          <Type variant="captionStrong">
             {initials(name)}
-          </Text>
+          </Type>
         </View>
       ))}
     </View>
@@ -98,12 +99,12 @@ export function EventLobbyScreen() {
           <ArrowLeft color={colors.primary} size={24} />
         </Pressable>
         <View className="flex-1">
-          <Text className="text-xs font-black uppercase tracking-widest text-primary">
+          <Type variant="eyebrow" tone="primary">
             Event lobby
-          </Text>
-          <Text className="text-2xl font-black text-foreground" numberOfLines={1}>
+          </Type>
+          <Type variant="title"  numberOfLines={1}>
             {event.name}
-          </Text>
+          </Type>
         </View>
       </View>
 
@@ -114,24 +115,24 @@ export function EventLobbyScreen() {
         <View className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
           <View className="flex-row items-center gap-2">
             <Bot color={colors.primary} size={18} />
-            <Text className="text-base font-black text-foreground">
+            <Type variant="heading">
               {event.botLabel} loads automatically
-            </Text>
+            </Type>
           </View>
-          <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+          <Type variant="caption" tone="muted" className="mt-2 leading-5">
             You never enter a room with strangers. Jump into a friend's room or
             start your own event room and invite your people.
-          </Text>
+          </Type>
         </View>
 
         <View>
           <View className="mb-3 flex-row items-center justify-between">
-            <Text className="text-sm font-black uppercase tracking-widest text-muted-foreground">
+            <Type variant="eyebrow" tone="muted">
               Friends with rooms
-            </Text>
-            <Text className="text-xs font-bold text-muted-foreground">
+            </Type>
+            <Type variant="captionStrong" tone="muted">
               {event.rooms.length} active
-            </Text>
+            </Type>
           </View>
 
           {event.rooms.length > 0 ? (
@@ -152,18 +153,18 @@ export function EventLobbyScreen() {
                   <View className="flex-row items-center gap-3">
                     <AvatarStack names={room.friends} />
                     <View className="flex-1">
-                      <Text className="text-lg font-black text-foreground" numberOfLines={1}>
+                      <Type variant="title"  numberOfLines={1}>
                         {room.name}
-                      </Text>
-                      <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+                      </Type>
+                      <Type variant="caption" tone="muted"  numberOfLines={1}>
                         {room.friends.join(", ")} are watching
-                      </Text>
+                      </Type>
                     </View>
                   </View>
                   <View className="mt-4 rounded-full bg-primary px-4 py-3">
-                    <Text className="text-center text-sm font-black text-primary-foreground">
+                    <Type variant="captionStrong" tone="onPrimary" className="text-center">
                       Jump in
-                    </Text>
+                    </Type>
                   </View>
                 </Pressable>
               ))}
@@ -172,14 +173,14 @@ export function EventLobbyScreen() {
             <View className="rounded-2xl border border-border bg-card p-4">
               <View className="flex-row items-center gap-2">
                 <Users color={colors.mutedForeground} size={18} />
-                <Text className="text-base font-black text-foreground">
+                <Type variant="heading">
                   No friends here yet
-                </Text>
+                </Type>
               </View>
-              <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+              <Type variant="caption" tone="muted" className="mt-2 leading-5">
                 Start the first room. Your friends see you in Friends Now and
                 can jump in from there.
-              </Text>
+              </Type>
             </View>
           )}
         </View>
@@ -200,12 +201,12 @@ export function EventLobbyScreen() {
               <Plus color={colors.primaryForeground} size={22} />
             </View>
             <View className="flex-1">
-              <Text className="text-lg font-black text-foreground">
+              <Type variant="title">
                 Start your own room
-              </Text>
-              <Text className="text-sm text-muted-foreground">
+              </Type>
+              <Type variant="caption" tone="muted">
                 Sends the presence loop: you are watching, friends can jump in.
-              </Text>
+              </Type>
             </View>
           </View>
         </Pressable>
@@ -213,13 +214,13 @@ export function EventLobbyScreen() {
         <View className="rounded-2xl border border-border bg-card p-4">
           <View className="flex-row items-center gap-2">
             <CalendarDays color={colors.primary} size={17} />
-            <Text className="text-sm font-black uppercase tracking-widest text-primary">
+            <Type variant="eyebrow" tone="primary">
               {event.startsAtLabel}
-            </Text>
+            </Type>
           </View>
-          <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+          <Type variant="caption" tone="muted" className="mt-2 leading-5">
             {event.subtitle}
-          </Text>
+          </Type>
         </View>
       </ScrollView>
     </SafeAreaView>

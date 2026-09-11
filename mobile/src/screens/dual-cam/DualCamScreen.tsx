@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import { X } from "lucide-react-native";
 import { DualCam, DualCamPreview } from "../../../modules/dual-cam";
+import { Type } from "@/components/ui/Type";
 import { MAX_SECONDS } from "@/lib/faceReaction";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
@@ -133,19 +134,19 @@ export function DualCamScreen() {
         {gameContext ? (
           <View className="absolute bottom-44 left-0 right-0 items-center px-6">
             <View className="rounded-full bg-black/70 px-4 py-2">
-              <Text className="text-xs font-black tracking-wide text-white">
+              <Type variant="dataStrong">
                 {gameContext}
-              </Text>
+              </Type>
             </View>
           </View>
         ) : null}
 
         <View className="absolute bottom-0 left-0 right-0 items-center pb-10">
-          <Text className="mb-3 text-xs font-bold text-white/70">
+          <Type variant={recording ? "dataStrong" : "captionStrong"} tone="muted" className="mb-3">
             {recording
               ? `${Math.min(elapsed, MAX_SECONDS).toFixed(1)}s`
               : `Hold to record · ${MAX_SECONDS}s max`}
-          </Text>
+          </Type>
 
           <Pressable
             onPressIn={begin}

@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, Switch, Text, View } from "react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { colors } from "@/theme/colors";
@@ -125,10 +126,10 @@ export function NotificationSettings() {
       {ROWS.map((row) => (
         <View key={row.key} className="flex-row items-center justify-between">
           <View className="flex-1 pr-3">
-            <Text className="text-sm font-medium text-foreground">
+            <Type variant="captionStrong">
               {row.label}
-            </Text>
-            <Text className="text-xs text-muted-foreground">{row.hint}</Text>
+            </Type>
+            <Type variant="caption" tone="muted">{row.hint}</Type>
           </View>
           <Switch
             value={prefs[row.key]}
@@ -144,10 +145,10 @@ export function NotificationSettings() {
         onPress={() => Linking.openSettings()}
         className="mt-1 active:opacity-70"
       >
-        <Text className="text-xs text-muted-foreground">
+        <Type variant="caption" tone="muted">
           Banners, sounds and badges are controlled by iOS.{" "}
-          <Text className="font-bold text-primary">Open iOS Settings →</Text>
-        </Text>
+          <Type variant="bodyStrong" tone="primary">Open iOS Settings →</Type>
+        </Type>
       </Pressable>
     </View>
   );

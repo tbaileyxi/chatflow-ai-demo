@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   UserPlus,
 } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { colors } from "@/theme/colors";
 import {
   useLiveGameContext,
@@ -116,33 +117,33 @@ function ScoreLine({ game, gameState }: { game: GameContext; gameState: GameStat
     return (
       <View className="mt-0.5 flex-row items-center gap-1.5">
         <PulsingDot />
-        <Text className="text-[11px] font-bold text-foreground" numberOfLines={1}>
-          {away} <Text className="font-black">{game.awayScore ?? 0}</Text>
-          <Text className="text-muted-foreground"> · </Text>
-          {home} <Text className="font-black">{game.homeScore ?? 0}</Text>
-        </Text>
-        <Text className="text-[10px] font-bold text-primary" numberOfLines={1}>
+        <Type variant="dataStrong"  numberOfLines={1}>
+          {away} <Type variant="heading">{game.awayScore ?? 0}</Type>
+          <Type variant="body" tone="muted"> · </Type>
+          {home} <Type variant="heading">{game.homeScore ?? 0}</Type>
+        </Type>
+        <Type variant="dataStrong" tone="primary"  numberOfLines={1}>
           {[game.period, game.clock].filter(Boolean).join(" ") || "LIVE"}
-        </Text>
+        </Type>
       </View>
     );
   }
 
   if (gameState === "postgame") {
     return (
-      <Text className="mt-0.5 text-[11px] text-muted-foreground" numberOfLines={1}>
-        {away} <Text className="font-bold text-foreground">{game.awayScore ?? 0}</Text>
+      <Type variant="data" tone="muted" className="mt-0.5" numberOfLines={1}>
+        {away} <Type variant="bodyStrong">{game.awayScore ?? 0}</Type>
         {" · "}
-        {home} <Text className="font-bold text-foreground">{game.homeScore ?? 0}</Text>
-        <Text className="font-bold text-success"> FINAL</Text>
-      </Text>
+        {home} <Type variant="bodyStrong">{game.homeScore ?? 0}</Type>
+        <Type variant="bodyStrong" tone="success"> FINAL</Type>
+      </Type>
     );
   }
 
   return (
-    <Text className="mt-0.5 text-[11px] text-muted-foreground" numberOfLines={1}>
+    <Type variant="data" tone="muted" className="mt-0.5" numberOfLines={1}>
       {away} at {home} · {formatNextGameDate(game.startTime)}
-    </Text>
+    </Type>
   );
 }
 
@@ -233,9 +234,9 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
               resizeMode="cover"
             />
           ) : (
-            <Text className="text-sm font-bold text-muted-foreground">
+            <Type variant="captionStrong" tone="muted">
               {displayName.charAt(0)}
-            </Text>
+            </Type>
           )}
         </View>
 
@@ -251,12 +252,9 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
           }
         >
           <View className="flex-row items-center gap-1.5">
-            <Text
-              className="shrink text-base font-black text-foreground"
-              numberOfLines={1}
-            >
+            <Type variant="heading" className="shrink" numberOfLines={1}>
               {displayName}
-            </Text>
+            </Type>
             {huddle.isVerified ? (
               <ShieldCheck color={colors.primary} size={14} />
             ) : null}
@@ -266,10 +264,10 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
             {hasGame ? (
               <ScoreLine game={game!} gameState={gameState} />
             ) : (
-              <Text className="mt-0.5 text-[11px] text-muted-foreground">
+              <Type variant="data" tone="muted" className="mt-0.5">
                 {huddle.memberCount}{" "}
                 {huddle.memberCount === 1 ? "member" : "members"}
-              </Text>
+              </Type>
             )}
 
             {/* The sponsor board drops over this line rather than owning a
@@ -291,12 +289,12 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
                   ],
                 }}
               >
-                <Text className="text-[11px] font-black text-primary" numberOfLines={1}>
+                <Type variant="dataStrong" tone="primary"  numberOfLines={1}>
                   {sponsor.brandName}
-                  <Text className="font-bold text-muted-foreground">
+                  <Type variant="bodyStrong" tone="muted">
                     {"  "}supports {huddle.teamName ?? "these"} fans
-                  </Text>
-                </Text>
+                  </Type>
+                </Type>
               </Animated.View>
             ) : null}
           </View>
@@ -332,9 +330,9 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
           className="items-center border-t border-border bg-muted/30 py-1"
           hitSlop={4}
         >
-          <Text className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          <Type variant="eyebrow" tone="muted">
             {sponsor.brandName} supports this room
-          </Text>
+          </Type>
         </Pressable>
       ) : null}
     </View>

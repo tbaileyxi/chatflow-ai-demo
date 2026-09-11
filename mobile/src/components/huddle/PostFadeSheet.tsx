@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { X, Swords } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
+import { Type } from "@/components/ui/Type";
 import { cn } from "@/lib/utils";
 import { colors } from "@/theme/colors";
 import type { GameContext } from "@/hooks/useLiveGameContext";
@@ -93,13 +94,13 @@ export function PostFadeSheet({
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-2">
               <Swords size={18} color={colors.primary} />
-              <Text className="text-lg font-black text-foreground">Take a side</Text>
+              <Type variant="title">Take a side</Type>
             </View>
             <Pressable onPress={onClose} hitSlop={8}>
               <X size={20} color={colors.mutedForeground} />
             </Pressable>
           </View>
-          <Text className="mt-0.5 text-xs text-muted-foreground">{matchup}</Text>
+          <Type variant="caption" tone="muted" className="mt-0.5">{matchup}</Type>
 
           <ScrollView className="mt-4" keyboardShouldPersistTaps="handled">
             {isLoading ? (
@@ -111,19 +112,19 @@ export function PostFadeSheet({
               // game there is nothing honest to fade, and a made-up number is
               // what made every game look identical before.
               <View className="rounded-xl border border-border bg-muted/30 p-4">
-                <Text className="text-sm font-bold text-foreground">
+                <Type variant="captionStrong">
                   No lines for this game yet
-                </Text>
-                <Text className="mt-1 text-xs leading-4 text-muted-foreground">
+                </Type>
+                <Type variant="caption" tone="muted" className="mt-1 leading-4">
                   Props show up once the book posts them — usually a few hours before
                   first pitch.
-                </Text>
+                </Type>
               </View>
             ) : (
               <>
-                <Text className="mb-1.5 text-xs font-bold uppercase text-muted-foreground">
+                <Type variant="eyebrow" tone="muted" className="mb-1.5">
                   Prop
-                </Text>
+                </Type>
                 {markets.map((m) => (
                   <Pressable
                     key={m.marketId}
@@ -135,16 +136,16 @@ export function PostFadeSheet({
                         : "border-border bg-muted/40",
                     )}
                   >
-                    <Text className="text-sm font-black text-foreground">{m.label}</Text>
-                    <Text className="mt-0.5 text-xs text-muted-foreground">
+                    <Type variant="captionStrong">{m.label}</Type>
+                    <Type variant="caption" tone="muted" className="mt-0.5">
                       {m.description}
-                    </Text>
+                    </Type>
                   </Pressable>
                 ))}
 
-                <Text className="mt-3 mb-1.5 text-xs font-bold uppercase text-muted-foreground">
+                <Type variant="eyebrow" tone="muted" className="mt-3 mb-1.5">
                   Your side
-                </Text>
+                </Type>
                 <View className="flex-row gap-2">
                   {(["over", "under"] as const).map((s) => (
                     <Pressable
@@ -169,9 +170,9 @@ export function PostFadeSheet({
                   ))}
                 </View>
 
-                <Text className="mt-3 mb-1.5 text-xs font-bold uppercase text-muted-foreground">
+                <Type variant="eyebrow" tone="muted" className="mt-3 mb-1.5">
                   Stake
-                </Text>
+                </Type>
                 <View className="flex-row gap-2">
                   {STAKES.map((s) => (
                     <Pressable
@@ -184,9 +185,9 @@ export function PostFadeSheet({
                           : "border-border bg-muted/40",
                       )}
                     >
-                      <Text className="text-center text-sm font-black text-foreground">
+                      <Type variant="captionStrong" className="text-center">
                         {s}
-                      </Text>
+                      </Type>
                     </Pressable>
                   ))}
                 </View>
@@ -202,9 +203,9 @@ export function PostFadeSheet({
                   {submitting ? (
                     <ActivityIndicator color={colors.primaryForeground} />
                   ) : (
-                    <Text className="text-sm font-black text-primary-foreground">
+                    <Type variant="captionStrong" tone="onPrimary">
                       Post {sideLabel(side)} · {stake} chips
-                    </Text>
+                    </Type>
                   )}
                 </Pressable>
 
@@ -224,9 +225,9 @@ export function PostFadeSheet({
                   }}
                   className="mt-3 items-center rounded-xl border border-border px-4 py-3"
                 >
-                  <Text className="text-sm font-bold text-foreground">
+                  <Type variant="captionStrong">
                     See all picks
-                  </Text>
+                  </Type>
                 </Pressable>
               </>
             )}

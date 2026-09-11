@@ -12,6 +12,7 @@
 
 import { useState } from "react";
 import { View, Text, TextInput, Pressable, ActivityIndicator, Alert } from "react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { colors } from "@/theme/colors";
 
@@ -53,22 +54,22 @@ export function ClaimRoomBox({
   if (!open) {
     return (
       <Pressable onPress={() => setOpen(true)} hitSlop={8} className="mt-6 items-center">
-        <Text className="text-sm font-semibold text-muted-foreground underline">
+        <Type variant="captionStrong" tone="muted" className="underline">
           Have a code?
-        </Text>
+        </Type>
       </Pressable>
     );
   }
 
   return (
     <View className="mt-6 gap-3 rounded-2xl border border-border p-4">
-      <Text className="text-sm font-bold text-foreground">
+      <Type variant="captionStrong">
         Enter your code
-      </Text>
-      <Text className="text-xs leading-4 text-muted-foreground">
+      </Type>
+      <Type variant="caption" tone="muted" className="leading-4">
         If we emailed you about your chapter, the code is in that email. It sets up
         your room and makes you the owner.
-      </Text>
+      </Type>
       <TextInput
         value={code}
         onChangeText={setCode}
@@ -87,9 +88,9 @@ export function ClaimRoomBox({
         {busy ? (
           <ActivityIndicator color={colors.primaryForeground} />
         ) : (
-          <Text className="text-sm font-black text-primary-foreground">
+          <Type variant="captionStrong" tone="onPrimary">
             Claim my room
-          </Text>
+          </Type>
         )}
       </Pressable>
     </View>

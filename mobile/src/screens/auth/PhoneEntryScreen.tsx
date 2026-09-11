@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ChevronLeft } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -140,14 +141,14 @@ export function PhoneEntryScreen() {
             </View>
 
             <View className="px-8 pt-8">
-              <Text className="text-3xl font-black text-foreground">
+              <Type variant="display">
                 {authMethod === "sms" ? "What's your number?" : "Sign in"}
-              </Text>
-              <Text className="mt-2 text-base leading-6 text-muted-foreground">
+              </Type>
+              <Type variant="body" tone="muted" className="mt-2">
                 {authMethod === "sms"
                   ? "One text with a code. No password, ever — and it's how your friends find you."
                   : "We'll email you a code."}
-              </Text>
+              </Type>
 
               <View className="mt-6 gap-4">
                 {authMethod === "email" && (
@@ -226,11 +227,11 @@ export function PhoneEntryScreen() {
                   setAuthMethod(authMethod === "sms" ? "email" : "sms");
                 }}
               >
-                <Text className="text-sm font-bold text-primary">
+                <Type variant="captionStrong" tone="primary">
                   {authMethod === "sms"
                     ? "Signed up with an email? Use that instead"
                     : "Use my phone number instead"}
-                </Text>
+                </Type>
               </Pressable>
             </View>
           </ScrollView>

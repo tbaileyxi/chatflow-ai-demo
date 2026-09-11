@@ -1,5 +1,6 @@
 import { View, Text, Pressable } from "react-native";
 import { UserPlus } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { colors } from "@/theme/colors";
 
 type Props = {
@@ -52,9 +53,9 @@ export function AdminWelcomeCard({ content, onInvite }: Props) {
       className="rounded-2xl bg-card px-4 py-3"
       style={{ borderLeftWidth: 3, borderLeftColor: colors.primary }}
     >
-      <Text className="text-base leading-6" style={{ color: colors.foreground }}>
+      <Type variant="body" className="leading-6"  style={{ color: colors.foreground }}>
         {renderRich(body)}
-      </Text>
+      </Type>
 
       <Pressable
         onPress={onInvite}
@@ -64,9 +65,9 @@ export function AdminWelcomeCard({ content, onInvite }: Props) {
         hitSlop={6}
       >
         <UserPlus color={colors.primaryForeground} size={16} />
-        <Text className="text-sm font-bold text-primary-foreground">
+        <Type variant="captionStrong" tone="onPrimary">
           {ctaLabel}
-        </Text>
+        </Type>
       </Pressable>
     </View>
   );

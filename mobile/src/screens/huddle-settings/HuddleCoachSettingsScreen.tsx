@@ -3,6 +3,7 @@ import { View, Text, Pressable, Alert, Switch } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation, type RouteProp } from "@react-navigation/native";
 import { ChevronLeft, Bot, Info } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -92,9 +93,9 @@ export function HuddleCoachSettingsScreen() {
           <ChevronLeft color={colors.foreground} size={24} />
         </Pressable>
         <Bot color={colors.secondary} size={22} />
-        <Text className="flex-1 text-lg font-bold text-foreground">
+        <Type variant="heading" className="flex-1">
           Coach Settings
-        </Text>
+        </Type>
       </View>
 
       <ScreenWrapper scroll className="gap-4 pt-2">
@@ -115,9 +116,9 @@ export function HuddleCoachSettingsScreen() {
                     isEnabled ? "bg-success" : "bg-muted-foreground",
                   )}
                 />
-                <Text className="text-sm font-medium text-foreground">
+                <Type variant="captionStrong">
                   {isEnabled ? "Enabled" : "Disabled"}
-                </Text>
+                </Type>
               </View>
               <Switch
                 value={isEnabled}
@@ -149,14 +150,14 @@ export function HuddleCoachSettingsScreen() {
                 )}
                 onPress={() => setPersonality(p.value)}
               >
-                <Text className="text-xl">{p.emoji}</Text>
+                <Type variant="title">{p.emoji}</Type>
                 <View className="flex-1">
-                  <Text className="text-sm font-semibold text-foreground">
+                  <Type variant="captionStrong">
                     {p.label}
-                  </Text>
-                  <Text className="text-xs text-muted-foreground">
+                  </Type>
+                  <Type variant="caption" tone="muted">
                     {p.desc}
-                  </Text>
+                  </Type>
                 </View>
               </Pressable>
             ))}
@@ -167,9 +168,9 @@ export function HuddleCoachSettingsScreen() {
         <View className="flex-row items-start gap-2 rounded-lg border border-border bg-muted/50 p-3">
           <Info color={colors.mutedForeground} size={16} />
           <View className="flex-1">
-            <Text className="text-sm text-muted-foreground">
-              Members can use <Text className="font-semibold text-secondary">@coach</Text> followed by a question in the chat.
-            </Text>
+            <Type variant="caption" tone="muted">
+              Members can use <Type variant="bodyStrong" className="text-secondary">@coach</Type> followed by a question in the chat.
+            </Type>
           </View>
         </View>
 

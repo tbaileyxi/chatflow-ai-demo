@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { View, Text, Pressable } from "react-native";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { colors } from "@/theme/colors";
 import { PredictionCard } from "./PredictionCard";
@@ -66,9 +67,9 @@ export function PredictionCardInMessage({ content, huddleId }: PredictionCardInM
             <ChevronLeft color={colors.mutedForeground} size={16} />
           </Pressable>
 
-          <Text className="text-xs text-muted-foreground">
+          <Type variant="caption" tone="muted">
             {activeIndex + 1} / {markets.length}
-          </Text>
+          </Type>
 
           <Pressable
             onPress={() =>

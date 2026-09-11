@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { Check, UserPlus } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { useContactMatch } from "@/hooks/useContactMatch";
 import { useProfile } from "@/hooks/useProfile";
 import { createRoomAndShare } from "@/lib/invite";
@@ -25,7 +26,7 @@ function Monogram({ name, size = 40 }: { name: string; size?: number }) {
       className="items-center justify-center rounded-full bg-muted"
       style={{ width: size, height: size }}
     >
-      <Text className="font-bold text-muted-foreground">{letter}</Text>
+      <Type variant="bodyStrong" tone="muted">{letter}</Type>
     </View>
   );
 }
@@ -45,33 +46,33 @@ export function FindYourPeople({ onDone }: { onDone?: () => void }) {
   if (state === "idle") {
     return (
       <View>
-        <Text className="text-4xl font-black leading-tight text-foreground">
+        <Type variant="display" className="leading-tight">
           Find your people.
-        </Text>
-        <Text className="mt-4 text-xl leading-8 text-muted-foreground">
+        </Type>
+        <Type variant="title" tone="muted" className="mt-4 leading-8">
           See which of your contacts are already watching games here.
-        </Text>
-        <Text className="mt-4 text-sm leading-5 text-muted-foreground">
+        </Type>
+        <Type variant="caption" tone="muted" className="mt-4 leading-5">
           Your contacts never leave your phone. We scramble them on this device
           and only check for matches — no names, no numbers, nothing stored.
-        </Text>
+        </Type>
 
         <Pressable
           onPress={run}
           className="mt-8 rounded-full bg-primary px-5 py-4 active:opacity-80"
         >
-          <Text className="text-center text-base font-black text-primary-foreground">
+          <Type variant="heading" tone="onPrimary" className="text-center">
             Check my contacts
-          </Text>
+          </Type>
         </Pressable>
 
         {/* Only in onboarding, where onDone is the way forward. On the profile
             there is nothing to skip TO — the screen is the destination. */}
         {onDone ? (
           <Pressable onPress={onDone} className="mt-4 py-3 active:opacity-70">
-            <Text className="text-center text-base font-semibold text-muted-foreground">
+            <Type variant="bodyStrong" tone="muted" className="text-center">
               Not now
-            </Text>
+            </Type>
           </Pressable>
         ) : null}
       </View>
@@ -82,9 +83,9 @@ export function FindYourPeople({ onDone }: { onDone?: () => void }) {
     return (
       <View className="items-center py-16">
         <ActivityIndicator color={colors.primary} />
-        <Text className="mt-4 text-base text-muted-foreground">
+        <Type variant="body" tone="muted" className="mt-4">
           {state === "requesting" ? "Asking permission..." : "Looking..."}
-        </Text>
+        </Type>
       </View>
     );
   }
@@ -92,22 +93,22 @@ export function FindYourPeople({ onDone }: { onDone?: () => void }) {
   if (state === "denied" || state === "error") {
     return (
       <View>
-        <Text className="text-2xl font-black text-foreground">
+        <Type variant="title">
           {state === "denied" ? "No problem." : "That didn't work."}
-        </Text>
-        <Text className="mt-3 text-base leading-6 text-muted-foreground">
+        </Type>
+        <Type variant="body" tone="muted" className="mt-3 leading-6">
           {state === "denied"
             ? "You can still invite people with a link, or turn contacts on later in Settings."
             : "You can try again later from your profile."}
-        </Text>
+        </Type>
         {onDone ? (
           <Pressable
             onPress={onDone}
             className="mt-8 rounded-full bg-primary px-5 py-4 active:opacity-80"
           >
-            <Text className="text-center text-base font-black text-primary-foreground">
+            <Type variant="heading" tone="onPrimary" className="text-center">
               Continue
-            </Text>
+            </Type>
           </Pressable>
         ) : null}
       </View>
@@ -127,13 +128,13 @@ export function FindYourPeople({ onDone }: { onDone?: () => void }) {
   if (matches.length === 0) {
     return (
       <View>
-        <Text className="text-2xl font-black text-foreground">
+        <Type variant="title">
           Nobody you know is here yet.
-        </Text>
-        <Text className="mt-3 text-base leading-6 text-muted-foreground">
+        </Type>
+        <Type variant="body" tone="muted" className="mt-3 leading-6">
           None of your contacts are on Side Huddle so far. That's normal this
           early — the app is one person until it's two.
-        </Text>
+        </Type>
 
         <View className="mt-6 flex-row gap-2">
           {[0, 1, 2, 3, 4].map((i) => (
@@ -141,7 +142,7 @@ export function FindYourPeople({ onDone }: { onDone?: () => void }) {
               key={i}
               className="h-11 w-11 items-center justify-center rounded-full border border-dashed border-border"
             >
-              <Text className="text-lg text-muted-foreground">+</Text>
+              <Type variant="heading" tone="muted">+</Type>
             </View>
           ))}
         </View>
@@ -166,19 +167,19 @@ export function FindYourPeople({ onDone }: { onDone?: () => void }) {
           }}
           className="mt-7 rounded-full bg-primary px-5 py-4 active:opacity-80"
         >
-          <Text className="text-center text-base font-black text-primary-foreground">
+          <Type variant="heading" tone="onPrimary" className="text-center">
             {inviting ? "One moment..." : "Text someone the link"}
-          </Text>
-          <Text className="mt-0.5 text-center text-xs font-bold text-primary-foreground/70">
+          </Type>
+          <Type variant="captionStrong" className="mt-0.5 text-center text-primary-foreground/70">
             One person is all it takes
-          </Text>
+          </Type>
         </Pressable>
 
         {onDone ? (
           <Pressable onPress={onDone} className="mt-4 py-2 active:opacity-70">
-            <Text className="text-center text-sm font-black text-muted-foreground">
+            <Type variant="captionStrong" tone="muted" className="text-center">
               I'll do it later
-            </Text>
+            </Type>
           </Pressable>
         ) : null}
       </View>
@@ -187,9 +188,9 @@ export function FindYourPeople({ onDone }: { onDone?: () => void }) {
 
   return (
     <View>
-      <Text className="text-2xl font-black text-foreground">
+      <Type variant="title">
         {matches.length} {matches.length === 1 ? "person" : "people"} you know.
-      </Text>
+      </Type>
 
       <ScrollView style={{ maxHeight: 340 }} className="mt-4">
         <View className="gap-1">
@@ -214,28 +215,26 @@ export function FindYourPeople({ onDone }: { onDone?: () => void }) {
                   <Monogram name={primary} />
                 )}
                 <View className="flex-1">
-                  <Text
-                    className="text-base font-bold text-foreground"
-                    numberOfLines={1}
-                  >
+                  <Type variant="bodyStrong"
+                    
+                    numberOfLines={1}>
                     {primary}
-                  </Text>
+                  </Type>
                   {secondary ? (
-                    <Text
-                      className="text-xs text-muted-foreground"
-                      numberOfLines={1}
-                    >
+                    <Type variant="caption" tone="muted"
+                      
+                      numberOfLines={1}>
                       {secondary} on Side Huddle
-                    </Text>
+                    </Type>
                   ) : null}
                 </View>
 
                 {m.alreadyConnected ? (
                   <View className="flex-row items-center gap-1.5 rounded-full bg-muted px-3 py-1.5">
                     <Check color={colors.mutedForeground} size={14} />
-                    <Text className="text-xs font-black text-muted-foreground">
+                    <Type variant="captionStrong" tone="muted">
                       Added
-                    </Text>
+                    </Type>
                   </View>
                 ) : (
                   <Pressable
@@ -251,9 +250,9 @@ export function FindYourPeople({ onDone }: { onDone?: () => void }) {
                     ) : (
                       <UserPlus color={colors.primaryForeground} size={14} />
                     )}
-                    <Text className="text-xs font-black text-primary-foreground">
+                    <Type variant="captionStrong" tone="onPrimary">
                       Add
-                    </Text>
+                    </Type>
                   </Pressable>
                 )}
               </View>
@@ -267,9 +266,9 @@ export function FindYourPeople({ onDone }: { onDone?: () => void }) {
           onPress={onDone}
           className="mt-6 rounded-full bg-primary px-5 py-4 active:opacity-80"
         >
-          <Text className="text-center text-base font-black text-primary-foreground">
+          <Type variant="heading" tone="onPrimary" className="text-center">
             Continue
-          </Text>
+          </Type>
         </Pressable>
       ) : null}
     </View>

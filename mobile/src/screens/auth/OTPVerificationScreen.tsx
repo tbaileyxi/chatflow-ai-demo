@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ChevronLeft } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { colors } from "@/theme/colors";
@@ -171,21 +172,21 @@ export function OTPVerificationScreen() {
             </View>
 
             <View className="px-8 pt-8">
-              <Text className="text-3xl font-black text-foreground">
+              <Type variant="display">
                 Enter code
-              </Text>
-              <Text className="mt-2 text-base text-muted-foreground">
+              </Type>
+              <Type variant="body" tone="muted" className="mt-2">
                 Sent to {method === "email" ? email : phone}
-              </Text>
+              </Type>
               {statusMessage ? (
-                <Text className="mt-3 text-sm text-muted-foreground">
+                <Type variant="caption" tone="muted" className="mt-3">
                   {statusMessage}
-                </Text>
+                </Type>
               ) : null}
               {errorMessage ? (
-                <Text className="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <Type variant="caption" tone="danger" className="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
                   {errorMessage}
-                </Text>
+                </Type>
               ) : null}
 
               <View className="mt-8 gap-6">
@@ -213,9 +214,9 @@ export function OTPVerificationScreen() {
 
                 <View className="items-center">
                   {resendTimer > 0 ? (
-                    <Text className="text-sm text-muted-foreground">
+                    <Type variant="caption" tone="muted">
                       Resend code in {resendTimer}s
-                    </Text>
+                    </Type>
                   ) : (
                     <Button variant="ghost" onPress={handleResend}>
                       Resend Code

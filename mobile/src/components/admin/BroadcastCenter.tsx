@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { View, Text, Pressable, Alert, ScrollView } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { Send, CheckSquare, Square } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -121,7 +122,7 @@ export function BroadcastCenter() {
     <View className="gap-4">
       {/* Message */}
       <View className="gap-2">
-        <Text className="text-sm font-semibold text-foreground">Message</Text>
+        <Type variant="captionStrong">Message</Type>
         <Textarea
           value={content}
           onChangeText={setContent}
@@ -133,9 +134,9 @@ export function BroadcastCenter() {
       {/* Team selector */}
       <View className="gap-2">
         <View className="flex-row items-center justify-between">
-          <Text className="text-sm font-semibold text-foreground">
+          <Type variant="captionStrong">
             Destination Teams ({selectedTeams.size})
-          </Text>
+          </Type>
           <Button variant="ghost" size="xs" onPress={selectAll}>
             {selectedTeams.size === teams?.length ? "Deselect All" : "Select All"}
           </Button>
@@ -184,9 +185,9 @@ export function BroadcastCenter() {
       >
         <View className="flex-row items-center gap-2">
           <Send color={colors.primaryForeground} size={16} />
-          <Text className="text-sm font-semibold text-primary-foreground">
+          <Type variant="captionStrong" tone="onPrimary">
             {sending ? "Sending..." : `Broadcast to ${selectedTeams.size} Team${selectedTeams.size !== 1 ? "s" : ""}`}
-          </Text>
+          </Type>
         </View>
       </Button>
     </View>

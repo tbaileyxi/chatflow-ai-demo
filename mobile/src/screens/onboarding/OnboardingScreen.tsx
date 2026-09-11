@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
 import { Radio, Users } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { FindYourPeople } from "@/components/profile/FindYourPeople";
@@ -246,17 +247,17 @@ export function OnboardingScreen() {
                   </>
                 ) : onProfileStep ? (
                   <>
-                    <Text className="text-4xl font-black leading-tight text-foreground">
+                    <Type variant="display">
                       What should we call you?
-                    </Text>
+                    </Type>
                     {/* Invited people are one tap from a room full of people
                         who already know them. Saying so makes this read as
                         walking through a door rather than filling in a form. */}
                     {invited ? (
-                      <Text className="mt-3 text-lg leading-7 text-muted-foreground">
+                      <Type variant="heading" tone="muted" className="mt-3">
                         Last thing — this is the name on every message you send.
                         Then you're in.
-                      </Text>
+                      </Type>
                     ) : null}
 
                     <TextInput
@@ -270,14 +271,14 @@ export function OnboardingScreen() {
                       className="mt-6 rounded-xl border border-border bg-muted px-4 py-3.5 text-lg text-foreground"
                       style={{ color: colors.foreground }}
                     />
-                    <Text className="mt-2 text-sm text-muted-foreground">
+                    <Type variant="caption" tone="muted" className="mt-2">
                       This is what people see in rooms.
-                    </Text>
+                    </Type>
 
-                    <Text className="mt-8 text-xl font-black text-foreground">
+                    <Type variant="title" className="mt-8">
                       Phone number
-                      <Text className="text-muted-foreground"> (optional)</Text>
-                    </Text>
+                      <Type variant="body" tone="muted"> (optional)</Type>
+                    </Type>
 
                     <TextInput
                       value={phone}
@@ -289,10 +290,10 @@ export function OnboardingScreen() {
                       className="mt-3 rounded-xl border border-border bg-muted px-4 py-3.5 text-lg text-foreground"
                       style={{ color: colors.foreground }}
                     />
-                    <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+                    <Type variant="caption" tone="muted" className="mt-2">
                       We never text you. Ever. It is only so people who already
                       have your number can find you here.
-                    </Text>
+                    </Type>
                   </>
                 ) : (
                   <>
@@ -301,12 +302,12 @@ export function OnboardingScreen() {
                         <ActiveIcon color={colors.primary} size={30} />
                       ) : null}
                     </View>
-                    <Text className="mt-8 text-4xl font-black leading-tight text-foreground">
+                    <Type variant="display" className="mt-8">
                       {activeSlide?.title}
-                    </Text>
-                    <Text className="mt-4 text-xl leading-8 text-muted-foreground">
+                    </Type>
+                    <Type variant="title" tone="muted" className="mt-4">
                       {activeSlide?.body}
-                    </Text>
+                    </Type>
                   </>
                 )}
 
@@ -352,9 +353,9 @@ export function OnboardingScreen() {
                     }
                   }}
                 >
-                  <Text className="text-center text-base font-black text-primary-foreground">
+                  <Type center variant="heading" tone="onPrimary">
                     {primaryLabel}
-                  </Text>
+                  </Type>
                 </Pressable>
               )}
 
@@ -367,27 +368,27 @@ export function OnboardingScreen() {
                   it has to be live at /terms before submitting. See
                   APP_STORE_UGC.md. */}
               {onProfileStep ? (
-                <Text className="px-2 text-center text-[11px] leading-4 text-muted-foreground">
+                <Type center variant="data" tone="muted" className="px-2">
                   By continuing you agree to the{" "}
-                  <Text
-                    className="font-bold text-primary"
+                  <Type variant="bodyStrong" tone="primary"
+                    
                     onPress={() =>
                       Linking.openURL(TOS_URL)
                     }
                   >
                     Terms
-                  </Text>{" "}
+                  </Type>{" "}
                   and{" "}
-                  <Text
-                    className="font-bold text-primary"
+                  <Type variant="bodyStrong" tone="primary"
+                    
                     onPress={() =>
                       Linking.openURL(PRIVACY_URL)
                     }
                   >
                     Privacy Policy
-                  </Text>
+                  </Type>
                   . Side Huddle has zero tolerance for objectionable content.
-                </Text>
+                </Type>
               ) : null}
               {/* Not for invited users. They start at the name step, so Back
                   would rewind them into the marketing slides they were
@@ -399,9 +400,9 @@ export function OnboardingScreen() {
                   disabled={saving}
                   onPress={() => setStep((value) => Math.max(0, value - 1))}
                 >
-                  <Text className="text-center text-sm font-black text-muted-foreground">
+                  <Type center variant="captionStrong" tone="muted">
                     Back
-                  </Text>
+                  </Type>
                 </Pressable>
               ) : null}
             </View>

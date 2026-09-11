@@ -35,6 +35,7 @@ import { useContactMatch } from "@/hooks/useContactMatch";
 import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Eyebrow, Type } from "@/components/ui/Type";
+import { fonts } from "@/theme/type";
 import { colors } from "@/theme/colors";
 
 function initials(name: string) {
@@ -67,7 +68,7 @@ function MonogramAvatar({ name, size = 36 }: { name: string; size?: number }) {
         borderWidth: 1,
       }}
     >
-      <Text style={{ color: palette.fg, fontSize: size * 0.34, fontWeight: "800" }}>
+      <Text style={{ color: palette.fg, fontSize: size * 0.34, fontFamily: fonts.display }}>
         {initials(name)}
       </Text>
     </View>
@@ -225,7 +226,7 @@ function FriendsNowSection() {
         </View>
         <Pressable className="flex-row items-center gap-1" onPress={inviteFriends}>
           <UserPlus color={colors.primary} size={14} />
-          <Text className="text-xs font-black text-primary">Invite</Text>
+          <Type variant="captionStrong" tone="primary">Invite</Type>
         </Pressable>
       </View>
 
@@ -239,23 +240,23 @@ function FriendsNowSection() {
             <UserPlus color={colors.primary} size={18} />
           </View>
           <View className="flex-1">
-            <Text className="text-base font-black text-foreground">
+            <Type variant="heading">
               {scanning ? "Looking..." : "Find friends you know"}
-            </Text>
-            <Text className="text-sm text-muted-foreground">
+            </Type>
+            <Type variant="caption" tone="muted">
               Checked on your phone. Nothing is stored.
-            </Text>
+            </Type>
           </View>
         </Pressable>
       ) : null}
 
       {newPeople.length > 0 ? (
         <View className="mb-4 gap-2">
-          <Text className="text-xs font-black uppercase tracking-widest text-primary">
+          <Type variant="eyebrow" tone="primary">
             {newPeople.length === 1
               ? "Someone you know is here"
               : `${newPeople.length} people you know are here`}
-          </Text>
+          </Type>
           {newPeople.slice(0, 5).map((m) => {
             // Their Side Huddle name can be anything, or "User". What you have
             // them saved as in your own phone is the name that identifies them.
@@ -271,12 +272,12 @@ function FriendsNowSection() {
                   <MonogramAvatar name={label} size={36} />
                 )}
                 <View className="flex-1">
-                  <Text className="text-base font-black text-foreground" numberOfLines={1}>
+                  <Type variant="heading"  numberOfLines={1}>
                     {label}
-                  </Text>
-                  <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+                  </Type>
+                  <Type variant="caption" tone="muted"  numberOfLines={1}>
                     From your contacts
-                  </Text>
+                  </Type>
                 </View>
                 <Pressable
                   onPress={async () => {
@@ -286,7 +287,7 @@ function FriendsNowSection() {
                   hitSlop={8}
                   className="rounded-full bg-primary px-4 py-1.5 active:opacity-80"
                 >
-                  <Text className="text-xs font-black text-primary-foreground">Add</Text>
+                  <Type variant="captionStrong" tone="onPrimary">Add</Type>
                 </Pressable>
               </View>
             );
@@ -341,12 +342,11 @@ function FriendsNowSection() {
                   <MonogramAvatar name={f.name} size={56} />
                 )}
               </View>
-              <Text
-                className="mt-1.5 text-center text-xs font-bold text-foreground"
-                numberOfLines={1}
-              >
+              <Type variant="captionStrong" className="mt-1.5 text-center"
+                
+                numberOfLines={1}>
                 {f.name.split(/\s+/)[0]}
-              </Text>
+              </Type>
               <Text
                 className={
                   f.isLive
@@ -366,25 +366,25 @@ function FriendsNowSection() {
               className="w-[88px] items-center justify-center active:opacity-70"
             >
               <View className="h-14 w-14 items-center justify-center rounded-full border border-border bg-card">
-                <Text className="text-sm font-black text-primary">
+                <Type variant="captionStrong" tone="primary">
                   {expanded ? "−" : `+${hiddenCount}`}
-                </Text>
+                </Type>
               </View>
-              <Text className="mt-1.5 text-center text-xs font-bold text-primary">
+              <Type variant="captionStrong" tone="primary" className="mt-1.5 text-center">
                 {expanded ? "Less" : "All"}
-              </Text>
+              </Type>
             </Pressable>
           ) : null}
         </ScrollView>
       ) : (
         <View className="rounded-2xl border border-border bg-card p-4">
-          <Text className="text-base font-black text-foreground">
+          <Type variant="heading">
             Nobody here yet
-          </Text>
-          <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+          </Type>
+          <Type variant="caption" tone="muted" className="mt-2 leading-5">
             Invite someone, or find people you already know. When they check
             into a room it shows up here so you can jump in.
-          </Text>
+          </Type>
           {/* "find people you already know" was the right thing to say and did
               nothing — it was a sentence, not a control. Someone looking at an
               empty friends list is the most willing they will ever be to hand
@@ -395,9 +395,9 @@ function FriendsNowSection() {
               disabled={scanning}
               className="mt-4 self-start rounded-full bg-primary px-5 py-3 active:opacity-80"
             >
-              <Text className="text-sm font-black text-primary-foreground">
+              <Type variant="captionStrong" tone="onPrimary">
                 {scanning ? "Looking..." : "Find people you know"}
-              </Text>
+              </Type>
             </Pressable>
           ) : null}
         </View>
@@ -464,7 +464,7 @@ function YourRoomsSection() {
             somebody — and the room exists because of that. Same destination
             for now; the word is what changes what people expect of it. */}
         <Pressable onPress={() => navigation.navigate("CreateSideHuddle")}>
-          <Text className="text-sm font-black text-primary">＋ Invite</Text>
+          <Type variant="captionStrong" tone="primary">＋ Invite</Type>
         </Pressable>
       </View>
 
@@ -493,14 +493,14 @@ function YourRoomsSection() {
         <View className="rounded-2xl border border-border bg-card p-4">
           <View className="flex-row items-center gap-2">
             <Lock color={colors.primary} size={17} />
-            <Text className="text-base font-black text-foreground">
+            <Type variant="heading">
               No rooms yet
-            </Text>
+            </Type>
           </View>
-          <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+          <Type variant="caption" tone="muted" className="mt-2 leading-5">
             Create a room anchored to a team. Invite-only — only people with
             your link can join.
-          </Text>
+          </Type>
         </View>
       )}
     </View>
@@ -582,9 +582,9 @@ export function HomeScreen() {
           )}
           {unreadCount > 0 ? (
             <View className="absolute -right-1 -top-1 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5">
-              <Text className="text-[10px] font-black text-destructive-foreground">
+              <Type variant="dataStrong" className="text-destructive-foreground">
                 {unreadCount > 9 ? "9+" : unreadCount}
-              </Text>
+              </Type>
             </View>
           ) : null}
         </Pressable>

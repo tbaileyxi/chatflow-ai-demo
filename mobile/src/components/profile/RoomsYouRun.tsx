@@ -3,6 +3,7 @@ import { Image, Pressable, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { Crown, Lock } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { colors } from "@/theme/colors";
@@ -59,13 +60,13 @@ export function RoomsYouRun() {
     <View className="gap-2">
       {totalPending > 0 ? (
         <View className="mb-1 rounded-xl bg-primary/10 px-3 py-2">
-          <Text className="text-sm font-black text-primary">
+          <Type variant="captionStrong" tone="primary">
             {totalPending} {totalPending === 1 ? "person is" : "people are"}{" "}
             waiting to join
-          </Text>
-          <Text className="mt-0.5 text-xs text-muted-foreground">
+          </Type>
+          <Type variant="caption" tone="muted" className="mt-0.5">
             They can't get in until you let them.
-          </Text>
+          </Type>
         </View>
       ) : null}
 
@@ -87,36 +88,33 @@ export function RoomsYouRun() {
                   resizeMode="cover"
                 />
               ) : (
-                <Text className="text-sm font-bold text-muted-foreground">
+                <Type variant="captionStrong" tone="muted">
                   {room.name.charAt(0)}
-                </Text>
+                </Type>
               )}
             </View>
 
             <View className="min-w-0 flex-1">
               <View className="flex-row items-center gap-1.5">
-                <Text
-                  className="shrink text-sm font-bold text-foreground"
-                  numberOfLines={1}
-                >
+                <Type variant="captionStrong" className="shrink" numberOfLines={1}>
                   {room.name}
-                </Text>
+                </Type>
                 <Crown color={colors.primary} size={11} />
                 {room.isPrivate ? (
                   <Lock color={colors.mutedForeground} size={10} />
                 ) : null}
               </View>
-              <Text className="mt-0.5 text-[11px] text-muted-foreground">
+              <Type variant="data" tone="muted" className="mt-0.5">
                 {room.memberCount}{" "}
                 {room.memberCount === 1 ? "member" : "members"}
-              </Text>
+              </Type>
             </View>
 
             {waiting > 0 ? (
               <View className="rounded-full bg-destructive px-2 py-0.5">
-                <Text className="text-[11px] font-black text-white">
+                <Type variant="dataStrong">
                   {waiting}
-                </Text>
+                </Type>
               </View>
             ) : null}
           </Pressable>

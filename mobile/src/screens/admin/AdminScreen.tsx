@@ -3,6 +3,7 @@ import { View, Text, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { ChevronLeft, LayoutDashboard, Users, Radio } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { useAuth } from "@/hooks/useAuth";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { UserManagement } from "@/components/admin/UserManagement";
@@ -36,9 +37,9 @@ export function AdminScreen() {
         <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
           <ChevronLeft color={colors.foreground} size={24} />
         </Pressable>
-        <Text className="flex-1 text-lg font-bold text-foreground">
+        <Type variant="heading" className="flex-1">
           Admin Panel
-        </Text>
+        </Type>
       </View>
 
       {/* Tabs */}

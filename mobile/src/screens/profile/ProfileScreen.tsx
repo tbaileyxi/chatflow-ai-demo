@@ -15,6 +15,7 @@ import {
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
+import { Type } from "@/components/ui/Type";
 import { useAuth } from "@/hooks/useAuth";
 import { useInAppNotifications } from "@/hooks/useInAppNotifications";
 import { consumeInvite, extractInviteCode } from "@/hooks/useInviteHandler";
@@ -286,7 +287,7 @@ export function ProfileScreen() {
       <ScreenWrapper scroll className="gap-4 pt-2">
         {/* Header */}
         <View className="flex-row items-center justify-between">
-          <Text className="text-2xl font-bold text-foreground">Profile</Text>
+          <Type variant="title">Profile</Type>
           {hasAdminAccess && (
             <Badge variant="secondary">
               {userRole === "admin" ? "Admin" : "Content Admin"}
@@ -308,20 +309,20 @@ export function ProfileScreen() {
                 resizeMode="cover"
               />
             ) : (
-              <Text className="text-3xl font-bold text-muted-foreground">
+              <Type variant="display" tone="muted">
                 {initial}
-              </Text>
+              </Type>
             )}
             <View className="absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-primary">
               <Camera color={colors.primaryForeground} size={16} />
             </View>
           </Pressable>
-          <Text className="text-xs font-semibold text-primary">
+          <Type variant="captionStrong" tone="primary">
             {uploadingAvatar ? "Uploading..." : "Tap photo to upload"}
-          </Text>
-          <Text className="text-sm text-muted-foreground">
+          </Type>
+          <Type variant="caption" tone="muted">
             {user?.phone ?? user?.email ?? ""}
-          </Text>
+          </Type>
         </View>
 
         {OFFICIAL_HUDDLES_ENABLED && (
@@ -329,17 +330,17 @@ export function ProfileScreen() {
             <CardContent className="gap-3 pt-4">
               <View className="flex-row items-center gap-2">
                 <Crown color={colors.primary} size={18} />
-                <Text className="text-base font-bold text-foreground">
+                <Type variant="bodyStrong">
                   Official Huddles
-                </Text>
+                </Type>
                 <Badge variant="outline" className="ml-auto">
                   $29/mo
                 </Badge>
               </View>
-              <Text className="text-sm leading-5 text-muted-foreground">
+              <Type variant="caption" tone="muted">
                 Verified badge, team-page listing, multiple admins, approval
                 membership, and an about page with links.
-              </Text>
+              </Type>
             </CardContent>
           </Card>
         )}
@@ -348,9 +349,9 @@ export function ProfileScreen() {
           <CardContent className="gap-3 pt-4">
             <View className="flex-row items-center gap-2">
               <Bell color={colors.primary} size={18} />
-              <Text className="text-base font-bold text-foreground">
+              <Type variant="bodyStrong">
                 Notifications Center
-              </Text>
+              </Type>
               {unreadCount > 0 && (
                 <Badge variant="secondary" className="ml-auto">
                   {`${unreadCount} unread`}
@@ -368,13 +369,13 @@ export function ProfileScreen() {
               </Button>
             )}
             {notificationsLoading ? (
-              <Text className="text-sm text-muted-foreground">
+              <Type variant="caption" tone="muted">
                 Loading alerts...
-              </Text>
+              </Type>
             ) : notifications.length === 0 ? (
-              <Text className="text-sm leading-5 text-muted-foreground">
+              <Type variant="caption" tone="muted">
                 Friend check-ins, game alerts, bot drops, invites, and pick results will collect here.
-              </Text>
+              </Type>
             ) : (
               <View className="gap-2">
                 {notifications.map((notification) => {
@@ -401,16 +402,16 @@ export function ProfileScreen() {
                         )}
                         <View className="flex-1">
                           <View className="flex-row items-start justify-between gap-2">
-                            <Text className="flex-1 text-sm font-bold text-foreground">
+                            <Type variant="captionStrong" className="flex-1">
                               {notification.title}
-                            </Text>
-                            <Text className="text-xs font-semibold text-muted-foreground">
+                            </Type>
+                            <Type variant="captionStrong" tone="muted">
                               {formatNotificationTime(notification.createdAt)}
-                            </Text>
+                            </Type>
                           </View>
-                          <Text className="mt-1 text-sm leading-5 text-muted-foreground">
+                          <Type variant="caption" tone="muted" className="mt-1">
                             {notification.body}
-                          </Text>
+                          </Type>
 
                           {/* Pending invite: explicit Join + Dismiss so it's
                               obvious how to act (not a guess-the-tap). */}
@@ -420,12 +421,11 @@ export function ProfileScreen() {
                                 onPress={() => handleOpenNotification(notification.id)}
                                 className="flex-1 items-center rounded-lg bg-primary py-2 active:opacity-80"
                               >
-                                <Text
-                                  className="text-sm font-bold"
-                                  style={{ color: colors.primaryForeground }}
-                                >
+                                <Type variant="captionStrong"
+                                  
+                                  style={{ color: colors.primaryForeground }}>
                                   Join huddle
-                                </Text>
+                                </Type>
                               </Pressable>
                               <Pressable
                                 onPress={() => markRead(notification.id)}
@@ -477,9 +477,9 @@ export function ProfileScreen() {
               onSubmitEditing={Keyboard.dismiss}
             />
             <View className="flex-row items-center justify-between">
-              <Text className="text-xs text-muted-foreground">
+              <Type variant="caption" tone="muted">
                 {bio.length}/280
-              </Text>
+              </Type>
               <Button size="sm" onPress={handleSave} disabled={saving}>
                 {saving ? "Saving..." : "Save Changes"}
               </Button>
@@ -510,10 +510,10 @@ export function ProfileScreen() {
               onPress={() => navigation.navigate("Ledger" as any)}
               className="flex-row items-center justify-between active:opacity-70"
             >
-              <Text className="text-base font-bold text-foreground">
+              <Type variant="bodyStrong">
                 Your picks
-              </Text>
-              <Text className="text-sm text-muted-foreground">›</Text>
+              </Type>
+              <Type variant="caption" tone="muted">›</Type>
             </Pressable>
           </CardContent>
         </Card>
@@ -548,17 +548,17 @@ export function ProfileScreen() {
             <Button variant="destructive" onPress={handleSignOut}>
               <View className="flex-row items-center gap-2">
                 <LogOut color={colors.destructiveForeground} size={16} />
-                <Text className="text-sm font-medium text-destructive-foreground">
+                <Type variant="captionStrong" tone="default">
                   Sign Out
-                </Text>
+                </Type>
               </View>
             </Button>
             <Button variant="ghost" onPress={handleDeleteAccount}>
               <View className="flex-row items-center gap-2">
                 <X color={colors.destructive} size={16} />
-                <Text className="text-sm font-medium text-destructive">
+                <Type variant="captionStrong" tone="danger">
                   Delete Account
-                </Text>
+                </Type>
               </View>
             </Button>
             {hasAdminAccess && (
@@ -568,9 +568,9 @@ export function ProfileScreen() {
               >
                 <View className="flex-row items-center gap-2">
                   <Shield color={colors.primary} size={16} />
-                  <Text className="text-sm font-medium text-foreground">
+                  <Type variant="captionStrong">
                     Admin Panel
-                  </Text>
+                  </Type>
                 </View>
               </Button>
             )}
@@ -584,9 +584,9 @@ export function ProfileScreen() {
             >
               <View className="flex-row items-center gap-2">
                 <Megaphone color={colors.primary} size={16} />
-                <Text className="text-sm font-medium text-foreground">
+                <Type variant="captionStrong">
                   Sponsor a team
-                </Text>
+                </Type>
               </View>
             </Button>
             <Button
@@ -595,9 +595,9 @@ export function ProfileScreen() {
             >
               <View className="flex-row items-center gap-2">
                 <FileText color={colors.primary} size={16} />
-                <Text className="text-sm font-medium text-foreground">
+                <Type variant="captionStrong">
                   Terms of Use (EULA)
-                </Text>
+                </Type>
               </View>
             </Button>
             <Button
@@ -606,9 +606,9 @@ export function ProfileScreen() {
             >
               <View className="flex-row items-center gap-2">
                 <Lock color={colors.primary} size={16} />
-                <Text className="text-sm font-medium text-foreground">
+                <Type variant="captionStrong">
                   Privacy Policy
-                </Text>
+                </Type>
               </View>
             </Button>
           </CardContent>

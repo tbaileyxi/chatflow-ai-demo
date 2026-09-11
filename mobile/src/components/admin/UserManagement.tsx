@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View, Text, Image, Alert, FlatList } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Ban, ShieldCheck, ShieldOff, Crown } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -128,22 +129,22 @@ export function UserManagement() {
             {item.avatarUrl ? (
               <Image source={{ uri: item.avatarUrl }} className="h-full w-full" />
             ) : (
-              <Text className="text-sm font-bold text-muted-foreground">
+              <Type variant="captionStrong" tone="muted">
                 {initial}
-              </Text>
+              </Type>
             )}
           </View>
           <View className="flex-1 gap-0.5">
             <View className="flex-row items-center gap-2">
-              <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
+              <Type variant="captionStrong"  numberOfLines={1}>
                 {name}
-              </Text>
+              </Type>
               <RoleBadge role={item.role} />
             </View>
             {item.phoneNumber && (
-              <Text className="text-xs text-muted-foreground">
+              <Type variant="caption" tone="muted">
                 {item.phoneNumber}
-              </Text>
+              </Type>
             )}
           </View>
           {(isBanned || isBlocked) && (
@@ -163,7 +164,7 @@ export function UserManagement() {
             >
               <View className="flex-row items-center gap-1">
                 <ShieldCheck color={colors.success} size={12} />
-                <Text className="text-xs text-foreground">Activate</Text>
+                <Type variant="caption">Activate</Type>
               </View>
             </Button>
           ) : (
@@ -175,7 +176,7 @@ export function UserManagement() {
               >
                 <View className="flex-row items-center gap-1">
                   <ShieldOff color={colors.accent} size={12} />
-                  <Text className="text-xs text-foreground">Block</Text>
+                  <Type variant="caption">Block</Type>
                 </View>
               </Button>
               <Button
@@ -185,7 +186,7 @@ export function UserManagement() {
               >
                 <View className="flex-row items-center gap-1">
                   <Ban color={colors.destructive} size={12} />
-                  <Text className="text-xs text-foreground">Ban</Text>
+                  <Type variant="caption">Ban</Type>
                 </View>
               </Button>
             </>
@@ -198,7 +199,7 @@ export function UserManagement() {
             >
               <View className="flex-row items-center gap-1">
                 <Crown color={colors.primary} size={12} />
-                <Text className="text-xs text-foreground">Make Admin</Text>
+                <Type variant="caption">Make Admin</Type>
               </View>
             </Button>
           )}
@@ -208,7 +209,7 @@ export function UserManagement() {
               size="xs"
               onPress={() => setRole(item, "content_admin")}
             >
-              <Text className="text-xs text-foreground">Content Admin</Text>
+              <Type variant="caption">Content Admin</Type>
             </Button>
           )}
           {item.role !== "member" && (
@@ -217,7 +218,7 @@ export function UserManagement() {
               size="xs"
               onPress={() => setRole(item, "member")}
             >
-              <Text className="text-xs text-foreground">Reset to Member</Text>
+              <Type variant="caption">Reset to Member</Type>
             </Button>
           )}
         </View>
@@ -246,9 +247,9 @@ export function UserManagement() {
           renderItem={renderUser}
           contentContainerStyle={{ gap: 12 }}
           ListEmptyComponent={
-            <Text className="py-8 text-center text-muted-foreground">
+            <Type variant="body" tone="muted" className="py-8 text-center">
               No users found
-            </Text>
+            </Type>
           }
         />
       )}

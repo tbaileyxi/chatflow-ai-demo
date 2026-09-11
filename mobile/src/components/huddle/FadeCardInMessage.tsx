@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, ActivityIndicator, Alert } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Swords } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { cn } from "@/lib/utils";
 import { colors } from "@/theme/colors";
 import { supabase } from "@/integrations/supabase/client";
@@ -191,24 +192,24 @@ export function FadeCardInMessage({
     >
       <View className="flex-row items-center gap-1.5">
         <Swords color={colors.primary} size={14} />
-        <Text className="text-xs font-black uppercase tracking-wide text-muted-foreground">
+        <Type variant="eyebrow" tone="muted">
           {isSettled ? "Fade · final" : isLocked ? "Fade · live" : "Fade"}
-        </Text>
+        </Type>
       </View>
 
-      <Text className="mt-1 text-base font-black text-foreground">
+      <Type variant="heading" className="mt-1">
         {payload.label ?? payload.description}
-      </Text>
+      </Type>
       {payload.description && payload.label ? (
-        <Text className="mt-0.5 text-xs text-muted-foreground">{payload.description}</Text>
+        <Type variant="caption" tone="muted" className="mt-0.5">{payload.description}</Type>
       ) : null}
 
       {isUnclaimed ? (
         // Bot prop nobody has taken — both sides open, one tap to claim.
         <View className="mt-2">
-          <Text className="mb-1.5 text-xs text-muted-foreground">
+          <Type variant="caption" tone="muted" className="mb-1.5">
             Pick a side · {CLAIM_STAKE} chips
-          </Text>
+          </Type>
           {/* STACKED, not side by side.
               The card sits in a chat bubble capped at 75% of screen width, so
               two buttons in a row got roughly 120px each — less than "Anything
@@ -236,13 +237,12 @@ export function FadeCardInMessage({
                 {busy ? (
                   <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
-                  <Text
-                    className="text-sm font-black text-success"
+                  <Type variant="captionStrong" tone="success"
+                    
                     numberOfLines={1}
-                    style={{ textAlign: "center" }}
-                  >
+                    style={{ textAlign: "center" }}>
                     {s === "over" ? overLabel : underLabel}
-                  </Text>
+                  </Type>
                 )}
               </Pressable>
             ))}
@@ -251,27 +251,27 @@ export function FadeCardInMessage({
       ) : isLocked || isSettled ? (
         // Head-to-head: who took which side, and what's in the pot.
         <View className="mt-2 rounded-xl border border-border bg-muted/30 px-3 py-2">
-          <Text className="text-sm font-bold text-foreground">
+          <Type variant="captionStrong">
             {nameOf(fade!.poster_id)} {posterSide === "over" ? overLabel : underLabel}
             {"  vs  "}
             {nameOf(fade!.accepter_id)} {posterSide === "over" ? underLabel : overLabel}
-          </Text>
-          <Text className="mt-0.5 text-xs text-muted-foreground">
+          </Type>
+          <Type variant="caption" tone="muted" className="mt-0.5">
             {isSettled && fade!.winner_id
               ? `${nameOf(fade!.winner_id)} won ${stake * 2} chips`
               : `${stake * 2} chip pot · settles when the game finals`}
-          </Text>
+          </Type>
         </View>
       ) : (
         // Claimed, still open — one side taken, the other is up for grabs.
         <View className="mt-2">
-          <Text className="mb-1.5 text-xs text-muted-foreground">
+          <Type variant="caption" tone="muted" className="mb-1.5">
             {/* Name the EVENT, not the mechanic. "waiting for someone to fade
                 you" describes plumbing; "JOE took the Over" is what happened. */}
             {isPoster
               ? `You took ${posterSide === "over" ? overLabel : underLabel}. Nobody's taken the other side yet.`
               : `${nameOf(fade!.poster_id)} took ${posterSide === "over" ? overLabel : underLabel}`}
-          </Text>
+          </Type>
           <Pressable
             disabled={isPoster || busy}
             onPress={take}

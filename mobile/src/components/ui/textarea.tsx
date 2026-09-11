@@ -1,4 +1,5 @@
 import { View, Text, TextInput, type TextInputProps } from "react-native";
+import { Type } from "@/components/ui/Type";
 import { cn } from "@/lib/utils";
 import { colors } from "@/theme/colors";
 
@@ -12,7 +13,7 @@ export function Textarea({ label, error, className, ...props }: TextareaProps) {
   return (
     <View className="gap-1.5">
       {label && (
-        <Text className="text-sm font-medium text-foreground">{label}</Text>
+        <Type variant="captionStrong">{label}</Type>
       )}
       <TextInput
         multiline
@@ -27,7 +28,7 @@ export function Textarea({ label, error, className, ...props }: TextareaProps) {
         {...props}
       />
       {error && (
-        <Text className="text-xs text-destructive">{error}</Text>
+        <Type variant="caption" tone="danger">{error}</Type>
       )}
     </View>
   );

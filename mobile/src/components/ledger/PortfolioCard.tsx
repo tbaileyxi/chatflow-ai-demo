@@ -1,5 +1,6 @@
 import { View, Text } from "react-native";
 import { Coins, TrendingUp, TrendingDown } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { Card, CardContent } from "@/components/ui/card";
 import { colors } from "@/theme/colors";
 import type { Portfolio } from "@/hooks/usePortfolio";
@@ -16,7 +17,7 @@ export function PortfolioCard({ portfolio }: Props) {
       <CardContent className="gap-4 pt-4">
         <View className="flex-row items-center gap-2">
           <Coins color={colors.primary} size={20} />
-          <Text className="text-lg font-bold text-foreground">Side Coins</Text>
+          <Type variant="heading">Side Coins</Type>
         </View>
 
         <View className="flex-row flex-wrap">
@@ -66,11 +67,11 @@ function StatBox({
 }) {
   return (
     <View className="w-1/2 gap-0.5 py-1">
-      <Text className="text-xs uppercase text-muted-foreground">{label}</Text>
+      <Type variant="eyebrow" tone="muted">{label}</Type>
       <View className="flex-row items-center gap-1">
-        <Text className="text-xl font-bold" style={{ color }}>
+        <Type variant="title"  style={{ color }}>
           {value}
-        </Text>
+        </Type>
         {icon}
       </View>
     </View>

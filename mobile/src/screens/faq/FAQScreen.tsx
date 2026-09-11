@@ -2,6 +2,7 @@ import { View, Text, Pressable, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { ChevronLeft, HelpCircle, Mail, ExternalLink } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { colors } from "@/theme/colors";
@@ -18,9 +19,9 @@ export function FAQScreen() {
         <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
           <ChevronLeft color={colors.foreground} size={24} />
         </Pressable>
-        <Text className="flex-1 text-lg font-bold text-foreground">
+        <Type variant="heading" className="flex-1">
           FAQ
-        </Text>
+        </Type>
       </View>
 
       <View className="gap-4 px-4 pt-4">
@@ -42,9 +43,9 @@ export function FAQScreen() {
             >
               <View className="flex-row items-center gap-2">
                 <ExternalLink color={colors.foreground} size={14} />
-                <Text className="text-sm font-medium text-foreground">
+                <Type variant="captionStrong">
                   View FAQs
-                </Text>
+                </Type>
               </View>
             </Button>
           </CardContent>
@@ -68,9 +69,9 @@ export function FAQScreen() {
             >
               <View className="flex-row items-center gap-2">
                 <ExternalLink color={colors.foreground} size={14} />
-                <Text className="text-sm font-medium text-foreground">
+                <Type variant="captionStrong">
                   Contact Us
-                </Text>
+                </Type>
               </View>
             </Button>
           </CardContent>

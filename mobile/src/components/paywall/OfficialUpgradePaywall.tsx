@@ -18,6 +18,7 @@ import {
   purchaseOfficialHuddle,
   activateOfficialOnHuddle,
 } from "@/lib/revenuecat";
+import { Type } from "@/components/ui/Type";
 import { Button } from "@/components/ui/button";
 import { PRIVACY_URL, TERMS_URL } from "@/lib/legal";
 import { colors } from "@/theme/colors";
@@ -115,9 +116,9 @@ export function OfficialUpgradePaywall({
             {/* Header */}
             <View className="mb-5 flex-row items-center gap-2">
               <ShieldCheck color={colors.primary} size={22} />
-              <Text className="text-xl font-black text-foreground">
+              <Type variant="title">
                 Make {huddleName} Official
-              </Text>
+              </Type>
             </View>
 
             {/* Benefits */}
@@ -130,8 +131,8 @@ export function OfficialUpgradePaywall({
                 "Get discovered in Search",
               ].map((line) => (
                 <View key={line} className="flex-row items-center gap-2">
-                  <Text className="text-base text-primary">✓</Text>
-                  <Text className="text-base text-foreground">{line}</Text>
+                  <Type variant="body" tone="primary">✓</Type>
+                  <Type variant="body">{line}</Type>
                 </View>
               ))}
             </View>
@@ -139,36 +140,36 @@ export function OfficialUpgradePaywall({
             {/* Price + CTA */}
             {loading ? (
               <View className="items-center py-4">
-                <Text className="text-sm text-muted-foreground">Loading…</Text>
+                <Type variant="caption" tone="muted">Loading…</Type>
               </View>
             ) : pkg ? (
               <>
-                <Text className="mb-1 text-center text-base font-bold text-foreground">
+                <Type variant="bodyStrong" className="mb-1 text-center">
                   Official Huddle
-                </Text>
-                <Text className="mb-1 text-center text-2xl font-black text-foreground">
+                </Type>
+                <Type variant="title" className="mb-1 text-center">
                   {priceLabel}
-                </Text>
-                <Text className="mb-4 text-center text-xs text-muted-foreground">
+                </Type>
+                <Type variant="caption" tone="muted" className="mb-4 text-center">
                   1-month auto-renewing subscription. Payment is charged to your
                   Apple ID at confirmation of purchase and renews automatically
                   for {priceLabel} each month unless cancelled at least 24 hours
                   before the end of the current period. Manage or cancel in your
                   Apple ID settings.
-                </Text>
+                </Type>
                 <Button onPress={handlePurchase} disabled={busy}>
                   {busy ? "Processing…" : "Make Official"}
                 </Button>
               </>
             ) : (
               <View className="rounded-xl border border-border bg-muted p-4">
-                <Text className="text-sm font-bold text-foreground">
+                <Type variant="captionStrong">
                   Subscription not yet available
-                </Text>
-                <Text className="mt-1 text-xs text-muted-foreground">
+                </Type>
+                <Type variant="caption" tone="muted" className="mt-1">
                   Our products are syncing with the App Store. Try again in a
                   few minutes. If this persists, contact support.
-                </Text>
+                </Type>
               </View>
             )}
 
@@ -179,17 +180,17 @@ export function OfficialUpgradePaywall({
                 onPress={() => Linking.openURL(TERMS_URL).catch(() => {})}
                 hitSlop={8}
               >
-                <Text className="text-xs font-medium text-muted-foreground underline">
+                <Type variant="captionStrong" tone="muted" className="underline">
                   Terms of Use (EULA)
-                </Text>
+                </Type>
               </Pressable>
               <Pressable
                 onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}
                 hitSlop={8}
               >
-                <Text className="text-xs font-medium text-muted-foreground underline">
+                <Type variant="captionStrong" tone="muted" className="underline">
                   Privacy Policy
-                </Text>
+                </Type>
               </Pressable>
             </View>
           </Pressable>

@@ -18,6 +18,7 @@ import {
   X,
   Share2,
 } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -539,9 +540,9 @@ export function HuddleSettingsScreen() {
         <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
           <ChevronLeft color={colors.foreground} size={24} />
         </Pressable>
-        <Text className="flex-1 text-lg font-bold text-foreground">
+        <Type variant="heading" className="flex-1">
           Side Huddle Settings
-        </Text>
+        </Type>
         {isOwner && (
           <ShieldCheck color={colors.primary} size={22} />
         )}
@@ -554,9 +555,9 @@ export function HuddleSettingsScreen() {
         {isRoomAdmin && (
           <Card>
             <CardContent className="gap-3 pt-4">
-              <Text className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+              <Type variant="eyebrow" tone="muted">
                 Room photo
-              </Text>
+              </Type>
               <View className="h-40 w-full overflow-hidden rounded-xl bg-muted">
                 {huddle.photoUrl ? (
                   <Image
@@ -566,10 +567,10 @@ export function HuddleSettingsScreen() {
                   />
                 ) : (
                   <View className="h-full w-full items-center justify-center">
-                    <Text className="px-8 text-center text-sm text-muted-foreground">
+                    <Type variant="caption" tone="muted" className="px-8 text-center">
                       Your bar, last year's tailgate, the chapter banner — it sits
                       behind every message in here.
-                    </Text>
+                    </Type>
                   </View>
                 )}
               </View>
@@ -585,13 +586,13 @@ export function HuddleSettingsScreen() {
                   }}
                   className="flex-1 items-center rounded-xl bg-primary px-4 py-3"
                 >
-                  <Text className="text-sm font-black text-primary-foreground">
+                  <Type variant="captionStrong" tone="onPrimary">
                     {roomPhoto.uploading
                       ? "Uploading..."
                       : huddle.photoUrl
                         ? "Change photo"
                         : "Add a photo"}
-                  </Text>
+                  </Type>
                 </Pressable>
                 {huddle.photoUrl && (
                   <Pressable
@@ -604,7 +605,7 @@ export function HuddleSettingsScreen() {
                     }}
                     className="items-center rounded-xl border border-border px-4 py-3"
                   >
-                    <Text className="text-sm font-bold text-foreground">Remove</Text>
+                    <Type variant="captionStrong">Remove</Type>
                   </Pressable>
                 )}
               </View>
@@ -622,36 +623,36 @@ export function HuddleSettingsScreen() {
                     className="h-full w-full"
                   />
                 ) : (
-                  <Text className="text-base font-black text-muted-foreground">
+                  <Type variant="heading" tone="muted">
                     {huddle.name.charAt(0)}
-                  </Text>
+                  </Type>
                 )}
               </View>
               <View className="flex-1">
-                <Text className="text-lg font-black text-foreground">
+                <Type variant="title">
                   {huddle.name}
-                </Text>
-                <Text className="text-sm text-muted-foreground">
+                </Type>
+                <Type variant="caption" tone="muted">
                   {huddle.memberCount} member{huddle.memberCount === 1 ? "" : "s"}
-                </Text>
+                </Type>
               </View>
               {isOfficial ? (
                 <View className="rounded-full border border-primary/40 bg-primary/10 px-2 py-1">
-                  <Text className="text-xs font-black text-primary">Official</Text>
+                  <Type variant="captionStrong" tone="primary">Official</Type>
                 </View>
               ) : null}
             </View>
             {bio ? (
-              <Text className="text-sm leading-5 text-muted-foreground">
+              <Type variant="caption" tone="muted" className="leading-5">
                 {bio}
-              </Text>
+              </Type>
             ) : null}
             {websiteUrl ? (
               <View className="flex-row items-center gap-2">
                 <Globe color={colors.mutedForeground} size={14} />
-                <Text className="text-sm font-semibold text-primary">
+                <Type variant="captionStrong" tone="primary">
                   {websiteUrl}
-                </Text>
+                </Type>
               </View>
             ) : null}
           </CardContent>
@@ -665,14 +666,14 @@ export function HuddleSettingsScreen() {
             <CardContent className="gap-2 pt-4">
               <View className="flex-row items-center gap-2">
                 <ShieldCheck color={colors.primary} size={18} />
-                <Text className="text-base font-black text-foreground">
+                <Type variant="heading">
                   Make this an Official Huddle
-                </Text>
+                </Type>
               </View>
-              <Text className="text-sm leading-5 text-muted-foreground">
+              <Type variant="caption" tone="muted" className="leading-5">
                 Unlocks website link, multiple admins, approval-only membership,
                 and discoverability in Search. $29/mo.
-              </Text>
+              </Type>
               {canFlipOfficial ? (
                 <Button onPress={() => flipOfficialStatus("active")}>
                   Make Official (admin override)
@@ -692,9 +693,9 @@ export function HuddleSettingsScreen() {
             <CardContent className="gap-2 pt-4">
               <View className="flex-row items-center gap-2">
                 <ShieldCheck color={colors.primary} size={18} />
-                <Text className="text-sm font-bold text-foreground">
+                <Type variant="captionStrong">
                   Official status: {huddle.officialStatus}
-                </Text>
+                </Type>
               </View>
               {!huddle.isOfficialTeam && (
                 <Button
@@ -737,9 +738,9 @@ export function HuddleSettingsScreen() {
                 />
               ) : null}
               <View className="flex-row items-center justify-between">
-                <Text className="text-xs text-muted-foreground">
+                <Type variant="caption" tone="muted">
                   {bio.length}/280
-                </Text>
+                </Type>
                 <Button size="sm" onPress={saveAbout} disabled={saving}>
                   {saving ? "Saving..." : "Save"}
                 </Button>
@@ -766,16 +767,16 @@ export function HuddleSettingsScreen() {
                       something he isn't the one doing — it is the visitor who
                       asks. It stays as the visitor's button on the join screen,
                       where it is the right words for the right person. */}
-                  <Text className="font-bold text-foreground">
+                  <Type variant="bodyStrong">
                     {huddle.isPrivate ? "Private" : "Open"}
-                  </Text>
+                  </Type>
                   {/* WAS: "Open by Invite", which wasn't true — an open room can
                       be joined by anyone who finds it, invite or not. */}
-                  <Text className="text-sm leading-5 text-muted-foreground">
+                  <Type variant="caption" tone="muted" className="leading-5">
                     {huddle.isPrivate
                       ? "You decide who comes in."
                       : "Anyone who finds this room can walk in."}
-                  </Text>
+                  </Type>
                 </View>
                 <Button variant="outline" size="sm" onPress={togglePrivate}>
                   {huddle.isPrivate ? "Make it open" : "Make it private"}
@@ -783,29 +784,29 @@ export function HuddleSettingsScreen() {
               </View>
 
               {huddle.isPrivate && joinRequests.length === 0 ? (
-                <Text className="text-sm text-muted-foreground">
+                <Type variant="caption" tone="muted">
                   Nobody's waiting to get in.
-                </Text>
+                </Type>
               ) : null}
 
               {huddle.isPrivate && joinRequests.length > 0 ? (
                 <View className="gap-2">
-                  <Text className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                  <Type variant="eyebrow" tone="muted">
                     Requests
-                  </Text>
+                  </Type>
                   {joinRequests.map((request) => (
                     <View
                       key={request.id}
                       className="flex-row items-center gap-3 rounded-xl border border-border bg-muted p-3"
                     >
                       <View className="h-9 w-9 items-center justify-center rounded-full bg-card">
-                        <Text className="text-xs font-black text-muted-foreground">
+                        <Type variant="captionStrong" tone="muted">
                           {(request.profile?.display_name ?? request.profile?.username ?? "U").charAt(0)}
-                        </Text>
+                        </Type>
                       </View>
-                      <Text className="flex-1 font-bold text-foreground">
+                      <Type variant="bodyStrong" className="flex-1">
                         {request.profile?.display_name ?? request.profile?.username ?? "User"}
-                      </Text>
+                      </Type>
                       <Pressable onPress={() => approveRequest(request)} hitSlop={8}>
                         <Check color={colors.success} size={18} />
                       </Pressable>
@@ -831,20 +832,20 @@ export function HuddleSettingsScreen() {
                   {admins.map((admin) => (
                     <View key={admin.user_id} className="flex-row items-center gap-3">
                       <View className="h-9 w-9 items-center justify-center rounded-full bg-muted">
-                        <Text className="text-xs font-black text-muted-foreground">
+                        <Type variant="captionStrong" tone="muted">
                           {(admin.profiles?.display_name ?? admin.profiles?.username ?? "A").charAt(0)}
-                        </Text>
+                        </Type>
                       </View>
-                      <Text className="flex-1 font-bold text-foreground">
+                      <Type variant="bodyStrong" className="flex-1">
                         {admin.profiles?.display_name ?? admin.profiles?.username ?? "Admin"}
-                      </Text>
+                      </Type>
                     </View>
                   ))}
                 </View>
               ) : (
-                <Text className="text-sm text-muted-foreground">
+                <Type variant="caption" tone="muted">
                   Add admins to help monitor requests and members.
-                </Text>
+                </Type>
               )}
               <View className="flex-row gap-2">
                 <View className="flex-1">
@@ -858,7 +859,7 @@ export function HuddleSettingsScreen() {
                 <Button onPress={addAdmin}>
                   <View className="flex-row items-center gap-1.5">
                     <UserPlus color={colors.primaryForeground} size={15} />
-                    <Text className="font-bold text-primary-foreground">Add</Text>
+                    <Type variant="bodyStrong" tone="onPrimary">Add</Type>
                   </View>
                 </Button>
               </View>
@@ -892,16 +893,16 @@ export function HuddleSettingsScreen() {
                       className="h-full w-full"
                     />
                   ) : (
-                    <Text className="text-xs font-bold text-muted-foreground">
+                    <Type variant="captionStrong" tone="muted">
                       {(m.displayName ?? m.username ?? "U").charAt(0)}
-                    </Text>
+                    </Type>
                   )}
                 </View>
                 <View className="flex-1">
                   <View className="flex-row items-center gap-1.5">
-                    <Text className="text-sm font-medium text-foreground">
+                    <Type variant="captionStrong">
                       {m.displayName ?? m.username ?? "User"}
-                    </Text>
+                    </Type>
                     {m.isOwner && <Crown color={colors.primary} size={14} />}
                   </View>
                 </View>
@@ -941,9 +942,9 @@ export function HuddleSettingsScreen() {
         <Button variant="outline" onPress={() => setShowPullIn(true)}>
           <View className="flex-row items-center gap-2">
             <Share2 color={colors.primary} size={16} />
-            <Text className="text-sm font-medium text-primary">
+            <Type variant="captionStrong" tone="primary">
               Invite people
-            </Text>
+            </Type>
           </View>
         </Button>
 
@@ -955,9 +956,9 @@ export function HuddleSettingsScreen() {
             <Button variant="outline" onPress={leaveHuddle}>
               <View className="flex-row items-center gap-2">
                 <LogOut color={colors.foreground} size={16} />
-                <Text className="text-sm font-medium text-foreground">
+                <Type variant="captionStrong">
                   Leave Side Huddle
-                </Text>
+                </Type>
               </View>
             </Button>
           )}
@@ -966,17 +967,17 @@ export function HuddleSettingsScreen() {
               <Button variant="outline" onPress={ownerLeaveHuddle}>
                 <View className="flex-row items-center gap-2">
                   <LogOut color={colors.foreground} size={16} />
-                  <Text className="text-sm font-medium text-foreground">
+                  <Type variant="captionStrong">
                     Leave this room
-                  </Text>
+                  </Type>
                 </View>
               </Button>
               <Button variant="destructive" onPress={deleteHuddle}>
                 <View className="flex-row items-center gap-2">
                   <Trash2 color={colors.destructiveForeground} size={16} />
-                  <Text className="text-sm font-medium text-destructive-foreground">
+                  <Type variant="captionStrong" className="text-destructive-foreground">
                     Delete room
-                  </Text>
+                  </Type>
                 </View>
               </Button>
             </>

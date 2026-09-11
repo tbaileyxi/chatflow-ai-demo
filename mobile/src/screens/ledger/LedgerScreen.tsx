@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { Target, Clock, Trophy, Sparkles, Swords, Flame } from "lucide-react-native";
 import { useQueryClient } from "@tanstack/react-query";
+import { Type } from "@/components/ui/Type";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { usePortfolio } from "@/hooks/usePortfolio";
@@ -84,7 +85,7 @@ export function LedgerScreen() {
       >
         <View className="px-4 pb-4 pt-2">
           <View className="flex-row items-center justify-between">
-            <Text className="text-2xl font-black text-foreground">Picks</Text>
+            <Type variant="title">Picks</Type>
             {/* Picks is a tab, so there is no stack back button. Arriving from
                 a room and being stranded here is how the room context got lost
                 before. */}
@@ -95,29 +96,29 @@ export function LedgerScreen() {
                 }
                 hitSlop={8}
               >
-                <Text className="text-xs font-black text-muted-foreground">
+                <Type variant="captionStrong" tone="muted">
                   ← {fromHuddleName ?? "Back to room"}
-                </Text>
+                </Type>
               </Pressable>
             ) : null}
           </View>
-          <Text className="text-sm text-muted-foreground">
+          <Type variant="caption" tone="muted">
             Take a side, make someone take the other.
-          </Text>
+          </Type>
         </View>
 
         <View className="gap-6 px-4">
           <View className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
             <View className="flex-row items-center gap-2">
               <Sparkles color={colors.primary} size={18} />
-              <Text className="text-base font-black text-foreground">
+              <Type variant="heading">
                 Play with coins, not cash
-              </Text>
+              </Type>
             </View>
-            <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+            <Type variant="caption" tone="muted" className="mt-2 leading-5">
               Real lines, no cash. You post a take, someone in your room fades
               it, the game settles it.
-            </Text>
+            </Type>
           </View>
 
           {/* Portfolio */}
@@ -147,13 +148,13 @@ export function LedgerScreen() {
             <View className="gap-3">
               <View className="flex-row items-center gap-2">
                 <Flame color={colors.primary} size={18} />
-                <Text className="text-sm font-bold uppercase tracking-wider text-primary">
+                <Type variant="eyebrow" tone="primary" className="tracking-wider">
                   Open fades
-                </Text>
+                </Type>
                 <View className="rounded-full bg-primary/15 px-2 py-0.5">
-                  <Text className="text-xs font-black text-primary">
+                  <Type variant="captionStrong" tone="primary">
                     {openFades.length}
-                  </Text>
+                  </Type>
                 </View>
               </View>
               {openFades.map((f) => (
@@ -171,13 +172,13 @@ export function LedgerScreen() {
           ) : (
             <View className="items-center rounded-2xl border border-dashed border-border py-8">
               <Swords color={colors.mutedForeground} size={28} />
-              <Text className="mt-2 text-base font-bold text-foreground">
+              <Type variant="bodyStrong" className="mt-2">
                 Nothing to take right now
-              </Text>
-              <Text className="mt-1 px-8 text-center text-sm leading-5 text-muted-foreground">
+              </Type>
+              <Type variant="caption" tone="muted" className="mt-1 px-8 text-center leading-5">
                 Open a room on gameday and hit Fade to put a line up. Whoever
                 disagrees takes the other side.
-              </Text>
+              </Type>
             </View>
           )}
 
@@ -189,13 +190,13 @@ export function LedgerScreen() {
             <View className="gap-3">
               <View className="flex-row items-center gap-2">
                 <Swords color={colors.primary} size={18} />
-                <Text className="text-sm font-bold uppercase tracking-wider text-primary">
+                <Type variant="eyebrow" tone="primary" className="tracking-wider">
                   Your picks
-                </Text>
+                </Type>
                 <View className="rounded-full bg-primary/15 px-2 py-0.5">
-                  <Text className="text-xs font-black text-primary">
+                  <Type variant="captionStrong" tone="primary">
                     {myFades.length}
-                  </Text>
+                  </Type>
                 </View>
               </View>
               {myFades.map((f) => (
@@ -227,9 +228,9 @@ export function LedgerScreen() {
                   <View key={b.huddleId} className="gap-3">
                     <View className="flex-row items-center gap-2">
                       <Trophy color={colors.primary} size={18} />
-                      <Text className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                      <Type variant="eyebrow" tone="muted" className="tracking-wider">
                         {b.huddleName} standings
-                      </Text>
+                      </Type>
                     </View>
                     <View className="rounded-2xl border border-border bg-card p-4">
                       {b.rows.map((row, i) => (
@@ -282,13 +283,13 @@ export function LedgerScreen() {
             <View className="gap-3">
               <View className="flex-row items-center gap-2">
                 <Trophy color={colors.primary} size={18} />
-                <Text className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                <Type variant="eyebrow" tone="muted" className="tracking-wider">
                   History
-                </Text>
+                </Type>
                 <View className="rounded-full bg-muted px-2 py-0.5">
-                  <Text className="text-xs font-semibold text-muted-foreground">
+                  <Type variant="captionStrong" tone="muted">
                     {fadeHistory.length}
-                  </Text>
+                  </Type>
                 </View>
               </View>
               {fadeHistory.map((h) => (
@@ -318,15 +319,15 @@ function FadeRecordSection({ record }: { record: FadeRecord }) {
     <View className="gap-3">
       <View className="flex-row items-center gap-2">
         <Swords color={colors.primary} size={18} />
-        <Text className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+        <Type variant="eyebrow" tone="muted" className="tracking-wider">
           Fade Record
-        </Text>
+        </Type>
       </View>
       <View className="rounded-2xl border border-border bg-card p-4">
         <View className="flex-row items-center justify-between">
-          <Text className="text-2xl font-black text-foreground">
+          <Type variant="title">
             {record.wins}-{record.losses}
-          </Text>
+          </Type>
           <Text
             className={cn(
               "text-base font-bold",
@@ -344,8 +345,8 @@ function FadeRecordSection({ record }: { record: FadeRecord }) {
                 key={h.opponentId}
                 className="flex-row items-center justify-between"
               >
-                <Text className="text-sm text-foreground">vs {h.name}</Text>
-                <Text className="text-sm font-medium text-muted-foreground">
+                <Type variant="caption">vs {h.name}</Type>
+                <Type variant="captionStrong" tone="muted">
                   {h.wins}-{h.losses}{"  "}
                   <Text
                     className={cn(
@@ -356,7 +357,7 @@ function FadeRecordSection({ record }: { record: FadeRecord }) {
                     {h.net >= 0 ? "+" : ""}
                     {h.net}
                   </Text>
-                </Text>
+                </Type>
               </View>
             ))}
           </View>
@@ -381,13 +382,13 @@ function BetSection({
     <View className="gap-3">
       <View className="flex-row items-center gap-2">
         {icon}
-        <Text className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+        <Type variant="eyebrow" tone="muted" className="tracking-wider">
           {title}
-        </Text>
+        </Type>
         <View className="rounded-full bg-muted px-2 py-0.5">
-          <Text className="text-xs font-semibold text-muted-foreground">
+          <Type variant="captionStrong" tone="muted">
             {count}
-          </Text>
+          </Type>
         </View>
       </View>
       {bets.map((bet) => (
@@ -410,12 +411,12 @@ function MyFadeRow({ fade }: { fade: MyFade }) {
     <View className="rounded-2xl border border-border bg-card p-4">
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
-          <Text className="text-base font-black text-foreground">{fade.line}</Text>
-          <Text className="mt-0.5 text-xs text-muted-foreground">
+          <Type variant="heading">{fade.line}</Type>
+          <Type variant="caption" tone="muted" className="mt-0.5">
             {fade.matchup} · {fade.huddleName}
-          </Text>
+          </Type>
         </View>
-        <Text className="text-sm font-black text-foreground">{fade.stake}</Text>
+        <Type variant="captionStrong">{fade.stake}</Type>
       </View>
       <Text
         className={cn(
@@ -473,15 +474,15 @@ function OpenFadeCard({
 
   return (
     <View className="rounded-2xl border border-border bg-card p-4">
-      <Text className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+      <Type variant="eyebrow" tone="muted" className="tracking-wider">
         {fade.huddleName} · {fade.away_team} @ {fade.home_team}
-      </Text>
-      <Text className="mt-1 text-base font-black text-foreground">
+      </Type>
+      <Type variant="heading" className="mt-1">
         {fade.line_description}
-      </Text>
-      <Text className="mt-1 text-sm text-muted-foreground">
+      </Type>
+      <Type variant="caption" tone="muted" className="mt-1">
         {fade.posterName} has {posterSide} {fade.line_value} · {fade.stake} chips
-      </Text>
+      </Type>
       <Pressable
         onPress={take}
         disabled={taking}
@@ -521,7 +522,7 @@ function StandingRow({
         !last && "border-b border-border",
       )}
     >
-      <Text className="w-6 text-sm font-black text-muted-foreground">{rank}</Text>
+      <Type variant="captionStrong" tone="muted" className="w-6">{rank}</Type>
       <Text
         className={cn(
           "flex-1 text-sm",
@@ -530,9 +531,9 @@ function StandingRow({
       >
         {isMe ? "You" : row.name}
       </Text>
-      <Text className="mr-3 text-sm text-muted-foreground">
+      <Type variant="caption" tone="muted" className="mr-3">
         {row.wins}-{row.losses}
-      </Text>
+      </Type>
       <Text
         className={cn(
           "w-16 text-right text-sm font-bold",
@@ -551,11 +552,11 @@ function FadeHistoryRow({ item }: { item: FadeHistoryItem }) {
   return (
     <View className="flex-row items-center rounded-2xl border border-border bg-card p-3">
       <View className="flex-1">
-        <Text className="text-sm font-bold text-foreground">{item.line}</Text>
-        <Text className="mt-0.5 text-xs text-muted-foreground">
+        <Type variant="captionStrong">{item.line}</Type>
+        <Type variant="caption" tone="muted" className="mt-0.5">
           {item.side === "over" ? "Over" : "Under"} {item.lineValue} · vs{" "}
           {item.opponentName} · {item.huddleName}
-        </Text>
+        </Type>
       </View>
       <View className="items-end">
         <Text

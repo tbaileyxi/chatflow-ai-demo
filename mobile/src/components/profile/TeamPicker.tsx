@@ -25,6 +25,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { colors } from "@/theme/colors";
@@ -138,12 +139,12 @@ export function TeamPicker({
 
   return (
     <View>
-      <Text className="text-4xl font-black leading-tight text-foreground">
+      <Type variant="display">
         {title}
-      </Text>
-      <Text className="mt-3 text-lg leading-7 text-muted-foreground">
+      </Type>
+      <Type variant="heading" tone="muted" className="mt-3">
         {subtitle}
-      </Text>
+      </Type>
 
       {chosen.length > 0 ? (
         <View className="mt-4 flex-row flex-wrap gap-2">
@@ -157,15 +158,15 @@ export function TeamPicker({
                 {t.logoUrl ? (
                   <Image source={{ uri: t.logoUrl }} className="h-full w-full" resizeMode="cover" />
                 ) : (
-                  <Text className="text-[10px] font-bold text-muted-foreground">
+                  <Type variant="dataStrong" tone="muted">
                     {t.name.charAt(0)}
-                  </Text>
+                  </Type>
                 )}
               </View>
-              <Text className="text-xs font-bold text-foreground" numberOfLines={1}>
+              <Type variant="captionStrong"  numberOfLines={1}>
                 {t.name}
-              </Text>
-              <Text className="text-xs font-bold text-primary">×</Text>
+              </Type>
+              <Type variant="captionStrong" tone="primary">×</Type>
             </Pressable>
           ))}
         </View>
@@ -208,22 +209,21 @@ export function TeamPicker({
                         resizeMode="cover"
                       />
                     ) : (
-                      <Text className="text-sm font-bold text-muted-foreground">
+                      <Type variant="captionStrong" tone="muted">
                         {t.name.charAt(0)}
-                      </Text>
+                      </Type>
                     )}
                   </View>
                   <View className="flex-1">
-                    <Text
-                      className="text-base font-bold text-foreground"
-                      numberOfLines={1}
-                    >
+                    <Type variant="bodyStrong"
+                      
+                      numberOfLines={1}>
                       {t.city ? `${t.city} ${t.name}` : t.name}
-                    </Text>
+                    </Type>
                     {t.league ? (
-                      <Text className="text-xs text-muted-foreground">
+                      <Type variant="caption" tone="muted">
                         {t.league}
-                      </Text>
+                      </Type>
                     ) : null}
                   </View>
                   <View
@@ -234,9 +234,9 @@ export function TeamPicker({
                     }
                   >
                     {on ? (
-                      <Text className="text-xs font-black text-primary-foreground">
+                      <Type variant="captionStrong" tone="onPrimary">
                         ✓
-                      </Text>
+                      </Type>
                     ) : null}
                   </View>
                 </Pressable>
@@ -244,9 +244,9 @@ export function TeamPicker({
             })}
 
             {filtered.length === 0 ? (
-              <Text className="py-8 text-center text-sm text-muted-foreground">
+              <Type center variant="caption" tone="muted" className="py-8">
                 No teams match that.
-              </Text>
+              </Type>
             ) : null}
           </View>
         </ScrollView>
@@ -264,9 +264,9 @@ export function TeamPicker({
 
       {onSkip ? (
         <Pressable onPress={onSkip} className="mt-3 py-2 active:opacity-70">
-          <Text className="text-center text-sm font-black text-muted-foreground">
+          <Type center variant="captionStrong" tone="muted">
             Skip for now
-          </Text>
+          </Type>
         </Pressable>
       ) : null}
     </View>

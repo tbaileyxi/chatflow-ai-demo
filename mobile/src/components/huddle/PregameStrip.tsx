@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Image, Pressable, Text, View } from "react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { colors } from "@/theme/colors";
@@ -124,7 +125,7 @@ export function PregameStrip({
     <View className="border-b border-border bg-primary/[0.06] px-4 py-2.5">
       <View className="flex-row items-center gap-3">
         <View className="flex-1">
-          <Text className="text-sm font-black text-foreground">
+          <Type variant="captionStrong">
             {attendees.length === 0
               ? "Nobody's said they're watching yet"
               : mine && others.length === 0
@@ -132,11 +133,11 @@ export function PregameStrip({
                 : `${others.length === 1 ? others[0].displayName : `${others.length} others`} ${
                     others.length === 1 ? "is" : "are"
                   } in${mine ? " with you" : ""}`}
-          </Text>
+          </Type>
           {startTime ? (
-            <Text className="mt-0.5 text-[11px] text-muted-foreground">
+            <Type variant="data" tone="muted" className="mt-0.5">
               Kicks in {kickoffIn(startTime)}
-            </Text>
+            </Type>
           ) : null}
         </View>
 
@@ -155,9 +156,9 @@ export function PregameStrip({
                     resizeMode="cover"
                   />
                 ) : (
-                  <Text className="text-[10px] font-bold text-muted-foreground">
+                  <Type variant="dataStrong" tone="muted">
                     {a.displayName.charAt(0).toUpperCase()}
-                  </Text>
+                  </Type>
                 )}
               </View>
             ))}
@@ -173,12 +174,11 @@ export function PregameStrip({
               : "rounded-full bg-primary px-3.5 py-1.5 active:opacity-80"
           }
         >
-          <Text
-            className="text-xs font-black"
-            style={{ color: mine ? colors.mutedForeground : colors.primaryForeground }}
-          >
+          <Type variant="captionStrong"
+            
+            style={{ color: mine ? colors.mutedForeground : colors.primaryForeground }}>
             {mine ? "I'm out" : "I'm in"}
-          </Text>
+          </Type>
         </Pressable>
       </View>
     </View>

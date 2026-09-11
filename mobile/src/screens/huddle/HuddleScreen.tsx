@@ -22,6 +22,7 @@ import {
   useRoute,
   type RouteProp,
 } from "@react-navigation/native";
+import { Type } from "@/components/ui/Type";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useHuddleDetails } from "@/hooks/useHuddleDetails";
@@ -56,6 +57,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DualCam } from "../../../modules/dual-cam";
+import { fonts } from "@/theme/type";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
 import { CoachThinking } from "@/components/huddle/CoachThinking";
@@ -480,17 +482,17 @@ export function HuddleScreen() {
   if (!huddle) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center gap-3 bg-background px-8">
-        <Text className="text-center text-lg font-bold text-foreground">
+        <Type center variant="heading">
           Couldn't open this room
-        </Text>
-        <Text className="text-center text-sm leading-5 text-muted-foreground">
+        </Type>
+        <Type center variant="caption" tone="muted">
           It may have been deleted, or you may not have access to it.
-        </Text>
+        </Type>
         <Pressable
           onPress={() => navigation.goBack()}
           className="mt-2 rounded-xl border border-border px-5 py-3"
         >
-          <Text className="text-sm font-bold text-foreground">Go back</Text>
+          <Type variant="captionStrong">Go back</Type>
         </Pressable>
       </SafeAreaView>
     );
@@ -630,9 +632,9 @@ export function HuddleScreen() {
                 return (
                   <View className="my-4 flex-row items-center gap-3 px-6">
                     <View className="h-px flex-1 bg-border" />
-                    <Text className="text-sm font-medium text-muted-foreground">
+                    <Type variant="captionStrong" tone="muted">
                       {item.label}
-                    </Text>
+                    </Type>
                     <View className="h-px flex-1 bg-border" />
                   </View>
                 );
@@ -648,9 +650,9 @@ export function HuddleScreen() {
                     {loadingMore ? (
                       <ActivityIndicator color={colors.primary} />
                     ) : (
-                      <Text className="text-sm font-semibold text-primary">
+                      <Type variant="captionStrong" tone="primary">
                         Load older messages
-                      </Text>
+                      </Type>
                     )}
                   </Pressable>
                 );
@@ -711,9 +713,9 @@ export function HuddleScreen() {
             // your team's markets is the Picks tab.
             ListEmptyComponent={
               <View className="flex-1 items-center justify-center px-4 py-12">
-                <Text className="text-sm text-muted-foreground">
+                <Type variant="caption" tone="muted">
                   Say something to start the room.
-                </Text>
+                </Type>
               </View>
             }
             // Anchor content to bottom (iMessage-style) so short threads
@@ -761,9 +763,9 @@ export function HuddleScreen() {
             hit when they were invited and gave up. */}
         {user && !huddle.isMember && (
           <View className="border-t border-border bg-background px-4 py-3">
-            <Text className="mb-2 text-center text-sm text-muted-foreground">
+            <Type center variant="caption" tone="muted" className="mb-2">
               You're reading {huddle.name}. Join to chat.
-            </Text>
+            </Type>
             <Pressable
               disabled={joining}
               onPress={async () => {
@@ -790,9 +792,9 @@ export function HuddleScreen() {
               }}
               className="rounded-full bg-primary py-3.5 active:opacity-80"
             >
-              <Text className="text-center text-base font-black text-primary-foreground">
+              <Type center variant="heading" tone="onPrimary">
                 {joining ? "Joining…" : "Join this huddle"}
-              </Text>
+              </Type>
             </Pressable>
           </View>
         )}
@@ -800,10 +802,10 @@ export function HuddleScreen() {
         {user && huddle.isMember && (
           <>
             {typingUsers.length > 0 && (
-              <Text className="border-t border-border bg-background px-4 pt-2 text-xs italic text-muted-foreground">
+              <Type variant="caption" tone="muted" className="border-t border-border bg-background px-4 pt-2 italic">
                 {typingUsers.map((typingUser) => typingUser.displayName).join(", ")}
                 {typingUsers.length === 1 ? " is" : " are"} typing...
-              </Text>
+              </Type>
             )}
             {coachThinking && <CoachThinking />}
             {/* Only while a game is on. Out of season these are four buttons
@@ -959,7 +961,7 @@ function DevAvatar({ name, size = 34 }: { name: string; size?: number }) {
         borderWidth: 1,
       }}
     >
-      <Text style={{ color: p.fg, fontSize: size * 0.35, fontWeight: "800" }}>
+      <Text style={{ color: p.fg, fontSize: size * 0.35, fontFamily: fonts.display }}>
         {initials(name)}
       </Text>
     </View>
@@ -989,9 +991,9 @@ function TeamTile({
         className="absolute bottom-0 left-0 top-0"
         style={{ width: 3, backgroundColor: visual.ink }}
       />
-      <Text className="font-black text-white" style={{ fontSize: size * 0.29 }}>
+      <Type variant="heading"  style={{ fontSize: size * 0.29 }}>
         {visual.abbr}
-      </Text>
+      </Type>
     </View>
   );
 }
@@ -1056,9 +1058,9 @@ function DevRoomMessageRow({
   if (item.isSystem) {
     return (
       <View className="items-center px-4 py-3">
-        <Text className="text-xs font-semibold text-muted-foreground">
+        <Type variant="captionStrong" tone="muted">
           {item.content}
-        </Text>
+        </Type>
       </View>
     );
   }
@@ -1068,46 +1070,46 @@ function DevRoomMessageRow({
       <View className="mb-4 px-1">
         <View className="mb-2 flex-row items-center gap-2">
           <TeamTile visual={teamVisual} size={23} />
-          <Text className="ml-auto text-xs text-muted-foreground">
+          <Type variant="caption" tone="muted" className="ml-auto">
             {item.time ?? "now"}
-          </Text>
+          </Type>
         </View>
 
         {item.botType === "prediction" ? (
           <View className="rounded-xl border border-border bg-card">
             <View className="flex-row items-center gap-2 border-b border-border px-4 py-2.5">
-              <Text className="rounded border border-info/40 bg-info/10 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-info">
+              <Type variant="eyebrow" tone="muted" className="rounded border border-info/40 bg-info/10 px-1.5 py-0.5 text-info">
                 Market
-              </Text>
-              <Text className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+              </Type>
+              <Type variant="eyebrow" tone="muted">
                 Prediction Market
-              </Text>
-              <Text className="ml-auto text-xs font-black text-success">+4%</Text>
+              </Type>
+              <Type variant="captionStrong" tone="success" className="ml-auto">+4%</Type>
             </View>
             <View className="p-4">
-              <Text className="text-base font-black leading-6 text-foreground">
+              <Type variant="heading">
                 {item.content}
-              </Text>
+              </Type>
               <View className="mt-4 h-1.5 flex-row overflow-hidden rounded-full bg-destructive/45">
                 <View className="h-full bg-success" style={{ width: "54%" }} />
               </View>
               <View className="mt-3 flex-row gap-2">
                 <Pressable className="flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-success/50 bg-success/15 py-3 active:opacity-80">
-                  <Text className="font-black text-success">Yes</Text>
-                  <Text className="font-black text-success">54c</Text>
+                  <Type variant="heading" tone="success">Yes</Type>
+                  <Type variant="heading" tone="success">54c</Type>
                 </Pressable>
                 <Pressable className="flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-border bg-muted py-3 active:opacity-80">
-                  <Text className="font-black text-foreground">No</Text>
-                  <Text className="font-black text-muted-foreground">46c</Text>
+                  <Type variant="heading">No</Type>
+                  <Type variant="heading" tone="muted">46c</Type>
                 </Pressable>
               </View>
             </View>
           </View>
         ) : (
           <View className="rounded-xl border border-border bg-muted p-4">
-            <Text className="text-base font-semibold leading-6 text-foreground">
+            <Type variant="bodyStrong">
               {item.content}
-            </Text>
+            </Type>
           </View>
         )}
       </View>
@@ -1127,10 +1129,10 @@ function DevRoomMessageRow({
         <View className={item.isOwn ? "flex-1 items-end" : "flex-1 items-start"}>
           {!item.isOwn ? (
             <View className="mb-1 flex-row items-baseline gap-2 pl-1">
-              <Text className="text-xs font-black text-foreground">{item.author}</Text>
-              <Text className="text-[11px] text-muted-foreground">
+              <Type variant="captionStrong">{item.author}</Type>
+              <Type variant="data" tone="muted">
                 {item.time ?? "now"}
-              </Text>
+              </Type>
             </View>
           ) : null}
 
@@ -1204,7 +1206,7 @@ function DevRoomMessageRow({
                         : "max-w-[220px] text-xs leading-5 text-muted-foreground"
                     }
                   >
-                    <Text className="font-black text-foreground">{reply.author} </Text>
+                    <Type variant="heading">{reply.author} </Type>
                     {reply.content}
                   </Text>
                 </View>
@@ -1213,9 +1215,9 @@ function DevRoomMessageRow({
           ) : null}
 
           <Pressable onPress={() => onReply(item)} hitSlop={8}>
-            <Text className="mt-1.5 text-[11px] font-semibold text-muted-foreground">
+            <Type variant="dataStrong" tone="muted" className="mt-1.5">
               Reply
-            </Text>
+            </Type>
           </Pressable>
         </View>
       </View>
@@ -1465,19 +1467,19 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
           />
           <View className="flex-row items-center gap-2.5">
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Text className="px-1 text-3xl text-primary">‹</Text>
+              <Type variant="display" tone="primary" className="px-1">‹</Type>
             </Pressable>
             <TeamTile visual={teamVisual} size={36} />
             <Pressable className="flex-1" onPress={() => setShowPeople(true)}>
               <View className="flex-row items-center gap-2">
-                <Text className="flex-1 text-lg font-black text-foreground" numberOfLines={1}>
+                <Type variant="title" className="flex-1" numberOfLines={1}>
                   {roomTitle}
-                </Text>
+                </Type>
               </View>
               <View className="mt-1 flex-row items-center gap-2">
-                <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                <Type variant="caption" tone="muted"  numberOfLines={1}>
                   Members · {present.length} in room
-                </Text>
+                </Type>
               </View>
             </Pressable>
             <Pressable
@@ -1504,17 +1506,17 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
                 >
                   {gameLabel}
                 </Text>
-                <Text className="text-[10px] text-muted-foreground" numberOfLines={1}>
+                <Type variant="data" tone="muted"  numberOfLines={1}>
                   {game ? formatGameClock(game) : ""}
-                </Text>
+                </Type>
               </View>
-              <Text className="mt-0.5 text-sm font-bold text-foreground" numberOfLines={1}>
+              <Type variant="captionStrong" className="mt-0.5" numberOfLines={1}>
                 <Text>{game?.awayTeamName ?? "Away"} </Text>
-                <Text className="font-black">{game?.awayScore ?? "-"}</Text>
-                <Text className="text-muted-foreground"> · </Text>
+                <Type variant="heading">{game?.awayScore ?? "-"}</Type>
+                <Type variant="body" tone="muted"> · </Type>
                 <Text>{game?.homeTeamName ?? "Home"} </Text>
-                <Text className="font-black">{game?.homeScore ?? "-"}</Text>
-              </Text>
+                <Type variant="heading">{game?.homeScore ?? "-"}</Type>
+              </Type>
             </View>
           ) : null}
 
@@ -1523,13 +1525,13 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ alignItems: "center", gap: 8, paddingTop: 10 }}
           >
-            <Text className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            <Type variant="eyebrow" tone="muted">
               Jump
-            </Text>
+            </Type>
             {availableRooms.length === 0 ? (
-              <Text className="text-xs font-bold text-muted-foreground">
+              <Type variant="captionStrong" tone="muted">
                 No other rooms yet
-              </Text>
+              </Type>
             ) : null}
             {availableRooms.map((room) => {
               const active = room.id === huddleId;
@@ -1581,12 +1583,12 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
         {pinnedMessage ? (
           <View className="flex-row items-center gap-2 border-b border-border bg-primary/10 px-4 py-2">
             <Pin color={colors.primary} size={13} />
-            <Text className="text-[10px] font-black uppercase tracking-widest text-primary">
+            <Type variant="eyebrow" tone="primary">
               Pinned
-            </Text>
-            <Text className="flex-1 text-xs font-semibold text-foreground" numberOfLines={1}>
+            </Type>
+            <Type variant="captionStrong" className="flex-1" numberOfLines={1}>
               {pinnedMessage}
-            </Text>
+            </Type>
           </View>
         ) : null}
 
@@ -1636,9 +1638,9 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
                   }}
                 >
                   <Pin color={colors.primary} size={18} />
-                  <Text className="font-bold text-primary">
+                  <Type variant="bodyStrong" tone="primary">
                     {pinnedMessage ? "Unpin message" : "Pin a message"}
-                  </Text>
+                  </Type>
                 </Pressable>
               ) : null}
               <Pressable
@@ -1649,7 +1651,7 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
                 }}
               >
                 <UserPlus color={colors.mutedForeground} size={18} />
-                <Text className="font-bold text-foreground">Invite people</Text>
+                <Type variant="bodyStrong">Invite people</Type>
               </Pressable>
               <Pressable
                 className="flex-row items-center gap-3 px-4 py-3"
@@ -1659,9 +1661,9 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
                 }}
               >
                 <LogOut color={colors.destructive} size={18} />
-                <Text className="font-bold text-destructive">
+                <Type variant="bodyStrong" tone="danger">
                   {isOwnerRoom ? "Close room" : "Leave room"}
-                </Text>
+                </Type>
               </Pressable>
             </Pressable>
           </View>
@@ -1685,7 +1687,7 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
               resizeMode="contain"
             />
           ) : null}
-          <Text className="mt-4 text-sm font-bold text-white">Tap anywhere to close</Text>
+          <Type variant="captionStrong" className="mt-4">Tap anywhere to close</Type>
         </Pressable>
       </Modal>
 
@@ -1703,15 +1705,15 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
             <View className="mx-auto mb-4 h-1 w-12 rounded-full bg-muted-foreground/40" />
             <View className="flex-row items-start justify-between">
               <View>
-                <Text className="text-xl font-black text-foreground">
+                <Type variant="title">
                   Who’s in the room
-                </Text>
-                <Text className="mt-1 text-sm text-muted-foreground">
+                </Type>
+                <Type variant="caption" tone="muted" className="mt-1">
                   {present.length} online · watching together
-                </Text>
+                </Type>
               </View>
               <Pressable onPress={() => setShowPeople(false)} hitSlop={8}>
-                <Text className="text-2xl text-muted-foreground">×</Text>
+                <Type variant="title" tone="muted">×</Type>
               </Pressable>
             </View>
 
@@ -1720,14 +1722,14 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
                 <View key={friend.id} className="flex-row items-center gap-3">
                   <DevAvatar name={friend.name} size={44} />
                   <View className="flex-1">
-                    <Text className="font-bold text-foreground">{friend.name}</Text>
-                    <Text className="text-sm text-muted-foreground">
+                    <Type variant="bodyStrong">{friend.name}</Type>
+                    <Type variant="caption" tone="muted">
                       {friend.status === "watching"
                         ? "Watching game"
                         : friend.status === "online"
                           ? "Online"
                           : "Away"}
-                    </Text>
+                    </Type>
                   </View>
                   <View
                     className={
@@ -1743,9 +1745,9 @@ function DevHuddleRoom({ huddleId }: { huddleId: string }) {
               className="mt-6 rounded-full bg-primary px-4 py-3 active:opacity-80"
               onPress={handleShareRoom}
             >
-              <Text className="text-center text-sm font-bold text-primary-foreground">
+              <Type center variant="captionStrong" tone="onPrimary">
                 Invite more friends
-              </Text>
+              </Type>
             </Pressable>
           </Pressable>
         </Pressable>

@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { UserCircle, X } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -111,14 +112,14 @@ export function CompleteProfileCard() {
       >
         <UserCircle color={colors.primary} size={22} />
         <View className="flex-1">
-          <Text className="text-base font-black text-foreground">
+          <Type variant="heading">
             {missingName ? "Add your name" : "Add your number"}
-          </Text>
-          <Text className="mt-0.5 text-sm leading-5 text-muted-foreground">
+          </Type>
+          <Type variant="caption" tone="muted" className="mt-0.5 leading-5">
             {missingName
               ? "You're showing up as \"User\" to everyone. Takes a second."
               : "So people who have your number can find you here. We never text you."}
-          </Text>
+          </Type>
         </View>
       </Pressable>
 
@@ -141,9 +142,9 @@ export function CompleteProfileCard() {
 
             {missingName ? (
               <>
-                <Text className="text-2xl font-black text-foreground">
+                <Type variant="title">
                   What should we call you?
-                </Text>
+                </Type>
                 <TextInput
                   value={name}
                   onChangeText={setName}
@@ -154,9 +155,9 @@ export function CompleteProfileCard() {
                   className="mt-4 rounded-xl border border-border bg-muted px-4 py-3.5 text-lg text-foreground"
                   style={{ color: colors.foreground }}
                 />
-                <Text className="mt-2 text-sm text-muted-foreground">
+                <Type variant="caption" tone="muted" className="mt-2">
                   This is what people see in rooms.
-                </Text>
+                </Type>
               </>
             ) : null}
 
@@ -164,7 +165,7 @@ export function CompleteProfileCard() {
               className={`${missingName ? "mt-7" : ""} text-xl font-black text-foreground`}
             >
               Phone number
-              <Text className="text-muted-foreground"> (optional)</Text>
+              <Type variant="body" tone="muted"> (optional)</Type>
             </Text>
             <TextInput
               value={phone}
@@ -175,10 +176,10 @@ export function CompleteProfileCard() {
               className="mt-3 rounded-xl border border-border bg-muted px-4 py-3.5 text-lg text-foreground"
               style={{ color: colors.foreground }}
             />
-            <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+            <Type variant="caption" tone="muted" className="mt-2 leading-5">
               We never text you. Ever. It is only so people who already have
               your number can find you here.
-            </Text>
+            </Type>
 
             <Pressable
               onPress={save}
@@ -188,9 +189,9 @@ export function CompleteProfileCard() {
               {saving ? (
                 <ActivityIndicator color={colors.primaryForeground} />
               ) : (
-                <Text className="text-center text-base font-black text-primary-foreground">
+                <Type variant="heading" tone="onPrimary" className="text-center">
                   Save
-                </Text>
+                </Type>
               )}
             </Pressable>
           </View>

@@ -136,16 +136,15 @@ function Row({
 }) {
   return (
     <View className="flex-row items-center gap-1.5">
-      <Text
-        className="shrink text-[11px] text-muted-foreground"
-        numberOfLines={1}
-      >
+      <Type variant="data" tone="muted" className="shrink"
+        
+        numberOfLines={1}>
         {name}
-      </Text>
+      </Type>
       {live ? (
-        <Text className="ml-auto text-sm font-black text-foreground">
+        <Type variant="captionStrong" className="ml-auto">
           {score ?? 0}
-        </Text>
+        </Type>
       ) : null}
     </View>
   );

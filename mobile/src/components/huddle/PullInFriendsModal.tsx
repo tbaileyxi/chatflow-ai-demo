@@ -22,6 +22,7 @@ import {
   View,
 } from "react-native";
 import { Check, Link2, Send, X } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { colors } from "@/theme/colors";
 
@@ -225,14 +226,14 @@ export function PullInFriendsModal({
               </Pressable>
             </View>
 
-            <Text className="mb-1 text-xl font-black text-foreground">
+            <Type variant="title" className="mb-1">
               {rallied ? `Room rallied ✓` : `Invite to ${huddleName}`}
-            </Text>
+            </Type>
             {rallied ? (
-              <Text className="mb-3 text-sm leading-5 text-muted-foreground">
+              <Type variant="caption" tone="muted" className="mb-3 leading-5">
                 Everyone in {huddleName} just got pinged. These people aren't in
                 the room yet — pull them in.
-              </Text>
+              </Type>
             ) : null}
 
             {/* Share link — the universal path, works for anyone anywhere. */}
@@ -241,14 +242,14 @@ export function PullInFriendsModal({
               className="mb-4 flex-row items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 active:opacity-80"
             >
               <Link2 color={colors.primaryForeground} size={18} />
-              <Text className="text-base font-black text-primary-foreground">
+              <Type variant="heading" tone="onPrimary">
                 Share invite link
-              </Text>
+              </Type>
             </Pressable>
 
-            <Text className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            <Type variant="eyebrow" tone="muted" className="mb-2">
               Or tap friends on Side Huddle
-            </Text>
+            </Type>
 
             <TextInput
               value={search}
@@ -266,11 +267,11 @@ export function PullInFriendsModal({
               </View>
             ) : filtered.length === 0 ? (
               <View className="items-center py-10">
-                <Text className="text-center text-sm text-muted-foreground">
+                <Type variant="caption" tone="muted" className="text-center">
                   {people.length === 0
                     ? "No friends on Side Huddle yet — use Share invite link above."
                     : "No matches."}
-                </Text>
+                </Type>
               </View>
             ) : (
               // Bounded list — the Send CTA below must NEVER leave the screen.
@@ -294,19 +295,19 @@ export function PullInFriendsModal({
                             resizeMode="cover"
                           />
                         ) : (
-                          <Text className="text-sm font-bold text-muted-foreground">
+                          <Type variant="captionStrong" tone="muted">
                             {name.charAt(0).toUpperCase()}
-                          </Text>
+                          </Type>
                         )}
                       </View>
                       <View className="flex-1">
-                        <Text className="text-sm font-bold text-foreground">
+                        <Type variant="captionStrong">
                           {name}
-                        </Text>
+                        </Type>
                         {p.username ? (
-                          <Text className="text-xs text-muted-foreground">
+                          <Type variant="caption" tone="muted">
                             @{p.username}
-                          </Text>
+                          </Type>
                         ) : null}
                       </View>
                       <View

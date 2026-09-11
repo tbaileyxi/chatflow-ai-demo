@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { View, Text, Animated, Easing } from "react-native";
+import { Type } from "@/components/ui/Type";
 import { colors } from "@/theme/colors";
 
 /**
@@ -38,10 +39,10 @@ export function CoachThinking() {
         className="h-7 w-7 items-center justify-center rounded-full"
         style={{ borderWidth: 1.5, borderColor: colors.primary }}
       >
-        <Text className="text-[10px] font-black" style={{ color: colors.primary }}>SH</Text>
+        <Type variant="dataStrong"  style={{ color: colors.primary }}>SH</Type>
       </View>
       <View className="flex-row items-center gap-2 rounded-2xl bg-white/5 px-3 py-2">
-        <Text className="text-xs text-muted-foreground">@coach is looking that up</Text>
+        <Type variant="caption" tone="muted">@coach is looking that up</Type>
         <View className="flex-row items-center gap-1">
           <Dot delay={0} />
           <Dot delay={160} />

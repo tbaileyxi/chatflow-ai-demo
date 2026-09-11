@@ -1,5 +1,6 @@
 import { View, Text } from "react-native";
 import { Check, X, Clock, Target } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { cn } from "@/lib/utils";
 import { marketSides } from "@/lib/marketSides";
 import { Badge } from "@/components/ui/badge";
@@ -52,30 +53,30 @@ export function BetCard({ bet }: Props) {
 
   return (
     <View className={cn("gap-2 rounded-lg border p-3", borderColor, bgColor)}>
-      <Text className="text-sm font-semibold text-foreground" numberOfLines={2}>
+      <Type variant="captionStrong"  numberOfLines={2}>
         {sides.headline}
-      </Text>
+      </Type>
 
       <View className="flex-row items-center gap-2">
         <Badge variant="default">{myLabel}</Badge>
-        <Text className="text-xs text-muted-foreground">
+        <Type variant="caption" tone="muted">
           {bet.chipsRisked} chips risked
-        </Text>
+        </Type>
 
         {/* Status */}
         {isOpen && bet.eventStartTime && (
           <View className="ml-auto flex-row items-center gap-1">
             <Clock color={colors.mutedForeground} size={12} />
-            <Text className="text-xs text-muted-foreground">
+            <Type variant="caption" tone="muted">
               {timeUntil(bet.eventStartTime)}
-            </Text>
+            </Type>
           </View>
         )}
 
         {isPending && (
           <View className="ml-auto flex-row items-center gap-1">
             <Clock color={colors.accent} size={12} />
-            <Text className="text-xs text-accent">Awaiting result</Text>
+            <Type variant="caption" className="text-accent">Awaiting result</Type>
           </View>
         )}
 
@@ -83,11 +84,11 @@ export function BetCard({ bet }: Props) {
           <View className="ml-auto flex-row items-center gap-1.5">
             <View className="flex-row items-center gap-1 rounded-full bg-success/15 px-2 py-0.5">
               <Check color={colors.success} size={13} />
-              <Text className="text-xs font-bold text-success">WON</Text>
+              <Type variant="captionStrong" tone="success">WON</Type>
             </View>
-            <Text className="text-xs font-semibold text-success">
+            <Type variant="captionStrong" tone="success">
               +{bet.chipsWon ?? 0}
-            </Text>
+            </Type>
           </View>
         )}
 
@@ -95,11 +96,11 @@ export function BetCard({ bet }: Props) {
           <View className="ml-auto flex-row items-center gap-1.5">
             <View className="flex-row items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5">
               <X color={colors.destructive} size={13} />
-              <Text className="text-xs font-bold text-destructive">LOST</Text>
+              <Type variant="captionStrong" tone="danger">LOST</Type>
             </View>
-            <Text className="text-xs font-semibold text-destructive">
+            <Type variant="captionStrong" tone="danger">
               -{bet.chipsRisked}
-            </Text>
+            </Type>
           </View>
         )}
       </View>

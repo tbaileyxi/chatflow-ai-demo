@@ -3,6 +3,7 @@ import { Alert, View, Text, Image, Pressable, ScrollView } from "react-native";
 import { useRoute, useNavigation, type RouteProp } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, Flag, Users } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -168,7 +169,7 @@ export default function PublicProfileScreen() {
         <Pressable onPress={() => navigation.goBack()} className="p-1 active:opacity-70">
           <ChevronLeft color={colors.foreground} size={26} />
         </Pressable>
-        <Text className="text-lg font-black text-foreground">Profile</Text>
+        <Type variant="title">Profile</Type>
       </View>
 
       {isLoading ? (
@@ -177,9 +178,9 @@ export default function PublicProfileScreen() {
         </View>
       ) : !p ? (
         <View className="flex-1 items-center justify-center px-8">
-          <Text className="text-center text-muted-foreground">
+          <Type center variant="body" tone="muted">
             This account is no longer available.
-          </Text>
+          </Type>
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
@@ -191,36 +192,36 @@ export default function PublicProfileScreen() {
               />
             ) : (
               <View className="h-24 w-24 items-center justify-center rounded-full bg-card border border-border">
-                <Text className="text-2xl font-black text-muted-foreground">
+                <Type variant="title" tone="muted">
                   {initials || "?"}
-                </Text>
+                </Type>
               </View>
             )}
 
-            <Text className="mt-4 text-2xl font-black text-foreground">{name}</Text>
+            <Type variant="title" className="mt-4">{name}</Type>
 
             {/* If their Side Huddle name is nothing useful but you have them in
                 your phone, say so — that is the line that answers "who?". */}
             {knownAs && rawName && knownAs !== rawName ? (
-              <Text className="mt-1 text-sm text-muted-foreground">
+              <Type variant="caption" tone="muted" className="mt-1">
                 In your contacts as {knownAs}
-              </Text>
+              </Type>
             ) : null}
 
             {!rawName ? (
-              <Text className="mt-1 text-sm text-muted-foreground">
+              <Type variant="caption" tone="muted" className="mt-1">
                 Hasn't set up their profile yet
-              </Text>
+              </Type>
             ) : null}
 
             {p.bio ? (
-              <Text className="mt-4 text-center text-base leading-relaxed text-foreground">
+              <Type center variant="body" className="mt-4">
                 {p.bio}
-              </Text>
+              </Type>
             ) : null}
 
             {joined ? (
-              <Text className="mt-3 text-xs text-muted-foreground">Joined {joined}</Text>
+              <Type variant="caption" tone="muted" className="mt-3">Joined {joined}</Type>
             ) : null}
 
             {/* Block and report live HERE, not only behind a long-press on
@@ -252,18 +253,18 @@ export default function PublicProfileScreen() {
                   className="flex-row items-center gap-1.5 rounded-full border border-border px-4 py-2 active:opacity-70"
                 >
                   <Flag color={colors.mutedForeground} size={12} />
-                  <Text className="text-xs font-black text-muted-foreground">
+                  <Type variant="captionStrong" tone="muted">
                     Report
-                  </Text>
+                  </Type>
                 </Pressable>
               </View>
             ) : null}
 
             {blocked ? (
-              <Text className="mt-3 px-6 text-center text-xs text-muted-foreground">
+              <Type center variant="caption" tone="muted" className="mt-3 px-6">
                 You've blocked {name}. Their messages are hidden from you
                 everywhere.
-              </Text>
+              </Type>
             ) : null}
           </View>
 
@@ -271,9 +272,9 @@ export default function PublicProfileScreen() {
             <View className="mt-8 px-4">
               <View className="mb-3 flex-row items-center gap-2">
                 <Users color={colors.mutedForeground} size={14} />
-                <Text className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                <Type variant="eyebrow" tone="muted">
                   Rooms you're both in
-                </Text>
+                </Type>
               </View>
               <View className="gap-2">
                 {data!.rooms.map((r) => (
@@ -282,10 +283,10 @@ export default function PublicProfileScreen() {
                     onPress={() => navigation.navigate("Huddle", { huddleId: r.id })}
                     className="flex-row items-center justify-between rounded-2xl border border-border bg-card p-4 active:opacity-80"
                   >
-                    <Text className="flex-1 text-base font-black text-foreground" numberOfLines={1}>
+                    <Type variant="heading" className="flex-1" numberOfLines={1}>
                       {r.name}
-                    </Text>
-                    <Text className="text-xs font-black text-primary">Open →</Text>
+                    </Type>
+                    <Type variant="captionStrong" tone="primary">Open →</Type>
                   </Pressable>
                 ))}
               </View>

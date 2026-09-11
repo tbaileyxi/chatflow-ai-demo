@@ -58,9 +58,9 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
               resizeMode="cover"
             />
           ) : (
-            <Text className="text-lg font-bold text-muted-foreground">
+            <Type variant="heading" tone="muted">
               {huddle.name.charAt(0)}
-            </Text>
+            </Type>
           )}
         </View>
 
@@ -112,24 +112,23 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
             gameOn ? "bg-muted/60" : "border border-dashed border-border",
           )}
         >
-          <Text
-            className="shrink text-[11px] text-muted-foreground"
-            numberOfLines={1}
-          >
+          <Type variant="data" tone="muted" className="shrink"
+            
+            numberOfLines={1}>
             {gameOn ? (
               <>
-                <Text className="font-bold text-foreground">
+                <Type variant="bodyStrong">
                   {game.us.name} {game.us.score ?? 0}
-                </Text>
+                </Type>
                 {" · "}
-                <Text className="font-bold text-foreground">
+                <Type variant="bodyStrong">
                   {game.them.name} {game.them.score ?? 0}
-                </Text>
+                </Type>
               </>
             ) : (
               `${game.us.name} ${game.isHome ? "vs" : "at"} ${game.them.name}`
             )}
-          </Text>
+          </Type>
           <Type
             variant="dataStrong"
             tone={gameOn ? "primary" : "muted"}

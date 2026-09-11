@@ -18,6 +18,7 @@ import {
 } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Check, Lock, Search, Radio } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -321,17 +322,17 @@ export function CreateSideHuddleScreen() {
         <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
           <ChevronLeft color={colors.foreground} size={24} />
         </Pressable>
-        <Text className="flex-1 text-lg font-bold text-foreground">
+        <Type variant="heading" className="flex-1">
           Start a room
-        </Text>
+        </Type>
       </View>
 
       <View className="flex-1">
         <View className="px-4">
           {/* Step 1 — name. Big target, zero jargon. */}
-          <Text className="text-xs font-black uppercase tracking-widest text-primary">
+          <Type variant="eyebrow" tone="primary">
             1 · Name your room
-          </Text>
+          </Type>
           <View className="mt-2">
             <Input
               placeholder={
@@ -346,22 +347,22 @@ export function CreateSideHuddleScreen() {
           </View>
           <View className="mt-1.5 flex-row items-center gap-1.5">
             <Lock color={colors.mutedForeground} size={12} />
-            <Text className="text-xs text-muted-foreground">
+            <Type variant="caption" tone="muted">
               Private — only people you invite can join.
-            </Text>
+            </Type>
           </View>
 
           {/* Step 2 — team. One line, then visual picker. */}
           <View className="mt-6 flex-row items-center gap-2">
-            <Text className="text-xs font-black uppercase tracking-widest text-primary">
+            <Type variant="eyebrow" tone="primary">
               2 · Pick your team
-            </Text>
+            </Type>
             {selectedTeam ? (
               <View className="flex-row items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5">
                 <Radio color={colors.primary} size={11} />
-                <Text className="text-xs font-bold text-primary">
+                <Type variant="captionStrong" tone="primary">
                   {selectedTeam.name}
-                </Text>
+                </Type>
               </View>
             ) : null}
           </View>
@@ -465,9 +466,9 @@ export function CreateSideHuddleScreen() {
                         resizeMode="cover"
                       />
                     ) : (
-                      <Text className="text-xs font-bold text-muted-foreground">
+                      <Type variant="captionStrong" tone="muted">
                         {team.name.slice(0, 2)}
-                      </Text>
+                      </Type>
                     )}
                   </View>
                   {selected && (
@@ -476,12 +477,9 @@ export function CreateSideHuddleScreen() {
                     </View>
                   )}
                 </View>
-                <Text
-                  className="text-center text-xs text-foreground"
-                  numberOfLines={1}
-                >
+                <Type center variant="caption" numberOfLines={1}>
                   {team.name}
-                </Text>
+                </Type>
               </Pressable>
             );
           })}
@@ -492,13 +490,13 @@ export function CreateSideHuddleScreen() {
       <View className="absolute bottom-0 left-0 right-0 border-t border-border bg-background px-4 pb-8 pt-4">
         <View className="mb-3 flex-row items-center justify-between">
           <View className="flex-1 pr-3">
-            <Text className="text-sm font-bold text-foreground">
+            <Type variant="captionStrong">
               Private
-            </Text>
-            <Text className="text-xs leading-4 text-muted-foreground">
+            </Type>
+            <Type variant="caption" tone="muted">
               You decide who comes in. Off means anyone who finds the room can
               walk in.
-            </Text>
+            </Type>
           </View>
           <Switch
             value={askToJoin}

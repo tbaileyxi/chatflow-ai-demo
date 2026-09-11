@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
 import { Lock, Plus, ShieldCheck } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { TeamPicker } from "@/components/profile/TeamPicker";
 import {
   useFollowedTeams,
@@ -78,12 +79,12 @@ export function TeamsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
       <View className="flex-row items-center justify-between px-4 pb-3 pt-2">
-        <Text className="text-2xl font-black text-foreground">Teams</Text>
+        <Type variant="title">Teams</Type>
         <Pressable
           onPress={() => setEditing(true)}
           className="rounded-full border border-border px-3 py-1.5 active:opacity-70"
         >
-          <Text className="text-xs font-black text-primary">Edit</Text>
+          <Type variant="captionStrong" tone="primary">Edit</Type>
         </Pressable>
       </View>
 
@@ -147,15 +148,15 @@ function TeamBlock({
               resizeMode="cover"
             />
           ) : (
-            <Text className="text-base font-bold text-muted-foreground">
+            <Type variant="bodyStrong" tone="muted">
               {team.name.charAt(0)}
-            </Text>
+            </Type>
           )}
         </View>
         <View className="min-w-0 flex-1">
-          <Text className="text-base font-black text-foreground" numberOfLines={1}>
+          <Type variant="heading"  numberOfLines={1}>
             {team.name}
-          </Text>
+          </Type>
           {/* The game line is the only thing here that changes hour to hour,
               so it sits with the team rather than being repeated on every
               room underneath it. */}
@@ -172,9 +173,9 @@ function TeamBlock({
                 : `${game.us.name} ${game.isHome ? "vs" : "at"} ${game.them.name}`}
             </Text>
           ) : team.league ? (
-            <Text className="mt-0.5 text-[11px] text-muted-foreground">
+            <Type variant="data" tone="muted" className="mt-0.5">
               {team.league}
-            </Text>
+            </Type>
           ) : null}
         </View>
         <Pressable
@@ -190,12 +191,12 @@ function TeamBlock({
           onPress={onCreate}
           className="mx-4 rounded-xl border border-dashed border-border p-3 active:opacity-70"
         >
-          <Text className="text-sm font-bold text-foreground">
+          <Type variant="captionStrong">
             No room for {team.name} yet
-          </Text>
-          <Text className="mt-0.5 text-xs text-muted-foreground">
+          </Type>
+          <Type variant="caption" tone="muted" className="mt-0.5">
             Start one and invite whoever you watch with.
-          </Text>
+          </Type>
         </Pressable>
       ) : (
         <View className="gap-2 px-4">
@@ -229,12 +230,9 @@ function RoomRow({
     >
       <View className="min-w-0 flex-1">
         <View className="flex-row items-center gap-1.5">
-          <Text
-            className="shrink text-sm font-bold text-foreground"
-            numberOfLines={1}
-          >
+          <Type variant="captionStrong" className="shrink" numberOfLines={1}>
             {huddle.name}
-          </Text>
+          </Type>
           {huddle.isOfficial ? (
             <ShieldCheck color={colors.primary} size={11} />
           ) : null}
@@ -246,7 +244,7 @@ function RoomRow({
         {/* Who is in there beats how many are in there, every time — but a
             room with nobody you know still gets a count, because on this
             screen "12 people" is the difference between a room and a shell. */}
-        <Text className="mt-0.5 text-[11px] text-muted-foreground" numberOfLines={1}>
+        <Type variant="data" tone="muted" className="mt-0.5" numberOfLines={1}>
           {huddle.knownNames.length > 0
             ? `${huddle.knownNames.slice(0, 2).join(", ")}${
                 huddle.knownNames.length > 2
@@ -256,7 +254,7 @@ function RoomRow({
             : huddle.memberCount > 0
               ? `${huddle.memberCount} ${huddle.memberCount === 1 ? "person" : "people"}`
               : "Nobody in yet — go first"}
-        </Text>
+        </Type>
       </View>
 
       <Text
@@ -274,20 +272,20 @@ function RoomRow({
 function EmptyFollows({ onPick }: { onPick: () => void }) {
   return (
     <View className="mx-4 mt-6 rounded-2xl border border-border bg-card p-5">
-      <Text className="text-base font-black text-foreground">
+      <Type variant="heading">
         You don't follow any teams yet
-      </Text>
-      <Text className="mt-2 text-sm leading-5 text-muted-foreground">
+      </Type>
+      <Type variant="caption" tone="muted" className="mt-2">
         Following a team is what makes its games show up on Home, and it's what
         lets you start a room for it.
-      </Text>
+      </Type>
       <Pressable
         onPress={onPick}
         className="mt-4 items-center rounded-xl bg-primary py-3 active:opacity-80"
       >
-        <Text className="text-sm font-black text-primary-foreground">
+        <Type variant="captionStrong" tone="onPrimary">
           Pick your teams
-        </Text>
+        </Type>
       </Pressable>
     </View>
   );

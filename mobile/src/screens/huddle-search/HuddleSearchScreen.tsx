@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Users, ShieldCheck } from "lucide-react-native";
+import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -102,9 +103,9 @@ export function HuddleSearchScreen() {
             resizeMode="cover"
           />
         ) : (
-          <Text className="text-lg font-bold text-muted-foreground">
+          <Type variant="heading" tone="muted">
             {item.name.charAt(0)}
-          </Text>
+          </Type>
         )}
       </View>
 
@@ -113,34 +114,30 @@ export function HuddleSearchScreen() {
           {item.isOfficial ? (
             <ShieldCheck color={colors.verified.primary} size={14} />
           ) : null}
-          <Text
-            className="flex-1 text-base font-semibold text-foreground"
-            numberOfLines={1}
-          >
+          <Type variant="bodyStrong" className="flex-1" numberOfLines={1}>
             {item.name}
-          </Text>
+          </Type>
         </View>
 
         {/* The reason this room is on your screen at all. */}
         {knownLine(item.knownNames, item.knownCount) ? (
-          <Text
-            className="text-xs font-bold text-primary"
-            numberOfLines={1}
-          >
+          <Type variant="captionStrong" tone="primary"
+            
+            numberOfLines={1}>
             {knownLine(item.knownNames, item.knownCount)}
-          </Text>
+          </Type>
         ) : null}
 
         {item.bio ? (
-          <Text className="text-xs text-muted-foreground" numberOfLines={2}>
+          <Type variant="caption" tone="muted"  numberOfLines={2}>
             {item.bio}
-          </Text>
+          </Type>
         ) : null}
         <View className="flex-row items-center gap-1">
           <Users color={colors.mutedForeground} size={12} />
-          <Text className="text-xs text-muted-foreground">
+          <Type variant="caption" tone="muted">
             {pluralize(item.memberCount, "member")}
-          </Text>
+          </Type>
         </View>
       </View>
 
@@ -155,13 +152,13 @@ export function HuddleSearchScreen() {
       <View className="px-4 pb-3 pt-2">
         <View className="flex-row items-center gap-2">
           <Search color={colors.primary} size={20} />
-          <Text className="text-3xl font-black text-foreground">
+          <Type variant="display">
             Search
-          </Text>
+          </Type>
         </View>
-        <Text className="mt-1 text-sm text-muted-foreground">
+        <Type variant="caption" tone="muted" className="mt-1">
           Rooms with people you know, and the team rooms.
-        </Text>
+        </Type>
       </View>
 
       <View className="px-4 pb-3">
@@ -189,14 +186,14 @@ export function HuddleSearchScreen() {
             // empty list usually means no connections yet, not a bad query —
             // so point at the fix instead of the failure.
             <View className="py-10 px-2">
-              <Text className="text-center text-base font-black text-foreground">
+              <Type center variant="heading">
                 {search.trim() ? "Nothing matches that." : "Nothing here yet."}
-              </Text>
-              <Text className="mt-2 text-center text-sm leading-5 text-muted-foreground">
+              </Type>
+              <Type center variant="caption" tone="muted" className="mt-2">
                 {search.trim()
                   ? "You see rooms where you know somebody, plus the team rooms."
                   : "Rooms show up here once someone you know is in one. Find your people from your profile, or start a room and invite someone."}
-              </Text>
+              </Type>
             </View>
           }
         />

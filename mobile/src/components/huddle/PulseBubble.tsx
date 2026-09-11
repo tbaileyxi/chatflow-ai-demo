@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { View, Text, Pressable } from "react-native";
+import { Type } from "@/components/ui/Type";
 import { TweetEmbed, parseTweetId } from "@/components/embeds/TweetEmbed";
 import type { HuddleMessage } from "@/hooks/useHuddleMessages";
 
@@ -23,22 +24,21 @@ function XPostCard({ content }: { content: string }) {
     <View className="rounded-2xl bg-muted px-4 py-3">
       <View className="mb-1.5 flex-row">
         <View className="rounded-full bg-muted px-2.5 py-0.5 border border-border">
-          <Text className="text-[11px] font-semibold text-muted-foreground">
+          <Type variant="dataStrong" tone="muted">
             X
-          </Text>
+          </Type>
         </View>
       </View>
       <Pressable onPress={() => setExpanded((e) => !e)}>
-        <Text
-          className="text-sm leading-5 text-foreground"
-          numberOfLines={expanded ? undefined : 4}
-        >
+        <Type variant="caption" className="leading-5"
+          
+          numberOfLines={expanded ? undefined : 4}>
           {content}
-        </Text>
+        </Type>
         {!expanded && content.length > 200 && (
-          <Text className="mt-1 text-xs font-medium text-primary">
+          <Type variant="captionStrong" tone="primary" className="mt-1">
             Read more
-          </Text>
+          </Type>
         )}
       </Pressable>
     </View>
@@ -60,26 +60,24 @@ function RedditPostCard({
       {subreddit && (
         <View className="mb-1.5 flex-row">
           <View className="rounded-full bg-orange-500/15 px-2.5 py-0.5">
-            <Text
-              className="text-[11px] font-semibold"
-              style={{ color: "#FF6B35" }}
-            >
+            <Type variant="dataStrong"
+              
+              style={{ color: "#FF6B35" }}>
               r/{subreddit}
-            </Text>
+            </Type>
           </View>
         </View>
       )}
       <Pressable onPress={() => setExpanded((e) => !e)}>
-        <Text
-          className="text-sm leading-5 text-foreground"
-          numberOfLines={expanded ? undefined : 3}
-        >
+        <Type variant="caption" className="leading-5"
+          
+          numberOfLines={expanded ? undefined : 3}>
           {content}
-        </Text>
+        </Type>
         {!expanded && content.length > 150 && (
-          <Text className="mt-1 text-xs font-medium text-primary">
+          <Type variant="captionStrong" tone="primary" className="mt-1">
             Read more
-          </Text>
+          </Type>
         )}
       </Pressable>
     </View>
@@ -117,9 +115,9 @@ export function PulseBubble({ message }: Props) {
   // Fallback: plain content card
   return (
     <View className="rounded-2xl bg-muted px-4 py-2.5">
-      <Text className="text-sm leading-5 text-foreground">
+      <Type variant="caption" className="leading-5">
         {message.content}
-      </Text>
+      </Type>
     </View>
   );
 }

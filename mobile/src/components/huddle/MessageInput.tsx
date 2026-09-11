@@ -25,6 +25,7 @@ import {
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Audio } from "expo-av";
+import { Type } from "@/components/ui/Type";
 import { colors } from "@/theme/colors";
 
 type MediaAttachment = {
@@ -336,12 +337,12 @@ export function MessageInput({
       {replyTo && (
         <View className="flex-row items-center gap-2 border-b border-border px-4 py-2">
           <View className="flex-1">
-            <Text className="text-sm font-semibold text-primary">
+            <Type variant="captionStrong" tone="primary">
               Replying to {replyTo.displayName}
-            </Text>
-            <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+            </Type>
+            <Type variant="caption" tone="muted"  numberOfLines={1}>
               {replyTo.content}
-            </Text>
+            </Type>
           </View>
           <Pressable onPress={onCancelReply} hitSlop={8}>
             <X color={colors.mutedForeground} size={16} />
@@ -362,16 +363,16 @@ export function MessageInput({
             ) : (
               <View className="flex-row items-center gap-2 rounded-lg bg-muted px-3 py-2">
                 <Mic color={colors.primary} size={16} />
-                <Text className="text-sm text-foreground">Voice message</Text>
+                <Type variant="caption">Voice message</Type>
               </View>
             )}
             <View className="flex-1">
-              <Text className="text-sm font-bold text-foreground">
+              <Type variant="captionStrong">
                 {media.type === "image" ? "Photo ready" : "Voice message ready"}
-              </Text>
-              <Text className="mt-0.5 text-xs text-muted-foreground">
+              </Type>
+              <Type variant="caption" tone="muted" className="mt-0.5">
                 Tap Send to post it to the room.
-              </Text>
+              </Type>
             </View>
             <Pressable
               onPress={() => setMedia(null)}
@@ -387,9 +388,9 @@ export function MessageInput({
               style={{ opacity: sending || disabled ? 0.5 : 1 }}
             >
               <Send color={colors.primaryForeground} size={14} />
-              <Text className="text-xs font-bold text-primary-foreground">
+              <Type variant="captionStrong" tone="onPrimary">
                 Send
-              </Text>
+              </Type>
             </Pressable>
           </View>
         </View>
@@ -407,9 +408,9 @@ export function MessageInput({
               backgroundColor: "#EF4444",
             }}
           />
-          <Text className="flex-1 text-sm font-semibold text-destructive">
+          <Type variant="captionStrong" tone="danger" className="flex-1">
             Recording {formatDuration(recordingDuration)}
-          </Text>
+          </Type>
           <Pressable
             onPress={cancelRecording}
             className="h-10 w-10 items-center justify-center rounded-full bg-muted"
@@ -442,23 +443,22 @@ export function MessageInput({
                         m.key === "coach" ? colors.primary : colors.muted,
                     }}
                   >
-                    <Text
-                      className="text-xs font-bold"
+                    <Type variant="captionStrong"
+                      
                       style={{
                         color:
                           m.key === "coach"
                             ? colors.primaryForeground
                             : colors.mutedForeground,
-                      }}
-                    >
+                      }}>
                       {m.key === "coach" ? "SH" : m.label.charAt(0).toUpperCase()}
-                    </Text>
+                    </Type>
                   </View>
-                  <Text className="font-semibold text-foreground">@{m.label}</Text>
+                  <Type variant="bodyStrong">@{m.label}</Type>
                   {m.sublabel ? (
-                    <Text className="flex-1 text-xs text-muted-foreground" numberOfLines={1}>
+                    <Type variant="caption" tone="muted" className="flex-1" numberOfLines={1}>
                       {m.sublabel}
-                    </Text>
+                    </Type>
                   ) : null}
                 </Pressable>
               ))}
@@ -560,17 +560,17 @@ export function MessageInput({
                   />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-base font-bold text-foreground">
+                  <Type variant="bodyStrong">
                     {a.label}
-                  </Text>
-                  <Text className="mt-0.5 text-xs text-muted-foreground">
+                  </Type>
+                  <Type variant="caption" tone="muted" className="mt-0.5">
                     {a.sub}
-                  </Text>
+                  </Type>
                 </View>
                 {a.soon ? (
-                  <Text className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  <Type variant="eyebrow" tone="muted">
                     Soon
-                  </Text>
+                  </Type>
                 ) : null}
               </Pressable>
             ))}
