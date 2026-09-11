@@ -117,12 +117,7 @@ export function GamesStrip({
               )}
               numberOfLines={1}
             >
-              {g.status === "live"
-                ? [g.period, g.clock].filter(Boolean).join(" ") || "LIVE"
-                : new Date(g.startTime).toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
+              {g.statusLabel}
             </Text>
           </Pressable>
         ))}

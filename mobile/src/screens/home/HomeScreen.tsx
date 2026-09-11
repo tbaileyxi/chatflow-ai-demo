@@ -27,7 +27,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useInAppNotifications } from "@/hooks/useInAppNotifications";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
-import { useRoomGames } from "@/hooks/useRoomGames";
+import { useRoomGames, type RoomGame } from "@/hooks/useRoomGames";
 import { GamesStrip } from "@/components/home/GamesStrip";
 import { useKnownPeople } from "@/hooks/useFriends";
 import { useAutoContactMatch } from "@/hooks/useAutoContactMatch";
@@ -296,66 +296,87 @@ function FriendsNowSection() {
       ) : null}
 
       {roster.length > 0 ? (
-        <View className="gap-2">
+        /**
+         * A ROW, not a stack. Five friends as full-width cards pushed the
+         * games and your own rooms below the fold — the roster is the least
+         * urgent thing on Home and it was eating the most screen. Sideways it
+         * costs one band whether you know five people or fifty.
+         */
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 10 }}
+        >
           {visible.map((f) => (
             <Pressable
               key={f.userId}
-              // Every row taps through now. Offline rows used to be disabled
+              // Every tile taps through. Offline tiles used to be disabled
               // outright, so a name you did not recognise — and "User" is what
               // the database calls anyone who never finished onboarding — was a
               // dead end with no way to find out who it was.
               onPress={() =>
-                navigation.navigate("PublicProfile", { userId: f.userId, knownAs: f.name })
+                f.isLive && f.huddleId
+                  ? navigation.navigate("Huddle", { huddleId: f.huddleId })
+                  : navigation.navigate("PublicProfile", {
+                      userId: f.userId,
+                      knownAs: f.name,
+                    })
               }
-              className={`flex-row items-center gap-3 rounded-2xl border border-border bg-card p-3 ${
-                f.isLive ? "active:opacity-80" : ""
-              }`}
-              // Offline people stay on the list but read as background: dimmed
-              // avatar and name, no tap target. The list is a roster you can
-              // count on, with presence as the layer on top.
+              className="w-[88px] items-center active:opacity-80"
+              // Offline people stay on the list but read as background.
               style={f.isLive ? undefined : { opacity: 0.45 }}
             >
-              {f.avatarUrl ? (
-                <Image
-                  source={{ uri: f.avatarUrl }}
-                  className="h-9 w-9 rounded-full"
-                />
-              ) : (
-                <MonogramAvatar name={f.name} size={36} />
-              )}
-              <View className="flex-1">
-                <Text className="text-base font-black text-foreground" numberOfLines={1}>
-                  {f.name}
-                </Text>
-                <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-                  {f.isLive ? `in ${f.huddleName ?? "a huddle"}` : "not watching"}
-                </Text>
+              <View
+                className={
+                  f.isLive
+                    ? "rounded-full border-2 border-success p-0.5"
+                    : "rounded-full border-2 border-transparent p-0.5"
+                }
+              >
+                {f.avatarUrl ? (
+                  <Image
+                    source={{ uri: f.avatarUrl }}
+                    className="h-14 w-14 rounded-full"
+                  />
+                ) : (
+                  <MonogramAvatar name={f.name} size={56} />
+                )}
               </View>
-              {f.isLive && f.huddleId ? (
-                <Pressable
-                  onPress={() =>
-                    navigation.navigate("Huddle", { huddleId: f.huddleId! })
-                  }
-                  hitSlop={10}
-                  className="active:opacity-70"
-                >
-                  <Text className="text-xs font-black text-primary">Jump in →</Text>
-                </Pressable>
-              ) : null}
+              <Text
+                className="mt-1.5 text-center text-xs font-bold text-foreground"
+                numberOfLines={1}
+              >
+                {f.name.split(/\s+/)[0]}
+              </Text>
+              <Text
+                className={
+                  f.isLive
+                    ? "text-center text-[10px] font-bold text-success"
+                    : "text-center text-[10px] text-muted-foreground"
+                }
+                numberOfLines={1}
+              >
+                {f.isLive ? "watching" : "not watching"}
+              </Text>
             </Pressable>
           ))}
 
           {hiddenCount > 0 || expanded ? (
             <Pressable
               onPress={() => setExpanded((v) => !v)}
-              className="py-2 active:opacity-70"
+              className="w-[88px] items-center justify-center active:opacity-70"
             >
-              <Text className="text-sm font-black text-primary">
-                {expanded ? "Show less" : `Show all ${roster.length}`}
+              <View className="h-14 w-14 items-center justify-center rounded-full border border-border bg-card">
+                <Text className="text-sm font-black text-primary">
+                  {expanded ? "−" : `+${hiddenCount}`}
+                </Text>
+              </View>
+              <Text className="mt-1.5 text-center text-xs font-bold text-primary">
+                {expanded ? "Less" : "All"}
               </Text>
             </Pressable>
           ) : null}
-        </View>
+        </ScrollView>
       ) : (
         <View className="rounded-2xl border border-border bg-card p-4">
           <Text className="text-base font-black text-foreground">
@@ -389,10 +410,10 @@ function FriendsNowSection() {
 function YourRoomsSection() {
   const navigation = useNavigation<any>();
   const { data: huddles, isLoading } = useUserHuddles();
-  const rooms = (huddles ?? []).filter((huddle) => !huddle.isOfficialTeam);
+  const unsorted = (huddles ?? []).filter((huddle) => !huddle.isOfficialTeam);
 
   // The game each room is about — ONE query for every room, not one per room.
-  const { data: gamesByTeam } = useRoomGames(rooms.map((r) => r.teamId));
+  const { data: gamesByTeam } = useRoomGames(unsorted.map((r) => r.teamId));
 
   // Who is in which room right now, from the presence channel the app already
   // runs. This is the half the list never had: it could say a room has three
@@ -407,6 +428,31 @@ function YourRoomsSection() {
     }
     return m;
   }, [presentUsers]);
+
+  /**
+   * Order: a game on, then people in, then whatever spoke last.
+   *
+   * The list used to arrive in whatever order the query returned, which meant
+   * the one room with a game live in it could sit sixth. Both live states
+   * count and they are independent — see HuddleCard — so a room scores for
+   * each, and a room with a game AND people in it beats both.
+   */
+  const rooms = useMemo(() => {
+    const score = (r: (typeof unsorted)[number]) => {
+      const gameOn =
+        r.teamId && gamesByTeam?.get(r.teamId)?.status === "live" ? 2 : 0;
+      const peopleIn = (hereByRoom.get(r.id)?.length ?? 0) > 0 ? 1 : 0;
+      return gameOn + peopleIn;
+    };
+    return [...unsorted].sort((a, b) => {
+      const diff = score(b) - score(a);
+      if (diff !== 0) return diff;
+      return (
+        new Date(b.lastMessageAt ?? 0).getTime() -
+        new Date(a.lastMessageAt ?? 0).getTime()
+      );
+    });
+  }, [unsorted, gamesByTeam, hereByRoom]);
 
   return (
     <View className="px-4">
@@ -470,6 +516,7 @@ export function HomeScreen() {
   const { user } = useAuth();
   const { data: profile } = useProfile();
   const { unreadCount } = useInAppNotifications(8);
+  const { data: myHuddles } = useUserHuddles();
   const [refreshing, setRefreshing] = useState(false);
 
   const myName =
@@ -477,6 +524,31 @@ export function HomeScreen() {
     profile?.username ??
     (user?.user_metadata?.display_name as string | undefined) ??
     "You";
+
+  /**
+   * Tapping a game takes you to the room for it.
+   *
+   * The strip was decorative: six cards you could press that did nothing. A
+   * score is only interesting because of where you'd go to talk about it, so
+   * the tap resolves to your room for that team — and when you don't have one,
+   * to making it, with the team already chosen.
+   *
+   * It deliberately does NOT open a public room full of strangers. That's the
+   * empty-room problem, and it's the reason there is no game-room directory.
+   */
+  const handlePickGame = useCallback(
+    (game: RoomGame) => {
+      const mine = (myHuddles ?? []).find(
+        (h) => h.teamId === game.us.teamId || h.teamId === game.them.teamId,
+      );
+      if (mine) {
+        navigation.navigate("Huddle", { huddleId: mine.id });
+        return;
+      }
+      navigation.navigate("CreateSideHuddle", { teamId: game.us.teamId });
+    },
+    [myHuddles, navigation],
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -539,7 +611,7 @@ export function HomeScreen() {
         {/* Who's around, then what's on, then where you'd go. The strip
             removes itself entirely when nothing is playing — in July, Home is
             just your rooms. */}
-        <GamesStrip />
+        <GamesStrip onPickGame={handlePickGame} />
         <YourRoomsSection />
       </ScrollView>
 

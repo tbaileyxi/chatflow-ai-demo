@@ -22,6 +22,14 @@ export type RoomGame = {
   /** Period/inning and clock, live games only. */
   period: string | null;
   clock: string | null;
+  /** Which sport, so callers can label the state correctly. */
+  sportKey: string | null;
+  /**
+   * Ready-to-render state line: "Q2 0:32", "8th", "LIVE", "7:05 PM".
+   * Every surface must use this rather than joining period and clock itself —
+   * see gameStatusLabel for why baseball breaks that.
+   */
+  statusLabel: string;
   /** Always ordered as the room's team first, then the opponent. */
   us: { teamId: string; name: string; score: number | null };
   them: { teamId: string; name: string; score: number | null };
@@ -35,6 +43,48 @@ export type RoomGame = {
 // status simply doesn't match and the room shows no game, which is the safe
 // failure.
 const LIVE_STATUSES = ["in_progress", "live", "halftime"];
+
+/**
+ * How a live game's state reads, per sport.
+ *
+ * BASEBALL HAS NO CLOCK. The feed still sends one — "0:00" — and joining
+ * period and clock blindly rendered "8 0:00" on a room row, which looks like a
+ * football game that has run out of time in the eighth quarter. Innings are
+ * ordinals and stand alone.
+ *
+ * Anything unrecognised falls back to period-then-clock, which is right for
+ * every clock sport we carry.
+ */
+export function gameStatusLabel(
+  sportKey: string | null,
+  period: string | null,
+  clock: string | null,
+): string {
+  const p = (period ?? "").trim();
+  const c = (clock ?? "").trim();
+
+  if (sportKey === "baseball_mlb") {
+    if (!p) return "LIVE";
+    const n = Number(p);
+    if (!Number.isFinite(n)) return p.toUpperCase();
+    const suffix =
+      n % 100 >= 11 && n % 100 <= 13
+        ? "th"
+        : n % 10 === 1
+          ? "st"
+          : n % 10 === 2
+            ? "nd"
+            : n % 10 === 3
+              ? "rd"
+              : "th";
+    return `${n}${suffix}`;
+  }
+
+  // A zeroed clock means the period has ended, not that there is 0:00 left to
+  // play in it — showing "0:00" reads as a game about to end at any score.
+  const useful = c && c !== "0:00" && c !== "00:00" ? c : "";
+  return [p, useful].filter(Boolean).join(" ") || "LIVE";
+}
 
 // A team row spans every sport its club plays: the Buckeyes who play football
 // are the same row as the Buckeyes who play basketball, separated only by
@@ -140,6 +190,13 @@ export function useRoomGames(teamIds: (string | null | undefined)[]) {
           startTime: game.start_time,
           period: live ? game.period : null,
           clock: live ? game.clock : null,
+          sportKey: game.sport_key,
+          statusLabel: live
+            ? gameStatusLabel(game.sport_key, game.period, game.clock)
+            : new Date(game.start_time).toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+              }),
           us: {
             teamId,
             name: nameFor(teamId),

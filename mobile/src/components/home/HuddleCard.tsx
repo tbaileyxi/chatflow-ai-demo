@@ -144,9 +144,7 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
               gameOn ? "text-primary" : "text-muted-foreground",
             )}
           >
-            {gameOn
-              ? [game.period, game.clock].filter(Boolean).join(" ") || "LIVE"
-              : formatWhen(game.startTime)}
+            {gameOn ? game.statusLabel : formatWhen(game.startTime)}
           </Text>
         </View>
       ) : null}
