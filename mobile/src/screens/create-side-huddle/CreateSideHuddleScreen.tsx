@@ -416,16 +416,9 @@ export function CreateSideHuddleScreen() {
               )}
               onPress={() => setFilterLeague(null)}
             >
-              <Text
-                className={cn(
-                  "text-sm font-medium",
-                  !filterLeague
-                    ? "text-primary-foreground"
-                    : "text-muted-foreground",
-                )}
-              >
+              <Type variant="data" tone={!filterLeague ? "onPrimary" : "muted"}>
                 All
-              </Text>
+              </Type>
             </Pressable>
             {LEAGUES.map((l) => (
               <Pressable
@@ -438,16 +431,9 @@ export function CreateSideHuddleScreen() {
                 )}
                 onPress={() => setFilterLeague(filterLeague === l ? null : l)}
               >
-                <Text
-                  className={cn(
-                    "text-sm font-medium",
-                    filterLeague === l
-                      ? "text-primary-foreground"
-                      : "text-muted-foreground",
-                  )}
-                >
+                <Type variant="data" tone={filterLeague === l ? "onPrimary" : "muted"}>
                   {l}
-                </Text>
+                </Type>
               </Pressable>
             ))}
           </ScrollView>

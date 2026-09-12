@@ -470,6 +470,12 @@ export function HuddleScreen() {
   const keepAtBottom = useCallback(() => {
     if (!atBottomRef.current) return;
     flatListRef.current?.scrollToEnd({ animated: settledRef.current });
+    // Twice. The first call lands before the pregame strip and the composer
+    // have taken their height out of the list, so it scrolls to an end that
+    // then moves — which left the newest message sliced in half by the strip.
+    setTimeout(() => {
+      if (atBottomRef.current) flatListRef.current?.scrollToEnd({ animated: false });
+    }, 140);
     settledRef.current = true;
   }, []);
 
@@ -537,8 +543,6 @@ export function HuddleScreen() {
     // a model call behind it. Without a sign that anything is happening the
     // room looks broken, and people ask again, which is how a thread ends up
     // with the same question three times.
-    // THE COACH ANSWERS THREE WAYS, so the dots have to appear for all three.
-    //
     // TWO ways, and "you are alone in the room" is deliberately not one of
     // them any more. In a room of one that was every message — which is what a
     // brand-new room is, so a first-time user met a bot that answered every
@@ -628,7 +632,7 @@ export function HuddleScreen() {
               />
               <View
                 style={StyleSheet.absoluteFill}
-                className="bg-background/[0.72]"
+                className="bg-background/[0.88]"
               />
             </>
           ) : null}

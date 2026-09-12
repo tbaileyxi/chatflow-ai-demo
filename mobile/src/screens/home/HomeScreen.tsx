@@ -380,30 +380,22 @@ function FriendsNowSection() {
           ) : null}
         </ScrollView>
       ) : (
-        <View className="rounded-2xl border border-border bg-card p-4">
-          <Type variant="heading">
-            Nobody here yet
+        granted === false ? (
+          // The prompt card above is already on screen with the same button on
+          // it, so all this has to do is not be a second card saying the same
+          // thing at the same size.
+          <Type variant="caption" tone="tertiary" className="px-1">
+            When someone you know checks into a room, they show up here.
           </Type>
-          <Type variant="caption" tone="muted" className="mt-2 leading-5">
-            Invite someone, or find people you already know. When they check
-            into a room it shows up here so you can jump in.
-          </Type>
-          {/* "find people you already know" was the right thing to say and did
-              nothing — it was a sentence, not a control. Someone looking at an
-              empty friends list is the most willing they will ever be to hand
-              over contacts, and this is that moment. */}
-          {granted === false ? (
-            <Pressable
-              onPress={findFriends}
-              disabled={scanning}
-              className="mt-4 self-start rounded-full bg-primary px-5 py-3 active:opacity-80"
-            >
-              <Type variant="captionStrong" tone="onPrimary">
-                {scanning ? "Looking..." : "Find people you know"}
-              </Type>
-            </Pressable>
-          ) : null}
-        </View>
+        ) : (
+          <View className="rounded-2xl border border-border bg-card p-4">
+            <Type variant="heading">Nobody here yet</Type>
+            <Type variant="caption" tone="muted" className="mt-2 leading-5">
+              Invite someone, or find people you already know. When they check
+              into a room it shows up here so you can jump in.
+            </Type>
+          </View>
+        )
       )}
     </View>
   );
@@ -592,7 +584,7 @@ export function HomeScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ gap: 24, paddingBottom: 36 }}
+        contentContainerStyle={{ gap: 24, paddingBottom: 108 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
