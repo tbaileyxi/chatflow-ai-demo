@@ -50,6 +50,13 @@ export function ProfileHeader({
     [displayName, username],
   );
 
+  // Auto-minted handles look like "12035550142_ffd42b1c". A real one has
+  // letters, no underscore-hex tail, and isn't mostly digits.
+  const chosenHandle =
+    username && !/^\d/.test(username) && !/_[0-9a-f]{6,}$/i.test(username)
+      ? username
+      : null;
+
   const joined = joinedAt
     ? new Date(joinedAt)
         .toLocaleDateString("en-US", { month: "short", year: "numeric" })
@@ -58,7 +65,7 @@ export function ProfileHeader({
 
   return (
     <View>
-      <View className="items-center pb-1.5 pt-4">
+      <View className="items-center pb-1.5 pt-1">
         <Pressable onPress={onEdit} className="active:opacity-80">
           <View
             className="h-[78px] w-[78px] items-center justify-center overflow-hidden rounded-full"
@@ -87,8 +94,12 @@ export function ProfileHeader({
         <Type variant="title" className="mt-3" style={{ fontSize: 23 }}>
           {displayName || "You"}
         </Type>
+        {/* A handle nobody chose is not a handle. Signing up by SMS mints
+            one from the phone number — "@12035550142_ffd42b1c" — and printing
+            that under somebody's name makes their own profile look like a
+            database row. Shown only when it reads like a name. */}
         <Type variant="data" tone="tertiary" className="mt-1">
-          {[username ? `@${username}` : null, joined ? `joined ${joined}` : null]
+          {[chosenHandle ? `@${chosenHandle}` : null, joined ? `joined ${joined}` : null]
             .filter(Boolean)
             .join(" · ")}
         </Type>

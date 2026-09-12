@@ -92,7 +92,37 @@ export function useAllGames(followedTeamIds: string[]) {
         };
       };
 
-      return (gamesRes.data ?? []).map((g: any) => {
+      /**
+       * One row per fixture.
+       *
+       * The games table carries duplicates — the same fixture arriving twice
+       * from the sync, which is why RUN_THIS_DEDUPE_GAMES.sql and
+       * RUN_THIS_FIX_DUPES.sql both exist. Cleaning the table is the real fix,
+       * but the slate must not show a doubled scoreboard while that is
+       * outstanding, and a second copy of a game is the most obviously broken
+       * thing a sports app can render.
+       *
+       * Keyed on the two teams and the calendar day, so a genuine
+       * doubleheader still shows twice. Live wins over scheduled when both
+       * copies exist — the one with a score on it is the one that is real.
+       */
+      const byFixture = new Map<string, any>();
+      for (const g of gamesRes.data ?? []) {
+        const pair = [g.home_team_id, g.away_team_id].sort().join("|");
+        const day = (g.start_time ?? "").slice(0, 10);
+        const key = `${pair}@${day}`;
+
+        const existing = byFixture.get(key);
+        if (!existing) {
+          byFixture.set(key, g);
+          continue;
+        }
+        const rank = (x: any) =>
+          LIVE.includes(x.status) ? 2 : x.status === "final" ? 1 : 0;
+        if (rank(g) > rank(existing)) byFixture.set(key, g);
+      }
+
+      return [...byFixture.values()].map((g: any) => {
         const live = LIVE.includes(g.status);
         const final = g.status === "final";
 

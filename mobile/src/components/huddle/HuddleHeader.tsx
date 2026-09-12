@@ -72,11 +72,14 @@ function formatNextGameDate(dateStr: string): string {
   const time = formatStartTime(dateStr);
   if (diffDays === 0) return `Today ${time}`;
   if (diffDays === 1) return `Tomorrow ${time}`;
-  const dayStr = date.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
+  // Weekday alone past tomorrow, and the date only once it is more than a
+  // week out. "Sun, Sep 20 4:25 PM" does not fit the header pill next to a
+  // room name and clipped to "Sun, Se…", which reads as a bug rather than a
+  // date. Inside a week, the weekday is the only part anybody uses.
+  const dayStr =
+    diffDays < 7
+      ? date.toLocaleDateString("en-US", { weekday: "short" })
+      : date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   return `${dayStr} ${time}`;
 }
 

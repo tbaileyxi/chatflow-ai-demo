@@ -187,6 +187,10 @@ export function useRoomGames(teamIds: (string | null | undefined)[]) {
 
         // A live game always wins over a scheduled one, however close kickoff
         // is. Otherwise the earliest upcoming, which the query already ordered.
+        //
+        // This also absorbs the duplicate rows in the games table — picking one
+        // of two identical copies is the same operation as picking the live one
+        // of two different games.
         const live = mine.find((g) => LIVE_STATUSES.includes(g.status));
         const game = live ?? mine[0];
 
