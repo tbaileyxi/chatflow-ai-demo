@@ -1,29 +1,20 @@
 import { Platform, type TextStyle } from "react-native";
 
 /**
- * The type system, taken from the design studies rather than invented.
+ * The type system, taken from the design studies — AT THE RIGHT SCALE.
  *
- * THE FACES ARE NOT A CHOICE I GET TO MAKE. They are in the renderings:
- * Outfit for display, Manrope for interface, DM Mono for data. An earlier
- * version of this file used Archivo and JetBrains Mono because I picked them
- * myself, and that is the single reason the built screens didn't look like the
- * design — the structure was right, the voice was somebody else's.
+ * THE MISTAKE THIS FILE EXISTS TO NOT REPEAT. The studies draw a phone inside
+ * a frame about 292px wide. A real iPhone is 402pt. Reading `font-size:14.5px`
+ * out of that CSS and setting 14.5 in the app makes everything **38% smaller
+ * than drawn** — which is exactly what shipped, and why the built screens read
+ * as a settings list next to a design that shouts.
  *
- * WHAT EACH ONE IS FOR.
+ * Every size here is the study's value × 1.38. If you are ever taking a number
+ * out of one of those files, scale it.
  *
- * Outfit is the display face: geometric, heavy, and it holds a shout. It is
- * used sparingly — wordmarks, screen titles, a score, a message somebody typed
- * in capitals. Everything else is Manrope.
- *
- * Manrope is the interface and the thread. It is what people read.
- *
- * DM Mono is the instrument panel: eyebrows, clocks, scores, counts. The
- * monospaced digits are the reason — a clock in a proportional face jitters as
- * it counts down and a column of scores never lines up.
- *
- * SIZES COME FROM THE RENDERINGS TOO. A message is 14.5px and a shout is 19px,
- * because that is what "Before, During, After" sets them at. I had guessed 19
- * and 27 and made the thread look like a children's book.
+ * THE FACES ARE NOT A CHOICE EITHER. Outfit for display, Manrope for interface,
+ * DM Mono for data — named in the renderings. Picking your own is the other way
+ * the design never lands.
  *
  * Never set fontWeight alongside these. iOS synthesises weight when a family
  * and a weight disagree, and a synthesised bold on a face that already has one
@@ -49,23 +40,23 @@ export const type = {
   /** The wordmark, and nothing else on a screen. */
   display: {
     fontFamily: fonts.display,
-    fontSize: 30,
-    lineHeight: 33,
-    letterSpacing: -0.75,
+    fontSize: 41,
+    lineHeight: 45,
+    letterSpacing: -1.0,
   },
   /** Screen titles. */
   title: {
     fontFamily: fonts.display,
-    fontSize: 21,
-    lineHeight: 25,
-    letterSpacing: -0.42,
+    fontSize: 29,
+    lineHeight: 33,
+    letterSpacing: -0.6,
   },
   /** A room name, a section heading. */
   heading: {
     fontFamily: fonts.extrabold,
-    fontSize: 16,
-    lineHeight: 21,
-    letterSpacing: -0.16,
+    fontSize: 22,
+    lineHeight: 27,
+    letterSpacing: -0.3,
   },
   /**
    * WHAT PEOPLE SAY. 14.5 in the rendering — dense on purpose, because with no
@@ -73,8 +64,9 @@ export const type = {
    */
   message: {
     fontFamily: fonts.regular,
-    fontSize: 14.5,
-    lineHeight: 21,
+    fontSize: 20,
+    lineHeight: 27,
+    letterSpacing: -0.3,
   },
   /**
    * A SHOUT. Someone typed in capitals and meant it.
@@ -85,36 +77,40 @@ export const type = {
    */
   shout: {
     fontFamily: fonts.extrabold,
-    fontSize: 19,
-    lineHeight: 24,
-    letterSpacing: -0.19,
+    fontSize: 26,
+    lineHeight: 30,
+    letterSpacing: -0.8,
   },
   /** A person's name above what they said. Small, heavy, in their colour. */
   speaker: {
     fontFamily: fonts.extrabold,
-    fontSize: 11,
-    lineHeight: 14,
-    letterSpacing: 0.11,
+    fontSize: 15,
+    lineHeight: 19,
+    letterSpacing: 0.1,
   },
   body: {
     fontFamily: fonts.regular,
-    fontSize: 14.5,
-    lineHeight: 21,
+    fontSize: 20,
+    lineHeight: 27,
+    letterSpacing: 0,
   },
   bodyStrong: {
     fontFamily: fonts.bold,
-    fontSize: 14.5,
-    lineHeight: 21,
+    fontSize: 20,
+    lineHeight: 27,
+    letterSpacing: 0,
   },
   caption: {
     fontFamily: fonts.regular,
-    fontSize: 12.5,
-    lineHeight: 17,
+    fontSize: 17,
+    lineHeight: 23,
+    letterSpacing: 0,
   },
   captionStrong: {
     fontFamily: fonts.semibold,
-    fontSize: 12.5,
-    lineHeight: 17,
+    fontSize: 17,
+    lineHeight: 23,
+    letterSpacing: 0,
   },
   /**
    * SECTION LABELS. Mono, uppercase, tracked far out — the broadcast
@@ -123,22 +119,22 @@ export const type = {
    */
   eyebrow: {
     fontFamily: fonts.monoMedium,
-    fontSize: 10,
-    lineHeight: 13,
-    letterSpacing: 1.7,
+    fontSize: 14,
+    lineHeight: 18,
+    letterSpacing: 1.9,
     textTransform: "uppercase",
   },
   /** Clocks, scores, counts, timestamps. */
   data: {
     fontFamily: fonts.mono,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 15,
+    lineHeight: 20,
     letterSpacing: 0.1,
   },
   dataStrong: {
     fontFamily: fonts.monoMedium,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 16,
+    lineHeight: 21,
     letterSpacing: 0.1,
   },
   /**
@@ -147,16 +143,16 @@ export const type = {
    */
   score: {
     fontFamily: fonts.display,
-    fontSize: 14,
-    lineHeight: 17,
-    letterSpacing: -0.14,
+    fontSize: 22,
+    lineHeight: 25,
+    letterSpacing: -0.3,
     fontVariant: ["tabular-nums"],
   },
   button: {
     fontFamily: fonts.bold,
-    fontSize: 14.5,
-    lineHeight: 19,
-    letterSpacing: -0.1,
+    fontSize: 20,
+    lineHeight: 26,
+    letterSpacing: -0.2,
   },
 } satisfies Record<string, TextStyle>;
 

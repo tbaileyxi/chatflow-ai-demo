@@ -92,33 +92,69 @@ export function Eyebrow({
 /**
  * A section label with its count, as a row.
  *
- * The renderings put a number on the right of every section header — "4 on ·
- * 11", "6 ›", "4". It is the difference between a label and a reading: the
- * header tells you what is below AND how much of it there is, so a section you
- * were going to scroll past announces itself.
+ * BIG AND BOLD, not a whisper. The renderings set these in the display face at
+ * 20 uppercase with an icon beside them and a gold count on the right —
+ * "FRIENDS · 4 on · 11", "ON NOW · 6 ›". Built as a tiny tracked mono label
+ * they read as fine print on a form, which is the opposite of what a section
+ * header in a broadcast layout does.
+ *
+ * The count is the difference between a label and a reading: the header says
+ * what is below AND how much of it there is, so a section you were about to
+ * scroll past announces itself.
  */
 export function SectionLabel({
   children,
   count,
   action,
+  icon,
+  tone = "default",
 }: {
   children: React.ReactNode;
   count?: React.ReactNode;
   action?: React.ReactNode;
+  icon?: React.ReactNode;
+  tone?: Tone;
 }) {
   return (
     <View
       style={{
         flexDirection: "row",
-        alignItems: "baseline",
+        alignItems: "center",
         justifyContent: "space-between",
-        paddingHorizontal: 5,
-        marginTop: 14,
-        marginBottom: 7,
+        paddingHorizontal: 4,
+        marginTop: 18,
+        marginBottom: 9,
+        gap: 8,
       }}
     >
-      <Eyebrow tone="tertiary">{children}</Eyebrow>
-      {action ?? (count != null ? <Eyebrow tone="tertiary">{count}</Eyebrow> : null)}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+        {icon}
+        <RNText
+          style={[
+            typeScale.title as TextStyle,
+            {
+              color: tones[tone],
+              fontSize: 20,
+              lineHeight: 24,
+              letterSpacing: 0.4,
+              textTransform: "uppercase",
+            },
+          ]}
+        >
+          {children}
+        </RNText>
+      </View>
+      {action ??
+        (count != null ? (
+          <RNText
+            style={[
+              typeScale.data as TextStyle,
+              { color: tones.primary, fontSize: 14 },
+            ]}
+          >
+            {count}
+          </RNText>
+        ) : null)}
     </View>
   );
 }

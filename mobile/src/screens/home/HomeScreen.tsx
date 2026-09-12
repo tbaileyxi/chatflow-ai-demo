@@ -34,7 +34,7 @@ import { useAutoContactMatch } from "@/hooks/useAutoContactMatch";
 import { useContactMatch } from "@/hooks/useContactMatch";
 import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Eyebrow, Type } from "@/components/ui/Type";
+import { Eyebrow, SectionLabel, Type } from "@/components/ui/Type";
 import { fonts } from "@/theme/type";
 import { colors } from "@/theme/colors";
 
@@ -222,7 +222,12 @@ function FriendsNowSection() {
           <View
             className={`h-2 w-2 rounded-full ${anyLive ? "bg-primary" : "bg-muted-foreground"}`}
           />
-          <Eyebrow tone="tertiary">Friends</Eyebrow>
+          <SectionLabel
+            icon={<Users color={colors.primary} size={17} />}
+            count={anyLive ? `${roster.filter((r) => r.isLive).length} on · ${roster.length}` : `${roster.length}`}
+          >
+            Friends
+          </SectionLabel>
         </View>
         <Pressable className="flex-row items-center gap-1" onPress={inviteFriends}>
           <UserPlus color={colors.primary} size={14} />
@@ -457,7 +462,9 @@ function YourRoomsSection() {
       <View className="mb-3 flex-row items-center justify-between">
         <View className="flex-row items-center gap-2">
           <Users color={colors.primary} size={17} />
-          <Eyebrow tone="tertiary">Your huddles</Eyebrow>
+          <SectionLabel icon={<Users color={colors.primary} size={17} />}>
+            Your rooms
+          </SectionLabel>
         </View>
         {/* Was "+ New". You don't decide to make a room, you decide to bring
             somebody — and the room exists because of that. Same destination
@@ -562,9 +569,7 @@ export function HomeScreen() {
             <Radio color={colors.primary} size={18} />
             <Type variant="display">Side Huddle</Type>
           </View>
-          <Type variant="caption" tone="muted" style={{ marginTop: 2 }}>
-            Friend rooms only. No public room directory.
-          </Type>
+
         </View>
 
         <Pressable

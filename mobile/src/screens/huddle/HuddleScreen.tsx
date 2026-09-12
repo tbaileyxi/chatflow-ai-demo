@@ -571,16 +571,12 @@ export function HuddleScreen() {
                   coming rather than pretending to work. FadeButton and
                   PostFadeSheet stay in the tree, unmounted, so the work is
                   recoverable if the mechanic comes back. */}
-              {pingGameState !== "none" ? (
-                <PingButton
-                  huddleId={huddleId}
-                  gameState={pingGameState}
-                  onRallied={() => {
-                    setInvitedViaRally(true);
-                    setShowInvite(true);
-                  }}
-                />
-              ) : null}
+              {/* Rally moved into the ⋯ menu. The renderings put nothing in
+                  this row but the faces and the invite ＋ — a green button
+                  shouting "Rally the huddle" above the thread is chrome
+                  competing with the conversation, and it is a thing you do
+                  once a game rather than something that needs a permanent
+                  seat. */}
             </View>
           }
         />

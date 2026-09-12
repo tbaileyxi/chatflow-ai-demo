@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRoomGames, type RoomGame } from "@/hooks/useRoomGames";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { getFollowedTeamIds } from "@/lib/follows";
-import { Eyebrow, Type } from "@/components/ui/Type";
+import { SectionLabel, Type } from "@/components/ui/Type";
 import { cn } from "@/lib/utils";
 
 /**
@@ -81,10 +81,17 @@ export function GamesStrip({
   return (
     <View className="mb-5">
       <View className="mb-2.5 flex-row items-center justify-between px-4">
-        <Eyebrow tone="default">{anyLive ? "On now" : "Tonight"}</Eyebrow>
-        <Type variant="data" tone="muted">
-          {games.length} {games.length === 1 ? "game" : "games"}
-        </Type>
+        <SectionLabel
+          icon={
+            <Type variant="dataStrong" tone="primary" style={{ fontSize: 13 }}>
+              ◆
+            </Type>
+          }
+          count={`${games.length} ›`}
+        >
+          {anyLive ? "On now" : "Tonight"}
+        </SectionLabel>
+
       </View>
 
       <ScrollView
