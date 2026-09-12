@@ -15,7 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Lock,
   Plus,
-  Radio,
+  MessagesSquare,
   Users,
   UserPlus,
 } from "lucide-react-native";
@@ -217,23 +217,22 @@ function FriendsNowSection() {
 
   return (
     <View className="px-4">
-      <View className="mb-3 flex-row items-center justify-between">
-        <View className="flex-row items-center gap-2">
-          <View
-            className={`h-2 w-2 rounded-full ${anyLive ? "bg-primary" : "bg-muted-foreground"}`}
-          />
-          <SectionLabel
-            icon={<Users color={colors.primary} size={17} />}
-            count={anyLive ? `${roster.filter((r) => r.isLive).length} on · ${roster.length}` : `${roster.length}`}
-          >
-            Friends
-          </SectionLabel>
-        </View>
-        <Pressable className="flex-row items-center gap-1" onPress={inviteFriends}>
-          <UserPlus color={colors.primary} size={14} />
-          <Type variant="captionStrong" tone="primary">Invite</Type>
-        </Pressable>
-      </View>
+      {/* SectionLabel owns the whole row — icon, label, and the action on the
+          right. The old wrapper around it left a stray status dot and a second
+          copy of the icon. */}
+      <SectionLabel
+        icon={<Users color={colors.primary} size={18} />}
+        action={
+          <Pressable className="flex-row items-center gap-1.5" onPress={inviteFriends}>
+            <UserPlus color={colors.primary} size={15} />
+            <Type variant="captionStrong" tone="primary">Invite</Type>
+          </Pressable>
+        }
+      >
+        {anyLive
+          ? `Friends · ${roster.filter((r) => r.isLive).length} on`
+          : "Friends"}
+      </SectionLabel>
 
       {granted === false && newPeople.length === 0 ? (
         <Pressable
@@ -357,7 +356,7 @@ function FriendsNowSection() {
                 variant="data"
                 tone={f.isLive ? "primary" : "tertiary"}
                 numberOfLines={1}
-                style={{ fontSize: 9 }}
+                style={{ fontSize: 13 }}
               >
                 {f.isLive ? (f.huddleName ?? "watching") : "·"}
               </Type>
@@ -459,20 +458,18 @@ function YourRoomsSection() {
 
   return (
     <View className="px-4">
-      <View className="mb-3 flex-row items-center justify-between">
-        <View className="flex-row items-center gap-2">
-          <Users color={colors.primary} size={17} />
-          <SectionLabel icon={<Users color={colors.primary} size={17} />}>
-            Your rooms
-          </SectionLabel>
-        </View>
-        {/* Was "+ New". You don't decide to make a room, you decide to bring
-            somebody — and the room exists because of that. Same destination
-            for now; the word is what changes what people expect of it. */}
-        <Pressable onPress={() => navigation.navigate("CreateSideHuddle")}>
-          <Type variant="captionStrong" tone="primary">＋ Invite</Type>
-        </Pressable>
-      </View>
+      <SectionLabel
+        icon={<MessagesSquare color={colors.primary} size={18} />}
+        action={
+          <Pressable onPress={() => navigation.navigate("CreateSideHuddle")}>
+            {/* Was "+ New". You don't decide to make a room, you decide to
+                bring somebody — the room exists because of that. */}
+            <Type variant="captionStrong" tone="primary">＋ Invite</Type>
+          </Pressable>
+        }
+      >
+        Your rooms
+      </SectionLabel>
 
       {isLoading ? (
         <View className="gap-3">
@@ -480,7 +477,7 @@ function YourRoomsSection() {
           <Skeleton className="h-20 rounded-2xl" />
         </View>
       ) : rooms.length > 0 ? (
-        <View className="gap-3">
+        <View>
           {rooms.map((room) => (
             <HuddleCard
               key={room.id}
@@ -564,12 +561,11 @@ export function HomeScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
       <View className="flex-row items-center justify-between px-4 pb-4 pt-2">
-        <View>
-          <View className="flex-row items-center gap-2">
-            <Radio color={colors.primary} size={18} />
-            <Type variant="display">Side Huddle</Type>
-          </View>
-
+        <View className="min-w-0 flex-1">
+          <Type variant="display">Side Huddle</Type>
+          <Type variant="caption" tone="tertiary" style={{ marginTop: 1 }}>
+            Your teams. Your crew. One thread.
+          </Type>
         </View>
 
         <Pressable

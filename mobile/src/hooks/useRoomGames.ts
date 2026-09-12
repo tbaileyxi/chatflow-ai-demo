@@ -31,8 +31,8 @@ export type RoomGame = {
    */
   statusLabel: string;
   /** Always ordered as the room's team first, then the opponent. */
-  us: { teamId: string; name: string; score: number | null };
-  them: { teamId: string; name: string; score: number | null };
+  us: { teamId: string; name: string; logoUrl: string | null; score: number | null };
+  them: { teamId: string; name: string; logoUrl: string | null; score: number | null };
   /** True when the room's team is the home side — for "vs" versus "at". */
   isHome: boolean;
 };
@@ -148,7 +148,7 @@ export function useRoomGames(teamIds: (string | null | undefined)[]) {
           .gte("start_time", since)
           .order("start_time", { ascending: true })
           .limit(400),
-        supabase.from("teams").select("id, name, city, league"),
+        supabase.from("teams").select("id, name, city, league, logo_url"),
       ]);
 
       const games = (gamesRes.data ?? []) as GameRow[];
@@ -170,6 +170,11 @@ export function useRoomGames(teamIds: (string | null | undefined)[]) {
         if (!t) return "TBD";
         return (t.name || t.city || "TBD").toString();
       };
+
+      // The crest. A scoreline with two logos on it reads as sport; the same
+      // line as two grey words reads as a spreadsheet.
+      const logoFor = (id: string | null) =>
+        (id ? ((teamById.get(id) as any)?.logo_url ?? null) : null) as string | null;
 
       for (const teamId of ids) {
         const team = teamById.get(teamId) as any;
@@ -213,11 +218,13 @@ export function useRoomGames(teamIds: (string | null | undefined)[]) {
           us: {
             teamId,
             name: nameFor(teamId),
+            logoUrl: logoFor(teamId),
             score: live ? (isHome ? game.home_score : game.away_score) : null,
           },
           them: {
             teamId: themId ?? "",
             name: nameFor(themId),
+            logoUrl: logoFor(themId),
             score: live ? (isHome ? game.away_score : game.home_score) : null,
           },
           isHome,

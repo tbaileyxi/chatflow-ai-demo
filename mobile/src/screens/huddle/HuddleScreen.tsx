@@ -61,6 +61,7 @@ import { fonts } from "@/theme/type";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
 import { CoachThinking } from "@/components/huddle/CoachThinking";
+import { RoomBackground } from "@/components/huddle/RoomBackground";
 
 type Route = RouteProp<RootStackParamList, "Huddle">;
 
@@ -130,9 +131,19 @@ function buildListItems(
     }
   }
 
-  // Sort root messages newest-first (they should already be, but ensure)
+  // READING ORDER: oldest first.
+  //
+  // The thread used to be built newest-first and rendered with the newest
+  // message at the top, which is a feed, not a conversation. Every messaging
+  // app people already use runs the other way: oldest at the top, newest at
+  // the bottom, the composer right under the last thing anybody said.
+  //
+  // This ordering is what makes the rest work — a reply sits under the message
+  // it answers, a day separator sits above that day, "load older" sits at the
+  // top, and consecutive-message grouping compares against the line directly
+  // above rather than the one below it.
   rootMessages.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
 
   // Build final list with day separators
@@ -167,8 +178,9 @@ function buildListItems(
     }
   }
 
+  // Older messages are up, so the door to them is up.
   if (hasMore) {
-    items.push({ type: "load-more", key: "load-more" });
+    items.unshift({ type: "load-more", key: "load-more" });
   }
 
   return items;
@@ -412,7 +424,7 @@ export function HuddleScreen() {
     return map;
   }, [messages]);
 
-  // Build list items with day separators (newest first)
+  // Build list items with day separators, in reading order (oldest first)
   const listItems = useMemo(
     () => (messages ? buildListItems(messages, hasMore) : []),
     [messages, hasMore],
@@ -443,8 +455,22 @@ export function HuddleScreen() {
   const [joining, setJoining] = useState(false);
   const queryClient = useQueryClient();
 
+  // The list runs oldest -> newest, so "newest" is the end of it. This used to
+  // be offset 0, which was the top, which was the newest only because the list
+  // was built backwards.
   const scrollToBottom = useCallback(() => {
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    flatListRef.current?.scrollToEnd({ animated: true });
+  }, []);
+
+  // Stay pinned to the newest line — unless you have scrolled up to read, in
+  // which case being yanked back down every time somebody types is the single
+  // most irritating thing a chat can do to you.
+  const atBottomRef = useRef(true);
+  const settledRef = useRef(false);
+  const keepAtBottom = useCallback(() => {
+    if (!atBottomRef.current) return;
+    flatListRef.current?.scrollToEnd({ animated: settledRef.current });
+    settledRef.current = true;
   }, []);
 
   const handleReply = useCallback(
@@ -513,32 +539,33 @@ export function HuddleScreen() {
     // with the same question three times.
     // THE COACH ANSWERS THREE WAYS, so the dots have to appear for all three.
     //
-    // It used to fire only on a literal @coach. But the trigger also answers
-    // when you are the only person in the room, and when you reply to something
-    // it said in the last ten minutes — both decided server-side, so the app had
-    // no idea an answer was coming and the message arrived out of nowhere.
+    // TWO ways, and "you are alone in the room" is deliberately not one of
+    // them any more. In a room of one that was every message — which is what a
+    // brand-new room is, so a first-time user met a bot that answered every
+    // line they typed. See RUN_THIS_COACH_QUIET.sql.
     //
     // This mirrors public.notify_coach_mention(). If that SQL changes, change
     // this with it: the two agreeing is what makes the dots honest.
-    const alone = (huddle?.memberCount ?? 1) <= 1;
-    const last = (messages ?? [])[0];
+    const last = (messages ?? [])[0]; // the query returns newest-first
     const answeringCoach =
       !!last &&
       last.messageType === "coach_answer" &&
       Date.now() - new Date(last.createdAt).getTime() < 10 * 60_000;
-    if (/@coach\b/i.test(content) || alone || answeringCoach) setCoachThinking(true);
+    if (/@coach\b/i.test(content) || answeringCoach) setCoachThinking(true);
     const result = await sendMessage(content, user.id, replyToId, media, {
       senderName,
       huddleName,
     });
     setTimeout(() => {
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      flatListRef.current?.scrollToEnd({ animated: true });
     }, 300);
     return result;
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
+    <SafeAreaView className="flex-1" edges={["top"]} style={{ backgroundColor: colors.huddleGround }}>
+      {/* The room is not the app's black. See RoomBackground. */}
+      <RoomBackground />
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -652,10 +679,13 @@ export function HuddleScreen() {
               const parentMsg = msg.replyToId ? messageMap.get(msg.replyToId) : undefined;
               const isReply = !!parentMsg;
 
-              // Consecutive grouping: hide the name + avatar row when the
-              // previous list item is a message from the same sender within
-              // the last 5 minutes. Reduces "name + time" clutter on
-              // back-to-back chatter.
+              // Consecutive grouping: drop the name when the line directly
+              // ABOVE is the same person inside five minutes.
+              //
+              // In reading order index-1 is the older message, so the delta is
+              // positive and the five-minute window means something. Built the
+              // other way round it was always negative, so the window never
+              // applied and a name was dropped from a message an hour later.
               const prev = index > 0 ? listItems[index - 1] : null;
               const prevMsg =
                 prev && (prev as any).type === "message"
@@ -708,13 +738,23 @@ export function HuddleScreen() {
                 </Type>
               </View>
             }
-            // Anchor content to bottom (iMessage-style) so short threads
-            // don't have a giant blank between header and the latest message.
+            // Bottom-anchored. A two-message room sits just above the
+            // composer instead of stranded under the header with a screen of
+            // black beneath it.
             contentContainerStyle={{
-              paddingVertical: 8,
+              paddingTop: 8,
+              paddingBottom: 10,
               flexGrow: 1,
               justifyContent: "flex-end",
             }}
+            onContentSizeChange={keepAtBottom}
+            onLayout={keepAtBottom}
+            onScroll={(e) => {
+              const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+              atBottomRef.current =
+                contentSize.height - layoutMeasurement.height - contentOffset.y < 80;
+            }}
+            scrollEventThrottle={16}
             keyboardShouldPersistTaps="handled"
             // Getting OUT of the composer. "Tap outside to dismiss" cannot work
             // in a chat: nearly everything above the keyboard is a message
@@ -752,7 +792,7 @@ export function HuddleScreen() {
             were "in" by every visible sign and mute. That is the bug people
             hit when they were invited and gave up. */}
         {user && !huddle.isMember && (
-          <View className="border-t border-border bg-background px-4 py-3">
+          <View className="border-t border-border px-4 py-3" style={{ backgroundColor: colors.huddleGroundAlt }}>
             <Type center variant="caption" tone="muted" className="mb-2">
               You're reading {huddle.name}. Join to chat.
             </Type>
@@ -792,7 +832,8 @@ export function HuddleScreen() {
         {user && huddle.isMember && (
           <>
             {typingUsers.length > 0 && (
-              <Type variant="caption" tone="muted" className="border-t border-border bg-background px-4 pt-2 italic">
+              <Type variant="caption" tone="muted" className="border-t border-border px-4 pt-2 italic"
+                style={{ backgroundColor: colors.huddleGroundAlt }}>
                 {typingUsers.map((typingUser) => typingUser.displayName).join(", ")}
                 {typingUsers.length === 1 ? " is" : " are"} typing...
               </Type>

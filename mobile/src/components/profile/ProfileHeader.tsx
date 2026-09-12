@@ -121,11 +121,11 @@ export function ProfileHeader({
               backgroundColor: "rgba(245,197,24,0.10)",
             }}
           >
-            <View className="h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-muted">
+            <View className="h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-muted">
               {t.logoUrl ? (
                 <Image source={{ uri: t.logoUrl }} className="h-full w-full" />
               ) : (
-                <Type variant="data" tone="muted" style={{ fontSize: 8 }}>
+                <Type variant="data" tone="muted" style={{ fontSize: 11 }}>
                   {t.name.slice(0, 2).toUpperCase()}
                 </Type>
               )}
@@ -168,13 +168,16 @@ function Stat({
 }) {
   return (
     <View
-      className="flex-1 items-center rounded-xl px-2 py-2.5"
+      className="flex-1 items-center rounded-[14px] px-2 py-3"
       style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: "#22222A" }}
     >
-      <Type variant="title" tone={gold ? "primary" : "default"} style={{ fontSize: 20 }}>
+      {/* These carried fontSize overrides of 20 and 7.5 — the 292px-frame
+          mistake surviving as two inline numbers after the scale was fixed
+          everywhere else. 7.5pt is smaller than a legal disclaimer. */}
+      <Type variant="score" tone={gold ? "primary" : "default"} style={{ fontSize: 27 }}>
         {value}
       </Type>
-      <Type variant="eyebrow" tone="tertiary" className="mt-1.5" style={{ fontSize: 7.5 }}>
+      <Type variant="eyebrow" tone="tertiary" className="mt-1">
         {label}
       </Type>
     </View>

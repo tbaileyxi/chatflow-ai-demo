@@ -1,11 +1,10 @@
 import { useMemo } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useRoomGames, type RoomGame } from "@/hooks/useRoomGames";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { getFollowedTeamIds } from "@/lib/follows";
 import { SectionLabel, Type } from "@/components/ui/Type";
-import { cn } from "@/lib/utils";
 
 /**
  * What's on, in one row.
@@ -97,58 +96,85 @@ export function GamesStrip({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
       >
-        {games.map((g) => (
-          <Pressable
-            key={g.gameId}
-            onPress={() => onPickGame?.(g)}
-            className={cn(
-              "w-[142px] rounded-xl border p-2.5 active:opacity-80",
-              g.status === "live"
-                ? "border-[#3A3A24] bg-card"
-                : "border-border bg-card",
-            )}
-          >
-            <Row name={g.us.name} score={g.us.score} live={g.status === "live"} />
-            <Row
-              name={g.them.name}
-              score={g.them.score}
-              live={g.status === "live"}
-            />
-            <Text
-              className={cn(
-                "mt-2 text-[10px] font-bold",
-                g.status === "live" ? "text-primary" : "text-muted-foreground",
-              )}
-              numberOfLines={1}
+        {games.map((g) => {
+          const live = g.status === "live";
+          const us = g.us.score ?? 0;
+          const them = g.them.score ?? 0;
+          return (
+            <Pressable
+              key={g.gameId}
+              onPress={() => onPickGame?.(g)}
+              className="w-[178px] overflow-hidden rounded-[14px] active:opacity-80"
+              style={{
+                backgroundColor: live ? "#15161A" : "#111113",
+                borderWidth: 1,
+                borderColor: live ? "rgba(255,91,77,0.30)" : "#2A2A2F",
+              }}
             >
-              {g.statusLabel}
-            </Text>
-          </Pressable>
-        ))}
+              {live ? (
+                <View style={{ height: 2.5, backgroundColor: "#FF5B4D" }} />
+              ) : null}
+
+              <View className="gap-1.5 px-2.5 py-2.5">
+                <Row side={g.us} score={live ? us : null} leading={us >= them} />
+                <Row side={g.them} score={live ? them : null} leading={them >= us} />
+              </View>
+
+              <View style={{ height: 1, backgroundColor: "#1E2027" }} />
+              <View className="flex-row items-center gap-1.5 px-2.5 py-1.5">
+                {live ? (
+                  <View
+                    style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#FF5B4D" }}
+                  />
+                ) : null}
+                <Type variant="data" tone={live ? "default" : "tertiary"} numberOfLines={1}>
+                  {g.statusLabel}
+                </Type>
+              </View>
+            </Pressable>
+          );
+        })}
       </ScrollView>
     </View>
   );
 }
 
+/**
+ * One team's line: crest, nickname, score.
+ *
+ * The leading side stays bright and the trailing side drops to muted, so the
+ * card answers "who's winning" before you read a digit.
+ */
 function Row({
-  name,
+  side,
   score,
-  live,
+  leading,
 }: {
-  name: string;
+  side: RoomGame["us"];
   score: number | null;
-  live: boolean;
+  leading: boolean;
 }) {
   return (
-    <View className="flex-row items-center gap-1.5">
-      <Type variant="caption" tone="muted" className="shrink" numberOfLines={1}>
-        {name}
+    <View className="flex-row items-center gap-2">
+      <View className="h-[22px] w-[22px] items-center justify-center overflow-hidden rounded-md"
+        style={{ backgroundColor: "#1B1D23" }}>
+        {side.logoUrl ? (
+          <Image source={{ uri: side.logoUrl }} style={{ width: 17, height: 17 }} resizeMode="contain" />
+        ) : null}
+      </View>
+      <Type
+        variant="captionStrong"
+        tone={score == null || leading ? "default" : "muted"}
+        numberOfLines={1}
+        style={{ flexShrink: 1 }}
+      >
+        {side.name}
       </Type>
-      {live ? (
-        <Type variant="captionStrong" className="ml-auto">
-          {score ?? 0}
+      {score != null ? (
+        <Type variant="score" tone={leading ? "default" : "muted"} style={{ marginLeft: "auto" }}>
+          {score}
         </Type>
       ) : null}
     </View>

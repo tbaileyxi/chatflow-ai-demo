@@ -222,7 +222,7 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
   };
 
   return (
-    <View className="border-b border-border bg-background">
+    <View className="border-b border-border" style={{ backgroundColor: colors.huddleGroundAlt }}>
       <View className="flex-row items-center gap-3 px-4 py-2.5">
         <Pressable
           onPress={() => navigation.goBack()}

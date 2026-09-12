@@ -293,8 +293,9 @@ export function MessageInput({
 
   return (
     <View
-      className="border-t border-border bg-background"
+      className="border-t border-border"
       style={{
+        backgroundColor: colors.huddleGroundAlt,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: -2 },
         shadowOpacity: 0.05,

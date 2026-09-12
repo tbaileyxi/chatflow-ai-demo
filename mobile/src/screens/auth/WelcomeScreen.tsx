@@ -23,10 +23,12 @@ export function WelcomeScreen() {
         className="flex-1 items-center justify-end px-8 pb-4"
         pointerEvents="box-none"
       >
-        <Type center variant="eyebrow">
-          Side Huddle
-        </Type>
-        <Type center variant="heading" tone="muted" className="mt-4">
+        {/* THE WORDMARK IS THE WORDMARK. This screen had "Side Huddle" set
+            as an eyebrow — 14px tracked mono, the same treatment as the word
+            "TONIGHT" over a list — with the tagline above it in heading grey.
+            The first screen of the app was announcing itself in a caption. */}
+        <Type center variant="display">Side Huddle</Type>
+        <Type center variant="body" tone="muted" className="mt-2">
           Never watch a game alone.
         </Type>
         <Type center variant="eyebrow" tone="primary" className="mt-8">

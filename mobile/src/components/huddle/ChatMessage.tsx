@@ -414,22 +414,25 @@ export function ChatMessage({
             // Tighter vertical padding when this is a follow-up message from
             // the same sender (consecutive grouping). Full padding on the
             // first message of a chain.
-            isGroupedWithPrev ? "pb-0.5 pt-0" : "gap-1 py-2",
-            // Everyone sits on the left, including you. Right-aligned bubbles
-            // are a two-person convention: in a room of eight they turn the
-            // thread into a zigzag and halve the usable width for no gain,
-            // since the name already says who spoke.
-            "items-start",
+            isGroupedWithPrev ? "pb-0.5 pt-0" : "gap-1 py-1.5",
+            // Yours on the right, everyone else's on the left — the
+            // renderings, and the convention every messaging app on the phone
+            // already uses. I had argued this flat on the grounds that a
+            // zigzag wastes width in a room of eight. It does, and it is also
+            // how a person tells their own voice from the room's at a glance.
+            isOwnMessage ? "items-end" : "items-start",
             isReply ? "pl-14 pr-4" : "px-4",
           )}
           style={isReply ? { borderLeftWidth: 2, borderLeftColor: colors.primary + "40", marginLeft: 16 } : undefined}
         >
           <View
             className={cn("flex-row gap-2.5")}
+            style={isOwnMessage ? { justifyContent: "flex-end" } : undefined}
           >
-            {/* Avatar — hidden on consecutive same-sender messages so chains
-                look like a single voice without the repeated circle. */}
-            {isGroupedWithPrev ? (
+            {/* Avatar — never on your own messages (you know who you are), and
+                hidden on consecutive same-sender messages so a chain looks
+                like one voice rather than a column of the same circle. */}
+            {isOwnMessage ? null : isGroupedWithPrev ? (
               <View className="h-0 w-9" />
             ) : (
               // Tapping whoever said it opens their profile. The name above a
@@ -464,17 +467,10 @@ export function ChatMessage({
                 width now: with nothing right-aligned there is no facing edge
                 to leave room for, and a long message shouldn't wrap early to
                 preserve a gutter nobody is using. */}
-            <View className="flex-1 gap-1">
-              {/* The name is NOT a line of its own any more. The renderings
-                  set it inline, in the person's colour, with the message
-                  running straight on from it — "Mike THAT'S THE GAME" is one
-                  line, not a label above a paragraph. Stacking them doubled
-                  the height of every message and made a fast room unreadable.
-
-                  The timestamp is gone with it. No rendering has one: in a
-                  room where everything happened in the last four minutes, a
-                  time on every line is noise, and the day separator already
-                  carries the only temporal fact anybody needs. */}
+            <View className={isOwnMessage ? "shrink gap-1" : "flex-1 gap-1"}>
+              {/* No timestamp. In a room where everything happened in the
+                  last four minutes a time on every line is noise, and the day
+                  separator carries the only temporal fact anybody needs. */}
 
               {/* Quoted reply context — hidden when the parent is the message
                   directly above (redundant). */}
@@ -519,24 +515,47 @@ export function ChatMessage({
                   message.content === "🎤 Voice message") ? null : (
                 <View
                   className={cn(
-                    // A person's words sit on the room, not in a container.
-                    // Bubbles were doing a job the name above already does —
-                    // saying where one message ends and the next begins — and
-                    // charging ~24px of horizontal padding per message for it.
-                    // The bot keeps its card and gold rule, because THAT
-                    // distinction is real: it separates a machine from the
-                    // people, which is worth spending chrome on.
                     message.isBotMessage && "rounded-2xl bg-card",
                     message.isBotMessage
                       ? isReply
                         ? "px-3 py-1.5"
                         : "px-4 py-2.5"
-                      : "py-0.5",
+                      : "",
                   )}
                   style={
                     message.isBotMessage
                       ? { borderLeftWidth: 3, borderLeftColor: colors.primary }
-                      : undefined
+                      : /**
+                         * THE BUBBLE, back, and this time out of the shipped-
+                         * palette prototype rather than out of my head.
+                         *
+                         * I took bubbles out on the argument that a coloured
+                         * name already says where one message ends and the
+                         * next begins. It does — and it also made a room of
+                         * eight people read as a wall of grey text on black,
+                         * which is the whole of what was wrong with the built
+                         * app next to the design.
+                         *
+                         * Own messages are GOLD with near-black text and hang
+                         * off the right edge. It is the single most
+                         * recognisable thing in the renderings and the one
+                         * piece of real colour a quiet room has.
+                         *
+                         * The square corner marks the start of a run, the way
+                         * every messaging app people already use does it.
+                         */
+                        {
+                          backgroundColor: isOwnMessage ? colors.primary : "#222226",
+                          paddingHorizontal: 14,
+                          paddingVertical: 9,
+                          borderRadius: 20,
+                          borderTopRightRadius:
+                            isOwnMessage && !isGroupedWithPrev ? 7 : 20,
+                          borderTopLeftRadius:
+                            !isOwnMessage && !isGroupedWithPrev ? 7 : 20,
+                          alignSelf: isOwnMessage ? "flex-end" : "flex-start",
+                          maxWidth: "88%",
+                        }
                   }
                 >
                   {(() => {
@@ -549,20 +568,28 @@ export function ChatMessage({
                       // A shout gets set bigger. "THAT'S THE GAME" at the same
                       // size as "ok" flattens the one moment a room exists for.
                       return (
-                        <Type
-                          variant={isShout ? "shout" : "message"}
-                          style={isReply ? { fontSize: 17, lineHeight: 23 } : undefined}
-                        >
-                          {!isGroupedWithPrev ? (
+                        <>
+                          {/* Whose bubble this is. Only for other people —
+                              yours is gold and on the right, which says it
+                              without a word. */}
+                          {!isOwnMessage && !isGroupedWithPrev ? (
                             <Type
-                              variant={isShout ? "shout" : "message"}
-                              style={{ color: who, fontFamily: fonts.extrabold }}
+                              variant="speaker"
+                              style={{ color: who, marginBottom: 2 }}
                             >
-                              {displayName}{" "}
+                              {displayName}
                             </Type>
                           ) : null}
-                          {message.content}
-                        </Type>
+                          <Type
+                            variant={isShout ? "shout" : "message"}
+                            style={{
+                              color: isOwnMessage ? "#0A0A0B" : colors.foreground,
+                              ...(isReply ? { fontSize: 17, lineHeight: 23 } : null),
+                            }}
+                          >
+                            {message.content}
+                          </Type>
+                        </>
                       );
                     }
                     const { body, sponsor } = splitSponsorCredit(

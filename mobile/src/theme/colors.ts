@@ -21,6 +21,20 @@ export const colors = {
   muted: "#18181B",
   mutedForeground: "#A0A0A8",
 
+  /**
+   * THE ROOM HAS ITS OWN GROUND. #141418, not the app's #0A0A0B.
+   *
+   * Straight from the shipped-palette prototype, and the reason the built
+   * room read as "dull grey on black" while the design did not: a thread on
+   * the same near-black as every other screen has nothing to sit on, so the
+   * messages float and the whole surface goes flat. One step up and the room
+   * becomes a place you walked into.
+   */
+  huddleGround: "#141418",
+  huddleGroundAlt: "#1A1A1F",
+  /** Somebody else's message. Yours is `primary`. */
+  bubbleOther: "#222226",
+
   card: "#111113",
   cardForeground: "#F0F0F2",
 

@@ -18,7 +18,7 @@ import {
   X,
   Share2,
 } from "lucide-react-native";
-import { Type } from "@/components/ui/Type";
+import { SectionLabel, Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -534,15 +534,24 @@ export function HuddleSettingsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
+    <SafeAreaView
+      className="flex-1"
+      edges={["top"]}
+      style={{ backgroundColor: colors.huddleGround }}
+    >
       {/* Header */}
       <View className="flex-row items-center gap-3 px-4 py-3">
         <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
           <ChevronLeft color={colors.foreground} size={24} />
         </Pressable>
-        <Type variant="heading" className="flex-1">
-          Side Huddle Settings
-        </Type>
+        <View className="flex-1">
+          <Type variant="title" numberOfLines={1}>
+            {huddle.name}
+          </Type>
+          <Type variant="data" tone="tertiary">
+            Room settings
+          </Type>
+        </View>
         {isOwner && (
           <ShieldCheck color={colors.primary} size={22} />
         )}
@@ -555,9 +564,7 @@ export function HuddleSettingsScreen() {
         {isRoomAdmin && (
           <Card>
             <CardContent className="gap-3 pt-4">
-              <Type variant="eyebrow" tone="muted">
-                Room photo
-              </Type>
+              <SectionLabel>Room photo</SectionLabel>
               <View className="h-40 w-full overflow-hidden rounded-xl bg-muted">
                 {huddle.photoUrl ? (
                   <Image
@@ -791,9 +798,7 @@ export function HuddleSettingsScreen() {
 
               {huddle.isPrivate && joinRequests.length > 0 ? (
                 <View className="gap-2">
-                  <Type variant="eyebrow" tone="muted">
-                    Requests
-                  </Type>
+                  <SectionLabel>Requests</SectionLabel>
                   {joinRequests.map((request) => (
                     <View
                       key={request.id}
