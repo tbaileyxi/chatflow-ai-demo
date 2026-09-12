@@ -24,6 +24,7 @@ import { peekPendingInvite } from "@/hooks/useInviteHandler";
 import { PRIVACY_URL, TOS_URL } from "@/lib/legal";
 import { RippleGlyph } from "@/components/brand/RippleGlyph";
 import { colors } from "@/theme/colors";
+import { type } from "@/theme/type";
 
 // Phone is stored ONLY as a match key so people who already have your number
 // can find you. Nothing sends to it — there is no outbound SMS in the product.
@@ -269,8 +270,16 @@ export function OnboardingScreen() {
                       autoCapitalize="words"
                       autoCorrect={false}
                       returnKeyType="next"
-                      className="mt-6 rounded-xl border border-border bg-muted px-4 py-3.5 text-lg text-foreground"
-                      style={{ color: colors.foreground }}
+                      className="mt-6 rounded-[22px] px-4 py-3.5"
+                      style={{
+                        color: colors.foreground,
+                        backgroundColor: colors.card,
+                        borderWidth: 1,
+                        borderColor: name.trim() ? colors.primary : colors.border,
+                        fontFamily: type.bodyStrong.fontFamily,
+                        fontSize: 28,
+                        lineHeight: 34,
+                      }}
                     />
                     <Type variant="caption" tone="muted" className="mt-2">
                       This is what people see in rooms.
@@ -296,8 +305,16 @@ export function OnboardingScreen() {
                           placeholderTextColor={colors.mutedForeground}
                           keyboardType="phone-pad"
                           returnKeyType="done"
-                          className="mt-3 rounded-xl border border-border bg-muted px-4 py-3.5 text-lg text-foreground"
-                          style={{ color: colors.foreground }}
+                          className="mt-3 rounded-[22px] px-4 py-3.5"
+                          style={{
+                            color: colors.foreground,
+                            backgroundColor: colors.card,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            fontFamily: type.bodyStrong.fontFamily,
+                            fontSize: 24,
+                            lineHeight: 30,
+                          }}
                         />
                         <Type variant="caption" tone="muted" className="mt-2">
                           Only so people who already have your number can find
