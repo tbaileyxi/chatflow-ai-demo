@@ -27,6 +27,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Audio } from "expo-av";
 import { Type } from "@/components/ui/Type";
 import { colors } from "@/theme/colors";
+import { type } from "@/theme/type";
 
 type MediaAttachment = {
   uri: string;
@@ -91,6 +92,7 @@ export function MessageInput({
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const inputRef = useRef<TextInput>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -278,6 +280,23 @@ export function MessageInput({
     run?: () => void;
     soon?: boolean;
   }[] = [
+    {
+      // ASK COACH, AT THE TOP. The sheet's render has always had a branch for
+      // it — gold tile, white glyph — and the entry itself was missing, so the
+      // Coach's only door was still knowing to type "@coach" at it. That is
+      // the thing this button exists to stop being true.
+      key: "coach",
+      label: "Ask the Coach",
+      sub: "Line, injury, who's hot",
+      Icon: Sparkles,
+      run: () => {
+        setText((t) => (t.trim() ? `${t.trim()} @coach ` : "@coach "));
+        // Hand over a live cursor. Dropping the text in with the keyboard down
+        // makes you tap the field to finish the thought you just asked the app
+        // to start.
+        setTimeout(() => inputRef.current?.focus(), 80);
+      },
+    },
     {
       key: "library",
       label: "From your library",
@@ -493,8 +512,20 @@ export function MessageInput({
 
           {/* Text input */}
           <TextInput
-            className="min-h-[44px] max-h-[120px] flex-1 rounded-2xl border-2 bg-muted px-4 py-2.5 text-base text-foreground"
-            style={{ borderColor: colors.primary + "4D" }}
+            ref={inputRef}
+            className="min-h-[46px] max-h-[120px] flex-1 rounded-[22px] px-4 py-2.5"
+            style={{
+              backgroundColor: "#222226",
+              borderWidth: 1.5,
+              // Gold when you have started typing, the way the renderings do
+              // it: the field says it is live, so the Send button doesn't have
+              // to shout about being available.
+              borderColor: text.trim() ? colors.primary : "#2F2F36",
+              color: colors.foreground,
+              fontFamily: type.body.fontFamily,
+              fontSize: 18,
+              lineHeight: 24,
+            }}
             placeholder="Message..."
             placeholderTextColor={colors.mutedForeground}
             value={text}
@@ -511,12 +542,7 @@ export function MessageInput({
             onBlur={() => onTypingChange?.(false)}
           />
 
-          {/* ＋ · text · RECORD, and the record button becomes Send once there
-              is something to send.
-
-              A Send button greyed out at 40% is the most common state of this
-              row and it does nothing — meanwhile the voice note, which is the
-              A plain Send. It greys out with nothing to send rather than
+          {/* A plain Send. It greys out with nothing to send rather than
               becoming a different button — a control that changes what it does
               depending on state is a control nobody trusts. */}
           <Pressable

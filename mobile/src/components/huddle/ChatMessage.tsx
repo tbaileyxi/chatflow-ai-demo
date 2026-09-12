@@ -467,7 +467,7 @@ export function ChatMessage({
                 width now: with nothing right-aligned there is no facing edge
                 to leave room for, and a long message shouldn't wrap early to
                 preserve a gutter nobody is using. */}
-            <View className={isOwnMessage ? "shrink gap-1" : "flex-1 gap-1"}>
+            <View className={isOwnMessage ? "shrink items-end gap-1" : "flex-1 gap-1"}>
               {/* No timestamp. In a room where everything happened in the
                   last four minutes a time on every line is noise, and the day
                   separator carries the only temporal fact anybody needs. */}
