@@ -454,105 +454,110 @@ export function MessageInput({
             </View>
           )}
 
-        <View className="flex-row items-end gap-2 px-3 py-3">
-          {/* Camera, library and mic were three separate 40px icons sitting
-              permanently in front of the text field. Collapsing them into one
-              ＋ is what makes room for everything else that wants to be here —
-              the Coach especially, which until now had no visible entry point
-              at all and could only be found by knowing to type "@". */}
-          {/* THE CAMERA, BIG, ON THE LEFT. The rendering's ◉ — a white disc,
-              the most prominent thing in the row, because capture is the point
-              of being in a room with a game on.
+        {/* ONE PILL. The renderings draw the whole composer as a single
+            rounded container on #111113 with the controls sitting inside it,
+            not a row of loose circles either side of a field. Radius 26 in a
+            290px frame is 36 here — see rendering-scale-factors.
 
-              It was a ＋ opening a sheet, which put the camera three taps and a
-              menu away from a moment that lasts two seconds. Tap for a photo,
-              hold to record — the same gesture as the capture screen itself.
-
-              Long-press-and-hold on the ＋ still reaches the rest (library,
-              poll, trivia) via the small chevron beside it. */}
-          <Pressable
-            onPress={onFaceReaction ?? takePhoto}
-            onLongPress={() => {
-              Keyboard.dismiss();
-              setShowPlus(true);
-            }}
-            delayLongPress={260}
-            className="items-center justify-center rounded-full active:opacity-80"
-            style={{ height: 46, width: 46, backgroundColor: colors.foreground }}
-            hitSlop={4}
-          >
-            {/* ◉, not a camera glyph. The rendering draws a record dot — a
-                camera icon says "attach a file", a record dot says "capture
-                this, now", and this is the button for a moment that lasts two
-                seconds. */}
-            <View
-              style={{
-                width: 18,
-                height: 18,
-                borderRadius: 9,
-                borderWidth: 2.5,
-                borderColor: "#000",
-              }}
-            />
-          </Pressable>
-
-          {/* The rest of the ＋ sheet is still reachable, just no longer the
-              first thing your thumb lands on. */}
-          <Pressable
-            onPress={() => {
-              Keyboard.dismiss();
-              setShowPlus(true);
-            }}
-            className="h-8 w-8 items-center justify-center rounded-full active:opacity-70"
-            style={{ backgroundColor: colors.muted }}
-            hitSlop={6}
-          >
-            <Plus color={colors.mutedForeground} size={16} />
-          </Pressable>
-
-          {/* Text input */}
-          <TextInput
-            ref={inputRef}
-            className="min-h-[46px] max-h-[120px] flex-1 rounded-[22px] px-4 py-2.5"
+            ＋ · ◉ · field · Send. The ＋ carries the library, Ask Coach, poll
+            and trivia; the ◉ is capture, which is the point of being in a room
+            with a game on; Send is a send. */}
+        <View className="px-3 pb-3 pt-2">
+          <View
+            className="flex-row items-center gap-2.5 px-2.5 py-2"
             style={{
-              backgroundColor: "#222226",
-              borderWidth: 1.5,
-              // Gold when you have started typing, the way the renderings do
-              // it: the field says it is live, so the Send button doesn't have
-              // to shout about being available.
-              borderColor: text.trim() ? colors.primary : "#2F2F36",
-              color: colors.foreground,
-              fontFamily: type.body.fontFamily,
-              fontSize: 18,
-              lineHeight: 24,
+              backgroundColor: colors.card,
+              borderWidth: 1,
+              borderColor: text.trim() ? "rgba(245,197,24,0.45)" : "#24242A",
+              borderRadius: 36,
             }}
-            placeholder="Message..."
-            placeholderTextColor={colors.mutedForeground}
-            value={text}
-            onChangeText={(value) => {
-              setText(value);
-              onTypingChange?.(value.trim().length > 0);
-            }}
-            multiline
-            editable={!disabled}
-            returnKeyType="send"
-            blurOnSubmit={false}
-            onSubmitEditing={handleSend}
-            onFocus={onFocus}
-            onBlur={() => onTypingChange?.(false)}
-          />
-
-          {/* A plain Send. It greys out with nothing to send rather than
-              becoming a different button — a control that changes what it does
-              depending on state is a control nobody trusts. */}
-          <Pressable
-            className="h-10 w-10 items-center justify-center rounded-full active:opacity-80"
-            onPress={handleSend}
-            disabled={!canSend || disabled}
-            style={{ backgroundColor: colors.primary, opacity: canSend ? 1 : 0.35 }}
           >
-            <Send color={colors.primaryForeground} size={19} />
-          </Pressable>
+            <Pressable
+              onPress={() => {
+                Keyboard.dismiss();
+                setShowPlus(true);
+              }}
+              className="items-center justify-center rounded-full active:opacity-70"
+              style={{ height: 40, width: 40, backgroundColor: colors.muted }}
+              hitSlop={4}
+            >
+              <Plus color={colors.mutedForeground} size={20} />
+            </Pressable>
+
+            {/* ◉, not a camera glyph. A camera icon says "attach a file"; a
+                record dot says "capture this, now", and this is the button for
+                a moment that lasts two seconds. Tap for a photo, hold to
+                record. */}
+            <Pressable
+              onPress={onFaceReaction ?? takePhoto}
+              onLongPress={startRecording}
+              delayLongPress={260}
+              className="items-center justify-center rounded-full active:opacity-80"
+              style={{ height: 50, width: 50, backgroundColor: colors.foreground }}
+              hitSlop={4}
+            >
+              <View
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  borderWidth: 3,
+                  borderColor: "#000",
+                }}
+              />
+            </Pressable>
+
+            <TextInput
+              ref={inputRef}
+              className="max-h-[110px] flex-1"
+              style={{
+                color: colors.foreground,
+                fontFamily: type.body.fontFamily,
+                fontSize: 19,
+                lineHeight: 25,
+                paddingVertical: 6,
+              }}
+              placeholder="Message…"
+              placeholderTextColor={colors.textTertiary}
+              value={text}
+              onChangeText={(value) => {
+                setText(value);
+                onTypingChange?.(value.trim().length > 0);
+              }}
+              multiline
+              editable={!disabled}
+              returnKeyType="send"
+              blurOnSubmit={false}
+              onSubmitEditing={handleSend}
+              onFocus={onFocus}
+              onBlur={() => onTypingChange?.(false)}
+            />
+
+            <Pressable
+              className="items-center justify-center rounded-full active:opacity-80"
+              style={{
+                height: 44,
+                width: 44,
+                backgroundColor: colors.primary,
+                opacity: canSend ? 1 : 0.3,
+              }}
+              onPress={handleSend}
+              disabled={!canSend || disabled}
+            >
+              <Send color={colors.primaryForeground} size={20} />
+            </Pressable>
+          </View>
+
+          {/* The renderings carry this line under the dock. It is the only
+              place the double-tap gesture is ever taught. */}
+          <Type
+            center
+            variant="eyebrow"
+            tone="tertiary"
+            style={{ fontSize: 12, letterSpacing: 0.6, marginTop: 8, textTransform: "none" }}
+          >
+            Double-tap any message to 🔥
+          </Type>
         </View>
         </>
       )}

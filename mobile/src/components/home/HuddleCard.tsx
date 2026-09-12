@@ -17,25 +17,21 @@ type Props = {
 };
 
 /**
- * A room card.
+ * A room row, built to "Who, What, Where".
  *
- * WHY THIS LOOKS THE WAY IT DOES. The version before this had the right facts
- * in the right order and still read as a settings list, because every one of
- * them was grey text on a grey card. The renderings carry a room on four
- * pieces of colour and nothing else: the team crest at a size you can actually
- * see it, a red LIVE, a gold unread, and a gold way in. Take those away and no
- * amount of correct hierarchy makes it look designed.
+ * SIZES COME FROM THAT ARTIFACT, scaled ×1.136 — it draws a 354px screen, not
+ * the 290px one the room study uses. Applying the room's ×1.386 here is what
+ * made the last version of this card look inflated next to the design.
  *
- * So: crest left at 46, name and state centre, gold right. Then a rule, then
- * who is in there and the way in.
+ * THE ORDER IS THE ARGUMENT. Faces first: who is in there is the only reason
+ * to tap, and a count is not a reason. Then the crest bar and the name. Then
+ * two status facts that are independent of each other — people being in a room
+ * and a game being on are different things, and a room whose team is playing
+ * with nobody in it is the most interesting row on the screen rather than a
+ * dead one.
  *
- * THE ORDER IS STILL THE ARGUMENT. Who is in there is the only reason to tap,
- * and it sits on the footer line where the eye lands last and stays. The two
- * status facts stay independent — people in a room and a game being on are
- * different things, and a room whose team is playing with nobody in it is the
- * most interesting row on the screen rather than a dead one.
- *
- * Member count is gone. It was the least interesting fact about a room.
+ * NAMES, NEVER COUNTS. "Mike, Sarah in", not "2 watching". The artifact is
+ * explicit about this: naming is the part that makes you tap.
  */
 export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
   const here = hereNow ?? [];
@@ -46,229 +42,175 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
   return (
     <Pressable
       onPress={onPress}
-      className="mb-2.5 overflow-hidden rounded-[16px] active:opacity-80"
+      className="mb-2 rounded-[16px] px-3 py-2.5 active:opacity-80"
       style={{
-        backgroundColor: hot ? "#15161A" : colors.card,
+        backgroundColor: hot ? "#16171C" : colors.card,
         borderWidth: 1,
-        borderColor: gameOn ? "rgba(245,197,24,0.30)" : hot ? "#333842" : colors.border,
+        borderColor: hot ? "#33404F" : colors.border,
       }}
     >
-      {/* A live room gets a gold rule across the top edge. It is the cheapest
-          possible signal and it survives being seen out of the corner of your
-          eye while scrolling, which is how this screen is actually read. */}
-      {gameOn ? (
-        <View style={{ height: 2.5, backgroundColor: colors.primary }} />
-      ) : null}
+      <View className="mb-2 flex-row items-start gap-2.5">
+        <FaceStack names={here} logoUrl={huddle.teamLogoUrl} dim={nobodyHome} />
 
-      <View className="px-3 pb-2.5 pt-3">
-        <View className="flex-row items-center gap-3">
-          <TeamTile logoUrl={huddle.teamLogoUrl} name={huddle.teamName} live={gameOn} />
-
-          <View className="min-w-0 flex-1">
-            <View className="flex-row items-center gap-1.5">
-              <Type variant="heading" numberOfLines={1} style={{ flexShrink: 1 }}>
-                {huddle.name}
-              </Type>
-              {huddle.roomRole === "owner" ? (
-                <Crown color={colors.primary} size={13} />
-              ) : null}
-              {huddle.isPrivate ? (
-                <Lock color={colors.mutedForeground} size={12} />
-              ) : null}
-              {gameOn ? <LivePill /> : null}
-            </View>
-
-            {/* Two states, never one. Either can be true without the other. */}
-            <View className="mt-1 flex-row flex-wrap items-center gap-x-2.5 gap-y-0.5">
-              {here.length > 0 ? (
-                <Type variant="data" tone="success" numberOfLines={1}>
-                  ● {here.slice(0, 2).join(", ")}
-                  {here.length > 2 ? ` +${here.length - 2}` : ""} in
-                </Type>
-              ) : (
-                <Type variant="data" tone="tertiary">
-                  ○ nobody in
-                </Type>
-              )}
-              {huddle.lastMessageAt ? (
-                <Type variant="data" tone="tertiary">
-                  {shortAgo(huddle.lastMessageAt)}
-                </Type>
-              ) : null}
-            </View>
+        <View className="min-w-0 flex-1">
+          <View className="flex-row items-center gap-2">
+            {/* A 4px bar of colour rather than a crest: at this size a logo is
+                a smudge, and the bar reads instantly. */}
+            <View
+              style={{
+                width: 4,
+                height: 15,
+                borderRadius: 2,
+                backgroundColor: gameOn ? colors.primary : "#3A3A42",
+              }}
+            />
+            <Type variant="heading" numberOfLines={1} style={{ flexShrink: 1, fontSize: 18 }}>
+              {huddle.name}
+            </Type>
+            {huddle.roomRole === "owner" ? (
+              <Crown color={colors.primary} size={12} />
+            ) : null}
+            {huddle.isPrivate ? (
+              <Lock color={colors.mutedForeground} size={11} />
+            ) : null}
           </View>
 
-          {huddle.hasUnread ? <UnreadDot /> : null}
+          {/* Two states, never one. Either can be true without the other. */}
+          <View className="mt-1.5 flex-row flex-wrap items-center gap-x-2.5 gap-y-0.5">
+            {here.length > 0 ? (
+              <Type variant="data" tone="success" numberOfLines={1} style={{ fontSize: 10 }}>
+                ● {here.slice(0, 2).join(", ")}
+                {here.length > 2 ? ` +${here.length - 2}` : ""} in
+              </Type>
+            ) : (
+              <Type variant="data" tone="tertiary" style={{ fontSize: 10 }}>
+                ○ nobody in
+              </Type>
+            )}
+            {gameOn ? (
+              <Type variant="data" tone="primary" style={{ fontSize: 10 }}>
+                ◆ game on
+              </Type>
+            ) : null}
+          </View>
         </View>
 
-        {game ? (
-          <View className="mt-2.5">
-            <ScoreStrip game={game} live={gameOn} />
-          </View>
-        ) : null}
-
-        {/* The best row on the screen: the team is playing and the room is
-            empty. Not a gap — the one moment when going in first is worth
-            something, and it says so exactly when it's true. */}
-        {gameOn && nobodyHome ? (
-          <View
-            className="mt-2 rounded-[10px] px-2.5 py-2"
-            style={{
-              backgroundColor: "rgba(245,197,24,0.10)",
-              borderWidth: 1,
-              borderColor: "rgba(245,197,24,0.30)",
-            }}
-          >
-            <Type variant="captionStrong" tone="primary">
-              ◆ Nobody's in and it's on — go first
-            </Type>
-          </View>
-        ) : huddle.latestMessage ? (
-          <Type
-            variant="caption"
-            tone={huddle.hasUnread ? "default" : "muted"}
-            numberOfLines={1}
-            className="mt-2"
-          >
-            {huddle.latestMessage}
+        {huddle.lastMessageAt ? (
+          <Type variant="data" tone="tertiary" style={{ fontSize: 10, paddingTop: 2 }}>
+            {shortAgo(huddle.lastMessageAt)}
           </Type>
         ) : null}
       </View>
 
-      {/* The footer rule, the faces, and the way in. Straight from the
-          rendering, and the reason a card reads as a card rather than as a
-          paragraph with a border round it. */}
-      <View style={{ height: 1, backgroundColor: "#1E2027" }} />
-      <View className="flex-row items-center gap-2 px-3 py-2">
-        <FaceStack names={here} />
-        <Type variant="data" tone={here.length ? "muted" : "tertiary"} numberOfLines={1} style={{ flexShrink: 1 }}>
-          {here.length > 0
-            ? `${here.slice(0, 2).join(", ")}${here.length > 2 ? ` +${here.length - 2}` : ""} here now`
-            : "quiet"}
-        </Type>
-        <Type
-          variant="captionStrong"
-          tone="primary"
-          style={{ marginLeft: "auto", fontFamily: fonts.extrabold }}
+      {game ? <ScoreStrip game={game} live={gameOn} /> : null}
+
+      {/* The best row on the screen: the team is playing and the room is
+          empty. Not a gap — the one moment when going in first is worth
+          something, and it says so exactly when it's true. */}
+      {gameOn && nobodyHome ? (
+        <View
+          className="mt-2 rounded-lg px-2.5 py-2"
+          style={{
+            backgroundColor: "rgba(245,197,24,0.09)",
+            borderWidth: 1,
+            borderColor: "rgba(245,197,24,0.28)",
+          }}
         >
-          Open →
+          <Type variant="captionStrong" tone="primary" style={{ fontSize: 13 }}>
+            ◆ Nobody's in and it's on — go first
+          </Type>
+        </View>
+      ) : huddle.latestMessage ? (
+        /* "Mike THAT'S A STOP" — the speaker in white, what they said in grey.
+           Without the name it is a fragment with no author, which is how the
+           liveliest line on the card ended up reading as boilerplate. */
+        <Type variant="caption" tone="muted" numberOfLines={1} className="mt-2" style={{ fontSize: 14 }}>
+          {huddle.latestMessageSender ? (
+            <Type style={{ fontFamily: fonts.extrabold, fontSize: 14, color: colors.foreground }}>
+              {huddle.latestMessageSender}{" "}
+            </Type>
+          ) : null}
+          {huddle.latestMessage}
         </Type>
-      </View>
+      ) : null}
     </Pressable>
   );
 }
 
 /**
- * The crest, at a size you can read it.
- *
- * 46px on its own tile, the way the renderings draw it. The version before
- * this put it at 25px behind the avatars, where an NFL logo is a smudge and
- * the card lost the one piece of real colour it had.
+ * The faces, overlapping — 27px in the artifact, so 31 here, each cut into the
+ * one before by 10. Falls back to the team crest when nobody is in: a row with
+ * no image at all reads as broken rather than as quiet.
  */
-function TeamTile({
+function FaceStack({
+  names,
   logoUrl,
-  name,
-  live,
+  dim,
 }: {
+  names: string[];
   logoUrl: string | null;
-  name: string | null;
-  live: boolean;
+  dim: boolean;
 }) {
-  return (
-    <View
-      className="h-[46px] w-[46px] items-center justify-center overflow-hidden rounded-[12px]"
-      style={{
-        backgroundColor: "#1B1D23",
-        borderWidth: 1,
-        borderColor: live ? "rgba(245,197,24,0.35)" : "#2C2F37",
-      }}
-    >
-      {logoUrl ? (
-        <Image
-          source={{ uri: logoUrl }}
-          style={{ width: 34, height: 34 }}
-          resizeMode="contain"
-        />
-      ) : (
-        <Type variant="data" tone="muted" style={{ fontSize: 15 }}>
-          {(name ?? "SH").slice(0, 2).toUpperCase()}
-        </Type>
-      )}
-    </View>
-  );
-}
-
-/** Red, small, and the only red on the screen. */
-function LivePill() {
-  return (
-    <View
-      className="flex-row items-center gap-1 rounded-full px-1.5 py-0.5"
-      style={{
-        backgroundColor: "rgba(255,91,77,0.14)",
-        borderWidth: 1,
-        borderColor: "rgba(255,91,77,0.34)",
-      }}
-    >
-      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: "#FF5B4D" }} />
-      <Type variant="eyebrow" style={{ color: "#FF5B4D", fontSize: 11, letterSpacing: 1.2 }}>
-        Live
-      </Type>
-    </View>
-  );
-}
-
-/** Gold, and the reason your eye goes to the right room first. */
-function UnreadDot() {
-  return (
-    <View
-      style={{
-        width: 11,
-        height: 11,
-        borderRadius: 6,
-        backgroundColor: colors.primary,
-        marginLeft: 4,
-      }}
-    />
-  );
-}
-
-/**
- * The faces, overlapping. Empty when nobody is in — the word "quiet" next to
- * it carries that, and three grey circles pretending to be people do not.
- */
-function FaceStack({ names }: { names: string[] }) {
-  if (names.length === 0) return null;
+  if (names.length === 0) {
+    return (
+      <View
+        className="h-[31px] w-[31px] items-center justify-center overflow-hidden rounded-full bg-muted"
+        style={{ opacity: dim ? 0.5 : 1 }}
+      >
+        {logoUrl ? (
+          <Image source={{ uri: logoUrl }} style={{ width: 26, height: 26 }} resizeMode="contain" />
+        ) : null}
+      </View>
+    );
+  }
 
   const shown = names.slice(0, 3);
+  const extra = names.length - shown.length;
 
   return (
-    <View className="flex-row">
+    <View className="flex-row pt-0.5">
       {shown.map((n, i) => (
         <View
           key={`${n}-${i}`}
-          className="h-[22px] w-[22px] items-center justify-center rounded-full"
+          className="h-[31px] w-[31px] items-center justify-center rounded-full"
           style={{
             backgroundColor: personColor(n),
             borderWidth: 2,
             borderColor: colors.card,
-            marginLeft: i === 0 ? 0 : -7,
+            marginLeft: i === 0 ? 0 : -10,
           }}
         >
-          <Type variant="data" style={{ color: "#000", fontSize: 8.5 }}>
+          <Type variant="data" style={{ color: "#000", fontSize: 10 }}>
             {n.slice(0, 2).toUpperCase()}
           </Type>
         </View>
       ))}
+      {extra > 0 ? (
+        <View
+          className="h-[31px] w-[31px] items-center justify-center rounded-full"
+          style={{
+            backgroundColor: "#2A3849",
+            borderWidth: 2,
+            borderColor: colors.card,
+            marginLeft: -10,
+          }}
+        >
+          <Type variant="data" style={{ fontSize: 10 }}>+{extra}</Type>
+        </View>
+      ) : null}
     </View>
   );
 }
 
 /**
- * The scoreline, in its own inset panel.
+ * The scoreline, in its own inset panel — #0F1721 on #223040, the one place on
+ * Home that gets a ground of its own, because digits are the only thing here
+ * allowed to be loud and they need something to be loud against.
  *
- * Leading side bright, trailing side muted. Before first pitch the panel is a
- * dashed outline with no numbers in it, because a score of nothing-to-nothing
- * is a lie about a game that hasn't started.
+ * Crest, abbreviation, score. Leading side bright, trailing side muted, so you
+ * read who is winning without reading a number. Before first pitch the panel
+ * is a dashed outline with no numbers in it: a score of nothing-to-nothing is
+ * a lie about a game that hasn't started.
  */
 function ScoreStrip({ game, live }: { game: RoomGame; live: boolean }) {
   const us = game.us.score ?? 0;
@@ -276,31 +218,30 @@ function ScoreStrip({ game, live }: { game: RoomGame; live: boolean }) {
 
   return (
     <View
-      className="flex-row items-center gap-1.5 rounded-[10px] px-2.5 py-2"
+      className="flex-row items-center gap-1.5 rounded-[9px] px-2.5 py-2"
       style={
         live
-          ? { backgroundColor: "#0E141C", borderWidth: 1, borderColor: "#243244" }
+          ? { backgroundColor: "#0F1721", borderWidth: 1, borderColor: "#223040" }
           : { borderWidth: 1, borderStyle: "dashed", borderColor: "#26384C" }
       }
     >
-      <Type variant="data" tone="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
+      <Crest url={game.us.logoUrl} />
+      <Type variant="data" tone="muted" numberOfLines={1} style={{ fontSize: 11, flexShrink: 1 }}>
         {game.us.name}
       </Type>
       {live ? (
-        <Type variant="score" tone={us >= them ? "default" : "muted"}>
+        <Type variant="score" tone={us >= them ? "default" : "muted"} style={{ fontSize: 18 }}>
           {us}
         </Type>
       ) : null}
 
-      <Type variant="data" tone="tertiary">
-        {live ? "·" : game.isHome ? "vs" : "at"}
-      </Type>
-
-      <Type variant="data" tone="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
-        {game.them.name}
+      <View style={{ width: 4 }} />
+      <Crest url={game.them.logoUrl} />
+      <Type variant="data" tone="muted" numberOfLines={1} style={{ fontSize: 11, flexShrink: 1 }}>
+        {live ? game.them.name : `${game.isHome ? "vs " : "at "}${game.them.name}`}
       </Type>
       {live ? (
-        <Type variant="score" tone={them >= us ? "default" : "muted"}>
+        <Type variant="score" tone={them >= us ? "default" : "muted"} style={{ fontSize: 18 }}>
           {them}
         </Type>
       ) : null}
@@ -308,7 +249,7 @@ function ScoreStrip({ game, live }: { game: RoomGame; live: boolean }) {
       <Type
         variant="data"
         tone={live ? "primary" : "tertiary"}
-        style={{ marginLeft: "auto" }}
+        style={{ marginLeft: "auto", fontSize: 10 }}
       >
         {game.statusLabel}
       </Type>
@@ -316,7 +257,20 @@ function ScoreStrip({ game, live }: { game: RoomGame; live: boolean }) {
   );
 }
 
-/** "2m", "1h", "Thu" — the rendering's stamp, not a full timestamp. */
+function Crest({ url }: { url: string | null }) {
+  return (
+    <View
+      className="h-[17px] w-[17px] items-center justify-center overflow-hidden rounded-full"
+      style={{ backgroundColor: "#1B1D23" }}
+    >
+      {url ? (
+        <Image source={{ uri: url }} style={{ width: 14, height: 14 }} resizeMode="contain" />
+      ) : null}
+    </View>
+  );
+}
+
+/** "2m", "1h", "Thu" — the artifact's stamp, not a full timestamp. */
 function shortAgo(iso: string): string {
   const then = new Date(iso).getTime();
   const mins = Math.round((Date.now() - then) / 60000);

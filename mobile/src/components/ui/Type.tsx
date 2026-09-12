@@ -24,6 +24,7 @@ type Tone =
   | "success"
   | "danger"
   | "onPrimary"
+  | "info"
   | "inverse";
 
 const tones: Record<Tone, string> = {
@@ -34,6 +35,7 @@ const tones: Record<Tone, string> = {
   success: colors.success,
   danger: colors.destructive,
   onPrimary: colors.primaryForeground,
+  info: colors.info,
   inverse: colors.background,
 };
 

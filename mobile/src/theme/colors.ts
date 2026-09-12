@@ -22,15 +22,13 @@ export const colors = {
   mutedForeground: "#A0A0A8",
 
   /**
-   * THE ROOM HAS ITS OWN GROUND. #141418, not the app's #0A0A0B.
+   * The room's ground. Flat black, the way the renderings draw it.
    *
-   * Straight from the shipped-palette prototype, and the reason the built
-   * room read as "dull grey on black" while the design did not: a thread on
-   * the same near-black as every other screen has nothing to sit on, so the
-   * messages float and the whole surface goes flat. One step up and the room
-   * becomes a place you walked into.
+   * It was #141418 for one round, out of a prototype file in the repo. The
+   * renderings are black, the messages sit straight on it with no bubble, and
+   * the only colour in the thread is the people's names.
    */
-  huddleGround: "#141418",
+  huddleGround: "#0A0A0B",
   huddleGroundAlt: "#1A1A1F",
   /** Somebody else's message. Yours is `primary`. */
   bubbleOther: "#222226",

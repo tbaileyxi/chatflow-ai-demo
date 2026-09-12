@@ -467,17 +467,37 @@ export function HuddleScreen() {
   // most irritating thing a chat can do to you.
   const atBottomRef = useRef(true);
   const settledRef = useRef(false);
+  // WHY THERE IS A GRACE PERIOD. Opening a room, the first scrollToEnd lands,
+  // then the pregame strip mounts underneath and takes ~90px out of the list.
+  // The offset doesn't move but the viewport shrinks, so the next onScroll
+  // reports "you are 90px from the end" and atBottomRef goes false — after
+  // which every later attempt to re-pin bails out, and the newest message is
+  // left sliced in half by the strip that pushed it there.
+  const openedAtRef = useRef(Date.now());
   const keepAtBottom = useCallback(() => {
-    if (!atBottomRef.current) return;
+    if (!atBottomRef.current && Date.now() - openedAtRef.current > 2000) return;
     flatListRef.current?.scrollToEnd({ animated: settledRef.current });
     // Twice. The first call lands before the pregame strip and the composer
     // have taken their height out of the list, so it scrolls to an end that
     // then moves — which left the newest message sliced in half by the strip.
-    setTimeout(() => {
-      if (atBottomRef.current) flatListRef.current?.scrollToEnd({ animated: false });
-    }, 140);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 140);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 420);
     settledRef.current = true;
   }, []);
+
+  /**
+   * Anything that changes the height of the thread has to re-pin it.
+   *
+   * onContentSizeChange alone was not enough: the pregame strip and the
+   * reaction rail both depend on a game query that resolves AFTER the first
+   * messages render, so they appear underneath a list that has already
+   * scrolled to what was the bottom a moment ago — and the newest message
+   * ends up sliced in half by the strip that just pushed it up.
+   */
+  useEffect(() => {
+    const t = setTimeout(keepAtBottom, 60);
+    return () => clearTimeout(t);
+  }, [keepAtBottom, messages?.length, pingGameState, liveGame?.settleable]);
 
   const handleReply = useCallback(
     (msg: HuddleMessage) => {
@@ -622,20 +642,15 @@ export function HuddleScreen() {
             the empty state and the timestamps sit directly on the background,
             and a bright tailgate photo turns those into nothing. */}
         <View className="flex-1" {...swipeHandlers}>
-          {huddle.photoUrl ? (
-            <>
-              <Image
-                source={{ uri: huddle.photoUrl }}
-                style={StyleSheet.absoluteFill}
-                resizeMode="cover"
-                accessible={false}
-              />
-              <View
-                style={StyleSheet.absoluteFill}
-                className="bg-background/[0.88]"
-              />
-            </>
-          ) : null}
+          {/* NO BACKGROUND PHOTO. "Before, During, After" ends with the
+              reason, and it is not a style opinion: "the upload made text
+              harder to read and added nothing." A tiled crest behind every
+              message is the thing that made the built room look nothing like
+              the design, and no scrim setting rescues it — 0.72, 0.88 and 0.94
+              were all tried and all of them still fight the thread.
+
+              The room photo still exists as a setting; it just isn't wallpaper
+              any more. */}
 
         {messagesLoading ? (
           <LoadingSpinner className="flex-1" />
@@ -747,7 +762,7 @@ export function HuddleScreen() {
             // black beneath it.
             contentContainerStyle={{
               paddingTop: 8,
-              paddingBottom: 10,
+              paddingBottom: 14,
               flexGrow: 1,
               justifyContent: "flex-end",
             }}

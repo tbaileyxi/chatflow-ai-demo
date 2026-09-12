@@ -27,8 +27,20 @@ export function WelcomeScreen() {
             as an eyebrow — 14px tracked mono, the same treatment as the word
             "TONIGHT" over a list — with the tagline above it in heading grey.
             The first screen of the app was announcing itself in a caption. */}
-        <Type center variant="display">Side Huddle</Type>
-        <Type center variant="body" tone="muted" className="mt-2">
+        {/* "Join First, Ask Later" draws a 254px screen, so its 35px wordmark
+            is 55 here and the tagline's 14 is 22 — see rendering-scale-factors.
+            The app-wide `display` size of 41 is the room study's scale and is
+            too small for the one screen whose whole job is the name. */}
+        <Type center variant="display" style={{ fontSize: 55, lineHeight: 58 }}>
+          Side Huddle
+        </Type>
+        <Type
+          center
+          variant="body"
+          tone="muted"
+          className="mt-3"
+          style={{ fontSize: 22, lineHeight: 31 }}
+        >
           Never watch a game alone.
         </Type>
         <Type center variant="eyebrow" tone="primary" className="mt-8">

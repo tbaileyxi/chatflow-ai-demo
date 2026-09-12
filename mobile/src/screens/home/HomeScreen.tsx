@@ -584,7 +584,7 @@ export function HomeScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ gap: 24, paddingBottom: 108 }}
+        contentContainerStyle={{ gap: 14, paddingBottom: 28 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -602,12 +602,6 @@ export function HomeScreen() {
         <YourRoomsSection />
       </ScrollView>
 
-      <Pressable
-        className="absolute bottom-6 right-6 h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg active:opacity-80"
-        onPress={() => navigation.navigate("CreateSideHuddle")}
-      >
-        <Plus color={colors.primaryForeground} size={28} />
-      </Pressable>
     </SafeAreaView>
   );
 }

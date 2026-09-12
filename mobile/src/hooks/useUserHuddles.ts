@@ -20,6 +20,11 @@ export type UserHuddle = {
   teamCity: string | null;
   teamLogoUrl: string | null;
   latestMessage: string | null;
+  /**
+   * Who said it. "Mike THAT'S A STOP" is the artifact's line; without the
+   * name the liveliest thing on the card is a fragment with no author.
+   */
+  latestMessageSender: string | null;
   latestMessageIsBot: boolean;
   hasUnread: boolean;
 };
@@ -52,6 +57,7 @@ export function useUserHuddles() {
           teamLogoUrl: room.teamLogoUrl ?? null,
           latestMessage:
             "Room created. Invite friends here; game-day chat and bot cards live in this space.",
+          latestMessageSender: null,
           latestMessageIsBot: true,
           hasUnread: false,
         }));
@@ -87,13 +93,13 @@ export function useUserHuddles() {
       // tables grew.
       const latestByHuddle = new Map<
         string,
-        { content: string; isBot: boolean }
+        { content: string; isBot: boolean; userId: string | null; sender: string | null }
       >();
       await Promise.all(
         huddleIds.map(async (hid) => {
           const { data: msg } = await supabase
             .from("huddle_messages")
-            .select("content, is_bot_message")
+            .select("content, is_bot_message, user_id")
             .eq("huddle_id", hid)
             .order("created_at", { ascending: false })
             .limit(1)
@@ -102,10 +108,38 @@ export function useUserHuddles() {
             latestByHuddle.set(hid, {
               content: msg.content,
               isBot: msg.is_bot_message ?? false,
+              // Resolved below. `profiles` is keyed on user_id rather than id,
+              // so PostgREST has no relationship to embed and the join form
+              // fails the whole select — which is how the last-message line
+              // disappeared from every card at once.
+              userId: msg.is_bot_message ? null : (msg as any).user_id ?? null,
+              sender: null,
             });
           }
         }),
       );
+
+      // One query for every speaker, not one per room.
+      const senderIds = [
+        ...new Set(
+          [...latestByHuddle.values()].map((l) => l.userId).filter(Boolean) as string[],
+        ),
+      ];
+      if (senderIds.length > 0) {
+        const { data: senders } = await supabase
+          .from("profiles")
+          .select("user_id, display_name, username")
+          .in("user_id", senderIds);
+        const byId = new Map((senders ?? []).map((p: any) => [p.user_id, p]));
+        for (const entry of latestByHuddle.values()) {
+          if (!entry.userId) continue;
+          const p = byId.get(entry.userId) as any;
+          // First name only — the card has room for "Mike", not for
+          // "Mike Donnelly THAT'S A STOP".
+          const full = (p?.display_name || p?.username || null) as string | null;
+          entry.sender = full ? full.split(/\s+/)[0] : null;
+        }
+      }
 
       return memberships
         .filter((m) => m.huddles)
@@ -138,6 +172,7 @@ export function useUserHuddles() {
             teamCity: team?.city ?? null,
             teamLogoUrl: team?.logo_url ?? null,
             latestMessage: latest?.content ?? null,
+            latestMessageSender: latest?.sender ?? null,
             latestMessageIsBot: latest?.isBot ?? false,
             hasUnread: lastMsg ? lastMsg > lastRead : false,
           };
