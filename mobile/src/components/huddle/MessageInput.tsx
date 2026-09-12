@@ -270,9 +270,6 @@ export function MessageInput({
   // and showing where they'll live costs nothing while building them properly
   // is its own piece of work — an empty menu teaches nobody what this button
   // is for.
-  // Ask Coach and the camera both have permanent buttons in the row now, so
-  // neither is listed here. A sheet row that duplicates a visible button is the
-  // two-doors-to-one-place problem that got the Coach tab removed.
   const plusActions: {
     key: string;
     label: string;
@@ -460,11 +457,23 @@ export function MessageInput({
               setShowPlus(true);
             }}
             delayLongPress={260}
-            className="h-11 w-11 items-center justify-center rounded-full active:opacity-80"
-            style={{ backgroundColor: colors.foreground }}
+            className="items-center justify-center rounded-full active:opacity-80"
+            style={{ height: 46, width: 46, backgroundColor: colors.foreground }}
             hitSlop={4}
           >
-            <Camera color="#000000" size={20} />
+            {/* ◉, not a camera glyph. The rendering draws a record dot — a
+                camera icon says "attach a file", a record dot says "capture
+                this, now", and this is the button for a moment that lasts two
+                seconds. */}
+            <View
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: 9,
+                borderWidth: 2.5,
+                borderColor: "#000",
+              }}
+            />
           </Pressable>
 
           {/* The rest of the ＋ sheet is still reachable, just no longer the
@@ -506,34 +515,16 @@ export function MessageInput({
 
               A Send button greyed out at 40% is the most common state of this
               row and it does nothing — meanwhile the voice note, which is the
-              fastest way to say something while a game is on, was three taps
-              down inside the ＋ sheet. One button, and it is always the one
-              that applies. */}
+              A plain Send. It greys out with nothing to send rather than
+              becoming a different button — a control that changes what it does
+              depending on state is a control nobody trusts. */}
           <Pressable
             className="h-10 w-10 items-center justify-center rounded-full active:opacity-80"
-            onPress={
-              canSend
-                ? handleSend
-                : () => {
-                    const next = text.trim() ? `${text.trim()} @coach ` : "@coach ";
-                    setText(next);
-                    onTypingChange?.(true);
-                  }
-            }
-            disabled={disabled}
-            style={{
-              backgroundColor: canSend ? colors.primary : "rgba(245,197,24,0.14)",
-              borderWidth: canSend ? 0 : 1,
-              borderColor: "rgba(245,197,24,0.4)",
-            }}
+            onPress={handleSend}
+            disabled={!canSend || disabled}
+            style={{ backgroundColor: colors.primary, opacity: canSend ? 1 : 0.35 }}
           >
-            {canSend ? (
-              <Send color={colors.primaryForeground} size={18} />
-            ) : (
-              <Type variant="dataStrong" tone="primary" style={{ fontSize: 15 }}>
-                @
-              </Type>
-            )}
+            <Send color={colors.primaryForeground} size={19} />
           </Pressable>
         </View>
         </>

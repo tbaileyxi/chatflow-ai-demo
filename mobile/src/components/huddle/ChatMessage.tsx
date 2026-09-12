@@ -30,6 +30,7 @@ import { blockUser, reportMessage } from "@/lib/moderation";
 import { shareMedia } from "@/lib/shareMedia";
 import { personColor } from "@/lib/personColor";
 import { colors } from "@/theme/colors";
+import { fonts } from "@/theme/type";
 import { FadeCardInMessage } from "@/components/huddle/FadeCardInMessage";
 import { PulseBubble } from "@/components/huddle/PulseBubble";
 import { AdminWelcomeCard } from "@/components/huddle/AdminWelcomeCard";
@@ -464,21 +465,16 @@ export function ChatMessage({
                 to leave room for, and a long message shouldn't wrap early to
                 preserve a gutter nobody is using. */}
             <View className="flex-1 gap-1">
-              {!message.isBotMessage && !isGroupedWithPrev ? (
-                <View className="flex-row items-center gap-2">
-                  {/* With the bubbles gone this is the only thing marking where
-                      one message stops and the next starts, so it carries more
-                      weight than it used to — and your own name is gold, which
-                      is how you find yourself in a fast-moving room now that
-                      nothing is right-aligned. */}
-                  <Type variant="speaker" style={{ color: who }}>
-                    {displayName}
-                  </Type>
-                  <Type variant="caption" tone="muted">
-                    {formatTime(message.createdAt)}
-                  </Type>
-                </View>
-              ) : null}
+              {/* The name is NOT a line of its own any more. The renderings
+                  set it inline, in the person's colour, with the message
+                  running straight on from it — "Mike THAT'S THE GAME" is one
+                  line, not a label above a paragraph. Stacking them doubled
+                  the height of every message and made a fast room unreadable.
+
+                  The timestamp is gone with it. No rendering has one: in a
+                  room where everything happened in the last four minutes, a
+                  time on every line is noise, and the day separator already
+                  carries the only temporal fact anybody needs. */}
 
               {/* Quoted reply context — hidden when the parent is the message
                   directly above (redundant). */}
@@ -545,20 +541,28 @@ export function ChatMessage({
                 >
                   {(() => {
                     if (!message.isBotMessage) {
+                      // NAME INLINE, then the message. One line, the way the
+                      // renderings draw it — the name in the person's colour
+                      // doing the work a bubble used to do, and the message
+                      // running straight on from it.
+                      //
+                      // A shout gets set bigger. "THAT'S THE GAME" at the same
+                      // size as "ok" flattens the one moment a room exists for.
                       return (
-                        <Text
-                          className={isReply ? "text-sm" : "text-base"}
-                          style={{
-                            // Was primaryForeground for your own messages —
-                            // dark ink meant to sit on the gold bubble. With
-                            // the bubble gone that is near-invisible on the
-                            // room's background.
-                            color: colors.foreground,
-                            lineHeight: isReply ? 19 : 22,
-                          }}
+                        <Type
+                          variant={isShout ? "shout" : "message"}
+                          style={isReply ? { fontSize: 17, lineHeight: 23 } : undefined}
                         >
+                          {!isGroupedWithPrev ? (
+                            <Type
+                              variant={isShout ? "shout" : "message"}
+                              style={{ color: who, fontFamily: fonts.extrabold }}
+                            >
+                              {displayName}{" "}
+                            </Type>
+                          ) : null}
                           {message.content}
-                        </Text>
+                        </Type>
                       );
                     }
                     const { body, sponsor } = splitSponsorCredit(
