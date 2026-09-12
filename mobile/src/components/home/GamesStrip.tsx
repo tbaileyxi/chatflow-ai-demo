@@ -106,9 +106,32 @@ export function GamesStrip({
   if (games.length === 0) return null;
 
   const anyLive = games.some((g) => g.status === "live");
-  const tonight = games.some(
-    (g) => new Date(g.startTime).getTime() < Date.now() + 12 * 60 * 60 * 1000,
+  /**
+   * What to call the strip.
+   *
+   * "Coming up" over a game that starts this afternoon reads as the app not
+   * knowing what day it is. The soonest kickoff decides the word, by CALENDAR
+   * DAY rather than by hours-from-now — 11pm on a Saturday is still "today"
+   * even though a 12-hour window would call Sunday lunchtime "tonight".
+   */
+  const soonest = games.reduce(
+    (min, g) => Math.min(min, new Date(g.startTime).getTime()),
+    Infinity,
   );
+  const dayOf = (t: number) => {
+    const d = new Date(t);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  };
+  const today = dayOf(Date.now());
+  const label = anyLive
+    ? "On now"
+    : dayOf(soonest) === today
+      ? new Date(soonest).getHours() >= 17
+        ? "Tonight"
+        : "Today"
+      : dayOf(soonest) === today + 86_400_000
+        ? "Tomorrow"
+        : "Coming up";
 
   return (
     <View className="mb-5">
@@ -121,7 +144,7 @@ export function GamesStrip({
           }
           count={`${games.length} ›`}
         >
-          {anyLive ? "On now" : tonight ? "Tonight" : "Coming up"}
+          {label}
         </SectionLabel>
 
       </View>

@@ -864,17 +864,16 @@ export function HuddleScreen() {
             {pingGameState === "live" ? (
               <ReactionRail onReact={sendReaction} />
             ) : null}
-            {/* Before kickoff the room gets a different question instead of a
-                live screen with the numbers missing. Gated on `settleable`
-                because the ESPN fallback path invents an "espn-…" id that has
-                no row in `games`, and the RSVP table keys off a real one. */}
-            {pingGameState === "pregame" && liveGame?.settleable ? (
-              <PregameStrip
-                huddleId={huddleId}
-                gameId={liveGame.id}
-                startTime={liveGame.startTime}
-              />
-            ) : null}
+            {/* THE PRE-GAME RSVP IS GONE. It was mine — commit 99367fb, not
+                in any artifact and never asked for. The seed is real ("Before,
+                During, After" opens the pre-game screen with a "Who's actually
+                watching?" card) but that is a card IN the thread that scrolls
+                away, not a permanent bar wedged between the thread and the
+                composer clipping the newest message.
+
+                PregameStrip and huddle_game_rsvps stay in the tree, unmounted,
+                so the work is recoverable if the pre-game screen gets built
+                properly. */}
           <MessageInput
             onSend={handleSend}
             replyTo={replyTo}
