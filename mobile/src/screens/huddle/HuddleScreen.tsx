@@ -654,6 +654,18 @@ export function HuddleScreen() {
           }
         />
 
+        {/* UNDER THE AVATARS, which is where the design put it and where it
+            belongs — it is about those faces. I had it above the composer
+            because that is where the other action bars live in this file,
+            which is an implementation habit, not a reason. */}
+        {huddle.isGameRoom && huddle.gameId ? (
+          <SpinUpBar
+            gameId={huddle.gameId}
+            friendsHere={friendsHere}
+            navigation={navigation}
+          />
+        ) : null}
+
         {/* THE ROOM'S OWN PICTURE, behind the conversation.
             Header, jump row and composer stay opaque on purpose — a photo
             running under the chrome makes the room name hard to read and the
@@ -898,15 +910,6 @@ export function HuddleScreen() {
                 PregameStrip and huddle_game_rsvps stay in the tree, unmounted,
                 so the work is recoverable if the pre-game screen gets built
                 properly. */}
-            {/* Only in a public game huddle, and only with friends in it. */}
-            {huddle.isGameRoom && huddle.gameId ? (
-              <SpinUpBar
-                gameId={huddle.gameId}
-                friendsHere={friendsHere}
-                navigation={navigation}
-              />
-            ) : null}
-
           <MessageInput
             onSend={handleSend}
             replyTo={replyTo}

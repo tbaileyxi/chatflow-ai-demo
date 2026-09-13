@@ -37,13 +37,13 @@ export function SpinUpBar({
   const names = friendsHere.slice(0, 2).map((f) => f.displayName.split(/\s+/)[0]);
   const label =
     friendsHere.length === 0
-      ? "Just you for now · invite whoever"
+      ? "Just you · your friends will see you're in it"
       : friendsHere.length > 2
         ? `${names.join(", ")} +${friendsHere.length - 2} come with you`
         : `${names.join(" and ")} come${names.length === 1 ? "s" : ""} with you`;
 
   return (
-    <View className="px-3 pb-2 pt-2.5">
+    <View className="px-4 pb-1 pt-2">
       <Pressable
         disabled={busy}
         onPress={async () => {
@@ -84,6 +84,8 @@ export function SpinUpBar({
             {busy ? "Spinning up…" : "Spin up a side huddle"}
           </Type>
           <Type variant="data" tone="muted" style={{ fontSize: 11, marginTop: 1 }}>
+            {/* No invite step. Your presence is the invite — friends see
+                where you are on Home and tap in. */}
             {label} · gone at 2am
           </Type>
         </View>
