@@ -279,6 +279,28 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
             {huddle.isVerified ? (
               <ShieldCheck color={colors.primary} size={14} />
             ) : null}
+            {/* WHICH KIND OF HUDDLE THIS IS. A public one full of strangers
+                and a side huddle that ends at 2am both behave differently
+                from your own, and neither says so anywhere else. */}
+            {huddle.isGameRoom ? (
+              <View
+                className="rounded-full px-2 py-0.5"
+                style={{ borderWidth: 1, borderColor: colors.border }}
+              >
+                <Type variant="eyebrow" tone="muted" style={{ fontSize: 10, letterSpacing: 1 }}>
+                  Open
+                </Type>
+              </View>
+            ) : huddle.expiresAt ? (
+              <View
+                className="rounded-full px-2 py-0.5"
+                style={{ borderWidth: 1, borderStyle: "dashed", borderColor: "rgba(245,197,24,0.55)" }}
+              >
+                <Type variant="eyebrow" tone="primary" style={{ fontSize: 10, letterSpacing: 1 }}>
+                  ◷ 2am
+                </Type>
+              </View>
+            ) : null}
           </View>
 
           <View className="overflow-hidden">

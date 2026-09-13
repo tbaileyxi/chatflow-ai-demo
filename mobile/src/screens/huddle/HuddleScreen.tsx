@@ -62,6 +62,8 @@ import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
 import { CoachThinking } from "@/components/huddle/CoachThinking";
 import { RoomBackground } from "@/components/huddle/RoomBackground";
+import { SpinUpBar } from "@/components/huddle/SpinUpBar";
+import { useKnownPeople } from "@/hooks/useFriends";
 
 type Route = RouteProp<RootStackParamList, "Huddle">;
 
@@ -246,6 +248,24 @@ export function HuddleScreen() {
   const navigation = useNavigation();
   const { data: myHuddles } = useUserHuddles();
   const { presentUsers: everyone } = useGlobalPresence();
+
+  /**
+   * Who in here you actually know.
+   *
+   * A public game huddle is forty strangers and two friends, and the two are
+   * the only reason to stay. They are also the only reason Spin up exists —
+   * with nobody you know there is nothing to pull out.
+   */
+  const { data: knownPeople } = useKnownPeople();
+  const friendsHere = useMemo(() => {
+    const known = new Set((knownPeople ?? []).map((p: any) => p.userId));
+    return presentUsers
+      .filter((u: any) => u.userId !== user?.id && known.has(u.userId))
+      .map((u: any) => ({
+        userId: u.userId as string,
+        displayName: (u.displayName ?? "Someone") as string,
+      }));
+  }, [presentUsers, knownPeople, user?.id]);
   const liveRoomIds = useMemo(
     () => new Set((everyone ?? []).map((u) => u.huddleId).filter(Boolean) as string[]),
     [everyone],
@@ -878,6 +898,15 @@ export function HuddleScreen() {
                 PregameStrip and huddle_game_rsvps stay in the tree, unmounted,
                 so the work is recoverable if the pre-game screen gets built
                 properly. */}
+            {/* Only in a public game huddle, and only with friends in it. */}
+            {huddle.isGameRoom && huddle.gameId ? (
+              <SpinUpBar
+                gameId={huddle.gameId}
+                friendsHere={friendsHere}
+                navigation={navigation}
+              />
+            ) : null}
+
           <MessageInput
             onSend={handleSend}
             replyTo={replyTo}

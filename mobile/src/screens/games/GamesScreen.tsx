@@ -15,6 +15,7 @@ import { useAllGames, type SlateGame } from "@/hooks/useAllGames";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { getFollowedTeamIds } from "@/lib/follows";
 import { colors } from "@/theme/colors";
+import { openGameRoom } from "@/lib/gameRoom";
 
 const CHIPS = ["ALL", "NFL", "NCAAF", "NBA", "NCAAB", "MLB", "NHL"] as const;
 
@@ -63,7 +64,15 @@ export function GamesScreen() {
     return { yours, live, later, done };
   }, [shown]);
 
-  const openGame = (g: SlateGame) => {
+  /**
+   * Tapping a game opens THAT GAME's huddle.
+   *
+   * It used to look for one of your own huddles for either team and, failing
+   * that, send you to a naming form — so for a new user every tap on the
+   * slate was a form. Your own huddle still wins when you have one; otherwise
+   * you land in the public one for the fixture.
+   */
+  const openGame = async (g: SlateGame) => {
     const mine = (huddles ?? []).find(
       (h) => h.teamId === g.home.teamId || h.teamId === g.away.teamId,
     );
@@ -71,9 +80,7 @@ export function GamesScreen() {
       navigation.navigate("Huddle", { huddleId: mine.id });
       return;
     }
-    navigation.navigate("CreateSideHuddle", {
-      teamId: g.yours ? (g.home.teamId ?? g.away.teamId ?? undefined) : undefined,
-    });
+    await openGameRoom(g.gameId, navigation);
   };
 
   return (

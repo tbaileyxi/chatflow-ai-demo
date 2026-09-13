@@ -37,6 +37,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Eyebrow, SectionLabel, Type } from "@/components/ui/Type";
 import { fonts } from "@/theme/type";
 import { colors } from "@/theme/colors";
+import { openGameRoom } from "@/lib/gameRoom";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/);
@@ -533,8 +534,12 @@ export function HomeScreen() {
    * It deliberately does NOT open a public room full of strangers. That's the
    * empty-room problem, and it's the reason there is no game-room directory.
    */
+  /**
+   * The strip is not decorative. A tap opens the huddle for that game — yours
+   * if you have one for either team, otherwise the public one everybody is in.
+   */
   const handlePickGame = useCallback(
-    (game: RoomGame) => {
+    async (game: RoomGame) => {
       const mine = (myHuddles ?? []).find(
         (h) => h.teamId === game.us.teamId || h.teamId === game.them.teamId,
       );
@@ -542,14 +547,7 @@ export function HomeScreen() {
         navigation.navigate("Huddle", { huddleId: mine.id });
         return;
       }
-      // WITH NO ROOMS, EVERY GAME TAP BECAME A FORM. Someone who taps a live
-      // score wants the game, not a naming exercise — so the create screen
-      // arrives with the team already chosen and its name in the title, and
-      // it is one step rather than the answer to "I want to watch this".
-      navigation.navigate("CreateSideHuddle", {
-        teamId: game.us.teamId,
-        gameId: game.gameId,
-      });
+      await openGameRoom(game.gameId, navigation);
     },
     [myHuddles, navigation],
   );
