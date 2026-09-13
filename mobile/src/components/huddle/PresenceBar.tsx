@@ -170,8 +170,10 @@ export function PresenceBar({
                   ＋
                 </Type>
               </View>
+              {/* "Invite" is seven characters in a 44px column and rendered
+                  as "In…". Add is the word that fits and the word we used. */}
               <Type variant="dataStrong" tone="primary" className="mt-1" numberOfLines={1}>
-                Invite
+                Add
               </Type>
             </Pressable>
           ) : null}

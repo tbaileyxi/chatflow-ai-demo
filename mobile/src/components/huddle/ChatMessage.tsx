@@ -536,16 +536,11 @@ export function ChatMessage({
                     // file in the repo, which was the wrong reference and cost
                     // a round trip — the bot keeps its card because THAT
                     // distinction is real, machine against people.
-                    message.isBotMessage && "rounded-lg",
-                    message.isBotMessage ? "px-2.5 py-1" : "py-0.5",
+                    message.isBotMessage ? "py-0.5 pl-2.5" : "py-0.5",
                   )}
                   style={
                     message.isBotMessage
-                      ? {
-                          backgroundColor: "rgba(245,197,24,0.045)",
-                          borderLeftWidth: 2,
-                          borderLeftColor: colors.primary,
-                        }
+                      ? { borderLeftWidth: 2, borderLeftColor: colors.primary }
                       : undefined
                   }
                 >
@@ -594,7 +589,7 @@ export function ChatMessage({
                     );
                     return (
                       <>
-                        <Type variant="body"  style={{ color: colors.foreground }}>
+                        <Type variant="message" style={{ color: colors.foreground }}>
                           {body}
                         </Type>
                         {sponsor ? (
