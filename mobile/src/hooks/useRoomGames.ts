@@ -14,7 +14,7 @@ import { makeTeamNamer } from "@/lib/teamName";
  * with nine rooms should not fire nine game queries.
  */
 
-export type RoomGameStatus = "live" | "upcoming";
+export type RoomGameStatus = "live" | "final" | "upcoming";
 
 export type RoomGame = {
   gameId: string;
@@ -145,7 +145,7 @@ export function useRoomGames(teamIds: (string | null | undefined)[]) {
             "id, sport_key, status, start_time, home_team_id, away_team_id, home_score, away_score, period, clock",
           )
           .or(`home_team_id.in.(${list}),away_team_id.in.(${list})`)
-          .in("status", [...LIVE_STATUSES, "scheduled"])
+          .in("status", [...LIVE_STATUSES, "scheduled", "final"])
           .gte("start_time", since)
           .order("start_time", { ascending: true })
           .limit(400),
@@ -186,35 +186,47 @@ export function useRoomGames(teamIds: (string | null | undefined)[]) {
         // of two identical copies is the same operation as picking the live one
         // of two different games.
         const live = mine.find((g) => LIVE_STATUSES.includes(g.status));
-        const game = live ?? mine[0];
+
+        // A final stays up for four hours. That is the window where the room
+        // is worth being in — and jumping to next week's fixture the instant
+        // the whistle goes is the app leaving before anyone else does.
+        const recentFinal = mine.find(
+          (g) =>
+            g.status === "final" &&
+            Date.now() - new Date(g.start_time).getTime() < 8 * 60 * 60 * 1000,
+        );
+        const upcoming = mine.find((g) => !LIVE_STATUSES.includes(g.status) && g.status !== "final");
+        const game = live ?? recentFinal ?? upcoming ?? mine[0];
 
         const isHome = game.home_team_id === teamId;
         const themId = isHome ? game.away_team_id : game.home_team_id;
 
         result.set(teamId, {
           gameId: game.id,
-          status: live ? "live" : "upcoming",
+          status: live ? "live" : game.status === "final" ? "final" : "upcoming",
           startTime: game.start_time,
           period: live ? game.period : null,
           clock: live ? game.clock : null,
           sportKey: game.sport_key,
           statusLabel: live
             ? gameStatusLabel(game.sport_key, game.period, game.clock)
-            : new Date(game.start_time).toLocaleTimeString("en-US", {
-                hour: "numeric",
-                minute: "2-digit",
-              }),
+            : game.status === "final"
+              ? "FINAL"
+              : new Date(game.start_time).toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                }),
           us: {
             teamId,
             name: nameFor(teamId),
             logoUrl: logoFor(teamId),
-            score: live ? (isHome ? game.home_score : game.away_score) : null,
+            score: live || game.status === "final" ? (isHome ? game.home_score : game.away_score) : null,
           },
           them: {
             teamId: themId ?? "",
             name: nameFor(themId),
             logoUrl: logoFor(themId),
-            score: live ? (isHome ? game.away_score : game.home_score) : null,
+            score: live || game.status === "final" ? (isHome ? game.away_score : game.home_score) : null,
           },
           isHome,
         });

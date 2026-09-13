@@ -37,6 +37,7 @@ type Props = {
 export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
   const here = hereNow ?? [];
   const gameOn = game?.status === "live";
+  const settled = game?.status === "final";
   const nobodyHome = here.length === 0;
   const hot = gameOn || here.length > 0;
 
@@ -96,6 +97,10 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
               <Type variant="data" tone="primary" style={{ fontSize: 11 }}>
                 ◆ {nobodyHome ? "on now — go first" : "game on"}
               </Type>
+            ) : settled ? (
+              <Type variant="data" tone="success" style={{ fontSize: 11 }}>
+                ✓ final
+              </Type>
             ) : here.length === 0 ? (
               <Type variant="data" tone="tertiary" style={{ fontSize: 11 }}>
                 quiet
@@ -111,7 +116,7 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
         ) : null}
       </View>
 
-      {game ? <ScoreStrip game={game} live={gameOn} /> : null}
+      {game ? <ScoreStrip game={game} live={gameOn || settled} /> : null}
 
       {/* THE LAST MESSAGE IS THE POINT. It sat under a gold banner shouting
           that nobody was there, in muted grey, truncated. A new message is the

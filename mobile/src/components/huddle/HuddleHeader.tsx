@@ -9,6 +9,7 @@ import {
 import { Type } from "@/components/ui/Type";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/theme/type";
+import { teamAbbr } from "@/lib/teamName";
 import {
   useLiveGameContext,
   getGameState,
@@ -121,12 +122,12 @@ function ScoreLine({ game, gameState }: { game: GameContext; gameState: GameStat
       <View className="mt-0.5 flex-row items-center gap-1.5">
         <PulsingDot />
         <Type variant="data" numberOfLines={1} style={{ fontSize: 14, flexShrink: 1 }}>
-          {away}{" "}
+          {teamAbbr(away)}{" "}
           <Type variant="data" style={{ fontSize: 19, fontFamily: fonts.monoMedium }}>
             {game.awayScore ?? 0}
           </Type>
           <Type variant="data" tone="tertiary" style={{ fontSize: 14 }}>{"  ·  "}</Type>
-          {home}{" "}
+          {teamAbbr(home)}{" "}
           <Type variant="data" style={{ fontSize: 19, fontFamily: fonts.monoMedium }}>
             {game.homeScore ?? 0}
           </Type>

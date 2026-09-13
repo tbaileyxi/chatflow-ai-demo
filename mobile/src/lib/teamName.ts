@@ -45,3 +45,30 @@ export function makeTeamNamer(
     return shared ? nick || place : place;
   };
 }
+
+
+/**
+ * The scorebug form: MIN, GB, NO, KC.
+ *
+ * A header has room for two names, two scores and a clock. "Packers 3 ·
+ * Vikings 0" spends that width on words you already know — every broadcast in
+ * the world abbreviates here, and the full name belongs on a card where there
+ * is room for it.
+ *
+ * Multi-word places take their initials (Green Bay → GB, New Orleans → NO,
+ * Kansas City → KC). Single words take three letters (Detroit → DET,
+ * Minnesota → MIN, Tulane → TUL). Both are what a scorebug does.
+ */
+export function teamAbbr(place: string | null | undefined): string {
+  const p = (place ?? "").trim();
+  if (!p) return "TBD";
+
+  const words = p.split(/\s+/).filter(Boolean);
+  if (words.length > 1) {
+    // "St. Louis" → STL, not SL: keep a leading initial's letters when the
+    // word is an abbreviation already.
+    const initials = words.map((w) => w.replace(/[^A-Za-z]/g, "").charAt(0)).join("");
+    return initials.toUpperCase().slice(0, 3);
+  }
+  return p.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase();
+}

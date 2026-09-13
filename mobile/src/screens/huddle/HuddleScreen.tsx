@@ -590,11 +590,11 @@ export function HuddleScreen() {
     //
     // This mirrors public.notify_coach_mention(). If that SQL changes, change
     // this with it: the two agreeing is what makes the dots honest.
-    const last = (messages ?? [])[0]; // the query returns newest-first
-    const answeringCoach =
-      !!last &&
-      last.messageType === "coach_answer" &&
-      Date.now() - new Date(last.createdAt).getTime() < 10 * 60_000;
+    // A REPLY to something it said — not "it spoke last". Its own answer is
+    // always the last message, so that rule made every message afterwards a
+    // question and it never stopped talking.
+    const parent = replyToId ? (messages ?? []).find((m) => m.id === replyToId) : null;
+    const answeringCoach = !!parent && parent.messageType === "coach_answer";
     if (/@coach\b/i.test(content) || answeringCoach) setCoachThinking(true);
     const result = await sendMessage(content, user.id, replyToId, media, {
       senderName,
@@ -917,9 +917,10 @@ export function HuddleScreen() {
             onFocus={scrollToBottom}
             onTypingChange={sendTyping}
             mentionables={mentionables}
-            onFaceReaction={
-              pingGameState === "live" ? handleFaceReaction : undefined
-            }
+            // Not gated on a live game any more. The ◉ is the capture
+            // button; what it captures should not change because a game
+            // finished twenty minutes ago.
+            onFaceReaction={handleFaceReaction}
           />
           </>
         )}

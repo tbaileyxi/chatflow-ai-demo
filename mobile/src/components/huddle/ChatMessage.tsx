@@ -670,6 +670,20 @@ export function ChatMessage({
                   >
                     <ShareIcon color="#FFFFFF" size={15} />
                   </Pressable>
+
+                  <Pressable
+                    onPress={isOwnMessage ? handleDeleteOwn : handleReport}
+                    hitSlop={8}
+                    className="absolute right-2 items-center justify-center rounded-full active:opacity-70"
+                    style={{ top: 46, height: 32, width: 32, backgroundColor: "rgba(0,0,0,0.55)" }}
+                    accessibilityLabel={isOwnMessage ? "Delete this" : "Report this"}
+                  >
+                    {isOwnMessage ? (
+                      <Trash2 color="#FFFFFF" size={15} />
+                    ) : (
+                      <Flag color="#FFFFFF" size={15} />
+                    )}
+                  </Pressable>
                 </Pressable>
               )}
 

@@ -27,6 +27,8 @@ export type UserHuddle = {
   latestMessageSender: string | null;
   latestMessageIsBot: boolean;
   hasUnread: boolean;
+  /** True for the public huddle attached to a fixture. */
+  isGameRoom: boolean;
   /** Set on a side huddle — the ones that close at 2am. Null on everything
    *  permanent, which is how a card knows to draw itself dashed. */
   expiresAt: string | null;
@@ -64,6 +66,7 @@ export function useUserHuddles() {
           latestMessageIsBot: true,
           hasUnread: false,
           expiresAt: null,
+          isGameRoom: false,
         }));
       }
 
@@ -93,7 +96,7 @@ export function useUserHuddles() {
 
       let { data: memberships, error: memError } = await (supabase as any)
         .from("huddle_members")
-        .select(CORE.replace("%EXTRA%", "expires_at,"))
+        .select(CORE.replace("%EXTRA%", "expires_at, is_game_room,"))
         .eq("user_id", user.id);
 
       if (memError) {
@@ -200,6 +203,7 @@ export function useUserHuddles() {
             latestMessageIsBot: latest?.isBot ?? false,
             hasUnread: lastMsg ? lastMsg > lastRead : false,
             expiresAt: (h as any).expires_at ?? null,
+            isGameRoom: (h as any).is_game_room === true,
           };
         })
         .sort((a, b) => {

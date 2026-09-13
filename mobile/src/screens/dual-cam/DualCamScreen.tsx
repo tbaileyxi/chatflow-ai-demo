@@ -225,7 +225,7 @@ export function DualCamScreen() {
           >
             {recording
               ? `${Math.min(elapsed, MAX_SECONDS).toFixed(1)}s · let go to stop`
-              : "Tap for a photo · hold to record"}
+              : `Tap for a photo · hold to record · ${MAX_SECONDS}s max`}
           </Type>
 
           <Pressable

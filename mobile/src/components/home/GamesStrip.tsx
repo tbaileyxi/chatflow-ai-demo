@@ -65,7 +65,10 @@ export function GamesStrip({
     const soon = Date.now() + 8 * 24 * 60 * 60 * 1000;
     return list
       .filter(
-        (g) => g.status === "live" || new Date(g.startTime).getTime() < soon,
+        (g) =>
+          g.status === "live" ||
+          g.status === "final" ||
+          new Date(g.startTime).getTime() < soon,
       )
       .sort((a, b) => {
         if (a.status !== b.status) return a.status === "live" ? -1 : 1;
@@ -158,6 +161,7 @@ export function GamesStrip({
       >
         {games.map((g) => {
           const live = g.status === "live";
+          const settled = g.status === "final";
           const us = g.us.score ?? 0;
           const them = g.them.score ?? 0;
           const watchers = watchersByGame.get(g.gameId) ?? [];
@@ -168,12 +172,12 @@ export function GamesStrip({
               className="w-[150px] rounded-[13px] px-2.5 py-2 active:opacity-80"
               style={cardStyle(live ? "live" : "quiet")}
             >
-              <Row side={g.us} score={live ? us : null} leading={us >= them} />
-              <Row side={g.them} score={live ? them : null} leading={them >= us} />
+              <Row side={g.us} score={live || settled ? us : null} leading={us >= them} />
+              <Row side={g.them} score={live || settled ? them : null} leading={them >= us} />
 
               <Type
                 variant="data"
-                tone={live ? "primary" : "info"}
+                tone={live ? "primary" : settled ? "success" : "info"}
                 style={{ fontSize: 10, marginTop: 5 }}
                 numberOfLines={1}
               >

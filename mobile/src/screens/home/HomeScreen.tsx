@@ -405,7 +405,13 @@ function FriendsNowSection() {
 function YourRoomsSection() {
   const navigation = useNavigation<any>();
   const { data: huddles, isLoading } = useUserHuddles();
-  const unsorted = (huddles ?? []).filter((huddle) => !huddle.isOfficialTeam);
+  // A GAME HUDDLE DOES NOT FOLLOW YOU HOME. Entering one makes you a member so
+  // you can post in it; that is not a reason for it to sit in Your Huddles
+  // beside the side huddle you actually made — which is why the same fixture
+  // turned up twice.
+  const unsorted = (huddles ?? []).filter(
+    (huddle) => !huddle.isOfficialTeam && !huddle.isGameRoom,
+  );
 
   // The game each room is about — ONE query for every room, not one per room.
   const { data: gamesByTeam } = useRoomGames(unsorted.map((r) => r.teamId));
@@ -433,15 +439,34 @@ function YourRoomsSection() {
    * each, and a room with a game AND people in it beats both.
    */
   const rooms = useMemo(() => {
+    // Inside "live", a fixed sport order. Otherwise the list reshuffles
+    // itself every time a score lands somewhere.
+    const SPORT_ORDER = [
+      "americanfootball_nfl",
+      "americanfootball_ncaaf",
+      "basketball_nba",
+      "basketball_ncaab",
+      "baseball_mlb",
+      "icehockey_nhl",
+    ];
     const score = (r: (typeof unsorted)[number]) => {
       const gameOn =
         r.teamId && gamesByTeam?.get(r.teamId)?.status === "live" ? 2 : 0;
       const peopleIn = (hereByRoom.get(r.id)?.length ?? 0) > 0 ? 1 : 0;
       return gameOn + peopleIn;
     };
+    const sportRank = (r: (typeof unsorted)[number]) => {
+      const key = r.teamId ? gamesByTeam?.get(r.teamId)?.sportKey : null;
+      const i = key ? SPORT_ORDER.indexOf(key) : -1;
+      return i < 0 ? SPORT_ORDER.length : i;
+    };
     return [...unsorted].sort((a, b) => {
       const diff = score(b) - score(a);
       if (diff !== 0) return diff;
+      // Then by sport. Ordering on last-message alone put a quiet baseball
+      // huddle above a football game in the fourth quarter.
+      const sport = sportRank(a) - sportRank(b);
+      if (sport !== 0) return sport;
       return (
         new Date(b.lastMessageAt ?? 0).getTime() -
         new Date(a.lastMessageAt ?? 0).getTime()
