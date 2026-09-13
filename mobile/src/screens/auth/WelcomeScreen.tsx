@@ -17,7 +17,7 @@ export function WelcomeScreen() {
       {/* The mark emits itself here rather than sitting still as a PNG, and a
           tap anywhere fires a ring from your finger. That is the app's core
           gesture, performed before anyone explains what the app is. */}
-      <RippleMark />
+      <RippleMark onTap={() => navigation.navigate("PhoneEntry")} />
 
       <View
         className="flex-1 items-center justify-end px-8 pb-4"
@@ -49,8 +49,11 @@ export function WelcomeScreen() {
         >
           Never watch a game alone.
         </Type>
-        <Type center variant="eyebrow" tone="primary" className="mt-8">
-          Tap anywhere
+        {/* It said "Tap anywhere" and nothing happened — the ripple fired
+            and that was all, so the one instruction on the first screen of
+            the app was false. */}
+        <Type center variant="eyebrow" tone="tertiary" className="mt-8">
+          Tap anywhere to begin
         </Type>
       </View>
 

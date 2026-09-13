@@ -20,8 +20,18 @@ import { DualCam } from "../../modules/dual-cam";
 export async function shareMedia(args: {
   url: string;
   type: "image" | "video" | "audio" | string | null;
+  /**
+   * What to say alongside it — normally the scoreline the moment was
+   * captured at.
+   *
+   * Without this iOS has nothing but the file, and when the composer fails
+   * and we fall through to the remote URL it renders as a LINK PREVIEW: the
+   * picture with "dejuwyeypiggvlyfliap.supabase.co" underneath it as the
+   * caption. A storage hostname is the least shareable string in the app.
+   */
+  caption?: string | null;
 }): Promise<void> {
-  const { url, type } = args;
+  const { url, type, caption } = args;
   if (!url) return;
 
   const isVideo = type === "video";
@@ -45,7 +55,8 @@ export async function shareMedia(args: {
       // Fall through with the clean file — worse for us, fine for them.
     }
 
-    await Share.share({ url: shareUri });
+    const text = (caption ?? "").trim();
+    await Share.share(text ? { url: shareUri, message: text } : { url: shareUri });
   } catch (err: any) {
     // A cancelled share sheet rejects on some iOS versions. That isn't an error
     // and must not raise an alert at somebody who simply changed their mind.

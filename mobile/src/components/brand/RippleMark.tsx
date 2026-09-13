@@ -89,9 +89,12 @@ export function RippleMark({
   children,
   /** Fires a ring wherever the screen is touched. */
   tappable = true,
+  onTap,
 }: {
   children?: ReactNode;
   tappable?: boolean;
+  /** What a tap does, after the ring has fired. */
+  onTap?: () => void;
 }) {
   const reduceMotion = useReduceMotion();
 
@@ -231,9 +234,14 @@ export function RippleMark({
       onPressIn={(e) =>
         fireAt(e.nativeEvent.locationX, e.nativeEvent.locationY)
       }
-      // Decorative: the ripple teaches by feel, and announcing it to a screen
-      // reader as a button that does nothing would be worse than silence.
-      accessible={false}
+      // The ripple fires on press-in so it tracks the finger; onTap runs on
+      // release, after you have seen the ring you made. Without onTap the
+      // screen says "tap anywhere" and nothing happens, which is the first
+      // promise the app breaks.
+      onPress={onTap}
+      accessible={!!onTap}
+      accessibilityRole={onTap ? "button" : undefined}
+      accessibilityLabel={onTap ? "Get started" : undefined}
     >
       {body}
     </Pressable>

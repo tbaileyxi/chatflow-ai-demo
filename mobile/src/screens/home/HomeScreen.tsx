@@ -494,8 +494,12 @@ function YourRoomsSection() {
             </Type>
           </View>
           <Type variant="caption" tone="muted" className="mt-2 leading-5">
-            Create a room anchored to a team. Invite-only — only people with
-            your link can join.
+            {/* It said "Invite-only — only people with your link can join",
+                which is not what the room does: a friend can turn up. Saying
+                a stronger thing than is true about who can see your messages
+                is the one place copy must not be loose. */}
+            Start a room around a team. You choose whether it stays private or
+            opens up to friends.
           </Type>
         </View>
       )}
@@ -538,7 +542,14 @@ export function HomeScreen() {
         navigation.navigate("Huddle", { huddleId: mine.id });
         return;
       }
-      navigation.navigate("CreateSideHuddle", { teamId: game.us.teamId });
+      // WITH NO ROOMS, EVERY GAME TAP BECAME A FORM. Someone who taps a live
+      // score wants the game, not a naming exercise — so the create screen
+      // arrives with the team already chosen and its name in the title, and
+      // it is one step rather than the answer to "I want to watch this".
+      navigation.navigate("CreateSideHuddle", {
+        teamId: game.us.teamId,
+        gameId: game.gameId,
+      });
     },
     [myHuddles, navigation],
   );

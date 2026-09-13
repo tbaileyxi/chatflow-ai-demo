@@ -386,11 +386,14 @@ export function CreateSideHuddleScreen() {
             <Type variant="eyebrow" tone="primary">
               2 · Pick your team
             </Type>
+            {/* It read as a gold badge with a team name in it and no word
+                saying what it was — especially arriving pre-filled from a tap
+                on a live game, where nobody chose it on this screen. */}
             {selectedTeam ? (
-              <View className="flex-row items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5">
-                <Radio color={colors.primary} size={11} />
-                <Type variant="captionStrong" tone="primary">
-                  {selectedTeam.name}
+              <View className="flex-row items-center gap-1.5 rounded-full bg-primary/15 px-2.5 py-1">
+                <Check color={colors.primary} size={12} />
+                <Type variant="data" tone="primary" style={{ fontSize: 12 }}>
+                  {selectedTeam.name} picked
                 </Type>
               </View>
             ) : null}

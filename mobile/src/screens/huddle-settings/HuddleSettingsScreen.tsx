@@ -295,6 +295,25 @@ export function HuddleSettingsScreen() {
    * Open to every member, not just admins: blocking is a personal wall, and
    * needing permission to stop seeing someone would defeat it.
    */
+  /**
+   * TAPPING A PERSON OPENS THE PERSON.
+   *
+   * This put up a menu first — View profile / Report / Block — so the common
+   * thing (who is this?) sat behind a list whose other two entries almost
+   * nobody will ever use. Report and block live on the profile, which is also
+   * where you would have gone to decide you wanted them.
+   *
+   * Long-press still reaches the menu directly, for the case where you know
+   * exactly what you want and do not need to look at them first.
+   */
+  const openMemberProfile = (memberId: string, name: string) => {
+    if (memberId === user?.id) {
+      navigation.navigate("Profile" as never);
+      return;
+    }
+    (navigation as any).navigate("PublicProfile", { userId: memberId, knownAs: name });
+  };
+
   const openMemberActions = (memberId: string, name: string) => {
     if (memberId === user?.id) {
       navigation.navigate("Profile" as never);
@@ -540,12 +559,18 @@ export function HuddleSettingsScreen() {
       style={{ backgroundColor: colors.huddleGround }}
     >
       {/* Header */}
-      <View className="flex-row items-center gap-3 px-4 py-3">
-        <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+      {/* items-start, not items-center: the title is two lines and a 29pt
+          face, so centring the row pushed the chevron down into the name. */}
+      <View className="flex-row items-start gap-2 px-4 py-3">
+        <Pressable
+          onPress={() => navigation.goBack()}
+          hitSlop={10}
+          style={{ paddingTop: 4 }}
+        >
           <ChevronLeft color={colors.foreground} size={24} />
         </Pressable>
         <View className="flex-1">
-          <Type variant="title" numberOfLines={1}>
+          <Type variant="title" numberOfLines={1} style={{ fontSize: 25 }}>
             {huddle.name}
           </Type>
           <Type variant="data" tone="tertiary">
@@ -884,6 +909,12 @@ export function HuddleSettingsScreen() {
               <Pressable
                 key={m.userId}
                 onPress={() =>
+                  openMemberProfile(
+                    m.userId,
+                    m.displayName ?? m.username ?? "This member",
+                  )
+                }
+                onLongPress={() =>
                   openMemberActions(
                     m.userId,
                     m.displayName ?? m.username ?? "This member",

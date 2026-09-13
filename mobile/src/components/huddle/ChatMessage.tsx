@@ -536,14 +536,14 @@ export function ChatMessage({
                     // file in the repo, which was the wrong reference and cost
                     // a round trip — the bot keeps its card because THAT
                     // distinction is real, machine against people.
-                    message.isBotMessage && "rounded-xl",
-                    message.isBotMessage ? "px-3 py-2" : "py-0.5",
+                    message.isBotMessage && "rounded-lg",
+                    message.isBotMessage ? "px-2.5 py-1" : "py-0.5",
                   )}
                   style={
                     message.isBotMessage
                       ? {
-                          backgroundColor: "rgba(245,197,24,0.05)",
-                          borderLeftWidth: 2.5,
+                          backgroundColor: "rgba(245,197,24,0.045)",
+                          borderLeftWidth: 2,
                           borderLeftColor: colors.primary,
                         }
                       : undefined
@@ -661,7 +661,13 @@ export function ChatMessage({
                       order this particular person uses them. */}
                   <Pressable
                     onPress={() =>
-                      shareMedia({ url: message.mediaUrl!, type: message.mediaType })
+                      shareMedia({
+                        url: message.mediaUrl!,
+                        type: message.mediaType,
+                        // The scoreline the moment was captured at — the
+                        // caption already burned into the frame.
+                        caption: message.content?.trim() || null,
+                      })
                     }
                     hitSlop={8}
                     className="absolute right-2 top-3 h-8 w-8 items-center justify-center rounded-full active:opacity-70"
@@ -732,7 +738,13 @@ export function ChatMessage({
                       order this particular person uses them. */}
                   <Pressable
                     onPress={() =>
-                      shareMedia({ url: message.mediaUrl!, type: message.mediaType })
+                      shareMedia({
+                        url: message.mediaUrl!,
+                        type: message.mediaType,
+                        // The scoreline the moment was captured at — the
+                        // caption already burned into the frame.
+                        caption: message.content?.trim() || null,
+                      })
                     }
                     hitSlop={8}
                     className="absolute right-2 top-3 h-8 w-8 items-center justify-center rounded-full active:opacity-70"
