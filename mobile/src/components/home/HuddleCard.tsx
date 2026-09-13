@@ -4,6 +4,7 @@ import { Type } from "@/components/ui/Type";
 import { fonts } from "@/theme/type";
 import { personColor } from "@/lib/personColor";
 import { colors } from "@/theme/colors";
+import { cardStyle } from "@/theme/cardStyle";
 import type { UserHuddle } from "@/hooks/useUserHuddles";
 import type { RoomGame } from "@/hooks/useRoomGames";
 
@@ -43,11 +44,11 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
     <Pressable
       onPress={onPress}
       className="mb-3 rounded-[16px] px-3 py-3 active:opacity-80"
-      style={{
-        backgroundColor: hot ? "#17181D" : colors.card,
-        borderWidth: 1,
-        borderColor: hot ? "#3A4A5C" : "#232329",
-      }}
+      // Solid gold when a game is on, dashed gold for a side huddle that ends
+      // at 2am, a plain light stroke otherwise. See theme/cardStyle — the
+      // old default was #232329, two shades off the card it drew around, so a
+      // screen of these read as one grey column.
+      style={cardStyle(huddle.expiresAt ? "side" : gameOn ? "live" : "quiet")}
     >
       <View className="mb-2.5 flex-row items-start gap-2.5">
         <FaceStack names={here} logoUrl={huddle.teamLogoUrl} dim={false} />
@@ -87,7 +88,11 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
                 {here.length > 2 ? ` +${here.length - 2}` : ""} in
               </Type>
             ) : null}
-            {gameOn ? (
+            {huddle.expiresAt ? (
+              <Type variant="data" tone="primary" style={{ fontSize: 11 }}>
+                ◷ until 2am
+              </Type>
+            ) : gameOn ? (
               <Type variant="data" tone="primary" style={{ fontSize: 11 }}>
                 ◆ {nobodyHome ? "on now — go first" : "game on"}
               </Type>

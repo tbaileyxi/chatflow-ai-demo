@@ -27,6 +27,9 @@ export type UserHuddle = {
   latestMessageSender: string | null;
   latestMessageIsBot: boolean;
   hasUnread: boolean;
+  /** Set on a side huddle — the ones that close at 2am. Null on everything
+   *  permanent, which is how a card knows to draw itself dashed. */
+  expiresAt: string | null;
 };
 
 export function useUserHuddles() {
@@ -60,28 +63,49 @@ export function useUserHuddles() {
           latestMessageSender: null,
           latestMessageIsBot: true,
           hasUnread: false,
+          expiresAt: null,
         }));
       }
 
-      // Get user's huddle memberships
-      const { data: memberships, error: memError } = await supabase
-        .from("huddle_members")
-        .select(
-          `
+      /**
+       * A ONE-COLUMN TYPO MUST NOT EMPTY THIS SCREEN.
+       *
+       * PostgREST fails the WHOLE select when any column in it is unknown, so
+       * asking for `expires_at` against a database that has not run the side
+       * huddle migration returns nothing — and Home shows "No huddles yet" to
+       * somebody with nine of them. That exact shape has now bitten twice
+       * this week: the profiles embed on the last-message line, and an RLS
+       * policy before it.
+       *
+       * So the newer column is asked for once, and its absence costs the
+       * dashed border rather than the entire list.
+       */
+      const CORE = `
           huddle_id,
           last_read_at,
           huddles (
             id, name, member_count, last_message_at,
             owner_id, is_verified, is_official_team_huddle, is_private, team_id,
+            %EXTRA%
             teams!team_id (name, city, logo_url)
           )
-        `,
-        )
+        `;
+
+      let { data: memberships, error: memError } = await (supabase as any)
+        .from("huddle_members")
+        .select(CORE.replace("%EXTRA%", "expires_at,"))
         .eq("user_id", user.id);
+
+      if (memError) {
+        ({ data: memberships, error: memError } = await (supabase as any)
+          .from("huddle_members")
+          .select(CORE.replace("%EXTRA%", ""))
+          .eq("user_id", user.id));
+      }
 
       if (memError || !memberships) return [];
 
-      const huddleIds = memberships
+      const huddleIds = (memberships as any[])
         .map((m) => (m.huddles as any)?.id)
         .filter(Boolean) as string[];
 
@@ -141,7 +165,7 @@ export function useUserHuddles() {
         }
       }
 
-      return memberships
+      return (memberships as any[])
         .filter((m) => m.huddles)
         .map((m) => {
           const h = m.huddles as any;
@@ -175,6 +199,7 @@ export function useUserHuddles() {
             latestMessageSender: latest?.sender ?? null,
             latestMessageIsBot: latest?.isBot ?? false,
             hasUnread: lastMsg ? lastMsg > lastRead : false,
+            expiresAt: (h as any).expires_at ?? null,
           };
         })
         .sort((a, b) => {

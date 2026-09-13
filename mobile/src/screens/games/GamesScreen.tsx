@@ -12,10 +12,14 @@ import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { SectionLabel, Type } from "@/components/ui/Type";
 import { useAllGames, type SlateGame } from "@/hooks/useAllGames";
+import type { GamePresence } from "@/hooks/useGameHuddles";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { getFollowedTeamIds } from "@/lib/follows";
 import { colors } from "@/theme/colors";
 import { openGameRoom } from "@/lib/gameRoom";
+import { useGameHuddles } from "@/hooks/useGameHuddles";
+import { cardStyle } from "@/theme/cardStyle";
+import { personColor } from "@/lib/personColor";
 
 const CHIPS = ["ALL", "NFL", "NCAAF", "NBA", "NCAAB", "MLB", "NHL"] as const;
 
@@ -50,6 +54,9 @@ export function GamesScreen() {
   });
   const { data: huddles } = useUserHuddles();
   const { data: games, isLoading, refetch, isRefetching } = useAllGames(followed ?? []);
+  // Who is in the huddle for each of these fixtures. A list of scores with
+  // nothing about people is a scoreboard, not a reason to open anything.
+  const presence = useGameHuddles((games ?? []).map((g) => g.gameId));
 
   const shown = useMemo(
     () => (games ?? []).filter((g) => league === "ALL" || g.league === league),
@@ -147,7 +154,7 @@ export function GamesScreen() {
               <>
                 <SectionLabel count={groups.yours.length}>Your teams</SectionLabel>
                 {groups.yours.map((g) => (
-                  <GameRow key={g.gameId} game={g} onPress={() => openGame(g)} />
+                  <GameRow key={g.gameId} game={g} here={presence.get(g.gameId)} onPress={() => openGame(g)} />
                 ))}
               </>
             ) : null}
@@ -156,7 +163,7 @@ export function GamesScreen() {
               <>
                 <SectionLabel count={groups.live.length}>On now</SectionLabel>
                 {groups.live.map((g) => (
-                  <GameRow key={g.gameId} game={g} onPress={() => openGame(g)} />
+                  <GameRow key={g.gameId} game={g} here={presence.get(g.gameId)} onPress={() => openGame(g)} />
                 ))}
               </>
             ) : null}
@@ -165,7 +172,7 @@ export function GamesScreen() {
               <>
                 <SectionLabel count={groups.later.length}>Later</SectionLabel>
                 {groups.later.map((g) => (
-                  <GameRow key={g.gameId} game={g} onPress={() => openGame(g)} />
+                  <GameRow key={g.gameId} game={g} here={presence.get(g.gameId)} onPress={() => openGame(g)} />
                 ))}
               </>
             ) : null}
@@ -174,7 +181,7 @@ export function GamesScreen() {
               <>
                 <SectionLabel count={groups.done.length}>Final</SectionLabel>
                 {groups.done.map((g) => (
-                  <GameRow key={g.gameId} game={g} onPress={() => openGame(g)} />
+                  <GameRow key={g.gameId} game={g} here={presence.get(g.gameId)} onPress={() => openGame(g)} />
                 ))}
               </>
             ) : null}
@@ -185,31 +192,84 @@ export function GamesScreen() {
   );
 }
 
-function GameRow({ game, onPress }: { game: SlateGame; onPress: () => void }) {
+function GameRow({
+  game,
+  here,
+  onPress,
+}: {
+  game: SlateGame;
+  here?: GamePresence;
+  onPress: () => void;
+}) {
   const live = game.status === "live";
   const a = game.away.score ?? 0;
   const h = game.home.score ?? 0;
   const scored = live || game.status === "final";
+  const friends = here?.friends ?? [];
 
   return (
     <Pressable
       onPress={onPress}
-      className="mb-1.5 rounded-[10px] px-2.5 py-2 active:opacity-80"
-      style={{
-        backgroundColor: colors.card,
-        borderWidth: 1,
-        borderColor: live ? "#3B4A5C" : colors.border,
-      }}
+      className="mb-2.5 rounded-[15px] px-3 py-3 active:opacity-80"
+      // Solid gold live, dashed gold when a friend is in a side huddle off it,
+      // a plain light stroke otherwise. See theme/cardStyle.
+      style={cardStyle(here?.inSideHuddle ? "side" : live ? "live" : "quiet")}
     >
       <Side side={game.away} score={scored ? a : null} leading={a >= h} />
       <Side side={game.home} score={scored ? h : null} leading={h >= a} />
+
       <Type
         variant="data"
-        tone={live ? "primary" : game.status === "final" ? "success" : "tertiary"}
-        className="mt-1"
+        tone={live ? "primary" : game.status === "final" ? "success" : "info"}
+        className="mt-1.5"
+        style={{ fontSize: 12 }}
       >
         {live ? `◆ ${game.statusLabel}` : game.statusLabel}
       </Type>
+
+      {/* NAMES, THEN A NUMBER. "Mike, Sarah in" is why you tap; "43 here" is
+          why you tap when you know nobody. Neither was on this card. */}
+      <View
+        className="mt-2.5 flex-row items-center gap-2 pt-2.5"
+        style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.10)", minHeight: 26 }}
+      >
+        {friends.length > 0 ? (
+          <>
+            <View className="flex-row">
+              {friends.slice(0, 3).map((n, i) => (
+                <View
+                  key={`${n}-${i}`}
+                  className="h-[19px] w-[19px] items-center justify-center rounded-full"
+                  style={{
+                    backgroundColor: personColor(n),
+                    borderWidth: 1.5,
+                    borderColor: colors.card,
+                    marginLeft: i === 0 ? 0 : -6,
+                  }}
+                >
+                  <Type variant="data" style={{ color: "#000", fontSize: 8 }}>
+                    {n.slice(0, 1).toUpperCase()}
+                  </Type>
+                </View>
+              ))}
+            </View>
+            <Type variant="data" tone="success" numberOfLines={1} style={{ fontSize: 11.5, flexShrink: 1 }}>
+              {friends.slice(0, 2).join(", ")}
+              {friends.length > 2 ? ` +${friends.length - 2}` : ""}
+              {here?.inSideHuddle ? " · side huddle" : " in"}
+            </Type>
+          </>
+        ) : (
+          <Type variant="data" tone="tertiary" style={{ fontSize: 11.5 }}>
+            nobody you know
+          </Type>
+        )}
+        {here && here.total > 0 ? (
+          <Type variant="data" tone="muted" style={{ marginLeft: "auto", fontSize: 11.5 }}>
+            {here.total} here
+          </Type>
+        ) : null}
+      </View>
     </Pressable>
   );
 }

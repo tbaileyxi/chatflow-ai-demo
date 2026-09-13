@@ -7,6 +7,8 @@ import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { getFollowedTeamIds } from "@/lib/follows";
 import { SectionLabel, Type } from "@/components/ui/Type";
 import { personColor } from "@/lib/personColor";
+import { cardStyle } from "@/theme/cardStyle";
+import { colors } from "@/theme/colors";
 
 /**
  * What's on, in one row.
@@ -164,11 +166,7 @@ export function GamesStrip({
               key={g.gameId}
               onPress={() => onPickGame?.(g)}
               className="w-[150px] rounded-[13px] px-2.5 py-2 active:opacity-80"
-              style={{
-                backgroundColor: live ? "#1A2431" : "#151E2A",
-                borderWidth: 1,
-                borderColor: live ? "#3B4A5C" : "#1E2937",
-              }}
+              style={cardStyle(live ? "live" : "quiet")}
             >
               <Row side={g.us} score={live ? us : null} leading={us >= them} />
               <Row side={g.them} score={live ? them : null} leading={them >= us} />
@@ -199,7 +197,7 @@ export function GamesStrip({
                           style={{
                             backgroundColor: personColor(w),
                             borderWidth: 1.5,
-                            borderColor: "#151E2A",
+                            borderColor: colors.card,
                             marginLeft: i === 0 ? 0 : -5,
                           }}
                         >
