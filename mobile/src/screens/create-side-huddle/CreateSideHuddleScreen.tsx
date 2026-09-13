@@ -111,7 +111,7 @@ async function postAdminWelcome(
     // Say what it IS, then what to DO — with the actual button named. The
     // 48-hour nudge is useless if nobody knew where anything was on day one.
     const content =
-      `🏟️ **${huddleName} is your room.**\n\n` +
+      `🏟️ **${huddleName} is your huddle.**\n\n` +
       `I've got ${team} covered — news as it breaks, and when they play I'm in ` +
       `here calling it live. Scores, big plays, all in this thread.\n\n` +
       `Your half: get your people in. Tap the **+** up top to invite them — ` +
@@ -155,7 +155,15 @@ export function CreateSideHuddleScreen() {
   // from this screen was public and the screen said otherwise. Home's own
   // subtitle is "Friend rooms only. No public room directory." — that is the
   // product's position, and the default now matches it.
-  const [askToJoin, setAskToJoin] = useState(true);
+  /**
+   * Private is OFF by default.
+   *
+   * Every huddle started as invite-only, which means every new huddle was a
+   * room of one that nobody could reach — in an app whose entire premise is
+   * the people you already know. Friends can walk in; strangers cannot find
+   * it either way, because nothing lists it.
+   */
+  const [askToJoin, setAskToJoin] = useState(false);
 
   const filtered = teams?.filter((t) => {
     if (filterLeague && t.league.toUpperCase() !== filterLeague) return false;
@@ -336,7 +344,7 @@ export function CreateSideHuddleScreen() {
           <ChevronLeft color={colors.foreground} size={24} />
         </Pressable>
         <Type variant="heading" className="flex-1">
-          Start a room
+          Start a huddle
         </Type>
       </View>
 
@@ -344,7 +352,7 @@ export function CreateSideHuddleScreen() {
         <View className="px-4">
           {/* Step 1 — name. Big target, zero jargon. */}
           <Type variant="eyebrow" tone="primary">
-            1 · Name your room
+            1 · Name your huddle
           </Type>
           <View className="mt-2">
             <Input
@@ -355,13 +363,18 @@ export function CreateSideHuddleScreen() {
               onChangeText={setName}
               maxLength={50}
               autoFocus
-              className="h-14 rounded-[14px] px-4"
+              className="rounded-[14px] px-4"
               style={{
                 color: colors.foreground,
                 backgroundColor: colors.card,
                 borderColor: name.trim() ? colors.primary : colors.border,
                 fontFamily: type.bodyStrong.fontFamily,
-                fontSize: 22,
+                fontSize: 21,
+                // A fixed h-14 with 22pt type clipped the descenders — "Browns
+                // crew" lost the bottom of its own letters. Let the padding
+                // set the height instead of fighting it.
+                lineHeight: 27,
+                paddingVertical: 14,
                 letterSpacing: 0,
               }}
             />
@@ -376,8 +389,8 @@ export function CreateSideHuddleScreen() {
             )}
             <Type variant="caption" tone="muted">
               {askToJoin
-                ? "Private — only people you invite can join."
-                : "Open — anyone with the link can walk in."}
+                ? "Private — you approve everyone. Invites and requests to join."
+                : "Friends can jump in. Strangers can't find it."}
             </Type>
           </View>
 
@@ -520,8 +533,9 @@ export function CreateSideHuddleScreen() {
               Private
             </Type>
             <Type variant="caption" tone="muted">
-              You decide who comes in. Off means anyone who finds the room can
-              walk in.
+              {askToJoin
+                ? "You approve everyone — invites and requests to join."
+                : "Off: your friends walk straight in. Nobody else can find it."}
             </Type>
           </View>
           <Switch
@@ -539,7 +553,7 @@ export function CreateSideHuddleScreen() {
           {creating
             ? "Creating..."
             : !name.trim()
-              ? "Name your room to continue"
+              ? "Name your huddle to continue"
               : !selectedTeamId
                 ? "Pick a team to continue"
                 : "Create room"}

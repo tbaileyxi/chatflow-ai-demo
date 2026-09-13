@@ -461,7 +461,7 @@ function YourRoomsSection() {
           </Pressable>
         }
       >
-        Your rooms
+        Your huddles
       </SectionLabel>
 
       {isLoading ? (
@@ -490,7 +490,7 @@ function YourRoomsSection() {
           <View className="flex-row items-center gap-2">
             <Lock color={colors.primary} size={17} />
             <Type variant="heading">
-              No rooms yet
+              No huddles yet
             </Type>
           </View>
           <Type variant="caption" tone="muted" className="mt-2 leading-5">
@@ -498,8 +498,8 @@ function YourRoomsSection() {
                 which is not what the room does: a friend can turn up. Saying
                 a stronger thing than is true about who can see your messages
                 is the one place copy must not be loose. */}
-            Start a room around a team. You choose whether it stays private or
-            opens up to friends.
+            Start one around a team. Friends can jump straight in; strangers
+            can't find it. Lock it down later if you want to.
           </Type>
         </View>
       )}

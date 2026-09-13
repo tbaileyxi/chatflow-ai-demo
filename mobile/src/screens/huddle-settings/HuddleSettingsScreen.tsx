@@ -172,7 +172,7 @@ export function HuddleSettingsScreen() {
       verb,
       next === "active"
         ? "Flip this huddle to Official? Unlocks website, multiple admins, approval mode, and listing in search."
-        : "Revert this huddle to a regular room? Locks the Official-only features.",
+        : "Revert this huddle to a regular one? Locks the Official-only features.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -356,7 +356,7 @@ export function HuddleSettingsScreen() {
         onPress: () => {
           Alert.alert(
             `Block ${name}?`,
-            "You won't see them anywhere in Side Huddle, in any room. They aren't told.",
+            "You won't see them anywhere in Side Huddle, in any huddle. They aren't told.",
             [
               { text: "Cancel", style: "cancel" },
               {
@@ -503,7 +503,7 @@ export function HuddleSettingsScreen() {
             if (handoverError) {
               Alert.alert(
                 "Couldn't hand over",
-                "The room still belongs to you. Try again in a moment.",
+                "The huddle still belongs to you. Try again in a moment.",
               );
               return;
             }
@@ -574,7 +574,7 @@ export function HuddleSettingsScreen() {
             {huddle.name}
           </Type>
           <Type variant="data" tone="tertiary">
-            Room settings
+            Huddle settings
           </Type>
         </View>
         {isOwner && (
@@ -589,7 +589,7 @@ export function HuddleSettingsScreen() {
         {isRoomAdmin && (
           <Card>
             <CardContent className="gap-3 pt-4">
-              <SectionLabel>Room photo</SectionLabel>
+              <SectionLabel>Huddle photo</SectionLabel>
               <View className="h-40 w-full overflow-hidden rounded-xl bg-muted">
                 {huddle.photoUrl ? (
                   <Image
@@ -745,7 +745,7 @@ export function HuddleSettingsScreen() {
         {isRoomAdmin && (
           <Card>
             <CardHeader>
-              <CardTitle>About This Huddle</CardTitle>
+              <CardTitle>About this huddle</CardTitle>
             </CardHeader>
             <CardContent className="gap-3">
               <Input
@@ -807,7 +807,7 @@ export function HuddleSettingsScreen() {
                   <Type variant="caption" tone="muted" className="leading-5">
                     {huddle.isPrivate
                       ? "You decide who comes in."
-                      : "Anyone who finds this room can walk in."}
+                      : "Friends can jump in. Strangers can't find it."}
                   </Type>
                 </View>
                 <Button variant="outline" size="sm" onPress={togglePrivate}>
