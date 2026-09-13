@@ -31,7 +31,13 @@ export function WelcomeScreen() {
             is 55 here and the tagline's 14 is 22 — see rendering-scale-factors.
             The app-wide `display` size of 41 is the room study's scale and is
             too small for the one screen whose whole job is the name. */}
-        <Type center variant="display" style={{ fontSize: 55, lineHeight: 58 }}>
+        <Type
+          center
+          variant="display"
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          style={{ fontSize: 46, lineHeight: 50 }}
+        >
           Side Huddle
         </Type>
         <Type

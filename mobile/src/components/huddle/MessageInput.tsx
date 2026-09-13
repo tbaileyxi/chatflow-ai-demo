@@ -6,7 +6,6 @@ import {
   Pressable,
   Alert,
   Image,
-  Animated,
   Keyboard,
   Modal,
 } from "react-native";
@@ -15,8 +14,6 @@ import {
   X,
   Camera,
   ImageIcon,
-  Mic,
-  Square,
   Plus,
   Sparkles,
   BarChart3,
@@ -24,7 +21,6 @@ import {
   Video,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
-import { Audio } from "expo-av";
 import { Type } from "@/components/ui/Type";
 import { colors } from "@/theme/colors";
 import { type } from "@/theme/type";
@@ -89,36 +85,7 @@ export function MessageInput({
   const [sending, setSending] = useState(false);
   const [showPlus, setShowPlus] = useState(false);
   const [media, setMedia] = useState<MediaAttachment | null>(null);
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingDuration, setRecordingDuration] = useState(0);
   const inputRef = useRef<TextInput>(null);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Pulsing animation while recording
-  useEffect(() => {
-    if (isRecording) {
-      const anim = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.3,
-            duration: 600,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 600,
-            useNativeDriver: true,
-          }),
-        ]),
-      );
-      anim.start();
-      return () => anim.stop();
-    } else {
-      pulseAnim.setValue(1);
-    }
-  }, [isRecording, pulseAnim]);
 
   const handleSend = async () => {
     const trimmed = text.trim();
@@ -168,81 +135,6 @@ export function MessageInput({
     }
   };
 
-  const startRecording = async () => {
-    try {
-      const { status } = await Audio.requestPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission needed", "Microphone access is required for voice messages.");
-        return;
-      }
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const { recording: rec } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
-      );
-      setRecording(rec);
-      setIsRecording(true);
-      setRecordingDuration(0);
-
-      durationInterval.current = setInterval(() => {
-        setRecordingDuration((d) => d + 1);
-      }, 1000);
-    } catch (err) {
-      console.error("Failed to start recording:", err);
-      Alert.alert("Error", "Could not start recording.");
-    }
-  };
-
-  const stopRecording = async () => {
-    if (!recording) return;
-
-    if (durationInterval.current) {
-      clearInterval(durationInterval.current);
-      durationInterval.current = null;
-    }
-
-    setIsRecording(false);
-
-    try {
-      await recording.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-      const uri = recording.getURI();
-      setRecording(null);
-
-      if (uri && recordingDuration >= 1) {
-        setMedia({ uri, type: "audio" });
-      }
-    } catch (err) {
-      console.error("Failed to stop recording:", err);
-      setRecording(null);
-    }
-  };
-
-  const cancelRecording = async () => {
-    if (!recording) return;
-
-    if (durationInterval.current) {
-      clearInterval(durationInterval.current);
-      durationInterval.current = null;
-    }
-
-    setIsRecording(false);
-    try {
-      await recording.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-    } catch {}
-    setRecording(null);
-  };
-
-  const formatDuration = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
 
   // @ autocomplete. Recomputed on render from `text` so there is no extra
   // state to keep in sync with the input.
@@ -343,21 +235,14 @@ export function MessageInput({
       {media && (
         <View className="border-b border-border bg-card px-4 py-3">
           <View className="flex-row items-center gap-3">
-            {media.type === "image" ? (
-              <Image
-                source={{ uri: media.uri }}
-                className="h-16 w-16 rounded-xl"
-                resizeMode="cover"
-              />
-            ) : (
-              <View className="flex-row items-center gap-2 rounded-lg bg-muted px-3 py-2">
-                <Mic color={colors.primary} size={16} />
-                <Type variant="caption">Voice message</Type>
-              </View>
-            )}
+            <Image
+              source={{ uri: media.uri }}
+              className="h-16 w-16 rounded-xl"
+              resizeMode="cover"
+            />
             <View className="flex-1">
               <Type variant="captionStrong">
-                {media.type === "image" ? "Photo ready" : "Voice message ready"}
+                Photo ready
               </Type>
               <Type variant="caption" tone="muted" className="mt-0.5">
                 Tap Send to post it to the room.
@@ -385,36 +270,7 @@ export function MessageInput({
         </View>
       )}
 
-      {/* Recording state */}
-      {isRecording ? (
-        <View className="flex-row items-center gap-3 px-4 py-3">
-          <Animated.View
-            style={{
-              transform: [{ scale: pulseAnim }],
-              width: 12,
-              height: 12,
-              borderRadius: 6,
-              backgroundColor: "#EF4444",
-            }}
-          />
-          <Type variant="captionStrong" tone="danger" className="flex-1">
-            Recording {formatDuration(recordingDuration)}
-          </Type>
-          <Pressable
-            onPress={cancelRecording}
-            className="h-10 w-10 items-center justify-center rounded-full bg-muted"
-          >
-            <X color={colors.mutedForeground} size={18} />
-          </Pressable>
-          <Pressable
-            onPress={stopRecording}
-            className="h-10 w-10 items-center justify-center rounded-full bg-destructive"
-          >
-            <Square color="#fff" size={16} />
-          </Pressable>
-        </View>
-      ) : (
-        <>
+      <>
           {/* @ autocomplete — collapses to nothing when not mentioning, so it
               costs no permanent chrome. */}
           {suggestions.length > 0 && (
@@ -490,7 +346,6 @@ export function MessageInput({
                 record. */}
             <Pressable
               onPress={onFaceReaction ?? takePhoto}
-              onLongPress={startRecording}
               delayLongPress={260}
               className="items-center justify-center rounded-full active:opacity-80"
               style={{ height: 50, width: 50, backgroundColor: colors.foreground }}
@@ -559,8 +414,7 @@ export function MessageInput({
             Double-tap any message to 🔥
           </Type>
         </View>
-        </>
-      )}
+      </>
 
       <Modal
         visible={showPlus}

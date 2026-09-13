@@ -65,6 +65,11 @@ final class DualCamRecorder: NSObject {
   private var startTime: CMTime = .zero
 
   /// The newest front frame, drawn into the next back frame that arrives.
+  /// False: back camera is the frame, your face is the inset. True swaps
+  /// them. Set from JS by the flip button on the capture screen, and read on
+  /// the buffer queue, so it has to be atomic with respect to it.
+  var swapped = false
+
   private var latestFrontImage: CIImage?
   /// The newest back frame, kept so a still can be taken without spinning up a
   /// separate AVCapturePhotoOutput. A photo here is one composited frame of the
@@ -281,7 +286,9 @@ final class DualCamRecorder: NSObject {
         return
       }
 
-      let frame = self.composite(back: back, front: self.latestFrontImage)
+      let frame = self.swapped
+        ? self.composite(back: self.latestFrontImage ?? back, front: back)
+        : self.composite(back: back, front: self.latestFrontImage)
       guard let cg = self.ciContext.createCGImage(frame, from: CGRect(origin: .zero, size: self.renderSize)) else {
         completion(.failure(RecorderError.configurationFailed("Couldn't render the photo.")))
         return
@@ -399,7 +406,10 @@ extension DualCamRecorder: AVCaptureVideoDataOutputSampleBufferDelegate,
       sessionStarted = true
     }
 
-    let frame = composite(back: CIImage(cvPixelBuffer: pixels), front: latestFrontImage)
+    let live = CIImage(cvPixelBuffer: pixels)
+    let frame = swapped
+      ? composite(back: latestFrontImage ?? live, front: live)
+      : composite(back: live, front: latestFrontImage)
 
     guard let pool = adaptor.pixelBufferPool else { return }
     var out: CVPixelBuffer?

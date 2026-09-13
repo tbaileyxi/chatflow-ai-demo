@@ -16,6 +16,9 @@ final class DualCamPreviewView: ExpoView {
   private let backLayer = AVCaptureVideoPreviewLayer()
   private let frontLayer = AVCaptureVideoPreviewLayer()
   private let frontFrame = UIView()
+  /// Mirrors DualCamRecorder.swapped. The preview has to agree with the
+  /// composite or people frame a shot that comes out inverted.
+  var swapped = false { didSet { setNeedsLayout() } }
 
   required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
@@ -74,12 +77,27 @@ final class DualCamPreviewView: ExpoView {
 
   override func layoutSubviews() {
     super.layoutSubviews()
-    backLayer.frame = bounds
 
     let inset: CGFloat = 12
     let width = bounds.width * 0.34
     let height = width * 4.0 / 3.0
-    frontFrame.frame = CGRect(x: inset, y: inset, width: width, height: height)
-    frontLayer.frame = frontFrame.bounds
+    let pip = CGRect(x: inset, y: inset, width: width, height: height)
+
+    // Swapping moves the LAYERS, not the session connections — each layer
+    // keeps the camera it was connected to, and only its geometry changes.
+    if swapped {
+      frontLayer.frame = bounds
+      layer.insertSublayer(frontLayer, at: 0)
+      frontFrame.frame = pip
+      backLayer.frame = frontFrame.bounds
+      frontFrame.layer.addSublayer(backLayer)
+    } else {
+      backLayer.frame = bounds
+      layer.insertSublayer(backLayer, at: 0)
+      frontFrame.frame = pip
+      frontLayer.frame = frontFrame.bounds
+      frontFrame.layer.addSublayer(frontLayer)
+    }
+    bringSubviewToFront(frontFrame)
   }
 }

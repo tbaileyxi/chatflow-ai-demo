@@ -42,15 +42,15 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
   return (
     <Pressable
       onPress={onPress}
-      className="mb-2 rounded-[16px] px-3 py-2.5 active:opacity-80"
+      className="mb-3 rounded-[16px] px-3 py-3 active:opacity-80"
       style={{
-        backgroundColor: hot ? "#16171C" : colors.card,
+        backgroundColor: hot ? "#17181D" : colors.card,
         borderWidth: 1,
-        borderColor: hot ? "#33404F" : colors.border,
+        borderColor: hot ? "#3A4A5C" : "#232329",
       }}
     >
-      <View className="mb-2 flex-row items-start gap-2.5">
-        <FaceStack names={here} logoUrl={huddle.teamLogoUrl} dim={nobodyHome} />
+      <View className="mb-2.5 flex-row items-start gap-2.5">
+        <FaceStack names={here} logoUrl={huddle.teamLogoUrl} dim={false} />
 
         <View className="min-w-0 flex-1">
           <View className="flex-row items-center gap-2">
@@ -75,28 +75,32 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
             ) : null}
           </View>
 
-          {/* Two states, never one. Either can be true without the other. */}
+          {/* ONE LINE, and it does not lead with absence.
+              This used to say "nobody in" here AND again in a gold banner
+              below — the same fact twice, with the louder of the two
+              announcing that the room was empty. A room being quiet is the
+              least interesting thing about it. */}
           <View className="mt-1.5 flex-row flex-wrap items-center gap-x-2.5 gap-y-0.5">
             {here.length > 0 ? (
-              <Type variant="data" tone="success" numberOfLines={1} style={{ fontSize: 10 }}>
+              <Type variant="data" tone="success" numberOfLines={1} style={{ fontSize: 11 }}>
                 ● {here.slice(0, 2).join(", ")}
                 {here.length > 2 ? ` +${here.length - 2}` : ""} in
               </Type>
-            ) : (
-              <Type variant="data" tone="tertiary" style={{ fontSize: 10 }}>
-                ○ nobody in
-              </Type>
-            )}
+            ) : null}
             {gameOn ? (
-              <Type variant="data" tone="primary" style={{ fontSize: 10 }}>
-                ◆ game on
+              <Type variant="data" tone="primary" style={{ fontSize: 11 }}>
+                ◆ {nobodyHome ? "on now — go first" : "game on"}
+              </Type>
+            ) : here.length === 0 ? (
+              <Type variant="data" tone="tertiary" style={{ fontSize: 11 }}>
+                quiet
               </Type>
             ) : null}
           </View>
         </View>
 
         {huddle.lastMessageAt ? (
-          <Type variant="data" tone="tertiary" style={{ fontSize: 10, paddingTop: 2 }}>
+          <Type variant="data" tone="tertiary" style={{ fontSize: 10, paddingTop: 3 }}>
             {shortAgo(huddle.lastMessageAt)}
           </Type>
         ) : null}
@@ -104,29 +108,20 @@ export function HuddleCard({ huddle, onPress, game, hereNow }: Props) {
 
       {game ? <ScoreStrip game={game} live={gameOn} /> : null}
 
-      {/* The best row on the screen: the team is playing and the room is
-          empty. Not a gap — the one moment when going in first is worth
-          something, and it says so exactly when it's true. */}
-      {gameOn && nobodyHome ? (
-        <View
-          className="mt-2 rounded-lg px-2.5 py-2"
-          style={{
-            backgroundColor: "rgba(245,197,24,0.09)",
-            borderWidth: 1,
-            borderColor: "rgba(245,197,24,0.28)",
-          }}
+      {/* THE LAST MESSAGE IS THE POINT. It sat under a gold banner shouting
+          that nobody was there, in muted grey, truncated. A new message is the
+          single best reason to go into a room — so it reads at body weight,
+          with the speaker named, and nothing above it competes. */}
+      {huddle.latestMessage ? (
+        <Type
+          variant="caption"
+          tone={huddle.hasUnread ? "default" : "muted"}
+          numberOfLines={2}
+          className="mt-2.5"
+          style={{ fontSize: 15, lineHeight: 20 }}
         >
-          <Type variant="captionStrong" tone="primary" style={{ fontSize: 13 }}>
-            ◆ Nobody's in and it's on — go first
-          </Type>
-        </View>
-      ) : huddle.latestMessage ? (
-        /* "Mike THAT'S A STOP" — the speaker in white, what they said in grey.
-           Without the name it is a fragment with no author, which is how the
-           liveliest line on the card ended up reading as boilerplate. */
-        <Type variant="caption" tone="muted" numberOfLines={1} className="mt-2" style={{ fontSize: 14 }}>
           {huddle.latestMessageSender ? (
-            <Type style={{ fontFamily: fonts.extrabold, fontSize: 14, color: colors.foreground }}>
+            <Type style={{ fontFamily: fonts.extrabold, fontSize: 15, color: colors.foreground }}>
               {huddle.latestMessageSender}{" "}
             </Type>
           ) : null}
@@ -154,11 +149,11 @@ function FaceStack({
   if (names.length === 0) {
     return (
       <View
-        className="h-[31px] w-[31px] items-center justify-center overflow-hidden rounded-full bg-muted"
-        style={{ opacity: dim ? 0.5 : 1 }}
+        className="h-[38px] w-[38px] items-center justify-center overflow-hidden rounded-full"
+        style={{ backgroundColor: "#1E2029", opacity: dim ? 0.5 : 1 }}
       >
         {logoUrl ? (
-          <Image source={{ uri: logoUrl }} style={{ width: 26, height: 26 }} resizeMode="contain" />
+          <Image source={{ uri: logoUrl }} style={{ width: 32, height: 32 }} resizeMode="contain" />
         ) : null}
       </View>
     );

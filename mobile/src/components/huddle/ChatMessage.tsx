@@ -38,7 +38,7 @@ import { YouTubeEmbed, parseYouTubeId } from "@/components/embeds/YouTubeEmbed";
 import type { HuddleMessage } from "@/hooks/useHuddleMessages";
 import type { ReactionSummary } from "@/hooks/useMessageReactions";
 
-const REACTION_PICKER_EMOJIS = ["W", "L", "🔥"] as const;
+const REACTION_PICKER_EMOJIS = ["🔥", "W", "L"] as const;
 
 function AudioBubble({ uri }: { uri: string }) {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
@@ -283,7 +283,10 @@ export function ChatMessage({
   const handleDoubleTap = () => {
     const now = Date.now();
     if (now - lastTapRef.current < 300) {
-      onReact?.("W");
+      // 🔥, not "W". The hint under the composer has always said 🔥 while
+      // this sent a W — the instruction and the code disagreeing is most of
+      // why reacting felt broken.
+      onReact?.("🔥");
     }
     lastTapRef.current = now;
   };
@@ -520,6 +523,9 @@ export function ChatMessage({
                 />
               ) : message.mediaUrl &&
                 (!message.content?.trim() ||
+                  // A face reaction's content is its caption, drawn over the
+                  // image below. Anything else here would be saying it twice.
+                  message.messageType === "face_reaction" ||
                   message.content === "📷 Photo" ||
                   message.content === "🎤 Voice message") ? null : (
                 <View
@@ -631,7 +637,7 @@ export function ChatMessage({
                   onPress={() => {
                     const now = Date.now();
                     if (now - lastTapRef.current < 300) {
-                      onReact?.("W");
+                      onReact?.("🔥");
                     } else {
                       setImageViewerVisible(true);
                     }
@@ -644,8 +650,8 @@ export function ChatMessage({
                   <Image
                     source={{ uri: message.mediaUrl }}
                     className="mt-1 rounded-xl"
-                    style={{ width: 230, height: 230 }}
-                    resizeMode="cover"
+                    style={{ width: 248, height: 330, backgroundColor: "#0E0E10" }}
+                    resizeMode="contain"
                   />
 
                   {/* One button, the OS sheet behind it. The person just made
@@ -674,8 +680,14 @@ export function ChatMessage({
                 <Pressable onLongPress={handleLongPress}>
                   <Video
                     source={{ uri: message.mediaUrl }}
-                    style={{ width: 230, height: 230, borderRadius: 12, marginTop: 4 }}
-                    resizeMode={ResizeMode.COVER}
+                    style={{
+                      width: 248,
+                      height: 330,
+                      borderRadius: 12,
+                      marginTop: 4,
+                      backgroundColor: "#0E0E10",
+                    }}
+                    resizeMode={ResizeMode.CONTAIN}
                     useNativeControls
                     isLooping
                     isMuted
@@ -707,9 +719,7 @@ export function ChatMessage({
                       style={{ backgroundColor: "rgba(0,0,0,0.62)" }}
                       pointerEvents="none"
                     >
-                      <Type variant="dataStrong"
-                        
-                        numberOfLines={1}>
+                      <Type variant="data" numberOfLines={2} style={{ fontSize: 12 }}>
                         {message.content}
                       </Type>
                     </View>
@@ -740,20 +750,24 @@ export function ChatMessage({
 
               {/* Reactions display — only show when reactions exist */}
               {reactions && reactions.length > 0 && (
-                <View className="mt-0.5 flex-row gap-1">
+                <View className="mt-1 flex-row gap-1 self-start">
                   {reactions.map((r) => (
                     <Pressable
                       key={r.emoji}
+                      // SMALLER. The W chip was set at caption size in a
+                      // bordered pill and ended up competing with what was
+                      // actually said. A reaction is a tally, not a message.
                       className={cn(
-                        "flex-row items-center gap-1 rounded-full border px-2 py-0.5",
-                        r.hasReacted
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-muted",
+                        "flex-row items-center gap-1 rounded-full px-1.5",
+                        r.hasReacted ? "bg-primary/15" : "bg-muted",
                       )}
+                      style={{ paddingVertical: 1 }}
                       onPress={() => onReact?.(r.emoji)}
                     >
-                      <Type variant="caption">{r.emoji}</Type>
-                      <Type variant="caption" tone="muted">{r.count}</Type>
+                      <Type variant="data" style={{ fontSize: 12 }}>{r.emoji}</Type>
+                      <Type variant="data" tone="muted" style={{ fontSize: 11 }}>
+                        {r.count}
+                      </Type>
                     </Pressable>
                   ))}
                 </View>

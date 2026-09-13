@@ -20,6 +20,8 @@ type DualCamNativeModule = {
   start(): Promise<string>;
   /** Finishes the file. Resolves with the final URI and its size on disk. */
   stop(): Promise<{ uri: string; bytes: number }>;
+  /** Which camera is the frame and which is the corner inset. */
+  setSwapped(swapped: boolean): void;
   /** Tears down the capture session. Two live cameras is the most expensive
    *  thing this app can leave running — always call this on unmount. */
   dismiss(): void;
@@ -59,6 +61,7 @@ export const DualCam = {
     if (!native) return Promise.reject(new Error("Dual camera isn't available on this device."));
     return native.stop();
   },
+  setSwapped: (swapped: boolean) => native?.setSwapped(swapped),
   dismiss: () => native?.dismiss(),
   composeShareAsset: (uri: string, isVideo: boolean) => {
     if (!native) return Promise.reject(new Error("Sharing isn't available on this build."));
@@ -66,7 +69,7 @@ export const DualCam = {
   },
 };
 
-export type DualCamPreviewProps = ViewProps & { active?: boolean };
+export type DualCamPreviewProps = ViewProps & { active?: boolean; swapped?: boolean };
 
 export const DualCamPreview: React.ComponentType<DualCamPreviewProps> = native
   ? requireNativeViewManager("DualCam")

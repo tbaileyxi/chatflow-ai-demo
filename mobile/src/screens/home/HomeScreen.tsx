@@ -454,9 +454,10 @@ function YourRoomsSection() {
         icon={<MessagesSquare color={colors.primary} size={18} />}
         action={
           <Pressable onPress={() => navigation.navigate("CreateSideHuddle")}>
-            {/* Was "+ New". You don't decide to make a room, you decide to
-                bring somebody — the room exists because of that. */}
-            <Type variant="captionStrong" tone="primary">＋ Invite</Type>
+            {/* It navigates to Create Room, so it says Start. It read
+                "＋ Invite" — the same words as the Friends header above it,
+                for a different action. */}
+            <Type variant="captionStrong" tone="primary">＋ Start</Type>
           </Pressable>
         }
       >
@@ -555,9 +556,6 @@ export function HomeScreen() {
       <View className="flex-row items-center justify-between px-4 pb-4 pt-2">
         <View className="min-w-0 flex-1">
           <Type variant="display">Side Huddle</Type>
-          <Type variant="caption" tone="tertiary" style={{ marginTop: 1 }}>
-            Your teams. Your crew. One thread.
-          </Type>
         </View>
 
         <Pressable

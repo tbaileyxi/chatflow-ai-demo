@@ -5,10 +5,10 @@ import {
   ChevronLeft,
   MoreVertical,
   ShieldCheck,
-  UserPlus,
 } from "lucide-react-native";
 import { Type } from "@/components/ui/Type";
 import { colors } from "@/theme/colors";
+import { fonts } from "@/theme/type";
 import {
   useLiveGameContext,
   getGameState,
@@ -120,12 +120,27 @@ function ScoreLine({ game, gameState }: { game: GameContext; gameState: GameStat
     return (
       <View className="mt-0.5 flex-row items-center gap-1.5">
         <PulsingDot />
-        <Type variant="dataStrong"  numberOfLines={1}>
-          {away} <Type variant="heading">{game.awayScore ?? 0}</Type>
-          <Type variant="body" tone="muted"> · </Type>
-          {home} <Type variant="heading">{game.homeScore ?? 0}</Type>
+        <Type
+          variant="data"
+          numberOfLines={1}
+          style={{ fontSize: 13, flexShrink: 1 }}
+        >
+          {away}{" "}
+          <Type variant="data" style={{ fontSize: 17, fontFamily: fonts.monoMedium }}>
+            {game.awayScore ?? 0}
+          </Type>
+          <Type variant="data" tone="tertiary" style={{ fontSize: 13 }}>{"  ·  "}</Type>
+          {home}{" "}
+          <Type variant="data" style={{ fontSize: 17, fontFamily: fonts.monoMedium }}>
+            {game.homeScore ?? 0}
+          </Type>
         </Type>
-        <Type variant="dataStrong" tone="primary"  numberOfLines={1}>
+        <Type
+          variant="data"
+          tone="primary"
+          numberOfLines={1}
+          style={{ fontSize: 12, flexShrink: 0 }}
+        >
           {[game.period, game.clock].filter(Boolean).join(" ") || "LIVE"}
         </Type>
       </View>
@@ -306,15 +321,10 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
           </View>
         </Pressable>
 
-        {onInvite ? (
-          <Pressable
-            onPress={onInvite}
-            className="h-9 w-9 items-center justify-center rounded-full bg-primary active:opacity-80"
-            hitSlop={8}
-          >
-            <UserPlus color={colors.primaryForeground} size={17} />
-          </Pressable>
-        ) : null}
+        {/* The invite button moved to the presence row, where the ＋ sits
+            next to the faces it is about. It was costing ~44px of a header
+            whose second line — the score and the opponent — was being clipped
+            for want of exactly that. */}
 
         <Pressable
           onPress={() =>

@@ -46,7 +46,19 @@ final class ShareComposer {
    reaction and on a 4032x3024 photo out of the camera roll, and a 14pt label
    on the second one is invisible.
    */
-  private static func overlayLayer(for size: CGSize) -> CALayer {
+  /**
+   The mark, laid out for ONE of two coordinate systems.
+
+   AVVideoCompositionCoreAnimationTool composites in Core Animation's own
+   space, where y grows upward — bottom-left origin. A UIImage context is
+   top-down. The same layer tree cannot satisfy both, and trying to reconcile
+   them by flipping the CONTEXT is what produced a mirrored wordmark: flipping
+   the context flips the glyphs with it, so "SIDE HUDDLE" came out reversed.
+
+   So the caller says which space it is drawing into and the frames are
+   computed for that space. Nothing is flipped.
+   */
+  private static func overlayLayer(for size: CGSize, bottomUp: Bool) -> CALayer {
     let scale = min(size.width, size.height) / 720.0
     let pad = 28 * scale
     let markSize = 26 * scale
@@ -75,13 +87,24 @@ final class ShareComposer {
     domainLayer.contentsScale = 2
     domainLayer.isWrapped = false
 
-    let markWidth = markSize * CGFloat(wordmark.count) * 0.72
-    let domainWidth = domainSize * CGFloat(domain.count) * 0.56
+    // MEASURED, not estimated. The old width came from character count times
+    // a fudge factor, and it under-measured — which is why the domain shipped
+    // as "sidehuddlesports.co" with the last letter clipped off.
+    let markWidth = ceil((mark.string as! NSAttributedString).size().width) + 2
+    let domainWidth = ceil((domainLayer.string as! NSAttributedString).size().width) + 2
+    let markHeight = markSize * 1.4
+    let domainHeight = domainSize * 1.4
 
-    // CALayer's origin is bottom-left, which is what we want here anyway.
-    domainLayer.frame = CGRect(x: pad, y: pad, width: domainWidth, height: domainSize * 1.4)
-    mark.frame = CGRect(x: pad, y: pad + domainSize * 1.5,
-                        width: markWidth, height: markSize * 1.4)
+    if bottomUp {
+      domainLayer.frame = CGRect(x: pad, y: pad, width: domainWidth, height: domainHeight)
+      mark.frame = CGRect(x: pad, y: pad + domainHeight * 1.08,
+                          width: markWidth, height: markHeight)
+    } else {
+      domainLayer.frame = CGRect(x: pad, y: size.height - pad - domainHeight,
+                                 width: domainWidth, height: domainHeight)
+      mark.frame = CGRect(x: pad, y: size.height - pad - domainHeight * 1.08 - markHeight,
+                          width: markWidth, height: markHeight)
+    }
 
     // A soft shadow rather than a plate: the mark has to stay legible over a
     // white jersey and a night sky without putting a black box on the picture.
@@ -109,14 +132,9 @@ final class ShareComposer {
     let output = renderer.image { ctx in
       image.draw(in: CGRect(origin: .zero, size: size))
 
-      let overlay = overlayLayer(for: size)
-      // CALayer draws bottom-up; UIImage's context is top-down. Flip once so
-      // the mark lands at the bottom of the picture rather than the top.
-      ctx.cgContext.saveGState()
-      ctx.cgContext.translateBy(x: 0, y: size.height)
-      ctx.cgContext.scaleBy(x: 1, y: -1)
-      overlay.render(in: ctx.cgContext)
-      ctx.cgContext.restoreGState()
+      // No flip. render(in:) already draws in this context's orientation;
+      // flipping it was what mirrored the wordmark.
+      overlayLayer(for: size, bottomUp: false).render(in: ctx.cgContext)
     }
 
     let out = FileManager.default.temporaryDirectory
@@ -151,7 +169,7 @@ final class ShareComposer {
     parent.frame = CGRect(origin: .zero, size: size)
     videoLayer.frame = parent.frame
     parent.addSublayer(videoLayer)
-    parent.addSublayer(overlayLayer(for: size))
+    parent.addSublayer(overlayLayer(for: size, bottomUp: true))
 
     composition.animationTool = AVVideoCompositionCoreAnimationTool(
       postProcessingAsVideoLayer: videoLayer,

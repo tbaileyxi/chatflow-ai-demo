@@ -92,6 +92,12 @@ public class DualCamModule: Module {
       }
     }
 
+    /// Which camera is the frame and which is the corner. The capture screen
+    /// owns this; the recorder and the preview both read it.
+    Function("setSwapped") { (swapped: Bool) in
+      self.recorder?.swapped = swapped
+    }
+
     /// Tears the capture session down. Two live camera inputs are the most
     /// expensive thing this app can leave running, so the screen that opens
     /// the preview must call this on unmount.
@@ -131,6 +137,9 @@ public class DualCamModule: Module {
     View(DualCamPreviewView.self) {
       Prop("active") { (view: DualCamPreviewView, active: Bool) in
         view.setActive(active, recorder: self.recorder)
+      }
+      Prop("swapped") { (view: DualCamPreviewView, swapped: Bool) in
+        view.swapped = swapped
       }
     }
   }

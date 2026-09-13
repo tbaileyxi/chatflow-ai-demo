@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
-import { X } from "lucide-react-native";
+import { SwitchCamera, X } from "lucide-react-native";
 import { DualCam, DualCamPreview } from "../../../modules/dual-cam";
 import { Type } from "@/components/ui/Type";
 import { MAX_SECONDS } from "@/lib/faceReaction";
@@ -18,8 +18,6 @@ import type { RootStackParamList } from "@/navigation/types";
 
 type Route = RouteProp<RootStackParamList, "DualCam">;
 
-/** Hold past this and the button latches, so you can let go and reframe. */
-const LOCK_AFTER_MS = 1200;
 /** Below this a press is a tap, not a very short film. */
 const TAP_MS = 350;
 
@@ -48,25 +46,21 @@ export function DualCamScreen() {
 
   const [ready, setReady] = useState(false);
   const [recording, setRecording] = useState(false);
-  const [locked, setLocked] = useState(false);
+  /** Which camera is the frame. Back by default — the game is the subject,
+      your face is the reaction to it. */
+  const [swapped, setSwapped] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressedAt = useRef(0);
   // Interval and timeout callbacks close over the render that created them, so
   // the live values have to live in refs rather than state.
   const recordingRef = useRef(false);
-  const lockedRef = useRef(false);
 
   const clearTimers = () => {
     if (timer.current) {
       clearInterval(timer.current);
       timer.current = null;
-    }
-    if (lockTimer.current) {
-      clearTimeout(lockTimer.current);
-      lockTimer.current = null;
     }
   };
 
@@ -110,9 +104,7 @@ export function DualCamScreen() {
   const stopRecording = useCallback(async () => {
     clearTimers();
     recordingRef.current = false;
-    lockedRef.current = false;
     setRecording(false);
-    setLocked(false);
 
     try {
       const { uri } = await DualCam.stop();
@@ -145,8 +137,8 @@ export function DualCamScreen() {
     timer.current = setInterval(() => {
       setElapsed((n) => {
         const next = n + 0.1;
-        // Stop ourselves at the cap rather than trusting a finger to let go —
-        // a latched recording has no finger on it at all.
+        // A backstop, not the main mechanism: letting go is what normally
+        // ends a recording now.
         if (next >= MAX_SECONDS) void stopRecording();
         return next;
       });
@@ -155,29 +147,12 @@ export function DualCamScreen() {
 
   const onPressIn = useCallback(() => {
     if (!ready) return;
-    // While latched the next press means stop, handled in onPress.
-    if (lockedRef.current) return;
-
     pressedAt.current = Date.now();
-    lockTimer.current = setTimeout(() => {
-      if (recordingRef.current) {
-        lockedRef.current = true;
-        setLocked(true);
-      }
-    }, LOCK_AFTER_MS);
-
     void beginRecording();
   }, [beginRecording, ready]);
 
   const onPressOut = useCallback(() => {
     if (!ready) return;
-    if (lockedRef.current) return; // hands-free; wait for the stop tap
-
-    if (lockTimer.current) {
-      clearTimeout(lockTimer.current);
-      lockTimer.current = null;
-    }
-
     const held = Date.now() - pressedAt.current;
 
     // A quick press is a photo, not a quarter-second film. Recording starts on
@@ -195,15 +170,12 @@ export function DualCamScreen() {
     void stopRecording();
   }, [ready, stopRecording, takePhoto]);
 
-  const onPress = useCallback(() => {
-    // Only meaningful while latched: the tap that ends a hands-free recording.
-    if (lockedRef.current) void stopRecording();
-  }, [stopRecording]);
+
 
   return (
     <SafeAreaView className="flex-1 bg-black" edges={["top", "bottom"]}>
       <View className="flex-1">
-        <DualCamPreview active={ready} style={StyleSheet.absoluteFill} />
+        <DualCamPreview active={ready} swapped={swapped} style={StyleSheet.absoluteFill} />
 
         {!ready ? (
           <View className="flex-1 items-center justify-center">
@@ -219,6 +191,24 @@ export function DualCamScreen() {
           <X color="#FFFFFF" size={20} />
         </Pressable>
 
+        {/* Swap which camera is the frame. Sits under the close button rather
+            than near the shutter — it is a decision you make once while
+            setting up, not something you reach for mid-play. */}
+        {ready ? (
+          <Pressable
+            onPress={() => {
+              const next = !swapped;
+              setSwapped(next);
+              DualCam.setSwapped(next);
+            }}
+            className="absolute right-4 top-[68px] h-10 w-10 items-center justify-center rounded-full bg-black/60 active:opacity-70"
+            hitSlop={8}
+            accessibilityLabel="Swap cameras"
+          >
+            <SwitchCamera color="#FFFFFF" size={20} />
+          </Pressable>
+        ) : null}
+
         {gameContext ? (
           <View className="absolute bottom-44 left-0 right-0 items-center px-6">
             <View className="rounded-full bg-black/70 px-4 py-2">
@@ -230,23 +220,20 @@ export function DualCamScreen() {
         <View className="absolute bottom-0 left-0 right-0 items-center pb-10">
           <Type
             variant={recording ? "dataStrong" : "captionStrong"}
-            tone={locked ? "primary" : "muted"}
+            tone={recording ? "primary" : "muted"}
             className="mb-3"
           >
-            {locked
-              ? `${Math.min(elapsed, MAX_SECONDS).toFixed(1)}s · tap to stop`
-              : recording
-                ? `${Math.min(elapsed, MAX_SECONDS).toFixed(1)}s`
-                : "Tap for a photo · hold to record"}
+            {recording
+              ? `${Math.min(elapsed, MAX_SECONDS).toFixed(1)}s · let go to stop`
+              : "Tap for a photo · hold to record"}
           </Type>
 
           <Pressable
             onPressIn={onPressIn}
             onPressOut={onPressOut}
-            onPress={onPress}
             disabled={!ready}
             className="h-20 w-20 items-center justify-center rounded-full border-4"
-            style={{ borderColor: locked ? colors.primary : "rgba(255,255,255,0.8)" }}
+            style={{ borderColor: recording ? colors.primary : "rgba(255,255,255,0.8)" }}
           >
             <Animated.View
               style={{

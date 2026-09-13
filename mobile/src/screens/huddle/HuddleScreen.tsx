@@ -34,7 +34,7 @@ import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { HuddleHeader } from "@/components/huddle/HuddleHeader";
 import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
 import { PresenceBar } from "@/components/huddle/PresenceBar";
-import { ReactionRail, FloatingReactions } from "@/components/huddle/ReactionRail";
+import { FloatingReactions } from "@/components/huddle/ReactionRail";
 import { PregameStrip } from "@/components/huddle/PregameStrip";
 import {
   captureFaceReaction,
@@ -588,8 +588,9 @@ export function HuddleScreen() {
 
   return (
     <SafeAreaView className="flex-1" edges={["top"]} style={{ backgroundColor: colors.huddleGround }}>
-      {/* The room is not the app's black. See RoomBackground. */}
-      <RoomBackground />
+      {/* Gradient by default, the room's photo when somebody set one —
+          never the seeded og-teams tile. See RoomBackground. */}
+      <RoomBackground photoUrl={huddle.photoUrl} />
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -613,6 +614,7 @@ export function HuddleScreen() {
           onSeeAll={() =>
             (navigation as any).navigate("HuddleSettings", { huddleId })
           }
+          onInvite={() => setShowInvite(true)}
           rightSlot={
             <View className="flex-row items-center gap-2">
               {/* Fade is gone from the room. It was retired as a mechanic and
@@ -858,12 +860,14 @@ export function HuddleScreen() {
               </Type>
             )}
             {coachThinking && <CoachThinking />}
-            {/* Only while a game is on. Out of season these are four buttons
-                reacting to nothing, and a rail that's always there stops
-                meaning "something is happening right now". */}
-            {pingGameState === "live" ? (
-              <ReactionRail onReact={sendReaction} />
-            ) : null}
+            {/* THE RAIL IS GONE. It was one of three ways to react — rail,
+                double-tap, long-press picker — and the three disagreed with
+                each other and with the hint under the composer. Reacting is
+                double-tapping the message you are reacting TO, which is also
+                the only one of the three that says what it is about.
+
+                ReactionRail stays in the tree for FloatingReactions, which
+                still draws the ones in flight. */}
             {/* THE PRE-GAME RSVP IS GONE. It was mine — commit 99367fb, not
                 in any artifact and never asked for. The seed is real ("Before,
                 During, After" opens the pre-game screen with a "Who's actually

@@ -13,6 +13,8 @@ type Props = {
   entryBanner: string | null;
   /** Opens the full member list, which is also where inviting lives. */
   onSeeAll?: () => void;
+  /** Opens the invite sheet. Replaces the header's invite button. */
+  onInvite?: () => void;
   // Optional action rendered on the same row, right-aligned (e.g. the ping pill).
   rightSlot?: ReactNode;
 };
@@ -41,6 +43,7 @@ export function PresenceBar({
   members,
   entryBanner,
   onSeeAll,
+  onInvite,
   rightSlot,
 }: Props) {
   const bannerOpacity = useRef(new Animated.Value(0)).current;
@@ -88,7 +91,7 @@ export function PresenceBar({
     return [...present, ...away];
   }, [users, members]);
 
-  if (faces.length === 0 && !rightSlot) return null;
+  if (faces.length === 0 && !rightSlot && !onInvite) return null;
 
   // Enough to fill the row; the rest live behind See all rather than making
   // this scroll forever.
@@ -143,20 +146,47 @@ export function PresenceBar({
             </View>
           ))}
 
-          {onSeeAll ? (
+          {/* ＋, not "All".
+              "All" opened the room bio, which says nothing about who is here —
+              so in a room of two, with both faces already on screen, it was a
+              link to nothing. Inviting somebody is the thing you actually want
+              from this row, and it takes the invite button off the header,
+              where it was stealing the width the score needed. */}
+          {onInvite ? (
+            <Pressable
+              onPress={onInvite}
+              className="w-11 items-center active:opacity-70"
+              accessibilityLabel="Invite someone"
+            >
+              <View
+                className="h-8 w-8 items-center justify-center rounded-full"
+                style={{
+                  borderWidth: 1.5,
+                  borderColor: "rgba(245,197,24,0.5)",
+                  backgroundColor: "rgba(245,197,24,0.12)",
+                }}
+              >
+                <Type variant="dataStrong" tone="primary" style={{ fontSize: 17 }}>
+                  ＋
+                </Type>
+              </View>
+              <Type variant="dataStrong" tone="primary" className="mt-1" numberOfLines={1}>
+                Invite
+              </Type>
+            </Pressable>
+          ) : null}
+
+          {/* The overflow count keeps its own tap into the member list, but
+              only when there IS an overflow. */}
+          {onSeeAll && overflow > 0 ? (
             <Pressable
               onPress={onSeeAll}
               className="w-11 items-center active:opacity-70"
             >
               <View className="h-8 w-8 items-center justify-center rounded-full border border-border bg-muted">
-                <Type variant="dataStrong" tone="primary">
-                  {overflow > 0 ? `+${overflow}` : "•••"}
-                </Type>
+                <Type variant="dataStrong" tone="primary">{`+${overflow}`}</Type>
               </View>
-              {/* "All", not "See all". Mono is wider than the sans this used
-                  to be and the column is 44px — the longer label rendered as
-                  "See…", which reads like a bug rather than a link. */}
-              <Type variant="dataStrong" tone="primary" className="mt-1" numberOfLines={1}>
+              <Type variant="dataStrong" tone="muted" className="mt-1" numberOfLines={1}>
                 All
               </Type>
             </Pressable>

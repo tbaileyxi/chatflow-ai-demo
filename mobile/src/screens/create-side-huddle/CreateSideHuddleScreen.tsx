@@ -39,6 +39,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { colors } from "@/theme/colors";
+import { type } from "@/theme/type";
 import type { RootStackParamList } from "@/navigation/types";
 
 type Route = RouteProp<RootStackParamList, "CreateSideHuddle">;
@@ -354,7 +355,15 @@ export function CreateSideHuddleScreen() {
               onChangeText={setName}
               maxLength={50}
               autoFocus
-              className="h-14 text-lg font-bold"
+              className="h-14 rounded-[14px] px-4"
+              style={{
+                color: colors.foreground,
+                backgroundColor: colors.card,
+                borderColor: name.trim() ? colors.primary : colors.border,
+                fontFamily: type.bodyStrong.fontFamily,
+                fontSize: 22,
+                letterSpacing: 0,
+              }}
             />
           </View>
           {/* Follows the toggle at the bottom of the screen rather than
