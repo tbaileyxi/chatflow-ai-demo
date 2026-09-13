@@ -9,8 +9,11 @@ import { Platform, type TextStyle } from "react-native";
  * than drawn** — which is exactly what shipped, and why the built screens read
  * as a settings list next to a design that shouts.
  *
- * Every size here is the study's value × 1.38. If you are ever taking a number
- * out of one of those files, scale it.
+ * Every size here is the study's value × 1.38 — EXCEPT the thread, which is
+ * smaller on purpose. The arithmetic was right and the result was too big:
+ * 14.5px read on a monitor a foot away is not the same experience as 20pt on
+ * a phone at arm's length. Four messages filled a screen. Scale from the
+ * study, then look at it.
  *
  * THE FACES ARE NOT A CHOICE EITHER. Outfit for display, Manrope for interface,
  * DM Mono for data — named in the renderings. Picking your own is the other way
@@ -64,9 +67,12 @@ export const type = {
    */
   message: {
     fontFamily: fonts.regular,
-    fontSize: 20,
-    lineHeight: 27,
-    letterSpacing: -0.3,
+    // 18, not the 20 the ×1.38 gave. Still above iMessage's 17 — a room is
+    // read at arm's length with a game on and should be bigger than a text
+    // thread — but 20 fit only four messages on a screen.
+    fontSize: 18,
+    lineHeight: 25,
+    letterSpacing: -0.2,
   },
   /**
    * A SHOUT. Someone typed in capitals and meant it.
@@ -77,15 +83,15 @@ export const type = {
    */
   shout: {
     fontFamily: fonts.extrabold,
-    fontSize: 26,
-    lineHeight: 30,
-    letterSpacing: -0.8,
+    fontSize: 24,
+    lineHeight: 28,
+    letterSpacing: -0.7,
   },
   /** A person's name above what they said. Small, heavy, in their colour. */
   speaker: {
     fontFamily: fonts.extrabold,
-    fontSize: 15,
-    lineHeight: 19,
+    fontSize: 14,
+    lineHeight: 18,
     letterSpacing: 0.1,
   },
   body: {

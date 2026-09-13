@@ -101,6 +101,7 @@ async function fetchMessages(
     .select("*")
     .eq("huddle_id", huddleId)
     .gte("created_at", cutoff)
+    .is("hidden_at", null)
     .order("created_at", { ascending: false })
     .limit(PAGE_SIZE + 1);
 
@@ -129,6 +130,7 @@ async function fetchOlderMessages(
     .select("*")
     .eq("huddle_id", huddleId)
     .lt("created_at", beforeDate)
+    .is("hidden_at", null)
     .order("created_at", { ascending: false })
     .limit(PAGE_SIZE + 1);
 

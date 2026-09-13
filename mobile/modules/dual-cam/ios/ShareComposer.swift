@@ -149,6 +149,37 @@ final class ShareComposer {
   // MARK: - Video
 
   static func compose(videoAt url: URL, completion: @escaping (Result<URL, Error>) -> Void) {
+    // A REMOTE URL HAS NO TRACKS YET, and that is the whole bug.
+    //
+    // `tracks(withMediaType:)` is synchronous. On an https asset it returns an
+    // EMPTY array until the asset has loaded, so the guard below failed
+    // instantly, the composer threw, and shareMedia fell back to sharing the
+    // remote URL — which iOS renders as a link preview captioned
+    // "dejuwyeypiggvlyfliap.supabase.co".
+    //
+    // The image path never hit this because Data(contentsOf:) blocks until it
+    // has the bytes. This one has to fetch first and compose from a local
+    // file, which is also what makes the share sheet treat the result as a
+    // video rather than a link.
+    if url.scheme == "http" || url.scheme == "https" {
+      URLSession.shared.dataTask(with: url) { data, _, error in
+        guard let data else {
+          completion(.failure(error ?? ComposerError.badInput))
+          return
+        }
+        let local = FileManager.default.temporaryDirectory
+          .appendingPathComponent("dl-\(UUID().uuidString).mp4")
+        do {
+          try data.write(to: local)
+        } catch {
+          completion(.failure(error))
+          return
+        }
+        compose(videoAt: local, completion: completion)
+      }.resume()
+      return
+    }
+
     let asset = AVURLAsset(url: url)
     guard let track = asset.tracks(withMediaType: .video).first else {
       completion(.failure(ComposerError.badInput))

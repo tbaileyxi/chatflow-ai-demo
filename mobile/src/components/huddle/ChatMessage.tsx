@@ -312,7 +312,7 @@ export function ChatMessage({
     setTimeout(() => {
       Alert.alert(
         "Report this?",
-        `We'll review it. You can also block ${displayName} so you never see them again, in any room.`,
+        `Two reports hide a message automatically, and the huddle's owner is told. You can also block ${displayName} so you never see them again, in any huddle.`,
         [
           { text: "Cancel", style: "cancel" },
           {
@@ -324,7 +324,10 @@ export function ChatMessage({
                 huddleId,
                 reportedUserId: message.userId,
               });
-              Alert.alert("Reported", "Thanks — we'll take a look.");
+              Alert.alert(
+                "Reported",
+                "If somebody else reports it too, it disappears and the owner is told.",
+              );
             },
           },
           {
@@ -417,7 +420,7 @@ export function ChatMessage({
             // Tighter vertical padding when this is a follow-up message from
             // the same sender (consecutive grouping). Full padding on the
             // first message of a chain.
-            isGroupedWithPrev ? "pb-1 pt-0" : "gap-1 pb-2 pt-1",
+            isGroupedWithPrev ? "pb-0.5 pt-0" : "gap-0.5 pb-1.5 pt-0.5",
             // Yours on the right, everyone else's on the left — the
             // renderings, and the convention every messaging app on the phone
             // already uses. I had argued this flat on the grounds that a
@@ -445,7 +448,7 @@ export function ChatMessage({
                 hidden on consecutive same-sender messages so a chain looks
                 like one voice rather than a column of the same circle. */}
             {isGroupedWithPrev ? (
-              <View className="h-0 w-9" />
+              <View className="h-0 w-[34px]" />
             ) : (
               // Tapping whoever said it opens their profile. The name above a
               // message was the only place you met a stranger, and it went
@@ -458,7 +461,7 @@ export function ChatMessage({
                     knownAs: displayName,
                   })
                 }
-                className="h-9 w-9 items-center justify-center overflow-hidden rounded-full"
+                className="h-[34px] w-[34px] items-center justify-center overflow-hidden rounded-full"
                 style={{ backgroundColor: message.avatarUrl ? colors.muted : who }}
               >
                 {message.avatarUrl ? (
@@ -467,7 +470,7 @@ export function ChatMessage({
                     className="h-full w-full"
                   />
                 ) : (
-                  <Type variant="speaker" style={{ color: "#000000", fontSize: 12 }}>
+                  <Type variant="speaker" style={{ color: "#000000", fontSize: 11.5 }}>
                     {initial}
                   </Type>
                 )}

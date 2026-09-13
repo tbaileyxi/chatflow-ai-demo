@@ -335,7 +335,7 @@ export function HuddleSettingsScreen() {
         onPress: () => {
           Alert.alert(
             `Report ${name}?`,
-            "We review every report within 24 hours.",
+            "Two reports hide it automatically, and the huddle owner is told.",
             [
               { text: "Cancel", style: "cancel" },
               {
@@ -343,7 +343,10 @@ export function HuddleSettingsScreen() {
                 style: "destructive",
                 onPress: async () => {
                   await reportUser({ userId: memberId });
-                  Alert.alert("Reported", "Thanks — we'll take a look.");
+                  Alert.alert(
+                    "Reported",
+                    "If somebody else reports them too, it disappears and the owner is told.",
+                  );
                 },
               },
             ],
