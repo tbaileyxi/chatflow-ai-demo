@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { gameStatusLabel } from "@/hooks/useRoomGames";
+import { makeTeamNamer } from "@/lib/teamName";
 
 export type SlateGame = {
   gameId: string;
@@ -80,13 +81,14 @@ export function useAllGames(followedTeamIds: string[]) {
       );
       const mine = new Set(followedTeamIds);
 
+      const nameFor = makeTeamNamer((teamsRes.data ?? []) as any);
+
       const side = (id: string | null, score: number | null) => {
         const t = id ? (teams.get(id) as any) : null;
         return {
           teamId: id,
-          // Nickname over city: "Los Angeles" is six teams, and there is no
-          // logo big enough here to tell them apart.
-          name: (t?.name || t?.city || "TBD").toString(),
+          // Place, not mascot: OSU · MICH, the way a scorebug does it.
+          name: nameFor(id),
           logoUrl: t?.logo_url ?? null,
           score,
         };

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { makeTeamNamer } from "@/lib/teamName";
 
 /**
  * The game a room is about, for every room in a list.
@@ -155,21 +156,9 @@ export function useRoomGames(teamIds: (string | null | undefined)[]) {
       const teams = teamsRes.data ?? [];
 
       const teamById = new Map(teams.map((t: any) => [t.id, t]));
-      /**
-       * Nickname, not city.
-       *
-       * City reads fine on a broadcast because a logo sits next to it. Here
-       * there is no logo, and "Los Angeles" is the Angels, the Dodgers, the
-       * Rams, the Chargers, the Lakers or the Clippers — a scoreline nobody
-       * can resolve. Nicknames are unique inside a single game, which is the
-       * only place two of these ever appear together.
-       */
-      const nameFor = (id: string | null) => {
-        if (!id) return "TBD";
-        const t = teamById.get(id) as any;
-        if (!t) return "TBD";
-        return (t.name || t.city || "TBD").toString();
-      };
+      // Place, not mascot — see makeTeamNamer. This used to be the other way
+      // round, which is how a header read "Green Wave at Wildcats".
+      const nameFor = makeTeamNamer(teams as any);
 
       // The crest. A scoreline with two logos on it reads as sport; the same
       // line as two grey words reads as a spreadsheet.
