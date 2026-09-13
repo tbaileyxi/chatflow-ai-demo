@@ -120,18 +120,14 @@ function ScoreLine({ game, gameState }: { game: GameContext; gameState: GameStat
     return (
       <View className="mt-0.5 flex-row items-center gap-1.5">
         <PulsingDot />
-        <Type
-          variant="data"
-          numberOfLines={1}
-          style={{ fontSize: 13, flexShrink: 1 }}
-        >
+        <Type variant="data" numberOfLines={1} style={{ fontSize: 14, flexShrink: 1 }}>
           {away}{" "}
-          <Type variant="data" style={{ fontSize: 17, fontFamily: fonts.monoMedium }}>
+          <Type variant="data" style={{ fontSize: 19, fontFamily: fonts.monoMedium }}>
             {game.awayScore ?? 0}
           </Type>
-          <Type variant="data" tone="tertiary" style={{ fontSize: 13 }}>{"  ·  "}</Type>
+          <Type variant="data" tone="tertiary" style={{ fontSize: 14 }}>{"  ·  "}</Type>
           {home}{" "}
-          <Type variant="data" style={{ fontSize: 17, fontFamily: fonts.monoMedium }}>
+          <Type variant="data" style={{ fontSize: 19, fontFamily: fonts.monoMedium }}>
             {game.homeScore ?? 0}
           </Type>
         </Type>
@@ -139,7 +135,7 @@ function ScoreLine({ game, gameState }: { game: GameContext; gameState: GameStat
           variant="data"
           tone="primary"
           numberOfLines={1}
-          style={{ fontSize: 12, flexShrink: 0 }}
+          style={{ fontSize: 13, flexShrink: 0, marginLeft: "auto" }}
         >
           {[game.period, game.clock].filter(Boolean).join(" ") || "LIVE"}
         </Type>
@@ -304,9 +300,7 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
           </View>
 
           <View className="overflow-hidden">
-            {hasGame ? (
-              <ScoreLine game={game!} gameState={gameState} />
-            ) : (
+            {hasGame ? null : (
               <Type variant="data" tone="muted" className="mt-0.5">
                 {huddle.memberCount}{" "}
                 {huddle.memberCount === 1 ? "member" : "members"}
@@ -358,6 +352,18 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
           <MoreVertical color={colors.mutedForeground} size={20} />
         </Pressable>
       </View>
+
+      {/* FULL WIDTH, ITS OWN LINE. Sharing the row above cost it the back
+          chevron, the crest and the ⋯ before it drew a character. */}
+      {hasGame ? (
+        <Pressable
+          className="px-4 pb-2"
+          onPress={() => navigation.navigate("HuddleSettings", { huddleId: huddle.id })}
+        >
+          <ScoreLine game={game!} gameState={gameState} />
+        </Pressable>
+      ) : null}
+
 
       {/* Sponsors with no game to drop over still need to be seen, so a room
           that isn't on a game day keeps the quiet credit line. Tappable —
