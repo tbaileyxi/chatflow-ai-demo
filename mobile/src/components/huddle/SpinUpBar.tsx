@@ -10,13 +10,18 @@ type Person = { userId: string; displayName: string };
 /**
  * Pull a few people out of a public game huddle into one of your own.
  *
- * IT ONLY APPEARS WHEN SOMEBODY YOU KNOW IS IN HERE. With nobody you know
- * there is nothing to spin off, and a button offering it anyway is a button
- * that makes an empty room — which is the failure mode this whole idea exists
- * to avoid.
+ * ALWAYS AVAILABLE. It used to be hidden unless a friend was already present
+ * — a rule I wrote into the design and which does not survive contact: you
+ * are in a huddle of forty strangers precisely when you most want your own
+ * corner, and that rule stopped you making one to invite people into.
  *
- * They come with you automatically. You spun off BECAUSE of them, so asking
- * again on the next screen is a form for a decision already made.
+ * The empty-room worry does not transfer either. An empty PUBLIC huddle is
+ * bad because nobody ever arrives; a side huddle you make and then invite two
+ * people to is just a private huddle, which already works.
+ *
+ * Friends who ARE here come with you automatically — you spun off because of
+ * them, so asking again on the next screen is a form for a decision already
+ * made. With nobody here it opens empty and you invite.
  */
 export function SpinUpBar({
   gameId,
@@ -28,13 +33,14 @@ export function SpinUpBar({
   navigation: any;
 }) {
   const [busy, setBusy] = useState(false);
-  if (friendsHere.length === 0) return null;
 
   const names = friendsHere.slice(0, 2).map((f) => f.displayName.split(/\s+/)[0]);
   const label =
-    friendsHere.length > 2
-      ? `${names.join(", ")} +${friendsHere.length - 2} come with you`
-      : `${names.join(" and ")} come${names.length === 1 ? "s" : ""} with you`;
+    friendsHere.length === 0
+      ? "Just you for now · invite whoever"
+      : friendsHere.length > 2
+        ? `${names.join(", ")} +${friendsHere.length - 2} come with you`
+        : `${names.join(" and ")} come${names.length === 1 ? "s" : ""} with you`;
 
   return (
     <View className="px-3 pb-2 pt-2.5">
