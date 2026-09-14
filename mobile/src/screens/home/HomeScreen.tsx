@@ -32,6 +32,8 @@ import { useRoomGames, type RoomGame } from "@/hooks/useRoomGames";
 import { GamesStrip } from "@/components/home/GamesStrip";
 import { useKnownPeople } from "@/hooks/useFriends";
 import { useVenuePresence } from "@/hooks/useAtVenue";
+import { personName, personShortName } from "@/lib/personName";
+import { AddFriendsSheet } from "@/components/home/AddFriendsSheet";
 import { useAutoContactMatch } from "@/hooks/useAutoContactMatch";
 import { useContactMatch } from "@/hooks/useContactMatch";
 import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
@@ -84,6 +86,7 @@ function FriendsNowSection() {
   const { data: knownPeople } = useKnownPeople();
   const { data: atVenue } = useVenuePresence();
   const [expanded, setExpanded] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   const { data: myHuddles } = useUserHuddles();
 
@@ -158,7 +161,17 @@ function FriendsNowSection() {
       const live = liveById.get(person.userId);
       return {
         userId: person.userId,
-        name: person.displayName || person.username || "Friend",
+        // What you have them saved as, falling back to the name they chose.
+        // Never the username — it is generated here, so it names nobody.
+        name: personName({
+          contactName: person.contactName,
+          displayName: person.displayName,
+          username: person.username,
+        }),
+        shortName: personShortName({
+          contactName: person.contactName,
+          displayName: person.displayName,
+        }),
         avatarUrl: person.avatarUrl,
         huddleId: live?.huddleId ?? null,
         huddleName: live?.huddleName ?? null,
@@ -187,7 +200,7 @@ function FriendsNowSection() {
 
   // People from your contacts who are here but not in your list yet. The sweep
   // runs itself once a day; this is only the result of it.
-  const { newPeople, forget, granted, offer } = useAutoContactMatch();
+  const { newPeople, forget, granted, offer, resweep } = useAutoContactMatch();
   const { connect, run, state: matchState } = useContactMatch();
 
   // A permanent way in, the way WhatsApp and Telegram keep one, rather than a
@@ -252,6 +265,16 @@ function FriendsNowSection() {
             ? `Friends · ${roster.filter((r) => r.isLive).length} on`
             : "Friends"}
       </SectionLabel>
+
+      <AddFriendsSheet
+        visible={addOpen}
+        onClose={() => setAddOpen(false)}
+        onShareLink={inviteFriends}
+        granted={granted}
+        onRescan={resweep}
+        onFindFriends={findFriends}
+        scanning={scanning}
+      />
 
       {granted === false && newPeople.length === 0 ? (
         <Pressable
@@ -318,7 +341,11 @@ function FriendsNowSection() {
         </View>
       ) : null}
 
-      {roster.length > 0 ? (
+      {/* The row renders even with nobody in it, because it carries the ＋ and
+          an empty roster is precisely when somebody needs it. It used to be
+          hidden behind roster.length > 0, so the one person who had no friends
+          yet was the one person with no button. */}
+      {(
         /**
          * A ROW, not a stack. Five friends as full-width cards pushed the
          * games and your own rooms below the fold — the roster is the least
@@ -399,7 +426,7 @@ function FriendsNowSection() {
                 ) : null}
               </View>
               <Type center variant="captionStrong" className="mt-1.5" numberOfLines={1}>
-                {f.name.split(/\s+/)[0]}
+                {f.shortName}
               </Type>
               {/* WHERE, not whether. "watching" said nothing the ring hadn't
                   already said — the room name is the reason to tap the tile. */}
@@ -414,6 +441,24 @@ function FriendsNowSection() {
               </Type>
             </Pressable>
           ))}
+
+          {/* ＋, in the row itself — the same place and the same gesture as the
+              room's avatar strip. The "Invite" in the section header reads as
+              a label, and nobody was pressing it. */}
+          <Pressable
+            onPress={() => setAddOpen(true)}
+            className="w-[88px] items-center active:opacity-70"
+          >
+            <View
+              className="items-center justify-center rounded-full border border-dashed"
+              style={{ height: 62, width: 62, borderColor: colors.primary }}
+            >
+              <UserPlus color={colors.primary} size={22} />
+            </View>
+            <Type center variant="captionStrong" tone="primary" className="mt-1.5">
+              Add
+            </Type>
+          </Pressable>
 
           {hiddenCount > 0 || expanded ? (
             <Pressable
@@ -431,24 +476,26 @@ function FriendsNowSection() {
             </Pressable>
           ) : null}
         </ScrollView>
-      ) : (
+      )}
+
+      {roster.length === 0 ? (
         granted === false ? (
           // The prompt card above is already on screen with the same button on
           // it, so all this has to do is not be a second card saying the same
           // thing at the same size.
-          <Type variant="caption" tone="tertiary" className="px-1">
+          <Type variant="caption" tone="tertiary" className="mt-2 px-1">
             When someone you know checks into a room, they show up here.
           </Type>
         ) : (
-          <View className="rounded-2xl border border-border bg-card p-4">
-            <Type variant="heading">Nobody here yet</Type>
-            <Type variant="caption" tone="muted" className="mt-2 leading-5">
-              Invite someone, or find people you already know. When they check
-              into a room it shows up here so you can jump in.
-            </Type>
-          </View>
+          // One line, not a card. The ＋ is right above it now, so a card
+          // repeating "invite someone" with its own button was saying the same
+          // thing twice at twice the size.
+          <Type variant="caption" tone="muted" className="mt-2 px-1 leading-5">
+            Nobody here yet. Tap Add to invite someone — when they check into a
+            room it shows up here.
+          </Type>
         )
-      )}
+      ) : null}
     </View>
   );
 }

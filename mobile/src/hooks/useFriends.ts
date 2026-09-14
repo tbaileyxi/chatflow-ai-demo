@@ -9,9 +9,11 @@
 // It now reads friend_connections through known_people(), which persists.
 // The migration seeded it from existing co-membership, so nobody lost anyone.
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useContactNames } from "@/lib/personName";
 
 export type KnownPerson = {
   userId: string;
@@ -20,12 +22,17 @@ export type KnownPerson = {
   avatarUrl: string | null;
   source: string | null;
   connectedAt: string | null;
+  // What YOU have them saved as, from this device's cache. Null for anyone who
+  // is not in your address book — someone you met through an invite link has
+  // only ever had their Side Huddle name.
+  contactName: string | null;
 };
 
 export function useKnownPeople() {
   const { user } = useAuth();
+  const contactNames = useContactNames();
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["known-people", user?.id],
     enabled: !!user?.id,
     staleTime: 60_000,
@@ -60,9 +67,28 @@ export function useKnownPeople() {
           avatarUrl: r.avatar_url ?? null,
           source: r.source ?? null,
           connectedAt: r.connected_at ?? null,
+          contactName: null as string | null,
         }));
     },
   });
+
+  // Names are stitched on HERE rather than in the query, because they come
+  // from this device and the query comes from the server. Keeping them apart
+  // means a contact scan relabels the list without refetching it.
+  //
+  // The onboarding_completed filter above does NOT catch everyone called
+  // "User": that flag is true on accounts that finished without ever setting a
+  // name. personName() handles them by name instead of by flag.
+  const data = useMemo(
+    () =>
+      query.data?.map((p) => ({
+        ...p,
+        contactName: contactNames.get(p.userId) ?? null,
+      })),
+    [query.data, contactNames],
+  );
+
+  return { ...query, data } as typeof query;
 }
 
 // Set of user ids, for callers that only need a membership test.

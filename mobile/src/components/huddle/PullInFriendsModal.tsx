@@ -25,12 +25,19 @@ import { Check, Link2, Send, X } from "lucide-react-native";
 import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { colors } from "@/theme/colors";
+import {
+  personName,
+  personAka,
+  personMatches,
+  useContactNames,
+} from "@/lib/personName";
 
 type CoHuddler = {
   user_id: string;
   display_name: string | null;
   username: string | null;
   avatar_url: string | null;
+  contact_name: string | null;
 };
 
 type Props = {
@@ -54,6 +61,8 @@ export function PullInFriendsModal({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  // What you have these people saved as. Local to this device — see lib/personName.
+  const contactNames = useContactNames();
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
@@ -91,6 +100,7 @@ export function PullInFriendsModal({
               display_name: r.display_name ?? null,
               username: r.username ?? null,
               avatar_url: r.avatar_url ?? null,
+              contact_name: contactNames.get(r.user_id) ?? null,
             })),
         );
       } catch (err) {
@@ -103,15 +113,22 @@ export function PullInFriendsModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, huddleId]);
+  }, [visible, huddleId, contactNames]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return people;
-    const q = search.trim().toLowerCase();
-    return people.filter(
-      (p) =>
-        (p.display_name?.toLowerCase().includes(q) ?? false) ||
-        (p.username?.toLowerCase().includes(q) ?? false),
+    // Matches the contact name first, then their Side Huddle name, then the
+    // handle. The handle stays searchable and stops being displayed — somebody
+    // who knows it should still find them.
+    return people.filter((p) =>
+      personMatches(
+        {
+          contactName: p.contact_name,
+          displayName: p.display_name,
+          username: p.username,
+        },
+        search,
+      ),
     );
   }, [people, search]);
 
@@ -254,7 +271,7 @@ export function PullInFriendsModal({
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder="Search by name or @username"
+              placeholder="Search by name"
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"
               className="mb-3 rounded-xl border border-border bg-muted px-3 py-2.5 text-foreground"
@@ -279,8 +296,18 @@ export function PullInFriendsModal({
                 <View className="gap-1">
                 {filtered.map((p) => {
                   const isSel = selected.has(p.user_id);
-                  const name =
-                    p.display_name ?? p.username ?? p.user_id.slice(0, 6);
+                  const parts = {
+                    contactName: p.contact_name,
+                    displayName: p.display_name,
+                    username: p.username,
+                  };
+                  // The name in YOUR phone, not the handle. "@tbaileyxi_d844fb6c"
+                  // identifies nobody; "Chris Emme" is who you went looking for.
+                  const name = personName(parts);
+                  // Their Side Huddle name underneath, and only when it says
+                  // something the line above did not — "Broseph" is worth
+                  // showing next to Chris Emme, twice is not.
+                  const aka = personAka(parts);
                   return (
                     <Pressable
                       key={p.user_id}
@@ -304,9 +331,9 @@ export function PullInFriendsModal({
                         <Type variant="captionStrong">
                           {name}
                         </Type>
-                        {p.username ? (
+                        {aka ? (
                           <Type variant="caption" tone="muted">
-                            @{p.username}
+                            {aka} on Side Huddle
                           </Type>
                         ) : null}
                       </View>

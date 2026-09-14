@@ -10,6 +10,7 @@ import * as Contacts from "expo-contacts";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { hashContacts } from "@/lib/contactMatch";
+import { rememberContactNames, CONTACT_NAMES_QK } from "@/lib/personName";
 
 export type ContactMatch = {
   userId: string;
@@ -86,6 +87,13 @@ export function useContactMatch() {
           : null,
       }));
 
+      // Same as the daily sweep: keep what you have these people saved as, on
+      // this device, so every list can lead with it.
+      await rememberContactNames(
+        found.map((f) => ({ userId: f.userId, contactName: f.contactName })),
+      );
+      queryClient.invalidateQueries({ queryKey: CONTACT_NAMES_QK });
+
       setMatches(found);
       setState("done");
       return found;
@@ -94,7 +102,7 @@ export function useContactMatch() {
       setState("error");
       return [];
     }
-  }, []);
+  }, [queryClient]);
 
   // Add someone to your graph. Idempotent server-side, so double-taps are safe.
   const connect = useCallback(

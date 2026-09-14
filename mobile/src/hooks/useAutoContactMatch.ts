@@ -16,11 +16,13 @@
 //     a social act, and it stays a tap.
 
 import { useEffect, useState, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import * as Contacts from "expo-contacts";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { hashContacts } from "@/lib/contactMatch";
+import { rememberContactNames, CONTACT_NAMES_QK } from "@/lib/personName";
 import type { ContactMatch } from "@/hooks/useContactMatch";
 
 const LAST_RUN_KEY = "contacts:lastAutoMatch";
@@ -28,6 +30,7 @@ const EVERY_MS = 24 * 60 * 60 * 1000;
 
 export function useAutoContactMatch() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [newPeople, setNewPeople] = useState<ContactMatch[]>([]);
   // Whether the sweep is allowed to run at all. The caller needs this to decide
   // whether to offer a manual "find friends" — somebody who tapped "Not now" at
@@ -70,6 +73,20 @@ export function useAutoContactMatch() {
       });
       if (error) throw error;
 
+      // BEFORE the filter below, and deliberately.
+      //
+      // This is the only moment the app can learn what you have somebody saved
+      // as, and the people it matters most for are the ones already in your
+      // list — they are who you see every day. Filtering first would cache
+      // names only for strangers.
+      await rememberContactNames(
+        ((rows ?? []) as any[]).map((r) => ({
+          userId: r.user_id,
+          contactName: r.matched_hash ? (nameByHash.get(r.matched_hash) ?? null) : null,
+        })),
+      );
+      queryClient.invalidateQueries({ queryKey: CONTACT_NAMES_QK });
+
       setNewPeople(
         ((rows ?? []) as any[])
           // Already in your list is not news.
@@ -88,7 +105,7 @@ export function useAutoContactMatch() {
       // failure must never produce an alert or block anything.
       console.warn("[contacts] auto match failed", err);
     }
-  }, [user?.id]);
+  }, [user?.id, queryClient]);
 
   useEffect(() => {
     void sweep();
