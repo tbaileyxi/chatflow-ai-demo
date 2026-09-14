@@ -17,6 +17,18 @@ import {
 import { DMMono_400Regular, DMMono_500Medium } from "@expo-google-fonts/dm-mono";
 import { AppProviders } from "@/providers/AppProviders";
 import { RootNavigator } from "@/navigation/RootNavigator";
+import { useAtVenueReporter } from "@/hooks/useAtVenue";
+
+/**
+ * Renders nothing. It exists to run the at-the-game check once, inside the
+ * providers — it needs the session and the query cache, so it cannot live in
+ * App itself. It is a no-op until someone turns the switch on in Profile and
+ * grants location; it never asks for either.
+ */
+function AtVenueReporter() {
+  useAtVenueReporter();
+  return null;
+}
 
 /**
  * NOTHING BLOCKS THE APP FROM RENDERING.
@@ -53,6 +65,7 @@ export default function App() {
 
   return (
     <AppProviders>
+      <AtVenueReporter />
       <RootNavigator />
       <StatusBar style="light" />
     </AppProviders>

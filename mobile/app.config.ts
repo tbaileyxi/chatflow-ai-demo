@@ -73,6 +73,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         "Side Huddle uses your camera so you can take a photo and post it straight into a huddle chat — for example, snapping the view from your seat at the game and sending it to your room.",
       NSPhotoLibraryUsageDescription:
         "Side Huddle uses your photo library so you can pick an existing photo to post in a huddle chat, set as your profile picture, or set as the background of a huddle you run — for example, choosing a tailgate photo from your camera roll to share with your room, or putting your chapter's bar photo behind your huddle's chat.",
+      // Location. WHEN IN USE ONLY — there is no background mode here and no
+      // Always string, deliberately: the app checks where you are when it is
+      // open and at no other time.
+      //
+      // Written to the same test as the three above, because 5.1.1(ii) is what
+      // bounced build 59: say what it does, give a concrete example, and stay
+      // TRUE to the code. This one is true in an unusual way worth keeping —
+      // the coordinates genuinely never leave the phone. useAtVenue compares
+      // the position against the venue list on-device and calls
+      // check_in_at_venue with a venue id. There is no column in the database
+      // that could hold a latitude.
+      NSLocationWhenInUseUsageDescription:
+        "Side Huddle uses your location only while the app is open, and only to tell the friends you are connected to that you are at the game — for example, showing “At Lambeau Field” next to your name on their Friends list while you are tailgating. Your device works out which stadium you are near and sends only that stadium's name. Your coordinates are never sent or stored, and nothing is tracked in the background.",
+
       NSMicrophoneUsageDescription:
         "Side Huddle uses your microphone to record voice messages you send in a huddle chat — for example, recording a quick reaction to a touchdown and sending it to your room instead of typing it.",
     },
@@ -92,6 +106,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           "Side Huddle uses your photo library so you can pick an existing photo to post in a huddle chat, set as your profile picture, or set as the background of a huddle you run — for example, choosing a tailgate photo from your camera roll to share with your room, or putting your chapter's bar photo behind your huddle's chat.",
         cameraPermission:
           "Side Huddle uses your camera so you can take a photo and post it straight into a huddle chat, and to record a short reaction that shows your face and what you are watching at the same time — for example, snapping the view from your seat at the game and sending it to your room.",
+      },
+    ],
+    [
+      "expo-location",
+      {
+        // MUST MATCH ios.infoPlist above, for the same reason as the two below.
+        locationWhenInUsePermission:
+          "Side Huddle uses your location only while the app is open, and only to tell the friends you are connected to that you are at the game — for example, showing “At Lambeau Field” next to your name on their Friends list while you are tailgating. Your device works out which stadium you are near and sends only that stadium's name. Your coordinates are never sent or stored, and nothing is tracked in the background.",
+        // Remove the Always keys outright. The plugin adds them by default, and
+        // an Info.plist that asks for background location the app never uses is
+        // a 5.1.1 question we have already paid for once.
+        locationAlwaysAndWhenInUsePermission: false,
+        locationAlwaysPermission: false,
+        isIosBackgroundLocationEnabled: false,
+        isAndroidBackgroundLocationEnabled: false,
       },
     ],
     [

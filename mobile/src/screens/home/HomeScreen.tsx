@@ -18,6 +18,7 @@ import {
   MessagesSquare,
   Users,
   UserPlus,
+  MapPin,
 } from "lucide-react-native";
 import { Image } from "react-native";
 import { HuddleCard } from "@/components/home/HuddleCard";
@@ -30,6 +31,7 @@ import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { useRoomGames, type RoomGame } from "@/hooks/useRoomGames";
 import { GamesStrip } from "@/components/home/GamesStrip";
 import { useKnownPeople } from "@/hooks/useFriends";
+import { useVenuePresence } from "@/hooks/useAtVenue";
 import { useAutoContactMatch } from "@/hooks/useAutoContactMatch";
 import { useContactMatch } from "@/hooks/useContactMatch";
 import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
@@ -80,6 +82,7 @@ function FriendsNowSection() {
   const navigation = useNavigation<any>();
   const { presentUsers } = useGlobalPresence();
   const { data: knownPeople } = useKnownPeople();
+  const { data: atVenue } = useVenuePresence();
   const [expanded, setExpanded] = useState(false);
 
   const { data: myHuddles } = useUserHuddles();
@@ -160,14 +163,27 @@ function FriendsNowSection() {
         huddleId: live?.huddleId ?? null,
         huddleName: live?.huddleName ?? null,
         isLive: !!live,
+        // Where they physically are, when they have chosen to share it and
+        // you are connected to them. Both of those are settled before this
+        // reaches the client — see the policy on venue_presence.
+        venueName: atVenue?.get(person.userId)?.venueName ?? null,
       };
     })
     .sort((a, b) => {
-      if (a.isLive !== b.isLive) return a.isLive ? -1 : 1;
+      // Someone AT a stadium ranks with someone in a room, and above it when
+      // it comes to a tie: being at the game is the rarer fact and the better
+      // reason to tap a name.
+      const aOn = a.isLive || !!a.venueName;
+      const bOn = b.isLive || !!b.venueName;
+      if (aOn !== bOn) return aOn ? -1 : 1;
+      if (!!a.venueName !== !!b.venueName) return a.venueName ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
 
   const anyLive = roster.some((p) => p.isLive);
+  // Says the rarer thing when there is one. "3 on" is true most evenings;
+  // "1 at the game" is the line worth reading.
+  const atCount = roster.filter((p) => p.venueName).length;
 
   // People from your contacts who are here but not in your list yet. The sweep
   // runs itself once a day; this is only the result of it.
@@ -211,7 +227,7 @@ function FriendsNowSection() {
   // the entire reason this section exists; a "show more" that buries a friend
   // currently watching would defeat it.
   const COLLAPSED_MAX = 4;
-  const liveCount = roster.filter((p) => p.isLive).length;
+  const liveCount = roster.filter((p) => p.isLive || p.venueName).length;
   const collapsedCount = Math.max(COLLAPSED_MAX, liveCount);
   const visible = expanded ? roster : roster.slice(0, collapsedCount);
   const hiddenCount = roster.length - visible.length;
@@ -230,9 +246,11 @@ function FriendsNowSection() {
           </Pressable>
         }
       >
-        {anyLive
-          ? `Friends · ${roster.filter((r) => r.isLive).length} on`
-          : "Friends"}
+        {atCount > 0
+          ? `Friends · ${atCount} at the game`
+          : anyLive
+            ? `Friends · ${roster.filter((r) => r.isLive).length} on`
+            : "Friends"}
       </SectionLabel>
 
       {granted === false && newPeople.length === 0 ? (
@@ -329,7 +347,7 @@ function FriendsNowSection() {
               }
               className="w-[88px] items-center active:opacity-80"
               // Offline people stay on the list but read as background.
-              style={f.isLive ? undefined : { opacity: 0.45 }}
+              style={f.isLive || f.venueName ? undefined : { opacity: 0.45 }}
             >
               {/* ONE SIZE, SET IN NUMBERS.
                   The photo used a Tailwind class (h-14 w-14) and the monogram
@@ -355,6 +373,30 @@ function FriendsNowSection() {
                 ) : (
                   <MonogramAvatar name={f.name} size={54} />
                 )}
+
+                {/* A pin on the corner. The line underneath carries the
+                    stadium, but at 13pt truncated to a tile it can read as
+                    just another room name — the pin is what says this one is
+                    a place. */}
+                {f.venueName ? (
+                  <View
+                    style={{
+                      position: "absolute",
+                      right: 0,
+                      bottom: 0,
+                      height: 20,
+                      width: 20,
+                      borderRadius: 10,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: colors.primary,
+                      borderWidth: 2,
+                      borderColor: colors.background,
+                    }}
+                  >
+                    <MapPin color="#000" size={11} strokeWidth={2.5} />
+                  </View>
+                ) : null}
               </View>
               <Type center variant="captionStrong" className="mt-1.5" numberOfLines={1}>
                 {f.name.split(/\s+/)[0]}
@@ -364,11 +406,11 @@ function FriendsNowSection() {
               <Type
                 center
                 variant="data"
-                tone={f.isLive ? "primary" : "tertiary"}
+                tone={f.venueName || f.isLive ? "primary" : "tertiary"}
                 numberOfLines={1}
                 style={{ fontSize: 13 }}
               >
-                {f.isLive ? (f.huddleName ?? "watching") : "·"}
+                {f.venueName ?? (f.isLive ? (f.huddleName ?? "watching") : "·")}
               </Type>
             </Pressable>
           ))}

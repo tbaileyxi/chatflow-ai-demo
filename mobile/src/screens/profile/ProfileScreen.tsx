@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { NotificationSettings } from "@/components/profile/NotificationSettings";
+import { AtTheGameSetting } from "@/components/profile/AtTheGameSetting";
 import { FindYourPeople } from "@/components/profile/FindYourPeople";
 import { RoomsYouRun } from "@/components/profile/RoomsYouRun";
 import { YourMessages } from "@/components/profile/YourMessages";
@@ -536,6 +537,18 @@ export function ProfileScreen() {
           </CardHeader>
           <CardContent>
             <FindYourPeople />
+          </CardContent>
+        </Card>
+
+        {/* At the game. Its own card, above Notifications, because it is the
+            only switch here that turns a sensor on — burying it in a list of
+            push preferences would be hiding it. */}
+        <Card>
+          <CardHeader>
+            <CardTitle>At the game</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AtTheGameSetting />
           </CardContent>
         </Card>
 
