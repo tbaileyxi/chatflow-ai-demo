@@ -140,6 +140,8 @@ type Props = {
   // Opens the invite sheet. Only the admin_welcome card uses this — it's the
   // single action on the highest-leverage message in the product.
   onInvite?: () => void;
+  /** Drop it from the list the moment the server agrees. */
+  onDeleted?: () => void;
 };
 
 // Strip raw URLs from bot message content so legacy posts (server fix now puts
@@ -200,6 +202,7 @@ export function ChatMessage({
   hideReplyQuote,
   isGroupedWithPrev,
   onInvite,
+  onDeleted,
 }: Props) {
   const lastTapRef = useRef<number>(0);
   const [showPicker, setShowPicker] = useState(false);
@@ -363,7 +366,25 @@ export function ChatMessage({
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            await supabase.from("huddle_messages").delete().eq("id", message.id);
+            const { error } = await supabase
+              .from("huddle_messages")
+              .delete()
+              .eq("id", message.id);
+
+            // It said nothing either way. If a policy refuses the delete,
+            // nothing happens and nothing is reported — identical, from the
+            // outside, to a button that does not work.
+            if (error) {
+              Alert.alert(
+                "Couldn't delete that",
+                /row-level security|permission/i.test(error.message)
+                  ? "The server wouldn't allow it. That's a policy on huddle_messages, not you."
+                  : error.message,
+              );
+              return;
+            }
+            // And it stayed on screen until something happened to refetch.
+            onDeleted?.();
           },
         },
       ]);
@@ -428,7 +449,7 @@ export function ChatMessage({
             // Tighter vertical padding when this is a follow-up message from
             // the same sender (consecutive grouping). Full padding on the
             // first message of a chain.
-            isGroupedWithPrev ? "pb-0 pt-0" : "gap-0.5 pb-2 pt-0.5",
+            isGroupedWithPrev ? "pb-0 pt-0" : "gap-0.5 pb-1.5 pt-0.5",
             // Yours on the right, everyone else's on the left — the
             // renderings, and the convention every messaging app on the phone
             // already uses. I had argued this flat on the grounds that a
@@ -573,7 +594,20 @@ export function ChatMessage({
                       return (
                         <Type
                           variant={isShout ? "shout" : "message"}
-                          style={isReply ? { fontSize: 17, lineHeight: 23 } : undefined}
+                          style={[
+                            // A ROOM PHOTO WILL EAT WHITE TEXT SOMEWHERE. The
+                            // scrim gets it most of the way, but a bright
+                            // tailgate shot has white in it and white on white
+                            // is unreadable. A shadow costs nothing, works
+                            // over anything, and is invisible on black — a
+                            // plate would put a box back on every line.
+                            {
+                              textShadowColor: "rgba(0,0,0,0.85)",
+                              textShadowOffset: { width: 0, height: 1 },
+                              textShadowRadius: 3,
+                            },
+                            isReply ? { fontSize: 16, lineHeight: 22 } : null,
+                          ]}
                         >
                           {/* The name is SMALLER than what was said — 11px
                               against 14.5 in the rendering, so 15 against 20
@@ -589,7 +623,7 @@ export function ChatMessage({
                                 fontFamily: fonts.extrabold,
                                 // Inherit the message's line height. Its own
                                 // 18 was setting the height of line one.
-                                lineHeight: isShout ? 28 : 25,
+                                lineHeight: isShout ? 27 : 23,
                               }}
                             >
                               {isOwnMessage ? "You" : displayName}{" "}
@@ -607,7 +641,15 @@ export function ChatMessage({
                         {/* One step off white. A person says something; the
                             bot is telling you what happened, and the voice
                             should sit slightly behind theirs. */}
-                        <Type variant="message" style={{ color: "#CFCFD6" }}>
+                        <Type
+                          variant="message"
+                          style={{
+                            color: "#CFCFD6",
+                            textShadowColor: "rgba(0,0,0,0.85)",
+                            textShadowOffset: { width: 0, height: 1 },
+                            textShadowRadius: 3,
+                          }}
+                        >
                           {body}
                         </Type>
                         {sponsor ? (

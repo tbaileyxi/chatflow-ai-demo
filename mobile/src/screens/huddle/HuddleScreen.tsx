@@ -769,6 +769,9 @@ export function HuddleScreen() {
                   // Drives the admin_welcome card's single CTA straight into
                   // the invite sheet the header already opens.
                   onInvite={() => setShowInvite(true)}
+                  onDeleted={() =>
+                    queryClient.invalidateQueries({ queryKey: ["huddle-messages", huddleId] })
+                  }
                   replyTo={
                     parentMsg
                       ? {

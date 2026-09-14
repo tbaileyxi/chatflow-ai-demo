@@ -35,12 +35,14 @@ export function SpinUpBar({
   const [busy, setBusy] = useState(false);
 
   const names = friendsHere.slice(0, 2).map((f) => f.displayName.split(/\s+/)[0]);
+  // "Spin up a side huddle · just you" read as though the room you are
+  // standing in were the thing being made. It is about THIS game.
   const label =
     friendsHere.length === 0
-      ? "Just you · your friends will see you're in it"
+      ? "You · gone at 2am"
       : friendsHere.length > 2
-        ? `${names.join(", ")} +${friendsHere.length - 2} come with you`
-        : `${names.join(" and ")} come${names.length === 1 ? "s" : ""} with you`;
+        ? `You + ${names.join(", ")} +${friendsHere.length - 2} here · gone at 2am`
+        : `You + ${names.join(" and ")} here · gone at 2am`;
 
   return (
     <View className="px-4 pb-1 pt-2">
@@ -81,7 +83,7 @@ export function SpinUpBar({
 
         <View className="min-w-0 flex-1">
           <Type variant="captionStrong" tone="primary" style={{ fontSize: 14 }}>
-            {busy ? "Spinning up…" : "Spin up a side huddle"}
+            {busy ? "Spinning up…" : "Spin up this game huddle"}
           </Type>
           <Type variant="data" tone="muted" style={{ fontSize: 11, marginTop: 1 }}>
             {/* No invite step. Your presence is the invite — friends see

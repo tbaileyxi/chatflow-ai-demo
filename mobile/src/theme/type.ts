@@ -67,12 +67,13 @@ export const type = {
    */
   message: {
     fontFamily: fonts.regular,
-    // 18, not the 20 the ×1.38 gave. Still above iMessage's 17 — a room is
-    // read at arm's length with a game on and should be bigger than a text
-    // thread — but 20 fit only four messages on a screen.
-    fontSize: 18,
-    lineHeight: 25,
-    letterSpacing: -0.2,
+    // 17, level with iMessage. Two passes got here: 20 from the study's
+    // ×1.38, then 18, then this. With no bubbles a message has nothing
+    // holding it in, so it reads larger than the same size does in a bubbled
+    // app — the number that matches iMessage is the one that FEELS smaller.
+    fontSize: 17,
+    lineHeight: 23,
+    letterSpacing: -0.15,
   },
   /**
    * A SHOUT. Someone typed in capitals and meant it.
@@ -83,9 +84,9 @@ export const type = {
    */
   shout: {
     fontFamily: fonts.extrabold,
-    fontSize: 24,
-    lineHeight: 28,
-    letterSpacing: -0.7,
+    fontSize: 23,
+    lineHeight: 27,
+    letterSpacing: -0.6,
   },
   /** A person's name above what they said. Small, heavy, in their colour. */
   speaker: {

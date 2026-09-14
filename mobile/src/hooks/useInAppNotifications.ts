@@ -70,6 +70,20 @@ export function useInAppNotifications(limit = 12) {
     },
   });
 
+  /** Swipe a notification away. It is yours; nobody else can see it. */
+  const remove = useMutation({
+    mutationFn: async (notificationId: string) => {
+      const { error } = await supabase
+        .from("notifications")
+        .delete()
+        .eq("id", notificationId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
   const markAllRead = useMutation({
     mutationFn: async () => {
       if (!user) return;
@@ -95,5 +109,6 @@ export function useInAppNotifications(limit = 12) {
     unreadCount,
     markRead: markRead.mutateAsync,
     markAllRead: markAllRead.mutateAsync,
+    removeNotification: remove.mutateAsync,
   };
 }

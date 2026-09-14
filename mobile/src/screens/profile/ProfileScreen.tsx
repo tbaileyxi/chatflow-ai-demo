@@ -18,6 +18,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { Type } from "@/components/ui/Type";
 import { useAuth } from "@/hooks/useAuth";
 import { useInAppNotifications } from "@/hooks/useInAppNotifications";
+import { SwipeToDelete } from "@/components/ui/SwipeToDelete";
 import { consumeInvite, extractInviteCode } from "@/hooks/useInviteHandler";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,6 +76,7 @@ export function ProfileScreen() {
     unreadCount,
     markRead,
     markAllRead,
+    removeNotification,
     isLoading: notificationsLoading,
   } = useInAppNotifications(8);
 
@@ -396,8 +398,11 @@ export function ProfileScreen() {
                       !Array.isArray(d) &&
                       typeof (d as { url?: string }).url === "string");
                   return (
-                    <Pressable
+                    <SwipeToDelete
                       key={notification.id}
+                      onDelete={() => void removeNotification(notification.id)}
+                    >
+                    <Pressable
                       className={`rounded-xl border p-3 active:opacity-80 ${
                         notification.readAt
                           ? "border-border bg-muted/20"
@@ -448,6 +453,7 @@ export function ProfileScreen() {
                         </View>
                       </View>
                     </Pressable>
+                    </SwipeToDelete>
                   );
                 })}
               </View>
