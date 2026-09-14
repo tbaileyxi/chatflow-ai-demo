@@ -85,6 +85,17 @@ export interface HuddleContext {
   teamName: string | null;
   league: string | null;
   memberCount: number;
+  /**
+   * A PUBLIC GAME ROOM HAS NO SIDE.
+   *
+   * Game rooms carry a team_id like any other huddle — tonight's
+   * "Denver · Kansas City" is stamped Kansas City — so everything downstream
+   * read them as that team's room and answered a room full of Broncos fans as
+   * a Chiefs expert. The room is about a FIXTURE, and both fanbases are in it.
+   */
+  isGameRoom: boolean;
+  /** Both sides, home first. Empty for a normal team huddle. */
+  gameTeams: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -741,12 +752,47 @@ export async function getHuddleContext(
   supabase: SupabaseClient,
   huddleId: string,
 ): Promise<HuddleContext | null> {
+  // is_game_room and game_id are asked for separately: one unknown column
+  // fails the WHOLE select in PostgREST, and losing the Coach's room context
+  // to a column that has not migrated yet is not worth the round trip saved.
   const { data: huddle } = await supabase
     .from("huddles")
     .select("id, name, team_id")
     .eq("id", huddleId)
     .maybeSingle();
   if (!huddle) return null;
+
+  let isGameRoom = false;
+  let gameTeams: string[] = [];
+  try {
+    const { data: gr } = await (supabase as any)
+      .from("huddles")
+      .select("is_game_room, game_id")
+      .eq("id", huddleId)
+      .maybeSingle();
+    isGameRoom = gr?.is_game_room === true;
+    if (isGameRoom && gr?.game_id) {
+      const { data: g } = await (supabase as any)
+        .from("games")
+        .select("home_team_id, away_team_id")
+        .eq("id", gr.game_id)
+        .maybeSingle();
+      const ids = [g?.home_team_id, g?.away_team_id].filter(Boolean);
+      if (ids.length) {
+        const { data: both } = await supabase
+          .from("teams")
+          .select("id, city, name")
+          .in("id", ids as string[]);
+        const byId = new Map((both ?? []).map((t: any) => [t.id, t]));
+        gameTeams = (ids as string[])
+          .map((id) => byId.get(id))
+          .filter(Boolean)
+          .map((t: any) => [t.city, t.name].filter(Boolean).join(" ").trim());
+      }
+    }
+  } catch (err) {
+    console.warn("[coach] game-room context unavailable", err);
+  }
 
   let teamName: string | null = null;
   let league: string | null = null;
@@ -773,6 +819,8 @@ export async function getHuddleContext(
     teamId: huddle.team_id ?? null,
     teamName,
     league,
+    isGameRoom,
+    gameTeams,
     memberCount: count ?? 0,
   };
 }
