@@ -147,13 +147,52 @@ const LEAGUE_OF: Record<string, string> = {
  * nothing is hidden. A filter would recreate the problem: you came here
  * precisely to look at a game that isn't yours.
  */
+/**
+ * TEAMS ARE NOT LIVE DATA.
+ *
+ * They were fetched inside the slate query, so all 396 rows came down again
+ * every 60 seconds on Home AND on Games. On this database that single select
+ * measured between 8 and 18 seconds, and it was the slowest thing either
+ * screen did — to learn a set of names and crests that change about twice a
+ * year.
+ *
+ * Its own query, cached for the session. The slate keeps refetching; the
+ * names stop coming with it.
+ */
+function useTeamsIndex() {
+  return useQuery({
+    queryKey: ["teams-index"],
+    staleTime: 12 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id, name, city, logo_url, league");
+      if (error) {
+        console.warn("[teams] index failed", error);
+        return [];
+      }
+      return data ?? [];
+    },
+  });
+}
+
 export function useAllGames(followedTeamIds: string[]) {
   const key = [...followedTeamIds].sort().join(",");
+  const { data: teamRows } = useTeamsIndex();
 
   return useQuery({
-    queryKey: ["all-games", key],
+    queryKey: ["all-games", key, (teamRows ?? []).length],
+    // Names come from the cached index; without them every side would render
+    // as an empty string, so wait rather than draw a blank scoreboard.
+    enabled: (teamRows ?? []).length > 0,
     staleTime: 30_000,
-    refetchInterval: 60_000,
+    // 90s, not 60. Every refetch is a round trip on a database whose floor is
+    // currently a second or two, and a scoreboard that is 90 seconds stale is
+    // not a product problem.
+    refetchInterval: 90_000,
     queryFn: async (): Promise<SlateGame[]> => {
       // A day either side. A 147-game college Saturday is the load case, and
       // pulling a week would be most of a season by the NBA's standards.
@@ -184,9 +223,7 @@ export function useAllGames(followedTeamIds: string[]) {
         console.warn("[all-games] no tv/rank columns yet:", gamesRes.error.message);
         gamesRes = await gamesQuery(CORE);
       }
-      const teamsRes = await supabase
-        .from("teams")
-        .select("id, name, city, logo_url, league");
+      const teamsRes = { data: teamRows ?? [] };
 
       const teams = new Map(
         (teamsRes.data ?? []).map((t: any) => [t.id, t]),
