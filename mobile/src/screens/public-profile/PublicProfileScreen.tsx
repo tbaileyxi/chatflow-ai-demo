@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { Alert, View, Text, Image, Pressable, ScrollView } from "react-native";
 import { useRoute, useNavigation, type RouteProp } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, Flag, Users } from "lucide-react-native";
+import { ChevronLeft, Flag, MessageCircle, Users } from "lucide-react-native";
 import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ScreenWrapper } from "@/components/ui/screen-wrapper";
 import { blockUser, isBlocked, reportUser, unblockUser } from "@/lib/moderation";
+import { openDm } from "@/lib/dm";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
 
@@ -228,8 +229,25 @@ export default function PublicProfileScreen() {
                 something they said. If they deleted the message, or the
                 problem is the profile itself, the long-press route doesn't
                 exist — and that's the route a reviewer is looking for. */}
+            {/* MESSAGE FIRST. This screen offered two ways to get rid of
+                somebody and no way to talk to them — you tap a name in a room
+                because you want to say something to them, not because you
+                want them gone. */}
+            {!isSelf && !blocked ? (
+              <Pressable
+                onPress={() => void openDm(userId!, navigation)}
+                className="mt-5 flex-row items-center justify-center gap-2 rounded-full py-3 active:opacity-80"
+                style={{ backgroundColor: colors.primary }}
+              >
+                <MessageCircle color={colors.primaryForeground} size={18} />
+                <Type variant="button" tone="onPrimary" style={{ fontSize: 17 }}>
+                  Message {name.split(/\s+/)[0]}
+                </Type>
+              </Pressable>
+            ) : null}
+
             {!isSelf ? (
-              <View className="mt-5 flex-row items-center gap-2">
+              <View className="mt-3 flex-row items-center gap-2">
                 <Pressable
                   onPress={() => handleBlockToggle(name)}
                   className={

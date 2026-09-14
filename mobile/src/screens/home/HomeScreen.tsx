@@ -419,7 +419,7 @@ function YourRoomsSection() {
   // beside the side huddle you actually made — which is why the same fixture
   // turned up twice.
   const unsorted = (huddles ?? []).filter((huddle) => {
-    if (huddle.isOfficialTeam || huddle.isGameRoom) return false;
+    if (huddle.isOfficialTeam || huddle.isGameRoom || huddle.isDm) return false;
     // A side huddle past its 2am does not belong in the list. The server-side
     // closer is scheduled with pg_cron, which is not enabled on this project,
     // so nothing was actually closing them — they sat here looking permanent.

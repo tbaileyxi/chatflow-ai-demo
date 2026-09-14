@@ -29,6 +29,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { NotificationSettings } from "@/components/profile/NotificationSettings";
 import { FindYourPeople } from "@/components/profile/FindYourPeople";
 import { RoomsYouRun } from "@/components/profile/RoomsYouRun";
+import { YourMessages } from "@/components/profile/YourMessages";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { TeamPicker } from "@/components/profile/TeamPicker";
 import { Separator } from "@/components/ui/separator";
@@ -510,12 +511,17 @@ export function ProfileScreen() {
             had to know to open. */}
         <Card>
           <CardHeader>
-            <CardTitle>Rooms you run</CardTitle>
+            <CardTitle>Huddles you run</CardTitle>
           </CardHeader>
           <CardContent>
             <RoomsYouRun />
           </CardContent>
         </Card>
+
+        {/* A DM has to live somewhere or it is simply lost. Not a fifth tab —
+            the volume does not justify one, and a tab that is usually empty
+            teaches people to ignore it. */}
+        <YourMessages />
 
         {/* Picks are gone. The mechanic was retired and this row was the
             last way in — a record of something nobody can do any more. Polls

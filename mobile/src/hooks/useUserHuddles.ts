@@ -29,6 +29,8 @@ export type UserHuddle = {
   hasUnread: boolean;
   /** True for the public huddle attached to a fixture. */
   isGameRoom: boolean;
+  /** A two-person thread. Lives on your profile, not in Your Huddles. */
+  isDm: boolean;
   /** Set on a side huddle — the ones that close at 2am. Null on everything
    *  permanent, which is how a card knows to draw itself dashed. */
   expiresAt: string | null;
@@ -67,6 +69,7 @@ export function useUserHuddles() {
           hasUnread: false,
           expiresAt: null,
           isGameRoom: false,
+          isDm: false,
         }));
       }
 
@@ -96,7 +99,7 @@ export function useUserHuddles() {
 
       let { data: memberships, error: memError } = await (supabase as any)
         .from("huddle_members")
-        .select(CORE.replace("%EXTRA%", "expires_at, is_game_room,"))
+        .select(CORE.replace("%EXTRA%", "expires_at, is_game_room, is_dm,"))
         .eq("user_id", user.id);
 
       if (memError) {
@@ -214,6 +217,7 @@ export function useUserHuddles() {
             hasUnread: lastMsg ? lastMsg > lastRead : false,
             expiresAt: (h as any).expires_at ?? null,
             isGameRoom: (h as any).is_game_room === true,
+            isDm: (h as any).is_dm === true,
           };
         })
         .sort((a, b) => {
