@@ -64,7 +64,16 @@ export function HuddleSettingsScreen() {
   const [showPullIn, setShowPullIn] = useState(false);
 
   const { data: profile } = useProfile();
-  const isOwner = user?.id === huddle?.ownerId;
+  /**
+   * Nobody owns a game huddle.
+   *
+   * get_or_create_game_room has to put something in owner_id, so it uses
+   * whoever opened the fixture first — and that person got the rename field,
+   * the photo upload and the power to remove people from a public huddle that
+   * exists because a game is on. Ownership is a real permission here, and it
+   * should not be handed out by being first through the door.
+   */
+  const isOwner = user?.id === huddle?.ownerId && huddle?.isGameRoom !== true;
   const roomPhoto = useRoomPhoto(huddleId);
   const isRoomAdmin =
     isOwner || admins.some((admin) => admin.user_id === user?.id);

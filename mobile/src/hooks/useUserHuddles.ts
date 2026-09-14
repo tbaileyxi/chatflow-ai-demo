@@ -181,8 +181,18 @@ export function useUserHuddles() {
             ? new Date(h.last_message_at)
             : null;
 
+          /**
+           * NOBODY OWNS A GAME HUDDLE.
+           *
+           * get_or_create_game_room has to put something in owner_id — the
+           * column is NOT NULL — so it uses whoever opened the fixture first,
+           * and that person got a crown on a room nobody made. Ownership means
+           * something here (it decides who can rename, set a photo, remove
+           * people), and none of that applies to a public huddle that exists
+           * because a game is on.
+           */
           const roomRole: "owner" | "joined" =
-            h.owner_id === user.id ? "owner" : "joined";
+            h.owner_id === user.id && h.is_game_room !== true ? "owner" : "joined";
 
           return {
             id: h.id,

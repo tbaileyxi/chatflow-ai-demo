@@ -547,12 +547,10 @@ export function ChatMessage({
                     // file in the repo, which was the wrong reference and cost
                     // a round trip — the bot keeps its card because THAT
                     // distinction is real, machine against people.
-                    message.isBotMessage ? "py-0.5 pl-2.5" : "py-0.5",
+                    "py-0.5",
                   )}
                   style={
-                    message.isBotMessage
-                      ? { borderLeftWidth: 2, borderLeftColor: colors.primary }
-                      : undefined
+                    undefined
                   }
                 >
                   {(() => {
@@ -606,7 +604,10 @@ export function ChatMessage({
                     );
                     return (
                       <>
-                        <Type variant="message" style={{ color: colors.foreground }}>
+                        {/* One step off white. A person says something; the
+                            bot is telling you what happened, and the voice
+                            should sit slightly behind theirs. */}
+                        <Type variant="message" style={{ color: "#CFCFD6" }}>
                           {body}
                         </Type>
                         {sponsor ? (
