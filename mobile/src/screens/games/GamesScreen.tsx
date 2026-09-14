@@ -11,7 +11,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { SectionLabel, Type } from "@/components/ui/Type";
-import { useAllGames, type SlateGame } from "@/hooks/useAllGames";
+import {
+  useAllGames,
+  compareSlate,
+  isWorthTheSlate,
+  type SlateGame,
+} from "@/hooks/useAllGames";
 import type { GamePresence } from "@/hooks/useGameHuddles";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { getFollowedTeamIds } from "@/lib/follows";
@@ -58,16 +63,24 @@ export function GamesScreen() {
   // nothing about people is a scoreboard, not a reason to open anything.
   const presence = useGameHuddles((games ?? []).map((g) => g.gameId));
 
-  const shown = useMemo(
-    () => (games ?? []).filter((g) => league === "ALL" || g.league === league),
-    [games, league],
-  );
+  const shown = useMemo(() => {
+    const inLeague = (games ?? []).filter(
+      (g) => league === "ALL" || g.league === league,
+    );
+    // The unranked-college cut applies to the ALL view only. Tapping the NCAAF
+    // chip is asking for college football, and answering it with twenty-five
+    // teams would be ignoring the question.
+    return league === "ALL" ? inLeague.filter(isWorthTheSlate) : inLeague;
+  }, [games, league]);
 
   const groups = useMemo(() => {
-    const yours = shown.filter((g) => g.yours && g.status !== "final");
-    const live = shown.filter((g) => !g.yours && g.status === "live");
-    const later = shown.filter((g) => !g.yours && g.status === "upcoming");
-    const done = shown.filter((g) => !g.yours && g.status === "final");
+    // SORTED, not just grouped. Every group came out in start-time order,
+    // which on a Monday in September put forty-six baseball games above
+    // Monday Night Football. See slateOrder.
+    const yours = shown.filter((g) => g.yours && g.status !== "final").sort(compareSlate);
+    const live = shown.filter((g) => !g.yours && g.status === "live").sort(compareSlate);
+    const later = shown.filter((g) => !g.yours && g.status === "upcoming").sort(compareSlate);
+    const done = shown.filter((g) => !g.yours && g.status === "final").sort(compareSlate);
     return { yours, live, later, done };
   }, [shown]);
 

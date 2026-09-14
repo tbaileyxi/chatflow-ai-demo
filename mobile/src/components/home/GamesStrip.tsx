@@ -1,7 +1,9 @@
 import { useMemo } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { useRoomGames, type RoomGame } from "@/hooks/useRoomGames";
+import { type RoomGame } from "@/hooks/useRoomGames";
+import { useAllGames, compareSlate, isWorthTheSlate } from "@/hooks/useAllGames";
+import { useNavigation } from "@react-navigation/native";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { getFollowedTeamIds } from "@/lib/follows";
@@ -13,13 +15,18 @@ import { colors } from "@/theme/colors";
 /**
  * What's on, in one row.
  *
- * NOT a schedule. On a college Saturday there are 147 games and nobody scrolls
- * a list of them — so this shows at most six, ordered by the only things that
- * make a game yours:
+ * NOT a schedule, and NOT just your teams.
  *
- *   1. a team you follow is playing
- *   2. a team one of your rooms is about is playing
- *   3. it's live and close
+ * It used to ask only for the games of teams you follow or have a room about,
+ * which meant Monday Night Football could not appear on Home unless you
+ * happened to follow one of the two sides. That is backwards: the reason this
+ * strip exists is the games going on OUTSIDE your own rooms.
+ *
+ * It takes the whole slate now and ranks it the way a person picks what to put
+ * on — NFL, then a ranked college game, then basketball, with baseball's
+ * hundred-and-sixty-two-game season last, and anything on television above
+ * anything that is not. Yours floats up inside that, and live beats all of it.
+ * See slateOrder in useAllGames.
  *
  * And it disappears entirely when nothing is on. A strip that's always there
  * stops meaning anything; in July there should be no strip, and Home should
@@ -34,6 +41,7 @@ export function GamesStrip({
 }: {
   onPickGame?: (game: RoomGame) => void;
 }) {
+  const navigation = useNavigation<any>();
   const { data: huddles } = useUserHuddles();
   const { presentUsers } = useGlobalPresence();
 
@@ -48,36 +56,39 @@ export function GamesStrip({
     return [...new Set([...(followed ?? []), ...roomTeams])];
   }, [followed, huddles]);
 
-  const { data: byTeam } = useRoomGames(teamIds);
+  const { data: slate } = useAllGames(teamIds);
 
-  const games = useMemo(() => {
-    if (!byTeam) return [];
-    // One game can belong to two of your teams — a rivalry where you follow
-    // both sides shouldn't show up twice.
-    const seen = new Set<string>();
-    const list: RoomGame[] = [];
-    for (const g of byTeam.values()) {
-      if (seen.has(g.gameId)) continue;
-      seen.add(g.gameId);
-      list.push(g);
-    }
+  const { games, more } = useMemo(() => {
+    if (!slate) return { games: [] as (RoomGame & { broadcast: string | null })[], more: 0 };
 
-    const soon = Date.now() + 8 * 24 * 60 * 60 * 1000;
-    return list
-      .filter(
-        (g) =>
-          g.status === "live" ||
-          g.status === "final" ||
-          new Date(g.startTime).getTime() < soon,
-      )
-      .sort((a, b) => {
-        if (a.status !== b.status) return a.status === "live" ? -1 : 1;
-        return (
-          new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-        );
-      })
-      .slice(0, 6);
-  }, [byTeam]);
+    const ranked = slate.filter(isWorthTheSlate).sort(compareSlate);
+
+    // Adapted to the row shape this strip already draws. "us" is YOUR team
+    // when one of them is yours, and otherwise the away side — which is how a
+    // scorebug reads a game you have no stake in.
+    const rows = ranked
+      .filter((g) => g.home.teamId && g.away.teamId)
+      .map((g) => {
+        const mineIsHome = g.yours && !!g.home.teamId && teamIds.includes(g.home.teamId);
+        const us = mineIsHome ? g.home : g.away;
+        const them = mineIsHome ? g.away : g.home;
+        return {
+          gameId: g.gameId,
+          status: g.status,
+          startTime: g.startTime,
+          period: null,
+          clock: null,
+          sportKey: g.sportKey,
+          statusLabel: g.statusLabel,
+          us: { ...us, teamId: us.teamId! },
+          them: { ...them, teamId: them.teamId! },
+          isHome: mineIsHome,
+          broadcast: g.broadcast,
+        };
+      });
+
+    return { games: rows.slice(0, 6), more: Math.max(0, rows.length - 6) };
+  }, [slate, teamIds]);
 
   /**
    * Who you know, per game.
@@ -184,6 +195,19 @@ export function GamesStrip({
                 {live ? `◆ ${g.statusLabel}` : g.statusLabel}
               </Type>
 
+              {/* WHERE IT IS ON. "8:15 PM" tells you when; the network is what
+                  tells you this is the game rather than one of forty. */}
+              {g.broadcast ? (
+                <Type
+                  variant="data"
+                  tone="tertiary"
+                  style={{ fontSize: 10, marginTop: 1 }}
+                  numberOfLines={1}
+                >
+                  {g.broadcast}
+                </Type>
+              ) : null}
+
               {/* NAMES, NEVER COUNTS. The artifact is explicit: "Mike, Sarah"
                   is what makes you tap a card, and when there is nobody it
                   says so plainly rather than leaving the row empty. */}
@@ -224,6 +248,21 @@ export function GamesStrip({
             </Pressable>
           );
         })}
+
+        {/* Six is what fits before a horizontal list stops being scannable.
+            The rest are a tab away rather than gone. */}
+        {more > 0 ? (
+          <Pressable
+            onPress={() => navigation.navigate("MainTabs", { screen: "Games" })}
+            className="w-[110px] items-center justify-center rounded-[13px] px-2.5 py-2 active:opacity-70"
+            style={cardStyle("quiet")}
+          >
+            <Type variant="captionStrong" tone="primary">See all</Type>
+            <Type variant="data" tone="tertiary" style={{ fontSize: 10, marginTop: 2 }}>
+              {more} more
+            </Type>
+          </Pressable>
+        ) : null}
       </ScrollView>
     </View>
   );

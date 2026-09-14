@@ -14,7 +14,74 @@ export type SlateGame = {
   away: { teamId: string | null; name: string; logoUrl: string | null; score: number | null };
   /** True when one of your teams is in it. Decides ordering, not filtering. */
   yours: boolean;
+  /** Networks carrying it, ESPN's order — "ESPN, ABC". Null if nobody is. */
+  broadcast: string | null;
+  /** Best AP position in the game, 1-25. Null when neither side is ranked. */
+  bestRank: number | null;
 };
+
+/**
+ * WHAT MOST PEOPLE ARE WATCHING, which is not the same as what is on next.
+ *
+ * The old order was chronological, so on a Monday in September the top of the
+ * list was forty-six baseball games and Monday Night Football was somewhere
+ * underneath them. Time is the least interesting thing about a slate.
+ *
+ * League leads, and NFL leads the leagues — that is not a preference, it is
+ * what the audience is. College sits behind it but ONLY when it is a game
+ * anybody outside the two schools would put on, which is what the poll is for.
+ * Baseball is a hundred-and-sixty-two-game season and it goes last.
+ */
+const LEAGUE_RANK: Record<string, number> = {
+  NFL: 0,
+  NCAAF: 1,
+  NBA: 2,
+  NCAAB: 3,
+  NHL: 4,
+  MLB: 5,
+};
+
+/**
+ * Sort key. Lower is higher up.
+ *
+ * Live first regardless of sport — a game in progress beats a better game that
+ * has not started, because you can actually watch it.
+ */
+export function slateOrder(g: SlateGame): number[] {
+  return [
+    g.status === "live" ? 0 : g.status === "upcoming" ? 1 : 2,
+    LEAGUE_RANK[g.league] ?? 9,
+    // On TV beats not on TV, inside the same league.
+    g.broadcast ? 0 : 1,
+    // Then the ranked game, best poll position first.
+    g.bestRank ?? 99,
+    new Date(g.startTime).getTime(),
+  ];
+}
+
+export function compareSlate(a: SlateGame, b: SlateGame): number {
+  const x = slateOrder(a);
+  const y = slateOrder(b);
+  for (let i = 0; i < x.length; i++) {
+    if (x[i] !== y[i]) return x[i] - y[i];
+  }
+  return 0;
+}
+
+/**
+ * College is the one league that needs filtering rather than ranking.
+ *
+ * There are 134 FBS teams and a Saturday runs to 147 games, almost all of them
+ * watched by two campuses. An unranked college game on a national list is
+ * noise; a top-25 game is the reason somebody turned the television on. This
+ * is the only place the app hides a game, and it hides it from the SLATE, not
+ * from search or from a team's own room.
+ */
+export function isWorthTheSlate(g: SlateGame): boolean {
+  if (g.yours) return true;
+  if (g.league !== "NCAAF" && g.league !== "NCAAB") return true;
+  return g.bestRank !== null || !!g.broadcast;
+}
 
 const LIVE = ["in_progress", "live", "halftime"];
 
@@ -63,18 +130,33 @@ export function useAllGames(followedTeamIds: string[]) {
       const from = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
       const to = new Date(Date.now() + 30 * 60 * 60 * 1000).toISOString();
 
-      const [gamesRes, teamsRes] = await Promise.all([
-        supabase
+      // CORE is what a scoreboard cannot be drawn without. EXTRA is the
+      // television and poll data, which only exists once RUN_THIS_GAMES_ON_TV
+      // has been run. PostgREST fails the WHOLE select on one unknown column,
+      // so asking for both in one go would empty the Games tab on any
+      // environment where that migration is outstanding — which has happened
+      // here twice before, and is a blank screen with nothing in the logs.
+      const CORE =
+        "id, sport_key, status, start_time, clock, period, home_team_id, away_team_id, home_score, away_score";
+      const EXTRA = "broadcast, home_rank, away_rank";
+
+      const gamesQuery = (cols: string) =>
+        (supabase as any)
           .from("games")
-          .select(
-            "id, sport_key, status, start_time, clock, period, home_team_id, away_team_id, home_score, away_score",
-          )
+          .select(cols)
           .gte("start_time", from)
           .lte("start_time", to)
           .order("start_time", { ascending: true })
-          .limit(300),
-        supabase.from("teams").select("id, name, city, logo_url, league"),
-      ]);
+          .limit(300);
+
+      let gamesRes = await gamesQuery(`${CORE}, ${EXTRA}`);
+      if (gamesRes.error) {
+        console.warn("[all-games] no tv/rank columns yet:", gamesRes.error.message);
+        gamesRes = await gamesQuery(CORE);
+      }
+      const teamsRes = await supabase
+        .from("teams")
+        .select("id, name, city, logo_url, league");
 
       const teams = new Map(
         (teamsRes.data ?? []).map((t: any) => [t.id, t]),
@@ -109,7 +191,7 @@ export function useAllGames(followedTeamIds: string[]) {
        * copies exist — the one with a score on it is the one that is real.
        */
       const byFixture = new Map<string, any>();
-      for (const g of gamesRes.data ?? []) {
+      for (const g of (gamesRes.data ?? []) as any[]) {
         const pair = [g.home_team_id, g.away_team_id].sort().join("|");
         const day = (g.start_time ?? "").slice(0, 10);
         const key = `${pair}@${day}`;
@@ -147,6 +229,17 @@ export function useAllGames(followedTeamIds: string[]) {
           yours:
             (!!g.home_team_id && mine.has(g.home_team_id)) ||
             (!!g.away_team_id && mine.has(g.away_team_id)),
+          broadcast: g.broadcast ?? null,
+          bestRank:
+            [g.home_rank, g.away_rank].filter(
+              (r: number | null) => typeof r === "number",
+            ).length > 0
+              ? Math.min(
+                  ...[g.home_rank, g.away_rank].filter(
+                    (r: number | null) => typeof r === "number",
+                  ),
+                )
+              : null,
         } satisfies SlateGame;
       });
     },
