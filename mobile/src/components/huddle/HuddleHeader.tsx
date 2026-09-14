@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, Image, Pressable, Animated, Linking } from "react-native";
+import { Alert, View, Text, Image, Pressable, Animated, Linking } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
   ChevronLeft,
@@ -18,6 +18,9 @@ import {
 } from "@/hooks/useLiveGameContext";
 import { useTeamSponsors, logSponsorTap } from "@/hooks/useTeamSponsor";
 import { useAuth } from "@/hooks/useAuth";
+import { useDmCounterparts } from "@/hooks/useDmCounterpart";
+import { personName } from "@/lib/personName";
+import { blockUser, reportUser } from "@/lib/moderation";
 import type { HuddleDetails } from "@/hooks/useHuddleDetails";
 
 type Props = {
@@ -168,6 +171,11 @@ function ScoreLine({ game, gameState }: { game: GameContext; gameState: GameStat
 export function HuddleHeader({ huddle, onInvite }: Props) {
   const navigation = useNavigation();
   const { user } = useAuth();
+  // Who this thread is WITH — resolved per viewer, because the stored huddle
+  // name is the other person's name from the creator's side and is therefore
+  // wrong for exactly half the people who see it.
+  const dmOthers = useDmCounterparts(huddle.isDm ? [huddle.id] : []);
+  const dmWith = huddle.isDm ? dmOthers.get(huddle.id) : undefined;
   const { data: game } = useLiveGameContext(huddle.teamId);
   const { data: sponsors } = useTeamSponsors(huddle.teamId);
 
@@ -216,9 +224,13 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
 
   const sponsor = sponsors?.[slot % Math.max(sponsors.length || 1, 1)] ?? null;
 
-  const displayName = huddle.isOfficialTeam
-    ? huddle.teamName ?? huddle.name
-    : huddle.name;
+  const displayName = huddle.isDm
+    // The person, as YOU have them saved — never the stored huddle name,
+    // which is whoever the creator was talking to.
+    ? (dmWith ? personName(dmWith) : huddle.name)
+    : huddle.isOfficialTeam
+      ? huddle.teamName ?? huddle.name
+      : huddle.name;
 
   const gameState = getGameState(game ?? null);
   const hasGame = !!game && gameState !== "none";
@@ -301,7 +313,7 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
           </View>
 
           <View className="overflow-hidden">
-            {hasGame ? null : (
+            {hasGame || huddle.isDm ? null : (
               <Type variant="data" tone="muted" className="mt-0.5">
                 {huddle.memberCount}{" "}
                 {huddle.memberCount === 1 ? "member" : "members"}
@@ -343,10 +355,58 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
             whose second line — the score and the opponent — was being clipped
             for want of exactly that. */}
 
+        {/* IN A DM THE ⋯ IS BLOCK, not settings. Huddle settings — photo,
+            bio, access, admins — describes nothing about a conversation
+            between two people, and blocking somebody who messaged you used to
+            mean leaving the thread, hunting their avatar down in the friends
+            row and going to their profile. Longest possible route for the one
+            case that is actually urgent. */}
         <Pressable
-          onPress={() =>
-            navigation.navigate("HuddleSettings", { huddleId: huddle.id })
-          }
+          onPress={() => {
+            if (!huddle.isDm) {
+              navigation.navigate("HuddleSettings", { huddleId: huddle.id });
+              return;
+            }
+            if (!dmWith) return;
+            const who = personName(dmWith);
+            Alert.alert(who, undefined, [
+              {
+                text: "Report",
+                onPress: () => {
+                  void reportUser({ userId: dmWith.userId, reason: "harassment" });
+                  Alert.alert("Reported", "Thanks — we'll take a look.");
+                },
+              },
+              {
+                text: `Block ${who.split(/\s+/)[0]}`,
+                style: "destructive",
+                onPress: () => {
+                  Alert.alert(
+                    `Block ${who}?`,
+                    "They won't be able to message you, and you won't see their messages anywhere. You can undo it from their profile.",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Block",
+                        style: "destructive",
+                        onPress: async () => {
+                          const ok = await blockUser(dmWith.userId);
+                          if (!ok) {
+                            Alert.alert("Couldn't block", "Try again in a moment.");
+                            return;
+                          }
+                          // Don't leave anyone standing in a thread with
+                          // somebody they have just blocked.
+                          (navigation as any).goBack();
+                        },
+                      },
+                    ],
+                  );
+                },
+              },
+              { text: "Cancel", style: "cancel" },
+            ]);
+          }}
           className="h-9 w-9 items-center justify-center rounded-full active:bg-muted"
           hitSlop={8}
         >

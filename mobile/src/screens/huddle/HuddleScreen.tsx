@@ -627,6 +627,11 @@ export function HuddleScreen() {
         {/* Fades live in the chat as cards. The rail that used to sit here ate
             the top of every room even when there was nothing to take, so the
             entry point is now a chip in the presence bar. */}
+        {/* A DM IS NOT A ROOM. Underneath it is a huddle, which is why this
+            furniture was turning up in a conversation between two people: a
+            strip of faces of the two of you, and an Add for a thread that
+            cannot take a third. */}
+        {huddle.isDm ? null : (
         <PresenceBar
           users={presentUsers}
           members={roomMembers}
@@ -653,12 +658,13 @@ export function HuddleScreen() {
             </View>
           }
         />
+        )}
 
         {/* UNDER THE AVATARS, which is where the design put it and where it
             belongs — it is about those faces. I had it above the composer
             because that is where the other action bars live in this file,
             which is an implementation habit, not a reason. */}
-        {huddle.isGameRoom && huddle.gameId ? (
+        {huddle.isGameRoom && huddle.gameId && !huddle.isDm ? (
           <SpinUpBar
             gameId={huddle.gameId}
             friendsHere={friendsHere}

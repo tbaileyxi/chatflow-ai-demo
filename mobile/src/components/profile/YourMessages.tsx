@@ -1,11 +1,13 @@
 import { useMemo } from "react";
-import { Image, Pressable, View } from "react-native";
+import { Alert, Image, Pressable, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { MessageCircle } from "lucide-react-native";
+import { MessageCircle, MoreHorizontal } from "lucide-react-native";
 import { SectionLabel, Type } from "@/components/ui/Type";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { useDmCounterparts } from "@/hooks/useDmCounterpart";
 import { personName } from "@/lib/personName";
+import { blockUser, reportUser } from "@/lib/moderation";
+import { useQueryClient } from "@tanstack/react-query";
 import { personColor } from "@/lib/personColor";
 import { colors } from "@/theme/colors";
 import { cardStyle } from "@/theme/cardStyle";
@@ -27,6 +29,7 @@ import { cardStyle } from "@/theme/cardStyle";
  */
 export function YourMessages() {
   const navigation = useNavigation<any>();
+  const queryClient = useQueryClient();
   const { data: huddles } = useUserHuddles();
 
   const dms = useMemo(
@@ -104,6 +107,56 @@ export function YourMessages() {
             <View
               style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary }}
             />
+          ) : null}
+
+          {/* The second route to Block. Someone who decides they do not want
+              to hear from a person should not have to open the thread to say
+              so — and before this the only way was through the friends row. */}
+          {who ? (
+            <Pressable
+              hitSlop={10}
+              className="p-1 active:opacity-60"
+              onPress={() => {
+                const name = personName(who);
+                Alert.alert(name, undefined, [
+                  {
+                    text: "Report",
+                    onPress: () => {
+                      void reportUser({ userId: who.userId, reason: "harassment" });
+                      Alert.alert("Reported", "Thanks — we'll take a look.");
+                    },
+                  },
+                  {
+                    text: `Block ${name.split(/\s+/)[0]}`,
+                    style: "destructive",
+                    onPress: () => {
+                      Alert.alert(
+                        `Block ${name}?`,
+                        "They won't be able to message you, and you won't see their messages anywhere. You can undo it from their profile.",
+                        [
+                          { text: "Cancel", style: "cancel" },
+                          {
+                            text: "Block",
+                            style: "destructive",
+                            onPress: async () => {
+                              const ok = await blockUser(who.userId);
+                              if (!ok) {
+                                Alert.alert("Couldn't block", "Try again in a moment.");
+                                return;
+                              }
+                              queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
+                            },
+                          },
+                        ],
+                      );
+                    },
+                  },
+                  { text: "Cancel", style: "cancel" },
+                ]);
+              }}
+            >
+              <MoreHorizontal color={colors.mutedForeground} size={18} />
+            </Pressable>
           ) : null}
         </Pressable>
         );

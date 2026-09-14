@@ -26,6 +26,9 @@ export type HuddleDetails = {
   isGameRoom: boolean;
   /** Set on a side huddle. Null on everything permanent. */
   expiresAt: string | null;
+  /** A thread with one other person. Underneath it is a huddle; on screen it
+      must not be — no faces strip, no Add, no bot, no settings. */
+  isDm: boolean;
   isMember: boolean;
 };
 
@@ -52,7 +55,7 @@ export function useHuddleDetails(huddleId: string) {
           is_official_team_huddle, is_verified, owner_id, team_id,
           teams!team_id (name, city, logo_url)
         `;
-      const EXTRA = `official_status, website_url, photo_url, game_id, is_game_room, expires_at`;
+      const EXTRA = `official_status, website_url, photo_url, game_id, is_game_room, expires_at, is_dm`;
 
       let { data: rawData, error } = await (supabase as any)
         .from("huddles")
@@ -106,6 +109,7 @@ export function useHuddleDetails(huddleId: string) {
         photoUrl: (data as any).photo_url ?? null,
         gameId: (data as any).game_id ?? null,
         isGameRoom: (data as any).is_game_room === true,
+        isDm: (data as any).is_dm === true,
         expiresAt: (data as any).expires_at ?? null,
         isMember,
       };

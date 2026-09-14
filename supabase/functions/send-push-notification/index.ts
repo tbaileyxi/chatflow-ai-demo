@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
       // Only notify for private huddles
       const { data: huddle } = await supabase
         .from('huddles')
-        .select('is_private')
+        .select('is_private, is_dm')
         .eq('id', huddleId)
         .single();
 
@@ -84,13 +84,20 @@ Deno.serve(async (req) => {
 
       const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
-      // Get members who haven't read the huddle in the last 30 minutes
+      // Members who haven't read the huddle in the last 30 minutes.
+      //
+      // `.lt('last_read_at', …)` ALONE DROPS NULLS, and a member who has never
+      // opened the room has a null last_read_at. So the one person guaranteed
+      // not to know about a message — somebody who has never been in the room
+      // at all — was the one person excluded from being told. That is why a
+      // brand-new DM notified nobody: its recipient had never read it, because
+      // it had only just been created.
       const { data: members } = await supabase
         .from('huddle_members')
         .select('user_id, last_read_at')
         .eq('huddle_id', huddleId)
         .neq('user_id', senderId)
-        .lt('last_read_at', thirtyMinAgo);
+        .or(`last_read_at.is.null,last_read_at.lt.${thirtyMinAgo}`);
 
       if (!members || members.length === 0) {
         return new Response(JSON.stringify({ sent: 0 }), {
@@ -117,9 +124,19 @@ Deno.serve(async (req) => {
         .filter((p) => p.expo_push_token)
         .map((p) => ({
           to: p.expo_push_token!,
-          title: huddleName || 'New message',
-          body: `${senderName}: ${content.slice(0, 100)}`,
-          data: { type: 'new_message', huddleId },
+          // A DM IS NOT ROOM TRAFFIC, and it must not read like it.
+          //
+          // The title was the huddle's name, and a DM huddle is named after
+          // the other person from the CREATOR's side — so the recipient got a
+          // notification titled with their own name. Say who it is from and
+          // that it was sent to them.
+          title: huddle.is_dm
+            ? `${senderName} sent you a message`
+            : huddleName || 'New message',
+          body: huddle.is_dm
+            ? content.slice(0, 140)
+            : `${senderName}: ${content.slice(0, 100)}`,
+          data: { type: 'new_message', huddleId, isDm: !!huddle.is_dm },
           sound: 'default',
         }));
 
