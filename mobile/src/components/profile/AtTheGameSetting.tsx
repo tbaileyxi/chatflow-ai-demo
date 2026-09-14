@@ -1,9 +1,9 @@
-// The one place the app asks for location.
+// The switch, and the way back from a denial.
 //
-// Not at launch, not on a foreground, not the first time you open a game room
-// — here, on a switch you flipped yourself, under a line explaining what it
-// does. An app that asks for location out of nowhere gets refused by the
-// person and questioned by review, and it deserves both.
+// It ships ON, so for most people the iOS dialog comes from useAtVenue the
+// first time they use the app, not from here — see the note there. What this
+// screen is for is the two things that switch cannot do on its own: turn the
+// thing OFF, and explain why nothing is showing when iOS was told no.
 
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, Switch, View } from "react-native";

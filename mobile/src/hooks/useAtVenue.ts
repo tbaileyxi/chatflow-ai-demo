@@ -55,11 +55,21 @@ export function useAtVenueReporter() {
       .maybeSingle();
     if (prof && (prof as any).share_at_venue === false) return;
 
-    // NEVER request here. Permission is asked for in Profile, at the moment
-    // someone turns the switch on and knows why they are being asked. Asking
-    // on a foreground is the dialog-out-of-nowhere that gets apps rejected —
-    // and refused.
-    const { status } = await Location.getForegroundPermissionsAsync();
+    // ASK, don't wait to be asked.
+    //
+    // This used to only READ the permission and leave the asking to the switch
+    // in Profile. But the switch ships ON, so it never changed, so the request
+    // never fired — the feature was on for everyone and did nothing for
+    // anyone. Nobody opens Profile to turn on a thing they have not seen yet.
+    //
+    // So: if the switch is on and iOS has never asked, ask. UNDETERMINED is
+    // the only state this fires in, and iOS shows that dialog exactly once in
+    // the life of an install, so this cannot nag — after the first answer the
+    // status is granted or denied and we fall straight through.
+    let { status, canAskAgain } = await Location.getForegroundPermissionsAsync();
+    if (status === Location.PermissionStatus.UNDETERMINED && canAskAgain) {
+      ({ status } = await Location.requestForegroundPermissionsAsync());
+    }
     if (status !== Location.PermissionStatus.GRANTED) return;
 
     let pos;
