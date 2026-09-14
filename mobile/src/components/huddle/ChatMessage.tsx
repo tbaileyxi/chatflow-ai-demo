@@ -10,8 +10,10 @@ import {
   Linking,
   Alert,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { useNavigation } from "@react-navigation/native";
 import {
+  Copy,
   Flag,
   MessageSquareReply,
   Mic,
@@ -300,6 +302,12 @@ export function ChatMessage({
     setShowPicker(false);
   };
 
+  const handleCopy = () => {
+    setShowPicker(false);
+    const text = (message.content ?? "").trim();
+    if (text) void Clipboard.setStringAsync(text);
+  };
+
   /**
    * Report, block, or remove — the three things guideline 1.2 asks for.
    *
@@ -420,7 +428,7 @@ export function ChatMessage({
             // Tighter vertical padding when this is a follow-up message from
             // the same sender (consecutive grouping). Full padding on the
             // first message of a chain.
-            isGroupedWithPrev ? "pb-0.5 pt-0" : "gap-0.5 pb-1.5 pt-0.5",
+            isGroupedWithPrev ? "pb-0 pt-0" : "gap-0.5 pb-2 pt-0.5",
             // Yours on the right, everyone else's on the left — the
             // renderings, and the convention every messaging app on the phone
             // already uses. I had argued this flat on the grounds that a
@@ -578,7 +586,13 @@ export function ChatMessage({
                           {!isGroupedWithPrev ? (
                             <Type
                               variant="speaker"
-                              style={{ color: who, fontFamily: fonts.extrabold }}
+                              style={{
+                                color: who,
+                                fontFamily: fonts.extrabold,
+                                // Inherit the message's line height. Its own
+                                // 18 was setting the height of line one.
+                                lineHeight: isShout ? 28 : 25,
+                              }}
                             >
                               {isOwnMessage ? "You" : displayName}{" "}
                             </Type>
@@ -764,6 +778,22 @@ export function ChatMessage({
                   >
                     <ShareIcon color="#FFFFFF" size={15} />
                   </Pressable>
+
+                  {/* The ⋯ went on photos only, so a video had share and
+                      nothing else — no way to take down your own clip. */}
+                  <Pressable
+                    onPress={isOwnMessage ? handleDeleteOwn : handleReport}
+                    hitSlop={8}
+                    className="absolute right-2 items-center justify-center rounded-full active:opacity-70"
+                    style={{ top: 46, height: 32, width: 32, backgroundColor: "rgba(0,0,0,0.55)" }}
+                    accessibilityLabel={isOwnMessage ? "Delete this" : "Report this"}
+                  >
+                    {isOwnMessage ? (
+                      <Trash2 color="#FFFFFF" size={15} />
+                    ) : (
+                      <Flag color="#FFFFFF" size={15} />
+                    )}
+                  </Pressable>
                 </Pressable>
               )}
 
@@ -840,6 +870,16 @@ export function ChatMessage({
               className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
             >
               <Share2 color={colors.mutedForeground} size={20} />
+            </Pressable>
+            {/* Reading something worth keeping with no way to keep it is a
+                small frustration that happens constantly — a score, a name,
+                a line somebody wants to send on elsewhere. */}
+            <Pressable
+              onPress={handleCopy}
+              className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
+              accessibilityLabel="Copy"
+            >
+              <Copy color={colors.mutedForeground} size={19} />
             </Pressable>
 
             {/* App Store guideline 1.2: an app carrying user content needs

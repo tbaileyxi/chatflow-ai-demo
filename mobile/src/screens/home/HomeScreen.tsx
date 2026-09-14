@@ -409,9 +409,16 @@ function YourRoomsSection() {
   // you can post in it; that is not a reason for it to sit in Your Huddles
   // beside the side huddle you actually made — which is why the same fixture
   // turned up twice.
-  const unsorted = (huddles ?? []).filter(
-    (huddle) => !huddle.isOfficialTeam && !huddle.isGameRoom,
-  );
+  const unsorted = (huddles ?? []).filter((huddle) => {
+    if (huddle.isOfficialTeam || huddle.isGameRoom) return false;
+    // A side huddle past its 2am does not belong in the list. The server-side
+    // closer is scheduled with pg_cron, which is not enabled on this project,
+    // so nothing was actually closing them — they sat here looking permanent.
+    if (huddle.expiresAt && new Date(huddle.expiresAt).getTime() < Date.now()) {
+      return false;
+    }
+    return true;
+  });
 
   // The game each room is about — ONE query for every room, not one per room.
   const { data: gamesByTeam } = useRoomGames(unsorted.map((r) => r.teamId));
@@ -461,12 +468,19 @@ function YourRoomsSection() {
       return i < 0 ? SPORT_ORDER.length : i;
     };
     return [...unsorted].sort((a, b) => {
+      // LIVE FIRST, absolutely. Nothing outranks a game that is on.
       const diff = score(b) - score(a);
       if (diff !== 0) return diff;
-      // Then by sport. Ordering on last-message alone put a quiet baseball
-      // huddle above a football game in the fourth quarter.
+
+      // Then sport, then TEAM — two Bears huddles belong next to each other,
+      // not separated by whichever spoke more recently.
       const sport = sportRank(a) - sportRank(b);
       if (sport !== 0) return sport;
+
+      const teamA = a.teamName ?? a.teamId ?? "";
+      const teamB = b.teamName ?? b.teamId ?? "";
+      if (teamA !== teamB) return teamA.localeCompare(teamB);
+
       return (
         new Date(b.lastMessageAt ?? 0).getTime() -
         new Date(a.lastMessageAt ?? 0).getTime()
