@@ -26,14 +26,65 @@ const corsHeaders = {
 };
 
 // The leagues we carry, as ESPN paths.
-const SCOREBOARDS: { path: string; league: string }[] = [
-  { path: "football/nfl", league: "NFL" },
-  { path: "football/college-football", league: "NCAA" },
-  { path: "basketball/nba", league: "NBA" },
-  { path: "basketball/mens-college-basketball", league: "NCAA" },
-  { path: "baseball/mlb", league: "MLB" },
-  { path: "hockey/nhl", league: "NHL" },
+const SCOREBOARDS: { path: string; slug: string; league: string }[] = [
+  { path: "football/nfl", slug: "nfl", league: "NFL" },
+  { path: "football/college-football", slug: "college-football", league: "NCAA" },
+  { path: "basketball/nba", slug: "nba", league: "NBA" },
+  { path: "basketball/mens-college-basketball", slug: "mens-college-basketball", league: "NCAA" },
+  { path: "baseball/mlb", slug: "mlb", league: "MLB" },
+  { path: "hockey/nhl", slug: "nhl", league: "NHL" },
 ];
+
+/**
+ * site.api.espn.com REFUSES SUPABASE. All six leagues came back 403 from the
+ * edge runtime while answering fine from a laptop, and a browser User-Agent
+ * changed nothing — it is the source IP, not the headers.
+ *
+ * Two other ESPN hosts serve the same scoreboard. cdn.espn.com nests it one
+ * level deeper (content.sbData) and is the one that answered; site.web is kept
+ * behind it because a single host is a single point of failure and this is a
+ * free endpoint we do not control.
+ */
+async function fetchEvents(board: { path: string; slug: string }): Promise<{
+  events: any[];
+  via: string;
+}> {
+  const attempts = [
+    {
+      via: "cdn",
+      url: `https://cdn.espn.com/core/${board.slug}/scoreboard?xhr=1&limit=400`,
+      pick: (j: any) => j?.content?.sbData?.events ?? [],
+    },
+    {
+      via: "site.web",
+      url: `https://site.web.api.espn.com/apis/site/v2/sports/${board.path}/scoreboard?limit=400`,
+      pick: (j: any) => j?.events ?? [],
+    },
+    {
+      via: "site",
+      url: `https://site.api.espn.com/apis/site/v2/sports/${board.path}/scoreboard?limit=400`,
+      pick: (j: any) => j?.events ?? [],
+    },
+  ];
+
+  for (const a of attempts) {
+    try {
+      const res = await fetch(a.url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
+          Accept: "application/json",
+        },
+      });
+      if (!res.ok) continue;
+      const events = a.pick(await res.json());
+      if (Array.isArray(events) && events.length > 0) return { events, via: a.via };
+    } catch {
+      // Try the next host.
+    }
+  }
+  return { events: [], via: "none" };
+}
 
 const THREE_HOURS = 3 * 60 * 60 * 1000;
 
@@ -81,22 +132,15 @@ Deno.serve(async (req) => {
 
     let matched = 0;
     let missed = 0;
+    const diag: Record<string, unknown> = {
+      teams: (teams ?? []).length,
+      ourGames: (ours ?? []).length,
+    };
 
     for (const board of SCOREBOARDS) {
-      let events: any[] = [];
-      try {
-        const res = await fetch(
-          `https://site.api.espn.com/apis/site/v2/sports/${board.path}/scoreboard?limit=400`,
-        );
-        if (!res.ok) {
-          console.log(`[espn] ${board.path} -> ${res.status}`);
-          continue;
-        }
-        events = (await res.json())?.events ?? [];
-      } catch (err) {
-        console.log(`[espn] ${board.path} failed`, err);
-        continue;
-      }
+      const { events, via } = await fetchEvents(board);
+      diag[board.path] = `${events.length} events via ${via}`;
+      if (events.length === 0) continue;
 
       for (const ev of events) {
         const comp = ev?.competitions?.[0];
@@ -156,7 +200,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ matched, missed }), {
+    return new Response(JSON.stringify({ matched, missed, diag }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

@@ -1,17 +1,15 @@
 -- Games worth watching: rank them, and stop listing the same one twice.
 --
--- TWO PROBLEMS, one file.
+-- THE FIRST VERSION OF THIS FAILED with "operator does not exist: text = uuid".
+-- game_id is uuid on some tables and text on others, and I hand-wrote a list of
+-- six tables assuming all of them matched games.id. Both halves of that were
+-- wrong: the types differ, and there are thirteen tables carrying a game_id,
+-- not six — arena_live_odds, arena_stakes, huddle_pings, notifications, picks
+-- and seen_events were all missed, and every one of them would have been left
+-- pointing at a row that no longer existed.
 --
--- 1. DUPLICATES. 52 fixtures since 1 September exist twice, and every row has
---    its OWN odds_game_id — the feed hands us the same game under two keys, so
---    nothing keyed on that id could ever have caught it. The pair is identical
---    in teams AND kickoff, which is what makes it safe to collapse: a real
---    doubleheader shares the teams and the date but never the minute.
---
--- 2. NOTHING TO RANK ON. games has no broadcaster and teams has no poll
---    ranking, so "the games most people are watching" was not expressible.
---    ESPN publishes both, free and unkeyed, and sync-espn-context writes them
---    here.
+-- So it asks the catalogue instead of me. Every base table with a game_id
+-- column gets repointed, cast to whatever that column actually is.
 
 -- ── new columns ──────────────────────────────────────────────────────────────
 alter table public.games add column if not exists broadcast text;      -- "ESPN", "FOX", "ESPN, ABC"
@@ -23,78 +21,64 @@ create index if not exists games_broadcast_idx on public.games (broadcast)
 
 
 -- ── collapse the duplicates ──────────────────────────────────────────────────
--- Keeper = the oldest row of each identical group. Anything pointing at a
--- loser is REPOINTED at the keeper before the loser goes, so no pick, fade,
--- RSVP or notification is orphaned by this.
-with ranked as (
-  select id,
-         first_value(id) over (
-           partition by home_team_id, away_team_id, start_time
-           order by created_at, id
-         ) as keeper
-    from public.games
-   where home_team_id is not null and away_team_id is not null
-),
-losers as (
-  select id, keeper from ranked where id <> keeper
-)
-select count(*) as duplicates_to_remove from losers;
+do $$
+declare
+  r record;
+  moved int := 0;
+  killed int := 0;
+begin
+  drop table if exists _dupes;
 
-with ranked as (
-  select id,
-         first_value(id) over (
-           partition by home_team_id, away_team_id, start_time
-           order by created_at, id
-         ) as keeper
-    from public.games
-   where home_team_id is not null and away_team_id is not null
-),
-losers as (
-  select id, keeper from ranked where id <> keeper
-)
-update public.fades f set game_id = l.keeper from losers l where f.game_id = l.id;
+  -- Keeper = the oldest row of each identical group. "Identical" means the same
+  -- two teams at the same EXACT kickoff — a real doubleheader shares the teams
+  -- and the date but never the minute, so it survives this.
+  create temp table _dupes as
+  with ranked as (
+    select id,
+           first_value(id) over (
+             partition by home_team_id, away_team_id, start_time
+             order by created_at, id
+           ) as keeper
+      from public.games
+     where home_team_id is not null
+       and away_team_id is not null
+  )
+  select id, keeper from ranked where id <> keeper;
 
-with ranked as (
-  select id, first_value(id) over (partition by home_team_id, away_team_id, start_time order by created_at, id) as keeper
-    from public.games where home_team_id is not null and away_team_id is not null
-), losers as (select id, keeper from ranked where id <> keeper)
-update public.game_states g set game_id = l.keeper from losers l where g.game_id = l.id;
+  raise notice 'duplicate rows to remove: %', (select count(*) from _dupes);
 
-with ranked as (
-  select id, first_value(id) over (partition by home_team_id, away_team_id, start_time order by created_at, id) as keeper
-    from public.games where home_team_id is not null and away_team_id is not null
-), losers as (select id, keeper from ranked where id <> keeper)
-update public.huddle_game_rsvps r set game_id = l.keeper from losers l where r.game_id = l.id;
+  -- Repoint everything BEFORE deleting anything.
+  for r in
+    select c.table_name, c.data_type
+      from information_schema.columns c
+      join information_schema.tables t
+        on t.table_schema = c.table_schema
+       and t.table_name = c.table_name
+     where c.table_schema = 'public'
+       and c.column_name = 'game_id'
+       and t.table_type = 'BASE TABLE'
+  loop
+    execute format(
+      'update public.%I t set game_id = d.keeper::%s from _dupes d
+        where t.game_id::text = d.id::text',
+      r.table_name,
+      case when r.data_type = 'uuid' then 'uuid' else 'text' end
+    );
+    get diagnostics moved = row_count;
+    if moved > 0 then
+      raise notice 'repointed % row(s) in %', moved, r.table_name;
+    end if;
+  end loop;
 
-with ranked as (
-  select id, first_value(id) over (partition by home_team_id, away_team_id, start_time order by created_at, id) as keeper
-    from public.games where home_team_id is not null and away_team_id is not null
-), losers as (select id, keeper from ranked where id <> keeper)
-update public.pickem_instance_games p set game_id = l.keeper from losers l where p.game_id = l.id;
+  delete from public.games g using _dupes d where g.id = d.id;
+  get diagnostics killed = row_count;
+  raise notice 'deleted % duplicate game row(s)', killed;
 
-with ranked as (
-  select id, first_value(id) over (partition by home_team_id, away_team_id, start_time order by created_at, id) as keeper
-    from public.games where home_team_id is not null and away_team_id is not null
-), losers as (select id, keeper from ranked where id <> keeper)
-update public.pickem_picks p set game_id = l.keeper from losers l where p.game_id = l.id;
-
-with ranked as (
-  select id, first_value(id) over (partition by home_team_id, away_team_id, start_time order by created_at, id) as keeper
-    from public.games where home_team_id is not null and away_team_id is not null
-), losers as (select id, keeper from ranked where id <> keeper)
-update public.huddles h set game_id = l.keeper from losers l where h.game_id = l.id;
-
--- Now the losers are unreferenced.
-with ranked as (
-  select id, first_value(id) over (partition by home_team_id, away_team_id, start_time order by created_at, id) as keeper
-    from public.games where home_team_id is not null and away_team_id is not null
-), losers as (select id, keeper from ranked where id <> keeper)
-delete from public.games g using losers l where g.id = l.id;
+  drop table _dupes;
+end $$;
 
 
 -- ── and stop it happening again ──────────────────────────────────────────────
--- On the exact kickoff, so a genuine doubleheader (same teams, same day,
--- different first pitch) is still two games.
 create unique index if not exists games_one_row_per_fixture
   on public.games (home_team_id, away_team_id, start_time)
   where home_team_id is not null and away_team_id is not null;
@@ -102,4 +86,4 @@ create unique index if not exists games_one_row_per_fixture
 
 select
   (select count(*) from public.games) as games_total,
-  (select count(*) from public.games where broadcast is not null) as with_tv;  -- 0 until the sync runs
+  (select count(*) from public.games where broadcast is not null) as with_tv;
