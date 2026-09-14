@@ -42,6 +42,35 @@ const LEAGUE_RANK: Record<string, number> = {
 };
 
 /**
+ * NATIONAL networks only.
+ *
+ * ESPN lists every carrier, and for baseball that is five regional ones on
+ * every single game — "MLB.TV, SportsNet LA, Gray Media, WXIX FOX19, Reds.TV".
+ * Treating the presence of a broadcaster as a signal therefore scored a
+ * Tuesday-night Reds game exactly like Monday Night Football on ABC, which is
+ * the opposite of the question being asked. A regional feed tells you the game
+ * exists; a national one tells you somebody chose it.
+ */
+const NATIONAL = [
+  "ESPN", "ESPN2", "ABC", "FOX", "FS1", "NBC", "CBS", "TNT", "TBS",
+  "Netflix", "Prime Video", "Peacock", "Paramount+", "Apple TV",
+  "NFL Net", "NFL Network", "MLB Net", "NBA TV", "truTV",
+  "BTN", "SEC Network", "ACC Network", "ESPNU", "CBSSN",
+];
+
+/** The national network carrying it, or null. Used for ranking AND display. */
+export function nationalNetwork(broadcast: string | null): string | null {
+  if (!broadcast) return null;
+  const parts = broadcast.split(",").map((p) => p.trim());
+  // ESPN's order is meaningful — the lead broadcaster comes first — so the
+  // first national hit wins rather than the first in our list.
+  for (const p of parts) {
+    if (NATIONAL.some((n) => p.toLowerCase() === n.toLowerCase())) return p;
+  }
+  return null;
+}
+
+/**
  * Sort key. Lower is higher up.
  *
  * Live first regardless of sport — a game in progress beats a better game that
@@ -51,8 +80,9 @@ export function slateOrder(g: SlateGame): number[] {
   return [
     g.status === "live" ? 0 : g.status === "upcoming" ? 1 : 2,
     LEAGUE_RANK[g.league] ?? 9,
-    // On TV beats not on TV, inside the same league.
-    g.broadcast ? 0 : 1,
+    // NATIONALLY on TV beats not, inside the same league. Regional carriage
+    // is not a signal — see nationalNetwork.
+    nationalNetwork(g.broadcast) ? 0 : 1,
     // Then the ranked game, best poll position first.
     g.bestRank ?? 99,
     new Date(g.startTime).getTime(),
@@ -80,7 +110,7 @@ export function compareSlate(a: SlateGame, b: SlateGame): number {
 export function isWorthTheSlate(g: SlateGame): boolean {
   if (g.yours) return true;
   if (g.league !== "NCAAF" && g.league !== "NCAAB") return true;
-  return g.bestRank !== null || !!g.broadcast;
+  return g.bestRank !== null || !!nationalNetwork(g.broadcast);
 }
 
 const LIVE = ["in_progress", "live", "halftime"];

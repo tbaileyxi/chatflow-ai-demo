@@ -2,7 +2,12 @@ import { useMemo } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { type RoomGame } from "@/hooks/useRoomGames";
-import { useAllGames, compareSlate, isWorthTheSlate } from "@/hooks/useAllGames";
+import {
+  useAllGames,
+  compareSlate,
+  isWorthTheSlate,
+  nationalNetwork,
+} from "@/hooks/useAllGames";
 import { useNavigation } from "@react-navigation/native";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
@@ -83,7 +88,7 @@ export function GamesStrip({
           us: { ...us, teamId: us.teamId! },
           them: { ...them, teamId: them.teamId! },
           isHome: mineIsHome,
-          broadcast: g.broadcast,
+          broadcast: nationalNetwork(g.broadcast),
         };
       });
 
