@@ -29,6 +29,29 @@ ABSOLUTE RULES — breaking these ruins the product:
 
 Output the message text only — no quotes, no labels, no link, no questions.`;
 
+/**
+ * THE FREE LINE.
+ *
+ * ESPN already wrote the sentence. "Eli Raridon 2 Yd pass from Drake Maye
+ * (Andy Borregales Kick)" is accurate, names the player, and costs nothing —
+ * and on 12 September this bot spent 1.79 MILLION Sonnet tokens producing 358
+ * messages averaging 144 characters. Five thousand tokens of input per line,
+ * because the prompt below asks the model to dig a fact out of a whole box
+ * score, so the whole box score goes in every time.
+ *
+ * Most plays do not need that. A field goal is a field goal. This renders the
+ * routine ones straight from the feed, instantly and for nothing, and the
+ * model is kept for the moments that are actually worth a voice.
+ */
+export function plainLine(facts: Record<string, unknown>): string | null {
+  const play = String(facts.play ?? "").trim();
+  if (!play) return null;
+  const score = String(facts.scoreLine ?? "").trim();
+  // The play text already names who and what. The score is the one thing it
+  // does not carry, and it is the thing a room checks for.
+  return score ? `${play} — ${score}.` : play;
+}
+
 export interface VoiceResult {
   message: string;
   provider: string;

@@ -16,7 +16,7 @@ import { getProvider, fetchEspnLeaders, fetchEspnBoxScoreLines } from "../_share
 import { gateEvents } from "../_shared/bot/brain.ts";
 import { searchX } from "../_shared/coach/xsearch.ts";
 import { fetchPostMedia, pickBest, postIdFromUrl } from "../_shared/x/media.ts";
-import { generateMessage, defaultPersona } from "../_shared/bot/voice.ts";
+import { generateMessage, plainLine, defaultPersona } from "../_shared/bot/voice.ts";
 import { publish } from "../_shared/bot/publisher.ts";
 import { findNbaMatchForTeam, fetchGameStats, pickSide, shootingLine } from "../_shared/bot/highlightly.ts";
 import type { Game, League } from "../_shared/bot/types.ts";
@@ -260,6 +260,50 @@ serve(async (req) => {
 
       for (const game of followed) {
         if (game.status !== "in_progress" && game.status !== "halftime") continue;
+
+        // ASK THE CHEAP ENDPOINT FIRST.
+        //
+        // liveGames() is one scoreboard call per LEAGUE and already carries
+        // the score. gameEvents() is one call per GAME, every poll — fourteen
+        // games on an NFL Sunday, every ninety seconds, unkeyed, from a
+        // datacenter IP. ESPN already 403s Supabase on site.api; there is no
+        // reason to keep testing their patience for an answer we have.
+        //
+        // A game whose score has not moved since the last poll has nothing we
+        // would narrate, so it does not get opened. Halftime is skipped for
+        // the same reason: the score cannot change during it.
+        //
+        // FAILING OPEN IS DELIBERATE. Any error reading or writing the cursor
+        // falls through to fetching, because one wasted request is a much
+        // cheaper mistake than a missed touchdown.
+        const scoreNow = `${game.away?.score ?? 0}-${game.home?.score ?? 0}`;
+        let skip = false;
+        try {
+          const { data: cur } = await supabase
+            .from("poller_game_cursor")
+            .select("last_score, last_status")
+            .eq("game_provider_id", game.providerId)
+            .maybeSingle();
+          if (cur && cur.last_score === scoreNow && cur.last_status === game.status) {
+            skip = true;
+          } else {
+            await supabase.from("poller_game_cursor").upsert(
+              {
+                game_provider_id: game.providerId,
+                last_score: scoreNow,
+                last_status: game.status,
+                seen_at: new Date().toISOString(),
+              },
+              { onConflict: "game_provider_id" },
+            );
+          }
+        } catch (err) {
+          console.warn("[live-poller] cursor unavailable, fetching anyway", err);
+        }
+        if (skip) {
+          summary.games_unchanged = (summary.games_unchanged ?? 0) + 1;
+          continue;
+        }
 
         const plays = await provider.gameEvents(game.providerId, league);
         summary.plays_fetched += plays.length;
@@ -534,9 +578,26 @@ serve(async (req) => {
               scoredAgainstUs: t.conceded,
             };
 
+            // IS THIS WORTH A MODEL?
+            //
+            // Decided HERE, before any enrichment, because the box score
+            // fetch, the leaders backstop, the NBA shooting call and the
+            // recent-lines query exist for one reason: feeding the prompt. On
+            // a routine play they are all work done to fill a request we are
+            // no longer going to make.
+            //
+            // 70 sits between the clip bar (65) and the push bar (80).
+            // Excitement already weights closeness and late-game leverage, so
+            // this is "the moments a room would look up for" rather than a
+            // fixed share of plays — a blowout produces almost none and a
+            // one-score fourth quarter produces most of them.
+            const VOICE_MIN = Number(Deno.env.get("INGAME_VOICE_MIN") || 70);
+            const worthAVoice = (g.facts.excitementScore ?? 0) >= VOICE_MIN;
+
             // Real box-score stat leaders for ALL sports (ESPN). This is the
             // smart-bot fuel: "Brunson 31 PTS, 7 AST" / "Soto 3 H, 2 RBI".
-            try {
+            // Only fetched when a model is going to read it.
+            if (worthAVoice) try {
               // Box score first: it is populated for every sport (ESPN's
               // `leaders` array is empty for MLB) and it lets us look up the
               // specific player who just did the thing.
@@ -579,7 +640,7 @@ serve(async (req) => {
             }
 
             // NBA-only Highlightly shooting % (extra texture when available).
-            if (league === "NBA" && Deno.env.get("HIGHLIGHTLY_API_KEY")) {
+            if (worthAVoice && league === "NBA" && Deno.env.get("HIGHLIGHTLY_API_KEY")) {
               try {
                 const hgMatch = await findNbaMatchForTeam(dbTeam.name);
                 if (hgMatch) {
@@ -602,10 +663,10 @@ serve(async (req) => {
               }
             }
 
-            // What this bot already said in this team's rooms. One query per
-            // emit, cheap and capped, but it is the only way the model can
-            // avoid re-narrating the touchdown when the extra point lands.
-            try {
+            // What this bot already said in this team's rooms. Only matters
+            // when a model is writing — a plain line is ESPN's own text and
+            // cannot wander into repeating itself.
+            if (worthAVoice) try {
               const { data: hRows } = await supabase
                 .from("huddles").select("id").eq("team_id", dbTeam.id).limit(1);
               if (hRows?.[0]?.id) {
@@ -624,13 +685,32 @@ serve(async (req) => {
             }
 
             const persona = defaultPersona(dbTeam.name, dbTeam.league);
-            const voice = await generateMessage({
-              mode: "in_game",
-              team: dbTeam.name,
-              rival: t.opponent,
-              persona,
-              facts: enrichedFacts,
-            });
+
+            // The plain line is also the FALLBACK. If the model fails or comes
+            // back empty, a room that just saw a touchdown gets ESPN's
+            // sentence rather than silence.
+            const free = plainLine(enrichedFacts);
+            let voice: { message: string; provider: string; model: string };
+            if (worthAVoice) {
+              voice = await generateMessage({
+                mode: "in_game",
+                team: dbTeam.name,
+                rival: t.opponent,
+                persona,
+                facts: enrichedFacts,
+              });
+              if (!voice.message?.trim() && free) {
+                voice = { message: free, provider: "espn", model: "play-text" };
+              }
+            } else if (free) {
+              voice = { message: free, provider: "espn", model: "play-text" };
+            } else {
+              // No play text to fall back on — nothing to say for free, and
+              // this play did not clear the bar for paying. Skip it.
+              continue;
+            }
+            summary.voiced = (summary.voiced ?? 0) + (worthAVoice ? 1 : 0);
+            summary.free_lines = (summary.free_lines ?? 0) + (worthAVoice ? 0 : 1);
 
             // Record the play BEFORE publish to prevent double-emit if publish fails partway.
             const { data: seenRow, error: seenErr } = await supabase
