@@ -70,7 +70,7 @@ export function useInAppNotifications(limit = 12) {
     },
   });
 
-  /** Swipe a notification away. It is yours; nobody else can see it. */
+  /** Dismiss one. It is yours; nobody else can see it. */
   const remove = useMutation({
     mutationFn: async (notificationId: string) => {
       const { error } = await supabase
@@ -100,6 +100,22 @@ export function useInAppNotifications(limit = 12) {
     },
   });
 
+  /** Clear the lot. Same reasoning as Mark all read — a list you cannot empty
+      in one go is a list you stop opening. */
+  const removeAll = useMutation({
+    mutationFn: async () => {
+      if (!user) return;
+      const { error } = await supabase
+        .from("notifications")
+        .delete()
+        .eq("user_id", user.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
   const notifications = query.data ?? [];
   const unreadCount = notifications.filter((n) => !n.readAt).length;
 
@@ -110,5 +126,6 @@ export function useInAppNotifications(limit = 12) {
     markRead: markRead.mutateAsync,
     markAllRead: markAllRead.mutateAsync,
     removeNotification: remove.mutateAsync,
+    removeAllNotifications: removeAll.mutateAsync,
   };
 }

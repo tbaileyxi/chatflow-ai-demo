@@ -53,7 +53,11 @@ export function AdminWelcomeCard({ content, onInvite }: Props) {
       className="rounded-2xl bg-card px-4 py-3"
       style={{ borderLeftWidth: 3, borderLeftColor: colors.primary }}
     >
-      <Type variant="body" className="leading-6"  style={{ color: colors.foreground }}>
+      {/* MESSAGE, not body. `body` is 20/27 and this card then added
+          leading-6 on top of it, so the one message a new room opens with was
+          set three points larger and five points airier than every message
+          under it. It is a message. It reads at message size. */}
+      <Type variant="message" style={{ color: colors.foreground }}>
         {renderRich(body)}
       </Type>
 

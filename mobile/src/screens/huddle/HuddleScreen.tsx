@@ -61,7 +61,7 @@ import { fonts } from "@/theme/type";
 import { colors } from "@/theme/colors";
 import type { RootStackParamList } from "@/navigation/types";
 import { CoachThinking } from "@/components/huddle/CoachThinking";
-import { RoomBackground } from "@/components/huddle/RoomBackground";
+import { RoomBackground, isRealRoomPhoto } from "@/components/huddle/RoomBackground";
 import { SpinUpBar } from "@/components/huddle/SpinUpBar";
 import { useKnownPeople } from "@/hooks/useFriends";
 
@@ -766,6 +766,7 @@ export function HuddleScreen() {
                   isReply={isReply}
                   hideReplyQuote={!!prevMsg && prevMsg.id === msg.replyToId}
                   isGroupedWithPrev={isGroupedWithPrev}
+                  onPhoto={isRealRoomPhoto(huddle.photoUrl)}
                   // Drives the admin_welcome card's single CTA straight into
                   // the invite sheet the header already opens.
                   onInvite={() => setShowInvite(true)}

@@ -47,13 +47,16 @@ export function RoomBackground({ photoUrl }: { photoUrl?: string | null }) {
             style={StyleSheet.absoluteFillObject}
             resizeMode="cover"
           />
-          {/* Enough scrim that a bright tailgate photo can't take the text
-              with it. Message text is solid, but day separators and the
-              speaker names sit straight on this. */}
+          {/* LIGHT. This was 0.80, which is not a scrim, it is switching the
+              photo off — somebody uploads a tailgate shot and sees a dark
+              grey wall. Legibility is the plate behind each message's words
+              now (see ChatMessage), which is where the contrast is actually
+              needed. This just takes the edge off so the gradient and the
+              chrome still read. */}
           <View
             style={[
               StyleSheet.absoluteFillObject,
-              { backgroundColor: "rgba(10,10,11,0.80)" },
+              { backgroundColor: "rgba(10,10,11,0.35)" },
             ]}
           />
         </>

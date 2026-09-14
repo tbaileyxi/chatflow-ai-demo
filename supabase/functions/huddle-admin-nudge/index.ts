@@ -162,11 +162,11 @@ async function nudgeCopy(
         timeZone: "America/New_York",
       });
 
-      return `We're on ${when} against ${oppName} — and right now it's just you and me in here. 👀\n\nI'll call the game either way, but it hits different with a few people to argue with.\n\nAsk me anything with **@coach** — score, who's starting, what happened at camp.\nMake it private or manage who's in from **Settings**.\n\n**→ Add your crew**`;
+      return `${oppName}, ${when}. Right now it's just you in here.\n\n**@coach** me for the score, the lineup, anything.\n\n**→ Add your crew**`;
     }
   }
 
-  return `Still just us in here. 👀\n\nI can call the whole game, but it's a lot better with a section behind you. Two or three friends is all it takes.\n\nAsk me anything with **@coach**. Make it private or manage members from **Settings**.\n\n**→ Add your crew**`;
+  return `Just you in here so far.\n\n**@coach** me for scores, lineups, news.\n\n**→ Add your crew**`;
 }
 
 function json(body: unknown, status = 200): Response {

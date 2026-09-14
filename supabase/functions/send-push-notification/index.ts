@@ -191,12 +191,24 @@ Deno.serve(async (req) => {
       // room size stops mattering at all.
       const { data: presenceHuddle } = await supabase
         .from('huddles')
-        .select('is_private, name, team_id, member_count, is_official_team_huddle')
+        .select('is_private, name, team_id, member_count, is_official_team_huddle, is_dm')
         .eq('id', huddleId)
         .single();
 
       if (!presenceHuddle) {
         return new Response(JSON.stringify({ sent: 0, skipped: 'no_huddle' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // A DM IS NOT A ROOM YOU WALKED INTO.
+      //
+      // DMs are huddles underneath, named after the other person, so opening
+      // one fired "Johnny Utah is watching the game in 'JOE'" at JOE. The
+      // notification is about finding people to watch with; there is nobody to
+      // find in a conversation between two people who are already talking.
+      if (presenceHuddle.is_dm) {
+        return new Response(JSON.stringify({ sent: 0, skipped: 'dm' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }

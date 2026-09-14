@@ -55,6 +55,7 @@ export function HuddleSettingsScreen() {
   );
 
   const [bio, setBio] = useState("");
+  const [name, setName] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [adminUsername, setAdminUsername] = useState("");
   const [joinRequests, setJoinRequests] = useState<any[]>([]);
@@ -84,6 +85,10 @@ export function HuddleSettingsScreen() {
   useEffect(() => {
     if (huddle?.bio) setBio(huddle.bio);
   }, [huddle?.bio]);
+
+  useEffect(() => {
+    if (huddle?.name) setName(huddle.name);
+  }, [huddle?.name]);
 
   useEffect(() => {
     const loadOfficialMeta = async () => {
@@ -155,9 +160,13 @@ export function HuddleSettingsScreen() {
 
   const saveAbout = async () => {
     setSaving(true);
+    // An empty name would leave the room with no way to identify it in any
+    // list, so a blank field keeps the name it already has.
+    const nextName = name.trim();
     const { error } = await (supabase as any)
       .from("huddles")
       .update({
+        ...(nextName ? { name: nextName } : {}),
         bio: bio.trim() || null,
         website_url: websiteUrl.trim() || null,
       })
@@ -171,7 +180,7 @@ export function HuddleSettingsScreen() {
       );
       return;
     }
-    Alert.alert("Saved", "Official Huddle details updated.");
+    Alert.alert("Saved", "Huddle details updated.");
   };
 
   const flipOfficialStatus = async (next: "active" | "inactive") => {
@@ -760,10 +769,16 @@ export function HuddleSettingsScreen() {
               <CardTitle>About this huddle</CardTitle>
             </CardHeader>
             <CardContent className="gap-3">
+              {/* EDITABLE. It was locked to the value it was created with and
+                  still drawn as a text field, so a room named in a typo looked
+                  fixable and was not. Renaming a room you own is not dangerous
+                  — it is the most ordinary thing an owner does. */}
               <Input
                 label="Room Name"
-                value={huddle.name}
-                editable={false}
+                value={name}
+                onChangeText={(t) => setName(t.slice(0, 60))}
+                placeholder="Name this huddle"
+                maxLength={60}
               />
               <Textarea
                 value={bio}

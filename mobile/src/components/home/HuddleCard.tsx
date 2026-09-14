@@ -240,10 +240,20 @@ function ScoreStrip({ game, live }: { game: RoomGame; live: boolean }) {
         </Type>
       ) : null}
 
+      {/* "vs" / "at" is its OWN element, between the two sides.
+          It used to be glued to the opponent's NAME string while the crest was
+          rendered before that Type — so the badge landed on the wrong side of
+          the word and the line read "New York [76ers] vs Philadelphia". The
+          separator belongs between the teams, not inside one of them. */}
       <View style={{ width: 4 }} />
+      {!live ? (
+        <Type variant="data" tone="tertiary" style={{ fontSize: 11 }}>
+          {game.isHome ? "vs" : "at"}
+        </Type>
+      ) : null}
       <Crest url={game.them.logoUrl} />
       <Type variant="data" tone="muted" numberOfLines={1} style={{ fontSize: 11, flexShrink: 1 }}>
-        {live ? game.them.name : `${game.isHome ? "vs " : "at "}${game.them.name}`}
+        {game.them.name}
       </Type>
       {live ? (
         <Type variant="score" tone={them >= us ? "default" : "muted"} style={{ fontSize: 18 }}>

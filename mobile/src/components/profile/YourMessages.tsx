@@ -4,6 +4,8 @@ import { useNavigation } from "@react-navigation/native";
 import { MessageCircle } from "lucide-react-native";
 import { SectionLabel, Type } from "@/components/ui/Type";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
+import { useDmCounterparts } from "@/hooks/useDmCounterpart";
+import { personName } from "@/lib/personName";
 import { personColor } from "@/lib/personColor";
 import { colors } from "@/theme/colors";
 import { cardStyle } from "@/theme/cardStyle";
@@ -39,6 +41,10 @@ export function YourMessages() {
     [huddles],
   );
 
+  // The stored huddle name is the other person's name FROM THE CREATOR'S SIDE,
+  // so the recipient saw a thread named after themselves. Resolved per viewer.
+  const others = useDmCounterparts(dms.map((d) => d.id));
+
   if (dms.length === 0) return null;
 
   const unread = dms.filter((d) => d.hasUnread).length;
@@ -52,7 +58,13 @@ export function YourMessages() {
         Messages
       </SectionLabel>
 
-      {dms.map((d) => (
+      {dms.map((d) => {
+        const who = others.get(d.id);
+        // Their name in YOUR phone first, exactly as everywhere else. Falls
+        // back to the stored huddle name for a thread whose other member is
+        // gone.
+        const title = who ? personName(who) : d.name;
+        return (
         <Pressable
           key={d.id}
           onPress={() => navigation.navigate("Huddle", { huddleId: d.id })}
@@ -63,18 +75,18 @@ export function YourMessages() {
             className="h-[38px] w-[38px] items-center justify-center overflow-hidden rounded-full"
             style={{ backgroundColor: personColor(d.id) }}
           >
-            {d.teamLogoUrl ? (
-              <Image source={{ uri: d.teamLogoUrl }} className="h-full w-full" />
+            {who?.avatarUrl ? (
+              <Image source={{ uri: who.avatarUrl }} className="h-full w-full" />
             ) : (
               <Type variant="data" style={{ color: "#000", fontSize: 14 }}>
-                {d.name.slice(0, 1).toUpperCase()}
+                {title.slice(0, 1).toUpperCase()}
               </Type>
             )}
           </View>
 
           <View className="min-w-0 flex-1">
             <Type variant="captionStrong" numberOfLines={1} style={{ fontSize: 16 }}>
-              {d.name}
+              {title}
             </Type>
             {d.latestMessage ? (
               <Type
@@ -94,7 +106,8 @@ export function YourMessages() {
             />
           ) : null}
         </Pressable>
-      ))}
+        );
+      })}
     </View>
   );
 }

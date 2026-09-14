@@ -18,7 +18,6 @@ import * as FileSystem from "expo-file-system/legacy";
 import { Type } from "@/components/ui/Type";
 import { useAuth } from "@/hooks/useAuth";
 import { useInAppNotifications } from "@/hooks/useInAppNotifications";
-import { SwipeToDelete } from "@/components/ui/SwipeToDelete";
 import { consumeInvite, extractInviteCode } from "@/hooks/useInviteHandler";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,6 +78,7 @@ export function ProfileScreen() {
     markRead,
     markAllRead,
     removeNotification,
+    removeAllNotifications,
     isLoading: notificationsLoading,
   } = useInAppNotifications(8);
 
@@ -371,15 +371,17 @@ export function ProfileScreen() {
                 </Badge>
               )}
             </View>
-            {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="self-start px-0"
-                onPress={() => markAllRead()}
-              >
-                Mark all read
-              </Button>
+            {notifications.length > 0 && (
+              <View className="flex-row items-center gap-4">
+                {unreadCount > 0 && (
+                  <Pressable onPress={() => void markAllRead()} className="active:opacity-60">
+                    <Type variant="captionStrong" tone="primary">Mark all read</Type>
+                  </Pressable>
+                )}
+                <Pressable onPress={() => void removeAllNotifications()} className="active:opacity-60">
+                  <Type variant="captionStrong" tone="muted">Clear all</Type>
+                </Pressable>
+              </View>
             )}
             {notificationsLoading ? (
               <Type variant="caption" tone="muted">
@@ -400,11 +402,8 @@ export function ProfileScreen() {
                       !Array.isArray(d) &&
                       typeof (d as { url?: string }).url === "string");
                   return (
-                    <SwipeToDelete
-                      key={notification.id}
-                      onDelete={() => void removeNotification(notification.id)}
-                    >
                     <Pressable
+                      key={notification.id}
                       className={`rounded-xl border p-3 active:opacity-80 ${
                         notification.readAt
                           ? "border-border bg-muted/20"
@@ -424,6 +423,18 @@ export function ProfileScreen() {
                             <Type variant="captionStrong" tone="muted">
                               {formatNotificationTime(notification.createdAt)}
                             </Type>
+                            {/* An X, not a swipe. The swipe never claimed the
+                                gesture inside a scrolling list, and the red
+                                panel it revealed sat BEHIND rows whose own
+                                background is 10% opaque — so every row went
+                                red and nothing could be deleted. */}
+                            <Pressable
+                              onPress={() => void removeNotification(notification.id)}
+                              hitSlop={10}
+                              className="-mr-1 -mt-0.5 p-1 active:opacity-60"
+                            >
+                              <X color={colors.mutedForeground} size={15} />
+                            </Pressable>
                           </View>
                           <Type variant="caption" tone="muted" className="mt-1">
                             {notification.body}
@@ -455,7 +466,6 @@ export function ProfileScreen() {
                         </View>
                       </View>
                     </Pressable>
-                    </SwipeToDelete>
                   );
                 })}
               </View>

@@ -142,6 +142,8 @@ type Props = {
   onInvite?: () => void;
   /** Drop it from the list the moment the server agrees. */
   onDeleted?: () => void;
+  /** A real uploaded photo is behind the thread, so the words need a ground. */
+  onPhoto?: boolean;
 };
 
 // Strip raw URLs from bot message content so legacy posts (server fix now puts
@@ -203,6 +205,7 @@ export function ChatMessage({
   isGroupedWithPrev,
   onInvite,
   onDeleted,
+  onPhoto,
 }: Props) {
   const lastTapRef = useRef<number>(0);
   const [showPicker, setShowPicker] = useState(false);
@@ -571,7 +574,27 @@ export function ChatMessage({
                     "py-0.5",
                   )}
                   style={
-                    undefined
+                    // A PLATE, not a darker photo.
+                    //
+                    // The first attempt at this was an 80% black scrim over
+                    // the whole image plus a text shadow — which is to say,
+                    // the photo somebody chose was turned off in order to
+                    // make text readable over it. That is not a solution to
+                    // the problem, it is a way of avoiding it.
+                    //
+                    // The words get their own ground instead, and only when
+                    // there is a photo behind them. On black this is nothing
+                    // at all — no box comes back to a room that never needed
+                    // one.
+                    onPhoto
+                      ? {
+                          backgroundColor: "rgba(8,8,10,0.72)",
+                          borderRadius: 12,
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          alignSelf: "flex-start",
+                        }
+                      : undefined
                   }
                 >
                   {(() => {
