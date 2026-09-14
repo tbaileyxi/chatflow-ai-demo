@@ -43,6 +43,23 @@ export function FindYourPeople({ onDone }: { onDone?: () => void }) {
     setBusy(null);
   };
 
+  /**
+   * ADD EVERYONE, in one tap.
+   *
+   * These are people already in your phone who already have the app. Tapping
+   * Add fourteen times to reach a list you assembled yourself is a chore with
+   * no decision in it — the decision was made when you saved their number.
+   * One at a time stays for the case where you genuinely want to pick.
+   */
+  const pending = matches.filter((m) => !m.alreadyConnected);
+  const handleConnectAll = async () => {
+    setBusy("__all__");
+    for (const m of pending) {
+      await connect(m.userId);
+    }
+    setBusy(null);
+  };
+
   if (state === "idle") {
     return (
       <View>
@@ -188,8 +205,30 @@ export function FindYourPeople({ onDone }: { onDone?: () => void }) {
 
   return (
     <View>
-      <Type variant="title">
-        {matches.length} {matches.length === 1 ? "person" : "people"} you know.
+      <View className="flex-row items-end justify-between gap-3">
+        <Type variant="title" className="flex-1">
+          {matches.length} {matches.length === 1 ? "person" : "people"} you know.
+        </Type>
+        {pending.length > 1 ? (
+          <Pressable
+            onPress={handleConnectAll}
+            disabled={busy !== null}
+            className="rounded-full px-3.5 py-2 active:opacity-80"
+            style={{ backgroundColor: colors.primary, opacity: busy ? 0.5 : 1 }}
+          >
+            <Type variant="captionStrong" tone="onPrimary">
+              {busy === "__all__" ? "Adding…" : `Add all ${pending.length}`}
+            </Type>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {/* Matching is a LOOKUP; connecting is a social act. Nobody is linked
+          without a tap — and the match re-runs daily, so somebody who joins
+          next week turns up here then rather than being missed forever. */}
+      <Type variant="caption" tone="tertiary" className="mt-1">
+        Nobody is added until you say so. We check again each day, so anyone who
+        joins later shows up here.
       </Type>
 
       <ScrollView style={{ maxHeight: 340 }} className="mt-4">

@@ -331,9 +331,18 @@ function FriendsNowSection() {
               // Offline people stay on the list but read as background.
               style={f.isLive ? undefined : { opacity: 0.45 }}
             >
+              {/* ONE SIZE, SET IN NUMBERS.
+                  The photo used a Tailwind class (h-14 w-14) and the monogram
+                  took a number, so the two came out different heights — and
+                  because the name sits under them, a tile with a photo had its
+                  name at a different height from one without. Explicit pixels
+                  on both, in a fixed-height box, so the row lines up whatever
+                  each person has. */}
               <View
-                className="rounded-full p-0.5"
+                className="items-center justify-center rounded-full"
                 style={{
+                  height: 62,
+                  width: 62,
                   borderWidth: 2,
                   borderColor: f.isLive ? colors.primary : "transparent",
                 }}
@@ -341,10 +350,10 @@ function FriendsNowSection() {
                 {f.avatarUrl ? (
                   <Image
                     source={{ uri: f.avatarUrl }}
-                    className="h-14 w-14 rounded-full"
+                    style={{ height: 54, width: 54, borderRadius: 27 }}
                   />
                 ) : (
-                  <MonogramAvatar name={f.name} size={56} />
+                  <MonogramAvatar name={f.name} size={54} />
                 )}
               </View>
               <Type center variant="captionStrong" className="mt-1.5" numberOfLines={1}>
