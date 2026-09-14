@@ -80,8 +80,14 @@ export function GamesScreen() {
    * you land in the public one for the fixture.
    */
   const openGame = async (g: SlateGame) => {
+    // "YOURS" MUST NOT MEAN THE OFFICIAL COMMUNITY HUDDLE. You are a member
+    // of "New York Giants Community" without ever having made or chosen it,
+    // so tapping the Giants–Rams fixture matched it and took you to a lobby
+    // instead of the game. Home already excludes official huddles from Your
+    // Huddles; this used the same data with a different idea of "yours".
     const mine = (huddles ?? []).find(
-      (h) => h.teamId === g.home.teamId || h.teamId === g.away.teamId,
+      (h) => !h.isOfficialTeam &&
+        (h.teamId === g.home.teamId || h.teamId === g.away.teamId),
     );
     if (mine) {
       navigation.navigate("Huddle", { huddleId: mine.id });

@@ -588,8 +588,14 @@ export function HomeScreen() {
    */
   const handlePickGame = useCallback(
     async (game: RoomGame) => {
+      // "YOURS" MUST NOT MEAN THE OFFICIAL COMMUNITY HUDDLE. You are a member
+      // of "New York Giants Community" without ever having made or chosen it,
+      // so tapping the Giants–Rams fixture matched it and took you to a lobby
+      // instead of the game. Home already excludes official huddles from Your
+      // Huddles; this used the same data with a different idea of "yours".
       const mine = (myHuddles ?? []).find(
-        (h) => h.teamId === game.us.teamId || h.teamId === game.them.teamId,
+        (h) => !h.isOfficialTeam &&
+          (h.teamId === game.us.teamId || h.teamId === game.them.teamId),
       );
       if (mine) {
         navigation.navigate("Huddle", { huddleId: mine.id });
