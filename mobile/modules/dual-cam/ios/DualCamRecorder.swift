@@ -280,9 +280,38 @@ final class DualCamRecorder: NSObject {
    session a third output is more contention for a session already running two.
    */
   func capturePhoto(completion: @escaping (Result<URL, Error>) -> Void) {
+    capturePhoto(retriesLeft: 6, completion: completion)
+  }
+
+  /**
+   WAIT FOR THE FACE.
+
+   composite() drops the inset entirely when there is no front frame, and the
+   two cameras do not start delivering at the same instant — the back is
+   usually first. Tap quickly enough after the camera opens, or straight after
+   a recording (which clears the last front frame on finishWriting), and the
+   still came out as a plain back-camera photo with no selfie in it at all.
+
+   The whole point of this capture is that both cameras are in it, so a missing
+   front frame is worth waiting a few frames for rather than silently shipping
+   half the picture. Six tries at 50ms is 300ms — under the shutter delay
+   anybody notices, and if the front camera genuinely is not running we still
+   produce the photo rather than failing.
+   */
+  private func capturePhoto(
+    retriesLeft: Int,
+    completion: @escaping (Result<URL, Error>) -> Void
+  ) {
     bufferQueue.async { [weak self] in
       guard let self, let back = self.latestBackImage else {
         completion(.failure(RecorderError.notRecording))
+        return
+      }
+
+      if self.latestFrontImage == nil && retriesLeft > 0 {
+        self.bufferQueue.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+          self?.capturePhoto(retriesLeft: retriesLeft - 1, completion: completion)
+        }
         return
       }
 
