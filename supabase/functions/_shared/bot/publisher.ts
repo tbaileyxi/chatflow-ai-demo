@@ -179,19 +179,30 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
   // and the team's own rooms keep the voice. No extra cost, and the room that
   // holds both fanbases stops taking a side.
   const neutral = (input.plainText ?? "").trim();
-  const rows = huddles.map((h) => ({
+  const rows = huddles.map((h) => {
+    const content = (h as any).is_game_room && neutral ? neutral : body;
+    // FEED, OR VOICE.
+    //
+    // Both used to be message_type 'live_play', so the client could not tell
+    // "Wil Lutz 31 Yd Field Goal" — which is the game happening — from the
+    // Coach having an opinion about it. They are different things and they
+    // should not look alike. A row whose content IS the plain ESPN sentence
+    // is the feed; anything else came from a model.
+    const isFeed = mode === "in_game" && !!neutral && content === neutral;
+    return {
     huddle_id: h.id,
     user_id: systemUserId,
-    content: (h as any).is_game_room && neutral ? neutral : body,
+    content,
     embed_code: embedUrl,
     is_bot_message: true,
-    message_type: mode === "in_game" ? "live_play" : "news",
+    message_type: mode === "in_game" ? (isFeed ? "play_feed" : "live_play") : "news",
     // Source 2: when the news item has an action photo, the client renders it
     // inline below the text (ChatMessage already handles media_url + image).
     ...(input.imageUrl
       ? { media_url: input.imageUrl, media_type: "image" }
       : {}),
-  }));
+    };
+  });
 
   const { data: inserted, error: insertErr } = await client
     .from("huddle_messages")

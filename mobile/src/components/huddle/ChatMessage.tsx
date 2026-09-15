@@ -231,9 +231,21 @@ export function ChatMessage({
   // catch-all below — any embed_code routed them to the plain muted PulseBubble
   // card with no gold accent, which is exactly why the gold looked
   // inconsistent ("on some chats and not others"). Pin them out first.
+  /**
+   * A PLAY THAT HAPPENED, not somebody talking about it.
+   *
+   * "Wil Lutz 31 Yd Field Goal — Broncos 10, Chiefs 21" is the game. It has
+   * no author, no opinion and nothing to reply to, and drawing it with an
+   * avatar and a name made the feed look like the most talkative member of
+   * the room. It gets its own treatment below: no avatar, centred, quiet,
+   * with the score in mono because the score is data.
+   */
+  const isPlayFeed = message.messageType === "play_feed";
+
   const isNewsOrPlay =
     message.messageType === "news" ||
     message.messageType === "live_play" ||
+    message.messageType === "play_feed" ||
     // The Coach answering a question or posting a recap is the same voice as
     // the news/play bubble and must get the same gold treatment. Pinned here
     // for the same reason the others are: anything with an embed_code was
@@ -442,6 +454,54 @@ export function ChatMessage({
   // legacy youtube_highlight messages entirely so they stop polluting the feed.
   if (message.messageType === "youtube_highlight") {
     return null;
+  }
+
+  /**
+   * THE FEED IS NOT A PARTICIPANT.
+   *
+   * Rendered before everything below, because none of it applies: no avatar,
+   * no name, no reply target, no long-press menu. A day separator with facts
+   * in it.
+   *
+   * The score is split off and set in mono — the app already uses mono for
+   * data everywhere else, and it gives every play line the same recognisable
+   * ending, so the eye can skip to the number without reading the sentence.
+   */
+  if (isPlayFeed) {
+    const cut = message.content.lastIndexOf(" — ");
+    const play = cut > 0 ? message.content.slice(0, cut) : message.content;
+    const score = cut > 0 ? message.content.slice(cut + 3).replace(/\.$/, "") : null;
+
+    return (
+      <View className="px-5 py-1.5">
+        <Type
+          center
+          variant="message"
+          style={{
+            fontSize: 15,
+            lineHeight: 21,
+            color: "#8E8E98",
+            textShadowColor: "rgba(0,0,0,0.85)",
+            textShadowOffset: { width: 0, height: 1 },
+            textShadowRadius: 3,
+          }}
+        >
+          {play}
+          {score ? (
+            <Type
+              variant="data"
+              style={{
+                fontSize: 14,
+                color: "#C9C9D2",
+                fontFamily: fonts.monoMedium,
+              }}
+            >
+              {"   "}{score}
+            </Type>
+          ) : null}
+        </Type>
+      </View>
+    );
   }
 
   return (

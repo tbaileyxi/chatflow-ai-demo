@@ -675,6 +675,9 @@ serve(async (req) => {
                   .from("huddle_messages")
                   .select("content")
                   .eq("huddle_id", hRows[0].id)
+                  // Voiced lines only. A plain feed line is ESPN's own
+                  // sentence and cannot wander into repeating itself, so it is
+                  // not context the model needs.
                   .eq("message_type", "live_play")
                   .order("created_at", { ascending: false })
                   .limit(3);
