@@ -18,6 +18,7 @@ import {
 } from "@/hooks/useLiveGameContext";
 import { useTeamSponsors, logSponsorTap } from "@/hooks/useTeamSponsor";
 import { useAuth } from "@/hooks/useAuth";
+import { gameStatusLabel } from "@/hooks/useRoomGames";
 import { useDmCounterparts } from "@/hooks/useDmCounterpart";
 import { personName } from "@/lib/personName";
 import { blockUser, reportUser } from "@/lib/moderation";
@@ -155,7 +156,12 @@ function ScoreLine({ game, gameState }: { game: GameContext; gameState: GameStat
           numberOfLines={1}
           style={{ fontSize: 13, flexShrink: 0, marginLeft: "auto" }}
         >
-          {[game.period, game.clock].filter(Boolean).join(" ") || "LIVE"}
+          {/* BASEBALL HAS NO CLOCK, and the feed sends "0:00" anyway. Joining
+              period and clock blindly rendered "6 0:00" on a baseball game —
+              the sixth inning with four minutes left in it. gameStatusLabel
+              already knows every sport's shape and this header was the one
+              surface still doing its own thing. */}
+          {gameStatusLabel(game.sportKey ?? null, game.period, game.clock)}
         </Type>
       </View>
     );
