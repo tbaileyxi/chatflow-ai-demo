@@ -661,13 +661,19 @@ export function ChatMessage({
                     );
                     return (
                       <>
-                        {/* One step off white. A person says something; the
-                            bot is telling you what happened, and the voice
-                            should sit slightly behind theirs. */}
+                        {/* A STEP BACK FROM A PERSON'S VOICE.
+                            Same 17 as a person read as LARGER, because a
+                            person's line opens with their name in bold colour
+                            and the bot's is an unbroken block — so the eye
+                            meets more uninterrupted body text and calls it
+                            bigger. 16 with a looser line puts it behind
+                            without making it hard to read. */}
                         <Type
                           variant="message"
                           style={{
-                            color: "#CFCFD6",
+                            fontSize: 16,
+                            lineHeight: 22,
+                            color: "#B9B9C2",
                             textShadowColor: "rgba(0,0,0,0.85)",
                             textShadowOffset: { width: 0, height: 1 },
                             textShadowRadius: 3,

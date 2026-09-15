@@ -111,9 +111,15 @@ function sides(game: {
   // Two teams sharing a city — Mets and Yankees are both "New York" — are the
   // one case where the nickname is the only thing that tells them apart.
   const clash = !!an && an.toLowerCase() === hn.toLowerCase();
+  // EMPTY WHEN UNKNOWN, never a placeholder word.
+  //
+  // The team lookup comes back empty often enough on this database, and the
+  // fallbacks used to be the literal strings "Away" and "Home" — which
+  // teamAbbr then rendered as AWA and HOM over a live score. A scoreline that
+  // invents team names is worse than one that shows only the numbers.
   return {
-    away: (clash ? game.awayTeamName : null) || an || "Away",
-    home: (clash ? game.homeTeamName : null) || hn || "Home",
+    away: (clash ? game.awayTeamName : null) || an || "",
+    home: (clash ? game.homeTeamName : null) || hn || "",
   };
 }
 
@@ -133,12 +139,12 @@ function ScoreLine({ game, gameState }: { game: GameContext; gameState: GameStat
       <View className="mt-0.5 flex-row items-center gap-1.5">
         <PulsingDot />
         <Type variant="data" numberOfLines={1} style={{ fontSize: 14, flexShrink: 1 }}>
-          {teamAbbr(away)}{" "}
+          {away ? `${teamAbbr(away)} ` : ""}
           <Type variant="data" style={{ fontSize: 19, fontFamily: fonts.monoMedium }}>
             {game.awayScore ?? 0}
           </Type>
           <Type variant="data" tone="tertiary" style={{ fontSize: 14 }}>{"  ·  "}</Type>
-          {teamAbbr(home)}{" "}
+          {home ? `${teamAbbr(home)} ` : ""}
           <Type variant="data" style={{ fontSize: 19, fontFamily: fonts.monoMedium }}>
             {game.homeScore ?? 0}
           </Type>
