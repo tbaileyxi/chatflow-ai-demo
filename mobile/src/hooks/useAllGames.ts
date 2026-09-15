@@ -181,12 +181,13 @@ function useTeamsIndex() {
 
 export function useAllGames(followedTeamIds: string[]) {
   const key = [...followedTeamIds].sort().join(",");
-  const { data: teamRows } = useTeamsIndex();
+  const teamsQuery = useTeamsIndex();
+  const teamRows = teamsQuery.data;
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["all-games", key, (teamRows ?? []).length],
-    // Names come from the cached index; without them every side would render
-    // as an empty string, so wait rather than draw a blank scoreboard.
+    // Waits for the names — a scoreboard of blank team names is worse than a
+    // spinner. But the WAITING has to look like waiting: see below.
     enabled: (teamRows ?? []).length > 0,
     staleTime: 30_000,
     // 90s, not 60. Every refetch is a round trip on a database whose floor is
@@ -311,4 +312,17 @@ export function useAllGames(followedTeamIds: string[]) {
       });
     },
   });
+
+  // "NOTHING ON" MUST NOT MEAN "STILL LOADING".
+  //
+  // The slate is gated on the team index above, and that select takes ten
+  // seconds against this database. So for ten seconds the slate query had not
+  // run, `data` was undefined, and the Games tab rendered its empty state —
+  // telling somebody there was no football on while the game was 14-7 in the
+  // third. A disabled query reports isLoading false, which is technically
+  // true and completely useless to the screen.
+  return {
+    ...query,
+    isLoading: query.isLoading || teamsQuery.isLoading || !teamRows,
+  } as typeof query;
 }
