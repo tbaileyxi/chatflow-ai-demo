@@ -37,12 +37,15 @@ export function SpinUpBar({
   const names = friendsHere.slice(0, 2).map((f) => f.displayName.split(/\s+/)[0]);
   // "Spin up a side huddle · just you" read as though the room you are
   // standing in were the thing being made. It is about THIS game.
+  // WHO, only. The expiry is appended once where this is rendered, and every
+  // branch here used to carry its own copy of it — so the line read
+  // "You · gone at 2am · gone at 2am".
   const label =
     friendsHere.length === 0
-      ? "You · gone at 2am"
+      ? "You"
       : friendsHere.length > 2
-        ? `You + ${names.join(", ")} +${friendsHere.length - 2} here · gone at 2am`
-        : `You + ${names.join(" and ")} here · gone at 2am`;
+        ? `You + ${names.join(", ")} +${friendsHere.length - 2} here`
+        : `You + ${names.join(" and ")} here`;
 
   return (
     <View className="px-4 pb-1 pt-2">
