@@ -100,12 +100,20 @@ function sides(game: {
   awayTeamName: string | null; homeTeamName: string | null;
   awayTeamCity: string | null; homeTeamCity: string | null;
 }): { away: string; home: string } {
-  const an = game.awayTeamName ?? "";
-  const hn = game.homeTeamName ?? "";
+  // PLACE, NOT MASCOT — the same rule the rest of the app follows, and the
+  // one every scorebug on television uses.
+  //
+  // This returned the nickname and handed it to teamAbbr(), which is written
+  // to take a place: "Broncos" became BRO and "Chiefs" became CHI. Nobody
+  // abbreviates them that way. From the city they become DEN and KC.
+  const an = game.awayTeamCity || game.awayTeamName || "";
+  const hn = game.homeTeamCity || game.homeTeamName || "";
+  // Two teams sharing a city — Mets and Yankees are both "New York" — are the
+  // one case where the nickname is the only thing that tells them apart.
   const clash = !!an && an.toLowerCase() === hn.toLowerCase();
   return {
-    away: (clash ? game.awayTeamCity : null) ?? an ?? "Away",
-    home: (clash ? game.homeTeamCity : null) ?? hn ?? "Home",
+    away: (clash ? game.awayTeamName : null) || an || "Away",
+    home: (clash ? game.homeTeamName : null) || hn || "Home",
   };
 }
 

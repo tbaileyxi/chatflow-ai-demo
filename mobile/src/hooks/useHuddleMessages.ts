@@ -205,7 +205,15 @@ export function useHuddleMessages(huddleId: string) {
         async (payload) => {
           const msg = payload.new as any;
 
-          const profileMap = await fetchProfiles([msg.user_id]);
+          // The profile lookup is a SECOND round trip before this message can
+          // be drawn, and if it throws the message is lost — realtime does not
+          // redeliver. Never let a name cost us the message it belongs to.
+          let profileMap = new Map<string, any>();
+          try {
+            profileMap = await fetchProfiles([msg.user_id]);
+          } catch (err) {
+            console.warn("[chat] profile lookup failed; showing message anyway", err);
+          }
           const newMessage = mapRow(msg, profileMap);
 
           // Prepend to cache (newest first). Guard against duplicates —
@@ -286,14 +294,42 @@ export function useHuddleMessages(huddleId: string) {
         }
       }
 
-      const { error } = await supabase.from("huddle_messages").insert({
+      // RETURNS THE ROW, and we put it on screen ourselves.
+      //
+      // Until now a sent message appeared ONLY when the realtime INSERT event
+      // came back. When realtime was slow or not connected, the row was in the
+      // database and nowhere on the screen — which is exactly what it looks
+      // like when sending is broken, so people retype and send again.
+      //
+      // The realtime handler already guards against duplicates by id, so
+      // whichever arrives second is ignored.
+      const { data: rows, error } = await supabase.from("huddle_messages").insert({
         huddle_id: huddleId,
         user_id: userId,
         content,
         ...(replyToId ? { reply_to_id: replyToId } : {}),
         ...(mediaUrl ? { media_url: mediaUrl, media_type: mediaType } : {}),
         ...(messageType ? { message_type: messageType } : {}),
-      });
+      })
+        .select();
+
+      if (!error && rows?.[0]) {
+        let profileMap = new Map<string, any>();
+        try {
+          profileMap = await fetchProfiles([userId]);
+        } catch {
+          // Your own message without your own name still beats no message.
+        }
+        const mine = mapRow(rows[0] as any, profileMap);
+        queryClient.setQueryData<HuddleMessage[]>(
+          ["huddle-messages", huddleId],
+          (old) => {
+            if (!old) return [mine];
+            if (old.some((m) => m.id === mine.id)) return old;
+            return [mine, ...old];
+          },
+        );
+      }
 
       // Fire push notification (edge function handles 30-min throttle)
       if (!error && notifContext) {
@@ -313,7 +349,7 @@ export function useHuddleMessages(huddleId: string) {
 
       return { error };
     },
-    [huddleId],
+    [huddleId, queryClient],
   );
 
   return {
