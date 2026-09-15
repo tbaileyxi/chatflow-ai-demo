@@ -147,48 +147,10 @@ const LEAGUE_OF: Record<string, string> = {
  * nothing is hidden. A filter would recreate the problem: you came here
  * precisely to look at a game that isn't yours.
  */
-/**
- * TEAMS ARE NOT LIVE DATA.
- *
- * They were fetched inside the slate query, so all 396 rows came down again
- * every 60 seconds on Home AND on Games. On this database that single select
- * measured between 8 and 18 seconds, and it was the slowest thing either
- * screen did — to learn a set of names and crests that change about twice a
- * year.
- *
- * Its own query, cached for the session. The slate keeps refetching; the
- * names stop coming with it.
- */
-function useTeamsIndex() {
-  return useQuery({
-    queryKey: ["teams-index"],
-    staleTime: 12 * 60 * 60 * 1000,
-    gcTime: 24 * 60 * 60 * 1000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("teams")
-        .select("id, name, city, logo_url, league");
-      if (error) {
-        console.warn("[teams] index failed", error);
-        return [];
-      }
-      return data ?? [];
-    },
-  });
-}
-
 export function useAllGames(followedTeamIds: string[]) {
   const key = [...followedTeamIds].sort().join(",");
-  const teamsQuery = useTeamsIndex();
-  const teamRows = teamsQuery.data;
-
-  const query = useQuery({
-    queryKey: ["all-games", key, (teamRows ?? []).length],
-    // Waits for the names — a scoreboard of blank team names is worse than a
-    // spinner. But the WAITING has to look like waiting: see below.
-    enabled: (teamRows ?? []).length > 0,
+  return useQuery({
+    queryKey: ["all-games", key],
     staleTime: 30_000,
     // 90s, not 60. Every refetch is a round trip on a database whose floor is
     // currently a second or two, and a scoreboard that is 90 seconds stale is
@@ -224,7 +186,30 @@ export function useAllGames(followedTeamIds: string[]) {
         console.warn("[all-games] no tv/rank columns yet:", gamesRes.error.message);
         gamesRes = await gamesQuery(CORE);
       }
-      const teamsRes = { data: teamRows ?? [] };
+      // ONLY THE TEAMS THAT ARE PLAYING.
+      //
+      // This used to pull all 396 rows — 74KB, and between 2 and 13 SECONDS
+      // against this database — to learn the names of the handful of teams in
+      // today's games. Worse, the slate was gated on it, so the Games tab sat
+      // on its empty state for the whole of that, telling people no football
+      // was on during a game.
+      //
+      // The games already name their teams. In tonight's window that is 32
+      // teams and 5KB. Fetched AFTER the games, so nothing blocks on it.
+      const wanted = [
+        ...new Set(
+          ((gamesRes.data ?? []) as any[])
+            .flatMap((g) => [g.home_team_id, g.away_team_id])
+            .filter(Boolean),
+        ),
+      ] as string[];
+
+      const teamsRes = wanted.length
+        ? await supabase
+            .from("teams")
+            .select("id, name, city, logo_url, league")
+            .in("id", wanted)
+        : { data: [] as any[] };
 
       const teams = new Map(
         (teamsRes.data ?? []).map((t: any) => [t.id, t]),
@@ -312,17 +297,4 @@ export function useAllGames(followedTeamIds: string[]) {
       });
     },
   });
-
-  // "NOTHING ON" MUST NOT MEAN "STILL LOADING".
-  //
-  // The slate is gated on the team index above, and that select takes ten
-  // seconds against this database. So for ten seconds the slate query had not
-  // run, `data` was undefined, and the Games tab rendered its empty state —
-  // telling somebody there was no football on while the game was 14-7 in the
-  // third. A disabled query reports isLoading false, which is technically
-  // true and completely useless to the screen.
-  return {
-    ...query,
-    isLoading: query.isLoading || teamsQuery.isLoading || !teamRows,
-  } as typeof query;
 }
