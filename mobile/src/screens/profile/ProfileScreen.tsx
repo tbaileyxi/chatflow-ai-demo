@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
+import { shrinkAvatar } from "@/lib/shrinkImage";
 import * as FileSystem from "expo-file-system/legacy";
 import { Type } from "@/components/ui/Type";
 import { useAuth } from "@/hooks/useAuth";
@@ -191,7 +192,10 @@ export function ProfileScreen() {
 
     setUploadingAvatar(true);
     try {
-      const asset = result.assets[0];
+      // SHRUNK FIRST, and to JPEG. The picker's `quality` does nothing to a
+      // PNG, which is how the avatar in this room became a 470 KB file that
+      // took half a minute to load — for a circle drawn at 62 points.
+      const asset = await shrinkAvatar(result.assets[0].uri);
 
       // Use the auth session's CURRENT user id (not the React context user) so
       // it matches what RLS sees in auth.uid().  Avoids "new row violates RLS"

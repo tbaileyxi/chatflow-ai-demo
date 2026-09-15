@@ -21,6 +21,7 @@ import {
   Video,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
+import { shrinkPhoto } from "@/lib/shrinkImage";
 import { Type } from "@/components/ui/Type";
 import { colors } from "@/theme/colors";
 import { type } from "@/theme/type";
@@ -116,7 +117,10 @@ export function MessageInput({
       allowsEditing: true,
     });
     if (!result.canceled && result.assets[0]) {
-      setMedia({ uri: result.assets[0].uri, type: "image" });
+      // Resized BEFORE it is attached, so the upload is a few hundred KB
+      // rather than a few MB. See lib/shrinkImage.
+      const small = await shrinkPhoto(result.assets[0].uri);
+      setMedia({ uri: small.uri, type: "image" });
     }
   };
 
@@ -131,7 +135,8 @@ export function MessageInput({
       allowsEditing: true,
     });
     if (!result.canceled && result.assets[0]) {
-      setMedia({ uri: result.assets[0].uri, type: "image" });
+      const small = await shrinkPhoto(result.assets[0].uri);
+      setMedia({ uri: small.uri, type: "image" });
     }
   };
 
