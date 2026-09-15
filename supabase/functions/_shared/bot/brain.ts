@@ -311,5 +311,34 @@ function bigNonScoringMoment(
   if (yards && Number(yards[1]) >= 40) {
     return { note: `${yards[1]}-yard play`, weight: 70 };
   }
+
+  // ── THE GAMECAST TIER ──────────────────────────────────────────────────────
+  //
+  // Everything above is loud enough to deserve a voice. Everything below is
+  // just worth KNOWING — the room was silent for ten minutes between scores,
+  // which is the stretch a gamecast exists to fill.
+  //
+  // Weights are deliberately under the voice threshold (INGAME_VOICE_MIN,
+  // default 70), so these always render as ESPN's own sentence and never as
+  // the bot having an opinion. That is the whole point: more plays, not more
+  // narration.
+  //
+  // TIGHT ON PURPOSE. First downs are excluded, and they are the reason —
+  // roughly forty a game, one every ninety seconds, which would push the
+  // actual conversation off the screen. A bot that narrates every snap gets
+  // muted, and then it never gets to say the thing that mattered. They can be
+  // added here later; they cannot be un-muted later.
+  if (/\bsack(ed)?\b/.test(t)) return { note: "Sack", weight: 45 };
+  if (/\b4th down\b|\bfourth down\b/.test(t)) return { note: "Fourth down", weight: 55 };
+  if (/\bfield goal\b.*\b(no good|missed|blocked)\b/.test(t)) {
+    return { note: "Missed field goal", weight: 60 };
+  }
+  if (/\bpunt(s|ed)?\b/.test(t) && /\bblocked\b/.test(t)) {
+    return { note: "Blocked punt", weight: 65 };
+  }
+  // Inside the twenty is where a drive becomes points or nothing.
+  if (/\bto the [A-Z]{2,4} (\d|1[0-9]|20)\b/.test(play.description ?? "")) {
+    return { note: "Red zone", weight: 40 };
+  }
   return null;
 }
