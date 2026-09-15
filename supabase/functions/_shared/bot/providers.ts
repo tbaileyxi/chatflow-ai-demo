@@ -343,8 +343,26 @@ export class EspnProvider implements SportsDataProvider {
       flatPlays.push(...data.drives.current.plays);
     }
 
+    // THE CLEAN SENTENCE LIVES IN A DIFFERENT ARRAY.
+    //
+    // drives[].plays[].text is raw play-by-play, written for a gamecast that
+    // shows it beside a field diagram:
+    //   "(Shotgun) P.Mahomes scrambles up the middle for 15 yards, TOUCHDOWN.
+    //    H.Butker extra point is GOOD, Center-J.Winchester, Holder-M.Araiza."
+    // The holder and the long snapper are in there. Nobody in a chat room
+    // wants that, and shortText does not exist on these objects at all.
+    //
+    // ESPN also publishes `scoringPlays`, the same play written for a human:
+    //   "Patrick Mahomes 15 Yd Rush (Harrison Butker Kick)"
+    // Same id, so it can be matched exactly rather than guessed at.
+    const cleanById = new Map<string, string>();
+    for (const sp of (Array.isArray(data?.scoringPlays) ? data.scoringPlays : [])) {
+      const t = String(sp?.text ?? "").trim();
+      if (sp?.id && t) cleanById.set(String(sp.id), t);
+    }
+
     const events = flatPlays
-      .map((p) => normalizeEspnPlay(p, game))
+      .map((p) => normalizeEspnPlay(p, game, cleanById))
       .filter((e): e is PlayEvent => e !== null);
 
     // Sort chronologically. NOTHING guaranteed this before, and two things
@@ -395,9 +413,17 @@ export class EspnProvider implements SportsDataProvider {
   }
 }
 
-function normalizeEspnPlay(p: any, game: Game): PlayEvent | null {
+function normalizeEspnPlay(
+  p: any,
+  game: Game,
+  cleanById?: Map<string, string>,
+): PlayEvent | null {
   if (!p?.id) return null;
-  const text = String(p.text ?? p.shortText ?? "");
+  // The readable version when ESPN has one for this play, the raw one
+  // otherwise — a non-scoring play has no scoringPlays entry.
+  const text = String(
+    cleanById?.get(String(p.id)) ?? p.text ?? p.shortText ?? "",
+  );
   const scoreValue = typeof p.scoreValue === "number" ? p.scoreValue : (p.scoringPlay ? Number(p.scoreValue ?? 0) : 0);
   const teamProviderId = String(p?.team?.id ?? p?.start?.team?.id ?? "");
   return {

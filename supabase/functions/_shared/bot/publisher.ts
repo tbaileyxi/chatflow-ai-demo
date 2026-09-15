@@ -17,6 +17,8 @@ export interface PublishInput {
   excitementScore?: number;
   shouldPush?: boolean;
   newsLink?: string;                        // appended outside the model (news mode)
+  /** ESPN's own sentence. Used verbatim in public game rooms, which have no side. */
+  plainText?: string;
   imageUrl?: string;                        // Source 2: article action photo (og:image)
 }
 
@@ -74,7 +76,7 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
   // staring at a blank screen.
   const { data: allHuddles, error: huddlesErr } = await client
     .from("huddles")
-    .select("id")
+    .select("id, is_game_room")
     .eq("team_id", teamId);
   if (huddlesErr) {
     console.error("[publisher] huddle lookup failed", huddlesErr);
@@ -161,10 +163,26 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
   }
 
   // 4. Fan-out insert into huddle_messages.
+  //
+  // A GAME ROOM GETS THE NEUTRAL LINE.
+  //
+  // One voiced line is generated per TEAM and then fanned out to every room
+  // that team has — which includes the public room for the fixture, where the
+  // other team's fans are sitting. So "house money for the defense, Mahomes
+  // and the offense already cashed in" landed in Denver·Kansas City, a room
+  // stamped Kansas City only because a fixture room has to be stamped
+  // something.
+  //
+  // Generating a second, neutral line would mean a second model call per play.
+  // There is already a neutral line in hand — ESPN's own sentence, which is
+  // what every routine play now uses anyway — so the fixture room gets that
+  // and the team's own rooms keep the voice. No extra cost, and the room that
+  // holds both fanbases stops taking a side.
+  const neutral = (input.plainText ?? "").trim();
   const rows = huddles.map((h) => ({
     huddle_id: h.id,
     user_id: systemUserId,
-    content: body,
+    content: (h as any).is_game_room && neutral ? neutral : body,
     embed_code: embedUrl,
     is_bot_message: true,
     message_type: mode === "in_game" ? "live_play" : "news",

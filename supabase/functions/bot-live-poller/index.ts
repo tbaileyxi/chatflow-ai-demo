@@ -740,6 +740,9 @@ serve(async (req) => {
               facts: g.facts,
               excitementScore: g.facts.excitementScore,
               shouldPush: g.shouldPush,
+              // ESPN's own sentence, for the public fixture room — it holds
+              // both fanbases and must not take a side. See publisher step 4.
+              plainText: free ?? undefined,
             });
             summary.posts += result.huddleIdsPosted.length;
             if (result.pushed) summary.pushes += 1;
