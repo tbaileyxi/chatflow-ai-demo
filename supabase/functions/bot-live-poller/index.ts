@@ -16,6 +16,7 @@ import { getProvider, fetchEspnLeaders, fetchEspnBoxScoreLines } from "../_share
 import { gateEvents } from "../_shared/bot/brain.ts";
 import { searchX } from "../_shared/coach/xsearch.ts";
 import { fetchPostMedia, pickBest, postIdFromUrl } from "../_shared/x/media.ts";
+import { findTeamClips, pickClip } from "../_shared/x/teamClips.ts";
 import { generateMessage, plainLine, defaultPersona } from "../_shared/bot/voice.ts";
 import { publish } from "../_shared/bot/publisher.ts";
 import { findNbaMatchForTeam, fetchGameStats, pickSide, shootingLine } from "../_shared/bot/highlightly.ts";
@@ -860,7 +861,10 @@ async function processPendingClips(supabase: any, summary: any) {
   if (!Deno.env.get("X_API_BEARER_TOKEN")) return;
 
   const PER_RUN     = Number(Deno.env.get("XLIVE_PER_RUN") || 1);
-  const MAX_READS   = Number(Deno.env.get("XLIVE_MAX_READS") || 3);
+  // TEN, because that is the X API's floor for a recent search — asking for 3
+  // still bills 10. What keeps a game cheap is how OFTEN we ask, and that is
+  // XLIVE_PER_GAME (3) times XLIVE_MAX_TRIES (3) as the worst case.
+  const MAX_READS   = Number(Deno.env.get("XLIVE_MAX_READS") || 10);
   const MAX_TRIES   = Number(Deno.env.get("XLIVE_MAX_TRIES") || 3);
   const RETRY_MIN   = Number(Deno.env.get("XLIVE_RETRY_MIN") || 5);
 
@@ -892,36 +896,51 @@ async function processPendingClips(supabase: any, summary: any) {
     summary.x_attempts += 1;
 
     try {
-      // Ask about the GAME, not the single play — naming the exact play was
-      // what returned nothing 12 times out of 12. The play is a good reason to
-      // go looking and a terrible search term.
+      // ASK THE TEAM'S OWN ACCOUNT.
       //
-      // The room has a side. "Best clip from the game" once put a Blue Jays
-      // highlight in a Yankees room: technically responsive, completely wrong.
-      const who = row.scorer ? ` Especially ${row.scorer}.` : "";
-      const found = await searchX(
-        `Find a video or photo of the ${row.team_name} posted in the last two hours, ` +
-          `from their game against the ${row.opponent} being played today.${who} ` +
-          `It must feature the ${row.team_name} — their players, their bench, their fans, ` +
-          `or a play that happened to them. ` +
-          `Do NOT return ${row.opponent} highlights or posts celebrating the ${row.opponent}. ` +
-          `Ignore previews, predictions, betting picks and old highlights.`,
-      );
+      // This used to pay xAI to search X in natural language, then pay X again
+      // to read each URL xAI cited — two providers, four-ish billable calls per
+      // attempt, and 7 clips from 93 attempts. "Find a video of this play" is a
+      // vague question, and it was never scoped to the account that actually
+      // posts the video.
+      //
+      // Now it is one request to the club's own handle, media attached, since
+      // the play. The search returns the post AND its media, so there is no
+      // second read, and xAI is out of the in-game path completely.
+      const { data: handleRows } = await supabase
+        .from("team_x_accounts")
+        .select("handle")
+        .eq("team_id", row.team_id)
+        .order("priority", { ascending: true });
+      const handles = (handleRows ?? []).map((h: any) => h.handle);
 
-      // Zero citations has two very different causes and they looked
-      // identical from the outside: xAI erroring (bad key, quota, 5xx) returns
-      // the same empty shape as xAI genuinely finding no clip. Weeks of "the
-      // search comes back empty" could have been either. found.ok separates
-      // them, so the next time this is quiet we know which thing to fix.
-      if (!found.ok) summary.x_search_failed += 1;
+      if (handles.length === 0) {
+        // No handle for this team is not a failure to retry — it is a gap in
+        // the seed, and looking again in five minutes will not fill it.
+        // Burn the remaining tries rather than writing a new status value —
+        // `status` has a check constraint and inventing a word for it here is
+        // how a migration and a function quietly disagree.
+        summary.x_no_handle = (summary.x_no_handle ?? 0) + 1;
+        await supabase.from("pending_clips")
+          .update({ attempts: MAX_TRIES }).eq("id", row.id);
+        continue;
+      }
 
-      const ids = [...new Set(
-        found.citations.map(postIdFromUrl).filter(Boolean) as string[],
-      )].slice(0, MAX_READS);
-      summary.x_citations += ids.length;
-      summary.x_moment_reads += ids.length;
+      // Since the play, not since the queue. A highlight posted before the
+      // play happened is a highlight of something else.
+      const since = new Date(
+        new Date(row.created_at).getTime() - 60_000,
+      ).toISOString();
 
-      const best = ids.length ? pickBest(await fetchPostMedia(ids)) : null;
+      const found = await findTeamClips(handles, since, MAX_READS);
+      if (!found.ok) {
+        summary.x_search_failed += 1;
+        summary.x_last_error = found.error ?? null;
+      }
+      // What we were actually billed for, so spend is visible in the run.
+      summary.x_moment_reads += found.postsRead;
+
+      const best = pickClip(found.media);
 
       // The same clip, twice.
       //
