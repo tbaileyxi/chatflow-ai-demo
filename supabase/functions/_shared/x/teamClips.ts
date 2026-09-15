@@ -17,13 +17,16 @@
 
 import type { XMedia } from "./media.ts";
 
+/** XMedia plus the one field that separates a highlight from a graphic. */
+type Clip = XMedia & { durationMs: number | null };
+
 const API = "https://api.x.com/2/tweets/search/recent";
 
 export interface ClipSearchResult {
   ok: boolean;
   /** Billable posts returned — for the run summary, so spend is visible. */
   postsRead: number;
-  media: XMedia[];
+  media: Clip[];
   error?: string;
 }
 
@@ -50,7 +53,7 @@ export async function findTeamClips(
     start_time: sinceIso,
     "tweet.fields": "created_at,public_metrics,attachments",
     expansions: "attachments.media_keys,author_id",
-    "media.fields": "type,url,preview_image_url,variants",
+    "media.fields": "type,url,preview_image_url,variants,duration_ms",
     "user.fields": "username",
   });
 
@@ -78,7 +81,7 @@ export async function findTeamClips(
   const users = new Map<string, any>();
   for (const u of j?.includes?.users ?? []) users.set(u.id, u);
 
-  const out: XMedia[] = [];
+  const out: Clip[] = [];
   for (const p of posts) {
     const keys: string[] = p?.attachments?.media_keys ?? [];
     keys.forEach((key, i) => {
@@ -118,6 +121,7 @@ export async function findTeamClips(
       }
 
       out.push({
+        durationMs: typeof m.duration_ms === "number" ? m.duration_ms : null,
         postId: String(p.id),
         authorHandle: handle,
         text: p.text ?? "",
@@ -146,12 +150,32 @@ export async function findTeamClips(
  * then the real highlight two minutes later" pattern means the photo is
  * usually the placeholder. Cover attachment only, then most liked.
  */
-export function pickClip(items: XMedia[]): XMedia | null {
+export function pickClip(items: Clip[]): Clip | null {
   const covers = items.filter((m) => m.index === 0);
   const pool = covers.length > 0 ? covers : items;
-  const videos = pool.filter((m) => m.type !== "photo" && m.videoUrl);
-  const best = (videos.length > 0 ? videos : pool)
-    .slice()
-    .sort((a, b) => b.likes - a.likes);
-  return best[0] ?? null;
+
+  // A HIGHLIGHT, NOT A GRAPHIC.
+  //
+  // Teams post a branded motion graphic the moment something happens — the
+  // player's name flying in over a logo — and the actual footage several
+  // minutes later. Both come back as video, and the graphic is usually first.
+  //
+  // Two things separate them. An animated GIF is never footage. And length:
+  // a graphic loops for three to eight seconds, while a real highlight runs
+  // fifteen or more because it has a build-up and an aftermath.
+  const footage = pool.filter(
+    (m) =>
+      m.type === "video" &&
+      m.videoUrl &&
+      (m.durationMs === null || m.durationMs >= 12_000),
+  );
+  if (footage.length > 0) {
+    return footage.slice().sort((a, b) => b.likes - a.likes)[0];
+  }
+
+  // Nothing that looks like footage. Returning the graphic anyway is how the
+  // room gets a name card instead of a catch, so: nothing. The play stays
+  // queued and the next retry looks again, by which time the real clip is
+  // usually up.
+  return null;
 }
