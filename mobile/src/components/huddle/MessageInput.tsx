@@ -85,6 +85,14 @@ export function MessageInput({
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [showPlus, setShowPlus] = useState(false);
+  // An action picked from the ＋ sheet, held until the sheet has finished
+  // closing — see the sheet's onPress for why it can't run straight away.
+  const pendingActionRef = useRef<(() => void) | null>(null);
+  const runPendingAction = () => {
+    const run = pendingActionRef.current;
+    pendingActionRef.current = null;
+    run?.();
+  };
   const [media, setMedia] = useState<MediaAttachment | null>(null);
   const inputRef = useRef<TextInput>(null);
 
@@ -426,6 +434,7 @@ export function MessageInput({
         transparent
         animationType="fade"
         onRequestClose={() => setShowPlus(false)}
+        onDismiss={runPendingAction}
       >
         <Pressable
           className="flex-1 justify-end bg-black/60"
@@ -443,8 +452,15 @@ export function MessageInput({
                 key={a.key}
                 disabled={a.soon}
                 onPress={() => {
+                  // Close first, act once the sheet is gone. iOS will not
+                  // present the photo picker over a modal that is still
+                  // animating closed — it drops the request with no error, so
+                  // "From your library" closed the sheet and did nothing.
+                  pendingActionRef.current = a.run ?? null;
                   setShowPlus(false);
-                  a.run?.();
+                  // onDismiss is iOS-only; this covers Android and any case
+                  // where it doesn't fire. Whichever runs first clears the ref.
+                  setTimeout(runPendingAction, 450);
                 }}
                 className="flex-row items-center gap-3 py-3 active:opacity-70"
                 style={a.soon ? { opacity: 0.4 } : undefined}

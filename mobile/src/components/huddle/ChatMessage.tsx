@@ -466,6 +466,20 @@ export function ChatMessage({
    * The score is split off and set in mono — the app already uses mono for
    * data everywhere else, and it gives every play line the same recognisable
    * ending, so the eye can skip to the number without reading the sentence.
+   *
+   * LEFT AND INLINE, ON A RAIL — it was centred, and centring only ever
+   * worked for the short ones. "Wil Lutz 31 Yd Field Goal" fits a line;
+   * "Sean Manaea pitches to Christian Encarnacion-Strand" does not, and a
+   * centred wrap gives you two ragged lines with the mono score stranded on
+   * its own in the middle of the column — pushed there by the three spaces
+   * that used to separate it. On a real half-inning of pitch-by-pitch that
+   * is most of the screen.
+   *
+   * Every other message starts at the same left edge and a play has no
+   * reason to be the exception, so it starts there too and wraps like
+   * anything else. The rail carries what the centring was there to say —
+   * this is the game talking, not a person — at a fraction of the cost, and
+   * matches the rail a reply already uses.
    */
   if (isPlayFeed) {
     const cut = message.content.lastIndexOf(" — ");
@@ -473,33 +487,41 @@ export function ChatMessage({
     const score = cut > 0 ? message.content.slice(cut + 3).replace(/\.$/, "") : null;
 
     return (
-      <View className="px-5 py-1.5">
-        <Type
-          center
-          variant="message"
+      <View className="px-5 py-1">
+        <View
           style={{
-            fontSize: 15,
-            lineHeight: 21,
-            color: "#8E8E98",
-            textShadowColor: "rgba(0,0,0,0.85)",
-            textShadowOffset: { width: 0, height: 1 },
-            textShadowRadius: 3,
+            borderLeftWidth: 2,
+            borderLeftColor: colors.primary + "40",
+            paddingLeft: 10,
           }}
         >
-          {play}
-          {score ? (
-            <Type
-              variant="data"
-              style={{
-                fontSize: 14,
-                color: "#C9C9D2",
-                fontFamily: fonts.monoMedium,
-              }}
-            >
-              {"   "}{score}
-            </Type>
-          ) : null}
-        </Type>
+          <Type
+            variant="message"
+            style={{
+              fontSize: 15,
+              lineHeight: 21,
+              color: "#8E8E98",
+              // Kept: a room with a photo behind it still has to be readable.
+              textShadowColor: "rgba(0,0,0,0.85)",
+              textShadowOffset: { width: 0, height: 1 },
+              textShadowRadius: 3,
+            }}
+          >
+            {play}
+            {score ? (
+              <Type
+                variant="data"
+                style={{
+                  fontSize: 14,
+                  color: "#C9C9D2",
+                  fontFamily: fonts.monoMedium,
+                }}
+              >
+                {" — "}{score}
+              </Type>
+            ) : null}
+          </Type>
+        </View>
       </View>
     );
   }

@@ -291,9 +291,18 @@ export function PullInFriendsModal({
                 </Type>
               </View>
             ) : (
-              // Bounded list — the Send CTA below must NEVER leave the screen.
-              <ScrollView style={{ maxHeight: 300 }} keyboardShouldPersistTaps="handled">
-                <View className="gap-1">
+              // A GRID OF FACES, three across — not a list of rows.
+              //
+              // Inviting people is a face-recognition task, not a reading task:
+              // you are looking for Marcus, and you know Marcus by his face. A
+              // one-per-row list shows four people in the space nine faces fit
+              // in, and pushes the Send button off the bottom the moment your
+              // graph is real. Selection is a ring plus a check on the avatar
+              // itself, so the thing you tapped is the thing that lights up.
+              //
+              // Bounded height — the Send CTA below must NEVER leave the screen.
+              <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
+                <View className="flex-row flex-wrap">
                 {filtered.map((p) => {
                   const isSel = selected.has(p.user_id);
                   const parts = {
@@ -312,9 +321,13 @@ export function PullInFriendsModal({
                     <Pressable
                       key={p.user_id}
                       onPress={() => toggle(p.user_id)}
-                      className="flex-row items-center gap-3 rounded-xl px-2 py-2 active:bg-muted/40"
+                      className="w-1/3 items-center px-1 py-2.5 active:opacity-70"
                     >
-                      <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-muted">
+                      <View
+                        className={`h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-full border-2 bg-muted ${
+                          isSel ? "border-primary" : "border-border"
+                        }`}
+                      >
                         {p.avatar_url ? (
                           <Image
                             source={{ uri: p.avatar_url }}
@@ -322,32 +335,29 @@ export function PullInFriendsModal({
                             resizeMode="cover"
                           />
                         ) : (
-                          <Type variant="captionStrong" tone="muted">
+                          <Type variant="title" tone="muted">
                             {name.charAt(0).toUpperCase()}
                           </Type>
                         )}
                       </View>
-                      <View className="flex-1">
-                        <Type variant="captionStrong">
-                          {name}
+
+                      {isSel ? (
+                        <View
+                          className="absolute h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-primary"
+                          style={{ top: 8, right: 14 }}
+                        >
+                          <Check color={colors.primaryForeground} size={15} />
+                        </View>
+                      ) : null}
+
+                      <Type variant="captionStrong" className="mt-2 text-center">
+                        {name}
+                      </Type>
+                      {aka ? (
+                        <Type variant="caption" tone="muted" className="text-center">
+                          {aka}
                         </Type>
-                        {aka ? (
-                          <Type variant="caption" tone="muted">
-                            {aka} on Side Huddle
-                          </Type>
-                        ) : null}
-                      </View>
-                      <View
-                        className={`h-6 w-6 items-center justify-center rounded-full border-2 ${
-                          isSel
-                            ? "border-primary bg-primary"
-                            : "border-border bg-transparent"
-                        }`}
-                      >
-                        {isSel ? (
-                          <Check color={colors.primaryForeground} size={14} />
-                        ) : null}
-                      </View>
+                      ) : null}
                     </Pressable>
                   );
                 })}

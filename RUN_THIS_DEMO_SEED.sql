@@ -22,7 +22,7 @@ declare
     '11111111-0000-4000-8000-000000000004'::uuid,
     '11111111-0000-4000-8000-000000000005'::uuid
   ];
-  v_names  text[] := array['Marcus Ellery','Dana Whitfield','Theo Barnes','Priya Raman','Cole Hutchins'];
+  v_names  text[] := array['Marcus Ellery','Dana Whitfield','Theo Barnes','Gus','Cole Hutchins'];
   i int;
 begin
   -- The account the screenshots are taken from: the App Store test login.
@@ -87,6 +87,12 @@ begin
     (v_room, v_ids[5], 'ok that throw was unreal', now() - interval '3 minutes'),
     (v_room, v_ids[1], 'TOLD YOU', now() - interval '2 minutes');
 
+  -- Inserting messages here does not move the room's last activity (nothing
+  -- updates it on a raw insert), and that is the time the Home card shows —
+  -- without this it reads the room's age, e.g. "4h", over a live conversation.
+  update public.huddles set last_message_at = now() - interval '2 minutes'
+   where id = v_room;
+
   -- One of them is at the game. Only people you are connected to can see this,
   -- and the demo account is connected to all five.
   insert into public.venue_presence (user_id, venue_id, until)
@@ -100,8 +106,10 @@ begin
   raise notice 'demo room: %', v_room;
 end $$;
 
+-- Count the cast by id, not username: a trigger rewrites the username on
+-- insert (demo_1 is stored as demo1_11111111), so matching on 'demo\_%' counts 0.
 select
-  (select count(*) from public.profiles where username like 'demo\_%') as demo_people,
+  (select count(*) from public.profiles where user_id::text like '11111111-0000-4000-8000-%') as demo_people,
   (select count(*) from public.huddles where name = 'Sunday Section')  as demo_room,
   (select count(*) from public.venue_presence)                          as at_stadium;
 

@@ -31,7 +31,7 @@ const CAST = [
   { id: "11111111-0000-4000-8000-000000000001", name: "Marcus Ellery" },
   { id: "11111111-0000-4000-8000-000000000002", name: "Dana Whitfield" },
   { id: "11111111-0000-4000-8000-000000000003", name: "Theo Barnes" },
-  { id: "11111111-0000-4000-8000-000000000004", name: "Priya Raman" },
+  { id: "11111111-0000-4000-8000-000000000004", name: "Gus" },
 ];
 
 const channels = [];
@@ -60,6 +60,23 @@ for (const person of CAST) {
     });
   });
   channels.push(ch);
+
+  // The lobby is what Home reads ("Marcus · Sunday Section"). Inside the room,
+  // the member row's ring reads a separate per-room channel — see
+  // useHuddlePresence — so the lobby alone leaves everyone grey in there.
+  if (huddleId) {
+    const room = client.channel(`presence-${huddleId}`, {
+      config: { presence: { key: person.id } },
+    });
+    await new Promise((resolve) => {
+      room.subscribe(async (status) => {
+        if (status !== "SUBSCRIBED") return;
+        await room.track({ userId: person.id, displayName: person.name, avatarUrl: null });
+        resolve();
+      });
+    });
+    channels.push(room);
+  }
 }
 
 console.log("\nHolding presence. Ctrl-C to clear them.\n");
