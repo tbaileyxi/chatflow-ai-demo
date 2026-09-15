@@ -55,3 +55,8 @@ supabase/.temp/
 
 # Vite writes these while resolving the config; regenerated every run
 vite.config.ts.timestamp-*.mjs
+
+# EAS --local simulator builds. Same reason as the .ipa rule above: these
+# are 35MB each, six of them are sitting in mobile/ right now, and one
+# committed by accident is permanent.
+build-*.tar.gz
