@@ -86,14 +86,35 @@ export async function findTeamClips(
       if (!m) return;
       const handle = users.get(p.author_id)?.username ?? null;
 
-      // Highest-bitrate mp4. `variants` is only present on video and gif.
+      // NOT the highest bitrate. `variants` is only present on video and gif.
+      //
+      // Taking the best one meant a 1920x1080 master — several megabytes that
+      // a phone has to pull before anything moves, on connections where a
+      // 300KB photo already took twenty seconds. The clip that plays beats the
+      // clip that is sharper.
+      //
+      // X publishes 320 / 480 / 720 / 1080 renditions. 720 is more than a chat
+      // bubble can show and starts several times faster, so: the best variant
+      // at or below 720, falling back to the smallest available if X only
+      // offers something bigger.
       let videoUrl: string | null = null;
       const variants = (m.variants ?? []).filter(
         (v: any) => v?.content_type === "video/mp4" && v?.url,
       );
       if (variants.length > 0) {
-        variants.sort((a: any, b: any) => (b.bit_rate ?? 0) - (a.bit_rate ?? 0));
-        videoUrl = variants[0].url;
+        const heightOf = (v: any) => {
+          const wh = /\/(\d+)x(\d+)\//.exec(String(v.url));
+          return wh ? Number(wh[2]) : 0;
+        };
+        const small = variants
+          .filter((v: any) => heightOf(v) > 0 && heightOf(v) <= 720)
+          .sort((a: any, b: any) => heightOf(b) - heightOf(a));
+        if (small.length > 0) {
+          videoUrl = small[0].url;
+        } else {
+          variants.sort((a: any, b: any) => (a.bit_rate ?? 0) - (b.bit_rate ?? 0));
+          videoUrl = variants[0].url;
+        }
       }
 
       out.push({
