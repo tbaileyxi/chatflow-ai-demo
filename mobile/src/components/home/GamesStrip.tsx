@@ -126,33 +126,16 @@ export function GamesStrip({
   // rooms and this row simply isn't part of it right now.
   if (games.length === 0) return null;
 
-  const anyLive = games.some((g) => g.status === "live");
-  /**
-   * What to call the strip.
-   *
-   * "Coming up" over a game that starts this afternoon reads as the app not
-   * knowing what day it is. The soonest kickoff decides the word, by CALENDAR
-   * DAY rather than by hours-from-now — 11pm on a Saturday is still "today"
-   * even though a 12-hour window would call Sunday lunchtime "tonight".
-   */
-  const soonest = games.reduce(
-    (min, g) => Math.min(min, new Date(g.startTime).getTime()),
-    Infinity,
-  );
-  const dayOf = (t: number) => {
-    const d = new Date(t);
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  };
-  const today = dayOf(Date.now());
-  const label = anyLive
-    ? "On now"
-    : dayOf(soonest) === today
-      ? new Date(soonest).getHours() >= 17
-        ? "Tonight"
-        : "Today"
-      : dayOf(soonest) === today + 86_400_000
-        ? "Tomorrow"
-        : "Coming up";
+  // GAME HUDDLES, because that is what a card opens — the public room for
+  // that fixture, not a schedule entry.
+  //
+  // The heading used to read "On now" whenever ANY game was live, while the
+  // number beside it was the count of CARDS. Four live games and six cards
+  // rendered as "ON NOW 6", which is a claim about the world that was simply
+  // untrue. The label is now fixed and the number says what it counts.
+  const label = "Game huddles";
+  const liveCount = games.filter((g) => g.status === "live").length;
+  const count = liveCount > 0 ? `${liveCount} live ›` : `${games.length} ›`;
 
   return (
     <View className="mb-5">
@@ -163,7 +146,7 @@ export function GamesStrip({
               ◆
             </Type>
           }
-          count={`${games.length} ›`}
+          count={count}
         >
           {label}
         </SectionLabel>
