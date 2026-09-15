@@ -566,6 +566,30 @@ serve(async (req) => {
           if (!coveredTeams.has(dbTeam.id)) { summary.skipped_not_covered += 1; continue; }
           summary.covered_targets += 1;
           if (emittedIds.has(t.key)) { summary.deduped_out += 1; continue; }
+
+          // A TOUCHDOWN AND ITS EXTRA POINT ARE ONE SCORE.
+          //
+          // The key is the RESULTING score, so a touchdown that makes it 30
+          // and the kick that makes it 31 are two different keys and posted
+          // twice, two minutes apart, with the same play text — the second
+          // copy differing only by "(Harrison Butker Kick)".
+          //
+          // Football only, and only +1: in basketball a single free throw is a
+          // real event, and in baseball a one-run change is the whole play.
+          // Here it is never anything but the conversion.
+          if (league === "NFL" || league === "NCAAF") {
+            const sa = g.play.scoreAfter;
+            const mine = g.scoringSide === "home" ? (sa?.home ?? 0) : (sa?.away ?? 0);
+            const prefix = t.conceded ? `against:${g.scoringSide}@` : `${g.scoringSide}@`;
+            const alreadyAtOneLess = [...emittedIds].some((k) => {
+              const str = String(k);
+              if (!str.startsWith(prefix)) return false;
+              const [away, home] = str.slice(prefix.length).split("-").map(Number);
+              const prior = g.scoringSide === "home" ? home : away;
+              return Number.isFinite(prior) && mine - prior === 1;
+            });
+            if (alreadyAtOneLess) { summary.deduped_extra_point = (summary.deduped_extra_point ?? 0) + 1; continue; }
+          }
           // TEST_MODE: also constrain emission to the test team.
           if (TEST_MODE && TEST_TEAM && !dbTeam.name.toLowerCase().includes(TEST_TEAM)) continue;
 
@@ -769,6 +793,15 @@ serve(async (req) => {
             const XLIVE_PER_GAME = Number(Deno.env.get("XLIVE_PER_GAME") || 3);
             if (
               Deno.env.get("X_API_BEARER_TOKEN") &&
+              // THE SIDE THAT SCORED, only.
+              //
+              // Every score emits twice — once for the team that scored and
+              // once for the team it happened to. Both used to queue a clip,
+              // so the same touchdown was searched for on BOTH accounts, and
+              // the conceding team's account is the one guaranteed not to be
+              // posting a highlight of it. Half the spend, looking in the
+              // wrong place.
+              !t.conceded &&
               (g.facts.excitementScore ?? 0) >= XLIVE_MIN &&
               result.huddleIdsPosted.length > 0 &&
               clipsThisGame < XLIVE_PER_GAME

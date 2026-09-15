@@ -74,10 +74,40 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
   // A room that gains its first member is furnished on the way in by
   // backfillIfEmpty() on the client, so gating here doesn't leave newcomers
   // staring at a blank screen.
-  const { data: allHuddles, error: huddlesErr } = await client
-    .from("huddles")
-    .select("id, is_game_room")
-    .eq("team_id", teamId);
+  // A FIXTURE ROOM BELONGS TO BOTH TEAMS.
+  //
+  // A huddle carries one team_id, and a public game room has to be stamped
+  // with something — last night's Denver·Kansas City was stamped Kansas City.
+  // So publishing "for the Broncos" never reached the room where Broncos fans
+  // were sitting, and only Chiefs plays ever appeared in it. Half the game,
+  // missing from the room built for the whole game.
+  //
+  // Rooms for this team, PLUS the fixture rooms for games this team is in,
+  // whoever they happen to be stamped with.
+  const [ownRes, fixtureRes] = await Promise.all([
+    client.from("huddles").select("id, is_game_room").eq("team_id", teamId),
+    (async () => {
+      if (mode !== "in_game") return { data: [] as any[] };
+      const { data: games } = await client
+        .from("games")
+        .select("id")
+        .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+        .gte("start_time", new Date(Date.now() - 8 * 3600_000).toISOString())
+        .lte("start_time", new Date(Date.now() + 8 * 3600_000).toISOString());
+      const ids = (games ?? []).map((g: any) => g.id);
+      if (ids.length === 0) return { data: [] as any[] };
+      return await client
+        .from("huddles")
+        .select("id, is_game_room")
+        .in("game_id", ids)
+        .eq("is_game_room", true);
+    })(),
+  ]);
+
+  const huddlesErr = ownRes.error;
+  const seenId = new Set<string>();
+  const allHuddles = [...(ownRes.data ?? []), ...((fixtureRes as any).data ?? [])]
+    .filter((h: any) => (seenId.has(h.id) ? false : (seenId.add(h.id), true)));
   if (huddlesErr) {
     console.error("[publisher] huddle lookup failed", huddlesErr);
     return { huddleIdsPosted: [], pushed: false };
