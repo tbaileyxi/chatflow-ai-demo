@@ -111,9 +111,61 @@ serve(async (req) => {
     posts: 0,
     pushes: 0,
     errors: [] as string[],
+    idle: false,          // nothing live, nothing due — the run cost 2-3 reads
   };
 
   try {
+    // IS THERE A GAME ON? Asked FIRST, and asked of our own schedule.
+    //
+    // This ran every two minutes, all day, every day — and before it ever
+    // found out whether anything was live it loaded every team, resolved every
+    // covered room, and called ESPN's scoreboard once per league. About a
+    // dozen database reads and six external calls, 720 times a day, almost all
+    // of it on a Tuesday afternoon with nothing on. It did that work to
+    // discover there was no work, then did it again two minutes later.
+    //
+    // We already know the schedule. Games have kickoff times; the Broncos are
+    // not live until the Broncos play. One query answers it.
+    //
+    // Fifteen minutes of lead time because a feed flips a game to in_progress
+    // a little before and a little after the posted kickoff, and being ready
+    // early costs one query.
+    const { data: onNow, error: onNowErr } = await supabase
+      .from("games")
+      .select("id")
+      .in("status", ["in_progress", "halftime", "live"])
+      .limit(1);
+
+    const { data: startingSoon } = await supabase
+      .from("games")
+      .select("id")
+      .eq("status", "scheduled")
+      .gte("start_time", new Date(Date.now() - 6 * 3600_000).toISOString())
+      .lte("start_time", new Date(Date.now() + 15 * 60_000).toISOString())
+      .limit(1);
+
+    // An ERROR here must not stop the bot — failing open costs one wasted run,
+    // failing closed silences the product for as long as the error lasts.
+    const nothingOn =
+      !onNowErr && (onNow ?? []).length === 0 && (startingSoon ?? []).length === 0;
+
+    // Pending clips are searched minutes AFTER the play, so a game that has
+    // just ended still has work queued. Never sleep on a non-empty queue.
+    if (nothingOn) {
+      const { data: queued } = await supabase
+        .from("pending_clips")
+        .select("id")
+        .eq("status", "pending")
+        .lte("search_after", new Date().toISOString())
+        .limit(1);
+      if ((queued ?? []).length === 0) {
+        summary.idle = true;
+        return new Response(JSON.stringify(summary), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // Preload DB teams once. Match by canonical lowercased name OR fullName.
     const { data: teams } = await supabase
       .from("teams")

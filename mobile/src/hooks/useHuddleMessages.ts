@@ -82,13 +82,44 @@ function mapRow(m: RawRow, profileMap: Map<string, any>): HuddleMessage {
   };
 }
 
+/**
+ * Profiles, looked up ONCE per person.
+ *
+ * The realtime handler calls this for every message that arrives. During a
+ * game the bot posts constantly and it is always the SAME system user, so the
+ * app was making a database round trip per bot message to be told the same
+ * name again — on a connection where a round trip can take seconds, at exactly
+ * the moment the room is busiest and a person is trying to type.
+ *
+ * Module-level and unbounded on purpose: a display name is small, and a room
+ * holds tens of people, not thousands. Cleared by an app restart, which is
+ * also when a changed avatar should reappear.
+ */
+const profileCache = new Map<string, any>();
+
 async function fetchProfiles(userIds: string[]) {
   if (userIds.length === 0) return new Map<string, any>();
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("user_id, display_name, username, avatar_url")
-    .in("user_id", userIds);
-  return new Map((profiles ?? []).map((p) => [p.user_id, p]));
+
+  const missing = userIds.filter((id) => !profileCache.has(id));
+  if (missing.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("user_id, display_name, username, avatar_url")
+      .in("user_id", missing);
+    for (const p of profiles ?? []) profileCache.set(p.user_id, p);
+    // Remember the misses too, or an id with no profile row is re-queried for
+    // every message that person ever sends.
+    for (const id of missing) {
+      if (!profileCache.has(id)) profileCache.set(id, null);
+    }
+  }
+
+  const out = new Map<string, any>();
+  for (const id of userIds) {
+    const hit = profileCache.get(id);
+    if (hit) out.set(id, hit);
+  }
+  return out;
 }
 
 // Fetch newest messages first (descending), with date cutoff for initial load
