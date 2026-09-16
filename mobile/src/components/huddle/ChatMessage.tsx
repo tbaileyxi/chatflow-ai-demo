@@ -9,6 +9,7 @@ import {
   Dimensions,
   Linking,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useNavigation } from "@react-navigation/native";
@@ -405,6 +406,31 @@ export function ChatMessage({
       ]);
     }, 250);
   };
+
+  // ONE SHARE AT A TIME, AND SAY SO ON THE BUTTON.
+  //
+  // composeShareAsset downloads the clip and re-exports it with the mark
+  // burned in BEFORE the OS sheet can open — twenty seconds on a 57MB video
+  // over LTE, with nothing on screen saying anything is happening. So people
+  // tapped again. Each tap started its own download and export, and the
+  // sheets then arrived in a row, one per tap, each having written its own
+  // 57MB temp file.
+  const [sharing, setSharing] = useState(false);
+  const handleShareMedia = useCallback(async () => {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      await shareMedia({
+        url: message.mediaUrl!,
+        type: message.mediaType,
+        // The scoreline the moment was captured at — the caption already
+        // burned into the frame.
+        caption: message.content?.trim() || null,
+      });
+    } finally {
+      setSharing(false);
+    }
+  }, [sharing, message.mediaUrl, message.mediaType, message.content]);
 
   const handleShare = () => {
     // Close the picker FIRST, then present the share sheet on the next tick —
@@ -832,33 +858,40 @@ export function ChatMessage({
                       AirDrop and Save Image are already on the sheet, in the
                       order this particular person uses them. */}
                   <Pressable
-                    onPress={() =>
-                      shareMedia({
-                        url: message.mediaUrl!,
-                        type: message.mediaType,
-                        // The scoreline the moment was captured at — the
-                        // caption already burned into the frame.
-                        caption: message.content?.trim() || null,
-                      })
-                    }
-                    hitSlop={8}
+                    onPress={handleShareMedia}
+                    disabled={sharing}
+                    hitSlop={4}
                     className="absolute right-2 top-3 h-8 w-8 items-center justify-center rounded-full active:opacity-70"
                     style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
                   >
-                    <ShareIcon color="#FFFFFF" size={15} />
+                    {sharing ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <ShareIcon color="#FFFFFF" size={15} />
+                    )}
                   </Pressable>
 
                   <Pressable
                     onPress={isOwnMessage ? handleDeleteOwn : handleReport}
-                    hitSlop={8}
-                    className="absolute right-2 items-center justify-center rounded-full active:opacity-70"
-                    style={{ top: 46, height: 32, width: 32, backgroundColor: "rgba(0,0,0,0.55)" }}
+                    // SAME COLUMN AS SHARE, OPPOSITE END OF IT.
+                    //
+                    // It sat 12pt under share, both with hitSlop 8, so their
+                    // live areas overlapped by 24pt: a share tap could land on
+                    // report, and on someone else's message that files a
+                    // report nobody meant to file. These buttons ride in the
+                    // gutter beside the media rather than on top of it, so the
+                    // bottom of that column is free — the full height of the
+                    // media now separates the safe action from the
+                    // irreversible one.
+                    hitSlop={4}
+                    className="absolute right-2 bottom-3 items-center justify-center rounded-full active:opacity-70"
+                    style={{ height: 30, width: 30, backgroundColor: "rgba(0,0,0,0.55)" }}
                     accessibilityLabel={isOwnMessage ? "Delete this" : "Report this"}
                   >
                     {isOwnMessage ? (
-                      <Trash2 color="#FFFFFF" size={15} />
+                      <Trash2 color="#FFFFFF" size={14} />
                     ) : (
-                      <Flag color="#FFFFFF" size={15} />
+                      <Flag color="#FFFFFF" size={14} />
                     )}
                   </Pressable>
                 </Pressable>
@@ -923,35 +956,42 @@ export function ChatMessage({
                       AirDrop and Save Image are already on the sheet, in the
                       order this particular person uses them. */}
                   <Pressable
-                    onPress={() =>
-                      shareMedia({
-                        url: message.mediaUrl!,
-                        type: message.mediaType,
-                        // The scoreline the moment was captured at — the
-                        // caption already burned into the frame.
-                        caption: message.content?.trim() || null,
-                      })
-                    }
-                    hitSlop={8}
+                    onPress={handleShareMedia}
+                    disabled={sharing}
+                    hitSlop={4}
                     className="absolute right-2 top-3 h-8 w-8 items-center justify-center rounded-full active:opacity-70"
                     style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
                   >
-                    <ShareIcon color="#FFFFFF" size={15} />
+                    {sharing ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <ShareIcon color="#FFFFFF" size={15} />
+                    )}
                   </Pressable>
 
                   {/* The ⋯ went on photos only, so a video had share and
                       nothing else — no way to take down your own clip. */}
                   <Pressable
                     onPress={isOwnMessage ? handleDeleteOwn : handleReport}
-                    hitSlop={8}
-                    className="absolute right-2 items-center justify-center rounded-full active:opacity-70"
-                    style={{ top: 46, height: 32, width: 32, backgroundColor: "rgba(0,0,0,0.55)" }}
+                    // SAME COLUMN AS SHARE, OPPOSITE END OF IT.
+                    //
+                    // It sat 12pt under share, both with hitSlop 8, so their
+                    // live areas overlapped by 24pt: a share tap could land on
+                    // report, and on someone else's message that files a
+                    // report nobody meant to file. These buttons ride in the
+                    // gutter beside the media rather than on top of it, so the
+                    // bottom of that column is free — the full height of the
+                    // media now separates the safe action from the
+                    // irreversible one.
+                    hitSlop={4}
+                    className="absolute right-2 bottom-3 items-center justify-center rounded-full active:opacity-70"
+                    style={{ height: 30, width: 30, backgroundColor: "rgba(0,0,0,0.55)" }}
                     accessibilityLabel={isOwnMessage ? "Delete this" : "Report this"}
                   >
                     {isOwnMessage ? (
-                      <Trash2 color="#FFFFFF" size={15} />
+                      <Trash2 color="#FFFFFF" size={14} />
                     ) : (
-                      <Flag color="#FFFFFF" size={15} />
+                      <Flag color="#FFFFFF" size={14} />
                     )}
                   </Pressable>
                 </Pressable>

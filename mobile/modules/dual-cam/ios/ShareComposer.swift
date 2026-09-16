@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreImage
+import CryptoKit
 import UIKit
 
 /**
@@ -162,20 +163,55 @@ final class ShareComposer {
     // file, which is also what makes the share sheet treat the result as a
     // video rather than a link.
     if url.scheme == "http" || url.scheme == "https" {
-      URLSession.shared.dataTask(with: url) { data, _, error in
-        guard let data else {
+      // COMPOSE EACH CLIP ONCE.
+      //
+      // Sharing the same moment twice — to Messages, then to Instagram —
+      // downloaded and re-exported the whole thing again. The composed copy
+      // depends only on the source, so it is kept under a digest of the URL
+      // and reused. The second share of a clip is then immediate.
+      let digest = SHA256.hash(data: Data(url.absoluteString.utf8))
+        .prefix(8).map { String(format: "%02x", $0) }.joined()
+      let cached = FileManager.default.temporaryDirectory
+        .appendingPathComponent("shared-\(digest).mp4")
+      if FileManager.default.fileExists(atPath: cached.path) {
+        completion(.success(cached))
+        return
+      }
+
+      // downloadTask, not dataTask: dataTask holds the whole file in memory
+      // before writing it — 57MB of RAM on a phone that is also playing video.
+      // downloadTask streams it to disk.
+      URLSession.shared.downloadTask(with: url) { temp, _, error in
+        guard let temp else {
           completion(.failure(error ?? ComposerError.badInput))
           return
         }
         let local = FileManager.default.temporaryDirectory
           .appendingPathComponent("dl-\(UUID().uuidString).mp4")
         do {
-          try data.write(to: local)
+          try? FileManager.default.removeItem(at: local)
+          try FileManager.default.moveItem(at: temp, to: local)
         } catch {
           completion(.failure(error))
           return
         }
-        compose(videoAt: local, completion: completion)
+        compose(videoAt: local) { result in
+          // The raw download has done its job either way; only the marked
+          // copy is worth keeping, under the cache name.
+          try? FileManager.default.removeItem(at: local)
+          guard case .success(let out) = result else {
+            completion(result)
+            return
+          }
+          try? FileManager.default.removeItem(at: cached)
+          do {
+            try FileManager.default.moveItem(at: out, to: cached)
+            completion(.success(cached))
+          } catch {
+            // Caching is an optimisation, never a reason to fail a share.
+            completion(.success(out))
+          }
+        }
       }.resume()
       return
     }
@@ -207,7 +243,15 @@ final class ShareComposer {
       in: parent
     )
 
-    guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetHighestQuality) else {
+    // 720p, not HighestQuality.
+    //
+    // This is a copy bound for someone else's feed, where Instagram or
+    // Messages re-encodes it again anyway. Exporting a 4K source at full
+    // quality is a minute of phone time and a file too big to send — on a
+    // long clip the export, not the download, is most of the wait.
+    // AVFoundation never upscales, so a smaller source exports at its own
+    // size.
+    guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPreset1280x720) else {
       completion(.failure(ComposerError.exportFailed("Couldn't start the export.")))
       return
     }
