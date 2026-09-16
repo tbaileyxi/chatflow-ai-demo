@@ -484,7 +484,13 @@ export function ChatMessage({
   if (isPlayFeed) {
     const cut = message.content.lastIndexOf(" — ");
     const play = cut > 0 ? message.content.slice(0, cut) : message.content;
-    const score = cut > 0 ? message.content.slice(cut + 3).replace(/\.$/, "") : null;
+    const rawScore = cut > 0 ? message.content.slice(cut + 3).replace(/\.$/, "") : null;
+    // The score moves as ONE unit. Ordinary spaces let the line break inside
+    // it — "Brewers 1," on one line and "Pirates 0" on the next, which reads
+    // as two facts instead of one. Non-breaking spaces (and the dash bound to
+    // the front) mean the whole "— Brewers 1, Pirates 0" either finishes the
+    // line or moves to the next intact.
+    const score = rawScore ? "— " + rawScore.replace(/ /g, " ") : null;
 
     return (
       <View className="px-5 py-1">
@@ -517,7 +523,7 @@ export function ChatMessage({
                   fontFamily: fonts.monoMedium,
                 }}
               >
-                {" — "}{score}
+                {" "}{score}
               </Type>
             ) : null}
           </Type>
