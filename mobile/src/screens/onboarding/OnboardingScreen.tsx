@@ -172,7 +172,42 @@ export function OnboardingScreen() {
       await queryClient.invalidateQueries({ queryKey: ["known-people"] });
       await queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
       await queryClient.invalidateQueries({ queryKey: ["super-huddle-feed"] });
-      const claimed = claimedRoom.current;
+
+      // WHERE A NEW PERSON LANDS.
+      //
+      // An invite wins — they came for that room. Otherwise the community room
+      // of a team they just followed, the one with the most recent message in
+      // it, because the alternative is Home with nothing on it. A first screen
+      // that is empty teaches that the app is empty, and following three teams
+      // is not the same as having somewhere to be.
+      //
+      // Following auto-joins them, so this is a room they are already in. If
+      // the lookup fails they land on Home exactly as before — it is a better
+      // first screen, not a required one.
+      let landing = claimedRoom.current?.huddleId ?? null;
+      if (!landing) {
+        try {
+          const { data: follows } = await supabase
+            .from("user_follows")
+            .select("team_id")
+            .eq("user_id", user.id);
+          const teamIds = (follows ?? []).map((f: any) => f.team_id);
+          if (teamIds.length > 0) {
+            const { data: rooms } = await (supabase as any)
+              .from("huddles")
+              .select("id, last_message_at")
+              .in("team_id", teamIds)
+              .eq("is_official_team_huddle", true)
+              .order("last_message_at", { ascending: false, nullsFirst: false })
+              .limit(1);
+            landing = rooms?.[0]?.id ?? null;
+          }
+        } catch {
+          landing = null;
+        }
+      }
+
+      const claimed = landing ? { huddleId: landing } : null;
       navigation.reset({
         index: 0,
         routes: claimed

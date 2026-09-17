@@ -27,10 +27,45 @@ export function JoinHuddleScreen() {
   const { huddleId } = route.params;
   const { data: huddle, isLoading } = useHuddleDetails(huddleId);
 
-  if (isLoading || !huddle) {
+  if (isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <LoadingSpinner className="flex-1" />
+      </SafeAreaView>
+    );
+  }
+
+  // A DEAD LINK IS AN ANSWER, NOT A SPINNER.
+  //
+  // This used to be `isLoading || !huddle`, so a link to a room that had been
+  // deleted, or a spun-up one that closed at 2am, left the person watching
+  // dots forever with no way back — the most common way somebody meets this
+  // app is a link from a friend, and that was the failure mode.
+  //
+  // A room past its 2am gets the same treatment as a missing one: it is over,
+  // and "wrapped" is what happened rather than an error they caused.
+  const wrapped =
+    !huddle ||
+    (huddle.expiresAt && new Date(huddle.expiresAt).getTime() < Date.now());
+
+  if (wrapped) {
+    return (
+      <SafeAreaView className="flex-1 bg-background">
+        <View className="flex-1 items-center justify-center gap-3 px-8">
+          <Type variant="heading" center>
+            That room wrapped.
+          </Type>
+          <Type variant="body" tone="muted" center>
+            Rooms made for a game close at 2am. Ask whoever sent this for a new
+            link, or find your people from Home.
+          </Type>
+          <Button
+            className="mt-2"
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: "MainTabs" as never }] })}
+          >
+            Go to Home
+          </Button>
+        </View>
       </SafeAreaView>
     );
   }

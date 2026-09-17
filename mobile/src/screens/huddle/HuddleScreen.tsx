@@ -68,6 +68,8 @@ import { useKnownPeople } from "@/hooks/useFriends";
 
 type Route = RouteProp<RootStackParamList, "Huddle">;
 
+const SWIPE_HINT_KEY = "side-huddle:swipe-hint-seen";
+
 type ListItem =
   | { type: "message"; data: HuddleMessage }
   | { type: "separator"; label: string; key: string }
@@ -298,6 +300,31 @@ export function HuddleScreen() {
     () => [huddleId, ...jumpRooms.map((r) => r.id)],
     [huddleId, jumpRooms],
   );
+  // A GESTURE NOBODY IS TOLD ABOUT DOES NOT EXIST.
+  //
+  // The jump pills were removed in favour of this swipe, which means the only
+  // way to discover it is to do it by accident. Say it once, the first time
+  // somebody is in a room with somewhere to swipe TO, then never again.
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+  useEffect(() => {
+    if (jumpRooms.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const seen = await AsyncStorage.getItem(SWIPE_HINT_KEY);
+        if (!cancelled && !seen) {
+          setShowSwipeHint(true);
+          await AsyncStorage.setItem(SWIPE_HINT_KEY, "1");
+        }
+      } catch {
+        // A hint is not worth failing a room over.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [jumpRooms.length]);
+
   const swipeHandlers = useRoomSwipe({
     roomIds: swipeRoomIds,
     currentId: huddleId,
@@ -695,6 +722,18 @@ export function HuddleScreen() {
             (ChatMessage uses bg-card / bg-primary), but the day separators,
             the empty state and the timestamps sit directly on the background,
             and a bright tailgate photo turns those into nothing. */}
+        {showSwipeHint ? (
+          <Pressable
+            onPress={() => setShowSwipeHint(false)}
+            className="flex-row items-center justify-center gap-2 border-b border-border px-4 py-2"
+            style={{ backgroundColor: "rgba(245,197,24,0.08)" }}
+          >
+            <Type variant="data" tone="primary" style={{ fontSize: 11 }}>
+              ← swipe sideways to your other rooms
+            </Type>
+          </Pressable>
+        ) : null}
+
         <View className="flex-1" {...swipeHandlers}>
           {/* NO BACKGROUND PHOTO. "Before, During, After" ends with the
               reason, and it is not a style opinion: "the upload made text

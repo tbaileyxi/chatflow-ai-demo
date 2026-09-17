@@ -228,8 +228,8 @@ export function GamesStrip({
                     </Type>
                   </>
                 ) : (
-                  <Type variant="data" tone="tertiary" style={{ fontSize: 9 }}>
-                    nobody you know
+                  <Type variant="data" tone="primary" style={{ fontSize: 9 }}>
+                    be first in →
                   </Type>
                 )}
               </View>

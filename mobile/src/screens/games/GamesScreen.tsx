@@ -279,8 +279,12 @@ function GameRow({
             </Type>
           </>
         ) : (
-          <Type variant="data" tone="tertiary" style={{ fontSize: 11.5 }}>
-            nobody you know
+          // "nobody you know" is a dead end: it reports an absence and offers
+          // nothing to do about it, on a row whose whole purpose is to be
+          // tapped. Tapping opens the room for this game either way, so the
+          // label says that instead.
+          <Type variant="data" tone="primary" style={{ fontSize: 11.5 }}>
+            be first in →
           </Type>
         )}
         {here && here.total > 0 ? (

@@ -253,19 +253,13 @@ export function PullInFriendsModal({
               </Type>
             ) : null}
 
-            {/* Share link — the universal path, works for anyone anywhere. */}
-            <Pressable
-              onPress={handleShareLink}
-              className="mb-4 flex-row items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 active:opacity-80"
-            >
-              <Link2 color={colors.primaryForeground} size={18} />
-              <Type variant="heading" tone="onPrimary">
-                Share invite link
-              </Type>
-            </Pressable>
-
+            {/* PEOPLE FIRST, LINK SECOND.
+                Tapping a face puts somebody in the room now; a link is a
+                message you still have to write, send, and hope gets opened.
+                The link led because it works for anyone anywhere, which is an
+                argument about coverage, not about what to do first. */}
             <Type variant="eyebrow" tone="muted" className="mb-2">
-              Or tap friends on Side Huddle
+              Tap friends on Side Huddle
             </Type>
 
             <TextInput
@@ -286,7 +280,7 @@ export function PullInFriendsModal({
               <View className="items-center py-10">
                 <Type variant="caption" tone="muted" className="text-center">
                   {people.length === 0
-                    ? "No friends on Side Huddle yet — use Share invite link above."
+                    ? "No friends on Side Huddle yet — send them the link below."
                     : "No matches."}
                 </Type>
               </View>
@@ -396,6 +390,19 @@ export function PullInFriendsModal({
                     ? "Send invites"
                     : `Send ${selected.size} invite${selected.size === 1 ? "" : "s"}`}
               </Text>
+            </Pressable>
+
+            {/* Second, for everybody not here yet. Quiet, because it is the
+                fallback — but always present, because for a new person it is
+                the only path that works. */}
+            <Pressable
+              onPress={handleShareLink}
+              className="mt-2.5 flex-row items-center justify-center gap-2 rounded-xl border border-border px-4 py-3 active:opacity-70"
+            >
+              <Link2 color={colors.mutedForeground} size={16} />
+              <Type variant="captionStrong" tone="muted">
+                Copy an invite link instead
+              </Type>
             </Pressable>
           </View>
         </View>
