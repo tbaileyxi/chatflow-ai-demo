@@ -338,6 +338,32 @@ function canonicalVertical(v: string): string {
   return x;
 }
 
+/**
+ * Does this company name read like a booster or NIL organisation?
+ *
+ * "school partner" is asked for with a company query — "Texas A&M booster club
+ * foundation" — and Apollo answers with its best guesses, which for that query
+ * included Frittella Italian Cafe, Gallery Furniture and Musclemilk. Every one
+ * of them was then stamped with the vertical that was ASKED for rather than the
+ * one they are, and turned up under "Booster and NIL groups — they have the
+ * donor list". A restaurant does not have a donor list.
+ *
+ * So the requested vertical is now a question, not an answer: a result only
+ * keeps "school partner" if its name carries one of the words these
+ * organisations actually use. Everything else is a local business, which is
+ * what it was all along.
+ */
+const BOOSTER_WORDS = [
+  "booster", "boosters", "foundation", "collective", "alumni", "athletic",
+  "athletics", "nil", "club", "association", "fund", "friends of", "society",
+  "endowment", "university", "college", "letterwinner", "varsity",
+];
+
+function looksLikeBooster(name: string): boolean {
+  const n = (name || "").toLowerCase();
+  return BOOSTER_WORDS.some((w) => n.includes(w));
+}
+
 function keywordTags(vertical: string): string[] {
   const k = (vertical || "").toLowerCase().trim();
   return VERTICAL_SYNONYMS[k] ?? (vertical ? [vertical] : []);
@@ -590,7 +616,14 @@ serve(async (req) => {
       const score = scoreForCategory(c.category, Boolean(contact?.email), Boolean(instagram));
 
       rows.push({
-        vertical: canonicalVertical(c.category || v),
+        // Asked-for vertical, only if the name bears it out. See
+        // looksLikeBooster: a restaurant filed as a booster group is a
+        // restaurant that gets a letter about donor lists.
+        vertical:
+          canonicalVertical(c.category || v) === "school partner" &&
+          !looksLikeBooster(c.name)
+            ? "other local business"
+            : canonicalVertical(c.category || v),
         region: reg || null,
         market: mkt || reg || null,
         school: sch || null,

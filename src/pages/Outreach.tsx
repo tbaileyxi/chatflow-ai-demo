@@ -732,7 +732,6 @@ export default function Outreach() {
               <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-6">
                 <Metric label="Leads" value={metrics.total} />
                 <Metric label="Schools" value={metrics.schoolPartners} />
-                <Metric label="12+ score" value={metrics.priority} />
                 <Metric label="Emails" value={metrics.withEmail} />
                 <Metric label="Due" value={metrics.due} />
                 <Metric label="Contacted" value={metrics.contacted} />

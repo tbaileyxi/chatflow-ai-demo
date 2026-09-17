@@ -45,6 +45,25 @@ type Place = {
 
 const SCHOOL_PARTNER = "school partner";
 
+/**
+ * Does this name read like a booster or NIL organisation?
+ *
+ * Kept deliberately in step with outreach-enrich's copy of the same list: that
+ * one stops new rows being misfiled, this one cleans up the rows filed before
+ * it existed. If the words diverge, the page will disagree with the importer
+ * about what a booster group is.
+ */
+const BOOSTER_WORDS = [
+  "booster", "boosters", "foundation", "collective", "alumni", "athletic",
+  "athletics", "nil", "club", "association", "fund", "friends of", "society",
+  "endowment", "university", "college", "letterwinner", "varsity",
+];
+
+function looksLikeBooster(name: string | null): boolean {
+  const n = (name || "").toLowerCase();
+  return BOOSTER_WORDS.some((w) => n.includes(w));
+}
+
 export default function WorkPanel() {
   const { toast } = useToast();
   const [chapters, setChapters] = useState<Chapter[] | null>(null);
@@ -71,17 +90,27 @@ export default function WorkPanel() {
     const [c, s] = await Promise.all([
       supabase
         .from("chapter_leads")
-        .select("org,emailed,unsubscribed,bounced,sequence_step")
+        .select("org,emailed,unsubscribed,bounced,sequence_step,follow_up_date")
         .limit(5000),
       supabase
         .from("sponsor_leads")
-        .select("school,vertical,emailed,unsubscribed,bounced,sequence_step")
+        .select("school,vertical,emailed,unsubscribed,bounced,sequence_step,follow_up_date")
         .limit(5000),
     ]);
     const out: { team: string; kind: "chapter" | "partner" | "business"; open: boolean; contacted: boolean; due: boolean }[] = [];
-    // "Due a follow-up" is the same rule the Group uses when it offers one:
-    // written to once, and no further.
-    const isDue = (r: any) => !!r.emailed && (r.sequence_step ?? 0) === 1;
+    // ONE DEFINITION OF "DUE", used by the team card, the Do-this-next line
+    // and the group that offers the send. It was two: the card counted anyone
+    // on step 1, the group offered a follow-up to anyone on step 1, and
+    // follow_up_date — a date somebody deliberately set — was read by neither.
+    // A card promising 115 follow-ups next to a group offering a different
+    // number is how you stop trusting both.
+    //
+    // Written to once, no further, and not deliberately scheduled for later.
+    const today = new Date().toISOString().slice(0, 10);
+    const isDue = (r: any) =>
+      !!r.emailed &&
+      (r.sequence_step ?? 0) === 1 &&
+      (!r.follow_up_date || String(r.follow_up_date).slice(0, 10) <= today);
     for (const r of (c.data ?? []) as any[]) {
       if (!r.org) continue;
       out.push({
@@ -158,6 +187,9 @@ export default function WorkPanel() {
   };
 
   useEffect(() => { void loadIndex(); }, []);
+  // Look for misfiled partners once, quietly. It only ever surfaces a control
+  // when there is something to fix.
+  useEffect(() => { void scanMisfiled(); }, []);
   useEffect(() => { if (picked) void load(picked); }, [picked]);
 
   // The team list, from the slim index.
@@ -346,6 +378,62 @@ export default function WorkPanel() {
     }
   }
 
+  /**
+   * Every misfiled school partner, everywhere, in one click.
+   *
+   * The per-row "not a partner" link is whack-a-mole: the rows were created in
+   * batches by a search that stamped its own question onto the answer, so they
+   * arrive in batches and have to leave that way. This finds them across all
+   * teams, shows the count and a sample before doing anything, and moves only
+   * the ones whose names carry no booster vocabulary at all.
+   */
+  const [fixing, setFixing] = useState(false);
+  /** Which group "Do this next" wants open when it lands on a team. */
+  const [openGroup, setOpenGroup] = useState<"chapters" | "partner" | "business" | null>(null);
+  const [misfiled, setMisfiled] = useState<{ id: string; company: string }[]>([]);
+
+  const scanMisfiled = async () => {
+    setFixing(true);
+    try {
+      const { data } = await supabase
+        .from("sponsor_leads")
+        .select("id,company,vertical")
+        .eq("vertical", SCHOOL_PARTNER)
+        .limit(5000);
+      const wrong = ((data ?? []) as any[])
+        .filter((r) => !looksLikeBooster(r.company))
+        .map((r) => ({ id: r.id as string, company: (r.company ?? "") as string }));
+      setMisfiled(wrong);
+      if (wrong.length === 0) {
+        toast({ title: "Nothing misfiled", description: "Every school partner reads like one." });
+      }
+    } finally {
+      setFixing(false);
+    }
+  };
+
+  const moveMisfiled = async () => {
+    if (misfiled.length === 0) return;
+    const sample = misfiled.slice(0, 5).map((m) => m.company).join(", ");
+    if (!confirm(`Move ${misfiled.length} rows out of school partners?\n\n${sample}${misfiled.length > 5 ? ", …" : ""}`)) return;
+    setFixing(true);
+    try {
+      // Chunked: a 2,000-id `in` list is a URL no server wants.
+      for (let i = 0; i < misfiled.length; i += 200) {
+        const ids = misfiled.slice(i, i + 200).map((m) => m.id);
+        await supabase
+          .from("sponsor_leads")
+          .update({ vertical: "other local business" })
+          .in("id", ids);
+      }
+      toast({ title: `Moved ${misfiled.length} to local businesses` });
+      setMisfiled([]);
+      await Promise.all([loadIndex(), picked ? load(picked) : Promise.resolve()]);
+    } finally {
+      setFixing(false);
+    }
+  };
+
   // Four Auburn restaurants are filed as school partners because an old search
   // typed the vertical wrong. A person can see that instantly; this is the one
   // click that fixes it.
@@ -356,6 +444,31 @@ export default function WorkPanel() {
     await Promise.all([loadIndex(), load(picked!)]);
   }
 
+  // The single highest-leverage thing on the page, in one sentence.
+  const nextUp = useMemo(() => {
+    const best = teams
+      .filter((t) => t.due > 0)
+      .sort((a, b) => b.due - a.due)[0];
+    if (best) {
+      return {
+        team: best.key,
+        kind: "chapters" as const,
+        line: `${best.due} ${best.key} contacts are due a follow-up — read it and send.`,
+      };
+    }
+    const firstTouch = teams
+      .filter((t) => t.open > 0)
+      .sort((a, b) => b.open - a.open)[0];
+    if (firstTouch) {
+      return {
+        team: firstTouch.key,
+        kind: "chapters" as const,
+        line: `${firstTouch.open} ${firstTouch.key} contacts have never been written to — start there.`,
+      };
+    }
+    return null;
+  }, [teams]);
+
   if (!index) {
     return <div className="container mx-auto px-4 py-8 text-muted-foreground">Loading teams…</div>;
   }
@@ -364,6 +477,37 @@ export default function WorkPanel() {
     <div className="container mx-auto grid gap-6 px-4 py-8 lg:grid-cols-[320px,1fr]">
       {/* Pick a place */}
       <div className="space-y-3">
+        {/* DO THIS NEXT.
+            The page listed everything and recommended nothing, so the first
+            decision of every session was which of 60 teams to open — a
+            decision the data can make. A letter already sent and waiting is
+            worth more than a letter never written, so follow-ups outrank
+            first touches, and the line goes straight into that team with the
+            group already open. */}
+        {nextUp ? (
+          <button
+            onClick={() => {
+              setPicked(nextUp.team);
+              setOpenGroup(nextUp.kind);
+            }}
+            className="w-full rounded-lg border border-primary/40 bg-primary/10 p-3 text-left"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Do this next
+            </p>
+            <p className="mt-0.5 text-sm">{nextUp.line}</p>
+          </button>
+        ) : null}
+        {misfiled.length > 0 ? (
+          <button
+            onClick={moveMisfiled}
+            disabled={fixing}
+            className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-left text-sm"
+          >
+            {misfiled.length} rows are filed as school partners but are not
+            booster groups — move them to local businesses
+          </button>
+        ) : null}
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -381,19 +525,17 @@ export default function WorkPanel() {
                 }`}
               >
                 <p className="text-sm font-medium">{p.key}</p>
-                {/* PROGRESS WHERE THE WORK IS. This used to say only what was
-                    left, and the count of what had been done lived on a
-                    separate "Where I've been" tab — a question you had to
-                    leave the job to answer. Both halves belong on the row. */}
+                {/* ONE SENTENCE, AND THE WORK LEADS IT.
+                    Buffalo Bills read "217 of 217 contacted · 115 due
+                    follow-up" and "nothing left to do" in the same card: the
+                    second line only looked at whether anything was unwritten
+                    and ignored the 115 letters waiting to go. A card cannot
+                    say there is nothing to do while naming something to do.
+                    Due follow-ups outrank everything, and "nothing left to do"
+                    has to earn itself — nobody waiting, nobody uncontacted. */}
                 <p className="text-xs text-muted-foreground">
-                  {p.total === 0
-                    ? "nothing here yet"
-                    : `${p.contacted} of ${p.total} contacted`}
-                  {p.due > 0 ? ` · ${p.due} due follow-up` : ""}
+                  {teamLine(p)}
                 </p>
-                {left === 0 && p.total > 0 ? (
-                  <p className="text-xs text-muted-foreground">nothing left to do</p>
-                ) : null}
               </button>
             );
           })}
@@ -436,6 +578,7 @@ export default function WorkPanel() {
             <h2 className="text-2xl font-semibold">{place.key}</h2>
 
             <Group
+              startOpen={openGroup === "chapters"}
               title="Fan clubs"
               done={progress[place.key]?.has("chapters")}
               onDone={() => markDone(place.key, "chapters", 0)}
@@ -458,6 +601,7 @@ export default function WorkPanel() {
             />
 
             <Group
+              startOpen={openGroup === "partner"}
               title="School partner"
               done={progress[place.key]?.has("partner")}
               onResearch={findPartner}
@@ -470,6 +614,7 @@ export default function WorkPanel() {
             />
 
             <Group
+              startOpen={openGroup === "business"}
               title="Local businesses"
               done={progress[place.key]?.has("business")}
               onDone={() => markDone(place.key, "business", 0)}
@@ -485,6 +630,22 @@ export default function WorkPanel() {
       </div>
     </div>
   );
+}
+
+/**
+ * What this team's row says, in the vocabulary used everywhere else on the
+ * page: not written to, sent step 1, opened, due follow-up, don't contact.
+ */
+function teamLine(p: {
+  total: number; open: number; contacted: number; due: number;
+}): string {
+  if (p.total === 0) return "nothing here yet";
+  if (p.due > 0) {
+    const rest = p.open > 0 ? `, ${p.open} not written to` : "";
+    return `${p.due} due follow-up${rest}`;
+  }
+  if (p.open > 0) return `${p.open} not written to · ${p.contacted} of ${p.total} contacted`;
+  return `all ${p.total} contacted · nothing left to do`;
 }
 
 type Row = {
@@ -520,7 +681,7 @@ function rowFromSponsor(s: Sponsor): Row {
  * glance, so give them one click.
  */
 function Group({
-  title, why, rows, busy, onSend, onPreview, onResearch, onRecategorise, done, onDone, doneHint,
+  title, why, rows, busy, onSend, onPreview, onResearch, onRecategorise, done, onDone, doneHint, startOpen,
 }: {
   done?: boolean;
   onDone?: () => void;
@@ -533,9 +694,11 @@ function Group({
   onPreview: (ids: string[], step: number) => void;
   onResearch?: () => void;
   onRecategorise?: (ids: string[]) => void;
+  /** Do-this-next landed on this team for this group: show it all. */
+  startOpen?: boolean;
 }) {
   const [sel, setSel] = useState<string[]>([]);
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(!!startOpen);
   // Rows with no address cannot be emailed and cannot be ticked, so by default
   // they are just noise between the ones you can act on — and for a team like
   // the Packers that is most of the list.
@@ -562,9 +725,18 @@ function Group({
     <Card className="space-y-3 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h3 className="text-lg font-semibold">
-            {title} <span className="text-muted-foreground">({rows.length})</span>
-          </h3>
+          <h3 className="text-lg font-semibold">{title}</h3>
+          {/* THE THREE NUMBERS, RECONCILED.
+              The header said "(122)" beside a "Show all 122" link and a
+              "Show 139 with no address" link, so the group was either 122 or
+              261 depending on which control you read. One line, and the
+              show/hide links below add up to it. */}
+          <p className="text-xs text-muted-foreground">
+            {rows.length} total · {sendable.length} emailable · {noEmail.length} no address
+            {rows.length - live.length > 0
+              ? ` · ${rows.length - live.length} don't contact`
+              : ""}
+          </p>
           <p className="text-sm text-muted-foreground">{why}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -653,7 +825,7 @@ function Group({
                 onClick={() => setShowAll((v) => !v)}
                 className="text-sm text-muted-foreground underline underline-offset-2"
               >
-                {showAll ? "Show fewer" : `Show all ${actionable.length}`}
+                {showAll ? "Show fewer" : `Show all ${actionable.length} emailable`}
               </button>
             ) : null}
             {noEmail.length > 0 ? (
