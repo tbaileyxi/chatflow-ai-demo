@@ -46,22 +46,34 @@ type Place = {
 const SCHOOL_PARTNER = "school partner";
 
 /**
- * Does this name read like a booster or NIL organisation?
+ * Is this unmistakably a consumer business that has been filed as a booster
+ * group?
  *
- * Kept deliberately in step with outreach-enrich's copy of the same list: that
- * one stops new rows being misfiled, this one cleans up the rows filed before
- * it existed. If the words diverge, the page will disagree with the importer
- * about what a booster group is.
+ * THE TEST IS POSITIVE ON PURPOSE. The obvious approach — anything WITHOUT
+ * booster vocabulary is misfiled — was measured against the live table and
+ * would have moved 89 rows including Tigers Unlimited and Cougar Pride, which
+ * are real booster organisations, while leaving YETI and WBRZ sitting in the
+ * partner list. Absence of the right word is not evidence: booster orgs are
+ * often named after nothing in particular, and IPTAY is the whole name.
+ *
+ * So a row only moves when its own name says what it is. Twelve rows qualify
+ * today, each for a reason you can read off the name. Everything ambiguous
+ * stays where it is and waits for a human, which is the correct outcome for a
+ * judgement a list of words cannot make.
  */
-const BOOSTER_WORDS = [
-  "booster", "boosters", "foundation", "collective", "alumni", "athletic",
-  "athletics", "nil", "club", "association", "fund", "friends of", "society",
-  "endowment", "university", "college", "letterwinner", "varsity",
+const BUSINESS_WORDS = [
+  "restaurant", "cafe", "caf\u00e9", "grill", "pizza", "bbq", "barbecue",
+  "barbershop", "salon", "furniture", "dealership", "motors", "automotive",
+  "insurance", "credit union", "gym", "fitness", "dental", "dentist",
+  "orthodont", "chiropract", "realty", "real estate", "roofing", "plumbing",
+  "hvac", "landscap", "brewing", "brewery", "coffee", "bakery", "deli",
+  "seasonings", "apparel", "boutique", "pharmacy", "hotel", "storage",
+  "tire", "collision", "car wash", "carwash",
 ];
 
-function looksLikeBooster(name: string | null): boolean {
+function businessReason(name: string | null): string | null {
   const n = (name || "").toLowerCase();
-  return BOOSTER_WORDS.some((w) => n.includes(w));
+  return BUSINESS_WORDS.find((w) => n.includes(w)) ?? null;
 }
 
 export default function WorkPanel() {
@@ -401,7 +413,7 @@ export default function WorkPanel() {
         .eq("vertical", SCHOOL_PARTNER)
         .limit(5000);
       const wrong = ((data ?? []) as any[])
-        .filter((r) => !looksLikeBooster(r.company))
+        .filter((r) => businessReason(r.company))
         .map((r) => ({ id: r.id as string, company: (r.company ?? "") as string }));
       setMisfiled(wrong);
       if (wrong.length === 0) {
@@ -504,8 +516,8 @@ export default function WorkPanel() {
             disabled={fixing}
             className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-left text-sm"
           >
-            {misfiled.length} rows are filed as school partners but are not
-            booster groups — move them to local businesses
+            {misfiled.length} restaurants, hotels and shops are filed as school
+            partners — move them to local businesses
           </button>
         ) : null}
         <Input
