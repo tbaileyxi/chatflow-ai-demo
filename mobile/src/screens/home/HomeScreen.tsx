@@ -26,6 +26,7 @@ import { CompleteProfileCard } from "@/components/home/CompleteProfileCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { createTeamHuddle } from "@/lib/teamHuddle";
 import { useInAppNotifications } from "@/hooks/useInAppNotifications";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
 import { useRoomGames, type RoomGame } from "@/hooks/useRoomGames";
@@ -87,6 +88,9 @@ function FriendsNowSection() {
   const { data: atVenue } = useVenuePresence();
   const [expanded, setExpanded] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const { user } = useAuth();
+  const { data: profile } = useProfile();
+  const queryClient = useQueryClient();
 
   const { data: myHuddles } = useUserHuddles();
 
@@ -106,12 +110,45 @@ function FriendsNowSection() {
     // room reads as a mailing list. Prefer yours; fall back to whichever room
     // has been talking most recently.
     const owned = all.filter((h) => h.roomRole === "owner" && !h.isOfficialTeam);
-    const pool = owned.length > 0 ? owned : all;
-    const pick = [...pool].sort(
+    const pool = owned.length > 0 ? owned : all.filter((h) => !h.isOfficialTeam);
+    let pick = [...pool].sort(
       (a, b) =>
         new Date(b.lastMessageAt ?? 0).getTime() -
         new Date(a.lastMessageAt ?? 0).getTime(),
     )[0];
+
+    // Now that the community room is back on Home, most new people have one of
+    // those and nothing else — and a community room is the one room here that
+    // reads as a mailing list rather than an invitation from a person. So the
+    // invite makes them their own room for that team first, which is the same
+    // one tap Spin up does inside the room, and invites to that instead.
+    if (!pick && user) {
+      const community = [...all]
+        .filter((h) => h.isOfficialTeam && h.teamId)
+        .sort(
+          (a, b) =>
+            new Date(b.lastMessageAt ?? 0).getTime() -
+            new Date(a.lastMessageAt ?? 0).getTime(),
+        )[0];
+      if (community?.teamId) {
+        const newId = await createTeamHuddle({
+          userId: user.id,
+          teamId: community.teamId,
+          teamName: community.teamName ?? null,
+          displayName: profile?.displayName ?? null,
+        });
+        if (newId) {
+          await queryClient.invalidateQueries({ queryKey: ["user-huddles"] });
+          pick = {
+            ...community,
+            id: newId,
+            name: community.teamName
+              ? `${(profile?.displayName ?? "My").trim().split(/\s+/)[0]}'s ${community.teamName} huddle`
+              : community.name,
+          };
+        }
+      }
+    }
 
     // No room means there is nothing to invite anyone TO. Sending the homepage
     // anyway is what the old version did, and it is why nobody ever joined from
