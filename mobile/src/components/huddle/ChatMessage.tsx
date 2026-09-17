@@ -27,6 +27,7 @@ import {
 } from "lucide-react-native";
 import { Audio, Video, ResizeMode } from "expo-av";
 import { Type } from "@/components/ui/Type";
+import { PregameCard, parsePregameCard } from "@/components/huddle/PregameCard";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { blockUser, reportMessage } from "@/lib/moderation";
@@ -129,6 +130,8 @@ type Props = {
   huddleName?: string;
   /** Locked rooms share the moment but never the door — see handleShare. */
   huddleIsLocked?: boolean;
+  /** The team's founding partner, when this room is one that may show it. */
+  partnerName?: string | null;
   reactions?: ReactionSummary[];
   onReact?: (emoji: string) => void;
   onReply?: () => void;
@@ -200,6 +203,7 @@ export function ChatMessage({
   huddleId,
   huddleName,
   huddleIsLocked = false,
+  partnerName = null,
   reactions,
   onReact,
   onReply,
@@ -217,6 +221,15 @@ export function ChatMessage({
 
   // Hooks above, early return below — legacy prediction cards render nothing.
   if (message.messageType === "prediction_card") return null;
+
+  // The founding partner's pregame card. Its own renderer because it is a card
+  // and not a bubble — and because the sponsor line lives inside it, in the one
+  // place a sponsor is allowed to appear.
+  if (message.messageType === "pregame_card") {
+    const card = parsePregameCard(message.content ?? "");
+    if (card) return <PregameCard data={card} messageId={message.id} />;
+    return null;
+  }
 
   // Retired. The yes/no market card asked a room of Yankees fans whether the
   // Yankees would win — everyone taps YES, nobody argues, and the card sat
@@ -1010,6 +1023,24 @@ export function ChatMessage({
               {message.mediaUrl && message.mediaType === "audio" && (
                 <AudioBubble uri={message.mediaUrl} />
               )}
+
+              {/* THE SECOND AND LAST SPONSOR SURFACE.
+                  A grey line under a dual-cam clip, in rooms whose team has a
+                  founding partner. UNDER the clip and never on it: the video is
+                  the person who made it, and burning a name into their face is
+                  selling something that was not ours to sell. Nothing here is
+                  tappable — it is an attribution, not an ad. */}
+              {partnerName &&
+              message.messageType === "face_reaction" &&
+              message.mediaUrl ? (
+                <Type
+                  variant="data"
+                  tone="muted"
+                  style={{ fontSize: 9.5, marginTop: 3, letterSpacing: 0.5 }}
+                >
+                  powered by {partnerName}
+                </Type>
+              ) : null}
 
               {/* Reactions display — only show when reactions exist */}
               {reactions && reactions.length > 0 && (

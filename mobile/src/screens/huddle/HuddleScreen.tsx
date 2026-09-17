@@ -65,6 +65,7 @@ import { RoomBackground, isRealRoomPhoto } from "@/components/huddle/RoomBackgro
 import { SpinUpBar } from "@/components/huddle/SpinUpBar";
 import { CommunitySpinUpBar } from "@/components/huddle/CommunitySpinUpBar";
 import { useKnownPeople } from "@/hooks/useFriends";
+import { useFoundingPartner } from "@/hooks/useFoundingPartner";
 
 type Route = RouteProp<RootStackParamList, "Huddle">;
 
@@ -259,6 +260,14 @@ export function HuddleScreen() {
    * the only reason to stay. They are also the only reason Spin up exists —
    * with nobody you know there is nothing to pull out.
    */
+  // A sponsor may appear in a team's own rooms and nowhere else: not in a
+  // fixture room that belongs to both teams, not behind a locked door, not in
+  // a DM between two people.
+  const partnerName = useFoundingPartner({
+    teamName: huddle?.teamName ?? null,
+    eligible: !!huddle && !huddle.isGameRoom && !huddle.isPrivate && !huddle.isDm,
+  });
+
   const { data: knownPeople } = useKnownPeople();
   const friendsHere = useMemo(() => {
     const known = new Set((knownPeople ?? []).map((p: any) => p.userId));
@@ -818,6 +827,7 @@ export function HuddleScreen() {
                   huddleId={huddleId}
                   huddleName={huddle.name}
                   huddleIsLocked={huddle.isPrivate}
+                  partnerName={partnerName}
                   reactions={reactionsMap?.get(msg.id)}
                   onReact={(emoji) =>
                     toggleReaction(msg.id, emoji, huddleId)
