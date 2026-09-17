@@ -160,9 +160,14 @@ function body(step: number, c: Chapter): string {
   if (step === 2) {
     return [
       `Hey ${greeting(c)},`,
-      `Following up once. The ${orgShort} room for ${who} is still there if you want it.`,
+      // "Still there if you want it" is the whole ask phrased as a shrug: it
+      // waits to be wanted instead of saying what to do, and a volunteer
+      // reading on a phone will not turn a shrug into an action for you. The
+      // paragraph under it is the best sentence in either sequence and does
+      // not change.
+      `Following up once on the ${orgShort} room for ${who}.`,
       `It fills itself — the score, the news and whatever clip everyone is passing around show up without anyone posting them. Nothing for you to run or moderate.`,
-      `Free on iPhone: ${APP_STORE_URL}`,
+      `One person has to be in it first. Download it and your members can follow you in: ${APP_STORE_URL}`,
       `Ty`,
     ].join("\n\n");
   }
@@ -171,7 +176,7 @@ function body(step: number, c: Chapter): string {
     return [
       `Hey ${greeting(c)},`,
       `Last one from me. If it is not for your group, no hard feelings — good luck this season either way.`,
-      `The ${orgShort} room stays open if you ever want it: ${APP_STORE_URL}`,
+      `The ${orgShort} room is there whenever you want it, and it costs nothing to look: ${APP_STORE_URL}`,
       `Ty`,
     ].join("\n\n");
   }
@@ -183,8 +188,8 @@ function body(step: number, c: Chapter): string {
     // members instead sidesteps it for fan clubs and alumni groups alike.
     `Your members already care about every snap. They are just watching apart, and the group goes quiet between games.`,
     `A ${orgShort} room fixes the quiet part on its own. The score, the news and the clips land in it without anyone posting them${c.venue ? `, and when you do post "${c.venue}, 1pm" people actually see it` : ``}.`,
-    `There is no admin work. That is the whole tool — nothing for you to run.`,
-    `Free on iPhone: ${APP_STORE_URL}`,
+    `There is no admin work. That is the whole tool — nothing for you to run or moderate.`,
+    `Free on iPhone, and your members can follow you in: ${APP_STORE_URL}`,
     `Ty`,
   ].join("\n\n");
 }
@@ -319,7 +324,10 @@ serve(async (req) => {
         state: "FL",
         venue: "The Greenlight Bar",
         leader_name: "Test Recipient",
-        first_name: "Ty",
+        // Empty on purpose: greeting() falls back to "there", so a self test
+        // shows the copy rather than a merge field that will differ for every
+        // real recipient.
+        first_name: "",
         email: to,
         member_count: 140,
         sequence_step: step - 1,

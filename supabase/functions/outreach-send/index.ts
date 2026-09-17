@@ -26,9 +26,12 @@ const SEASON_PRICE = "$2,500";
 
 // Trademark posture: we describe who the fans are, never claim affiliation.
 // Never render a school or club mark, logo, or the word "official" beside one.
+// "Not affiliated with, endorsed by, or sponsored by" inside a letter selling
+// a sponsorship reads as a contradiction — the reader is being asked to
+// sponsor something that opens by saying nobody sponsors it. Same legal
+// meaning, one plain sentence, small.
 const DISCLAIMER =
-  "Side Huddle is an independent app and is not affiliated with, endorsed by, " +
-  "or sponsored by any school, team, or league.";
+  "Side Huddle is an independent app, not affiliated with the team or league.";
 
 type Lead = {
   id: string;
@@ -144,6 +147,18 @@ function subject(step: number, lead: Lead): string {
   }
 }
 
+/**
+ * Their category, in the words a person would use out loud. The vertical
+ * column holds things like "auto dealer" and "quick service restaurant";
+ * "one auto dealer" reads fine, "one other quick service restaurant" is a
+ * mouthful, and an empty vertical must never produce "one  ".
+ */
+function categoryWord(lead: Lead): string {
+  const v = (lead.vertical || "").trim().toLowerCase();
+  if (!v || v === SCHOOL_PARTNER_VERTICAL) return "business";
+  return v.replace(/s$/, "");
+}
+
 /** The team page to buy on, with the team already chosen. */
 function sponsorLink(lead: Lead): string {
   const team = (lead.school || lead.market || "").trim();
@@ -179,32 +194,52 @@ function body(step: number, lead: Lead): string {
   const company = lead.company;
 
   if (step === 2) {
+    // "Quick follow-up" spends the one line that gets read announcing that a
+    // line is coming. The news is that the slot is open and the category is
+    // still free; lead with it.
     return [
-      `Hi ${firstName(lead)} \u2014 quick follow-up.`,
-      `The founding partner spot for ${slot} is still open. One business, one season, ${SEASON_PRICE} flat.`,
+      `Hi ${firstName(lead)},`,
+      `The founding partner slot for ${slot} is still open, and no other ${categoryWord(lead)} has it.`,
+      `${SEASON_PRICE} flat for the season, the rate locked for three.`,
       `${link}`,
       `Ty`,
+      DISCLAIMER,
     ].join("\n\n");
   }
 
   if (step === 3) {
+    // "The first name on the team" has no noun in it. A reader who skipped
+    // step 1 cannot tell what is being offered — first name of what?
     return [
       `Hi ${firstName(lead)},`,
       `Last note on ${slot}. If it is not for you, no hard feelings.`,
-      `Whoever takes it is the first name on the team, and that only happens once: ${link}`,
+      `Whoever takes it is the founding backer of ${slot} fans on Side Huddle, and there is only ever one: ${link}`,
       `Ty`,
       `Not relevant? Reply "unsubscribe" and I won't follow up.`,
+      DISCLAIMER,
+      DISCLAIMER,
     ].join("\n\n");
   }
 
+  // THE STORY IS THE PRODUCT, so it goes first. The earlier version opened
+  // with what the app is and then listed inventory in one run-on sentence,
+  // which reads as a brochure — and a brochure is judged on reach, which is
+  // the argument we lose. One partner, attached to these fans from the start,
+  // and that only happens once: that is the thing being sold.
+  //
+  // "${company} would be it for ${slot}" also presumed the sale. Holding a
+  // slot for a category is an offer; naming them the partner in paragraph two
+  // is a decision they have not made.
   return [
     `Hi ${firstName(lead)},`,
-    `Side Huddle is where ${slot} fans watch the game together \u2014 their own room, the score and the news landing in it as it happens.`,
-    `I am taking one founding partner per team per season. ${company} would be it for ${slot} \u2014 nobody else in your category.`,
-    `You get founding partner status and the launch story, a small "powered by" on the pregame card at kickoff and under the clips fans post of themselves watching, and co-branded shirts in the team's colors.`,
-    `${SEASON_PRICE} flat for the season. The rate is locked for three seasons and you get first refusal after that.`,
+    `One business per team gets to be the founding partner of ${slot} fans on Side Huddle \u2014 the name attached to them from day one. That only happens once.`,
+    `Side Huddle is where those fans watch the game together, with the score and the news landing as it happens.`,
+    `I am holding the ${slot} slot for one ${categoryWord(lead)}.`,
+    `Included: founding status and the launch story, a "powered by" on the pregame card and under the clips fans post, and co-branded shirts in team colors.`,
+    `${SEASON_PRICE} flat, the rate locked for three seasons, first refusal after that.`,
     `${link}`,
     `Ty`,
+    DISCLAIMER,
   ].join("\n\n");
 }
 
@@ -222,7 +257,10 @@ function htmlFromText(text: string): string {
     .split(/\n{2,}/)
     .map((block) => `<p>${linkify(escape(block)).replace(/\n/g, "<br>")}</p>`)
     .join("\n");
-  return `<!DOCTYPE html><html><body>\n${paragraphs}\n<p style="color:#888;font-size:12px">${escape(DISCLAIMER)}</p>\n</body></html>`;
+  // The disclaimer is part of the text now, so it arrives through the
+  // paragraphs above. Appending it here as well printed it twice in any client
+  // showing the HTML part.
+  return `<!DOCTYPE html><html><body>\n${paragraphs}\n</body></html>`;
 }
 
 
@@ -335,7 +373,11 @@ serve(async (req) => {
       const sample = {
         id: "self-test",
         company: "Wally's Auto Group",
-        contact_name: "Dana Whitfield",
+        // NO NAME ON A SELF TEST. A merged first name is the one part of the
+        // letter that will be different for every real recipient, and reading
+        // "Hi Dana" pulls attention onto the merge instead of the sentences
+        // being judged. firstName() falls back to "there" when this is empty.
+        contact_name: null,
         contact_email: to,
         vertical: "auto dealer",
         school: "Cleveland Browns",
