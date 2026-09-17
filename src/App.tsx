@@ -73,8 +73,12 @@ const AppContent = () => {
         <Route path="/i/:code" element={<InviteCodePage />} />
         <Route path="/admin/events" element={<AdminEventsPage />} />
         <Route path="/picks/:betId" element={<PickSharePage />} />
-        <Route path="/sponsor" element={<Navigate to="/sponsors" replace />} />
-        <Route path="/sponsors" element={<Sponsor />} />
+        {/* ONE sponsor page, at the singular URL the emails link to. It was
+            the other way round — /sponsor redirected to /sponsors — so every
+            link with ?team= lost its query on the bounce and the page could
+            not tell which team it was selling. */}
+        <Route path="/sponsor" element={<Sponsor />} />
+        <Route path="/sponsors" element={<Navigate to="/sponsor" replace />} />
         <Route path="/sponsors/admin" element={<SponsorAdmin />} />
         <Route path="/teams" element={<TeamsIndex />} />
         <Route path="/t/:slug" element={<TeamLanding />} />

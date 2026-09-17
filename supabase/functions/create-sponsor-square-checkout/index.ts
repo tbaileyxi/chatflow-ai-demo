@@ -33,11 +33,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SEASON_PRICE_CENTS = 10000;    // $100 for one of six positions
-const EXCLUSIVE_PRICE_CENTS = 50000; // $500 for the whole team, nobody beside you
+/**
+ * ONE PRICE, AND EXCLUSIVITY IS NOT AN UPGRADE.
+ *
+ * This sold six positions per team at $100, with $500 to take all six — a
+ * ladder that made the cheap option the default and category exclusivity a
+ * thing you paid extra for. The model is now one founding partner per team per
+ * season at $2,500 flat: exclusivity IS the product, so there is nothing to
+ * upsell and no second number to explain. No prorating, whenever in the season
+ * it is bought.
+ */
+const SEASON_PRICE_CENTS = 250000;
 
-function totalCents(count: number, exclusive: boolean) {
-  return count * (exclusive ? EXCLUSIVE_PRICE_CENTS : SEASON_PRICE_CENTS);
+function totalCents(count: number) {
+  return count * SEASON_PRICE_CENTS;
 }
 
 serve(async (req) => {
@@ -55,8 +64,10 @@ serve(async (req) => {
     // for — the order arrives as an anonymous amount and somebody has to go
     // and ask. Here the team is on the order note and the claim row exists
     // before the card field is ever shown, exactly as it is for $100.
-    const { teams, businessName, website, exclusive } = await req.json();
-    const isExclusive = exclusive === true;
+    // `exclusive` is still accepted and ignored: every partnership is
+    // exclusive now, and an old page or a stale tab sending it should not be
+    // charged differently for saying so.
+    const { teams, businessName, website } = await req.json();
     if (!Array.isArray(teams) || teams.length === 0) {
       return json({ error: "Select at least one team." }, 400);
     }
@@ -113,17 +124,14 @@ serve(async (req) => {
     }
 
     const count = cleanTeams.length;
-    const total = totalCents(count, isExclusive);
+    const total = totalCents(count);
 
     const teamNames: string[] = cleanTeams.map((team) => team.teamName);
     const teamList = teamNames.join(", ");
-    const productName = isExclusive
-      ? (count === 1
-          ? `Side Huddle EXCLUSIVE — ${teamNames[0]} (all six, season)`
-          : `Side Huddle EXCLUSIVE — ${count} teams (all six each, season)`)
-      : (count === 1
-          ? `Side Huddle sponsor — ${teamNames[0]} (season)`
-          : `Side Huddle sponsor — ${count} teams (season)`);
+    const productName =
+      count === 1
+        ? `Side Huddle founding partner — ${teamNames[0]} (season)`
+        : `Side Huddle founding partner — ${count} teams (season)`;
 
     const origin = req.headers.get("origin") || "https://sidehuddlesports.com";
 
@@ -142,13 +150,13 @@ serve(async (req) => {
           location_id: locationId,
         },
         checkout_options: {
-          redirect_url: `${origin}/sponsors?paid=1`,
+          redirect_url: `${origin}/sponsor?paid=1`,
           ask_for_shipping_address: false,
         },
         // Team list is recorded on the order note so you can see what was bought.
         // The teams ride on the order note, so a payment is always matchable
         // to the slots it bought without asking the buyer to say it twice.
-        payment_note: `${isExclusive ? "EXCLUSIVE (all six)" : "season"} · ${teamList}`.slice(0, 500),
+        payment_note: `founding partner · season · ${teamList}`.slice(0, 500),
       }),
     });
 
@@ -170,11 +178,12 @@ serve(async (req) => {
       team_name: team.teamName,
       league: team.league,
       status: "open",
-      plan: isExclusive ? "exclusive" : "full",
+      // One plan exists now. The column stays so old rows still read.
+      plan: "founding",
       business_name: brand,
       website: siteUrl,
       amount_paid_cents: 0,   // set by square-webhook when the payment lands
-      balance_due_cents: 0,   // nothing owed later — $100 is the whole price
+      balance_due_cents: 0,   // nothing owed later — $2,500 is the whole price
       square_checkout_id: paymentLink.id ?? null,
       square_order_id: orderId,
     }));
