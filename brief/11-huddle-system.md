@@ -68,7 +68,8 @@ Decisions locked 2026-09-17:
       scheduled with pg_cron, which is not enabled here, so an expired room
       stayed live and reachable by link. close_expired_side_huddles() is that
       closer as a callable function (migration 20260917000002). RUN IT.
-- [ ] F5 (parked) Shared clips deep-link back into the huddle — waiting on locked rooms
+- [x] F5 Shares deep-link into the room; a LOCKED room shares the moment without
+      the room on it, so the link is never a way around the owner's approval.
 - [ ] G2 Off-day content (X highlights, news) keeping community rooms alive at
       9am Tuesday. Ops, not app code: the bot pipeline feeds these rooms.
 - [ ] RUN THE MIGRATION: supabase/migrations/20260917000001_dismiss_your_own_notifications.sql
