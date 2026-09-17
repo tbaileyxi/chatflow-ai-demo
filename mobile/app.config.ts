@@ -40,10 +40,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "applinks:sidehuddlesports.com",
       "applinks:www.sidehuddlesports.com",
     ],
-    // Unique within its version train, so 1.0.5 could start at 1 — kept
-    // climbing instead so a number is never reused anywhere and `eas
-    // build:list` reads in order.
-    buildNumber: "104",
+    // GLOBAL, not per train. The note here used to say a build number was
+    // unique within its version, so 1.0.5 could start again at 1. It cannot:
+    // Transporter rejected 1.0.9 (104) with "bundle version must be higher
+    // than the previously uploaded version: 104", and 104 had never been used
+    // under 1.0.9 at all. The number has to climb past the highest ever
+    // uploaded for this app, whatever version wore it.
+    //
+    // AND THIS VALUE IS IGNORED. eas.json sets autoIncrement on the production
+    // profile, so EAS computes the number from its own remote counter and
+    // overwrites whatever is here: this file said 78 while 103 shipped, and
+    // asking for 110 produced 105. It is kept only so the config is readable;
+    // the number that ships is whatever EAS's counter says next. To control it
+    // by hand, turn off autoIncrement in eas.json first.
+    buildNumber: "105",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       // Contacts are hashed on this device and only the hashes are sent, so we
