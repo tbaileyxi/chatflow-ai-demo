@@ -152,6 +152,46 @@ serve(async (req) => {
 
       if (sponsorErr) console.error("team_sponsors insert error:", sponsorErr);
       else console.log(`${claim.business_name} is now live on ${claim.team_name}`);
+
+      // AND THE TABLE THE PRODUCT ACTUALLY READS.
+      //
+      // team_sponsors is the old model's store, and nothing in the app reads
+      // it any more — the pregame card and the clip caption both read
+      // founding_partners. Payment was landing in a table the surfaces never
+      // look at, which means a partner could pay $2,500 and never appear
+      // anywhere, with every row in the database saying it had worked.
+      //
+      // team_sponsors is still written above so the old board and anything
+      // reporting off it keep functioning; this is the row that makes the
+      // partnership real.
+      const teamSlug = String(claim.team_name ?? "")
+        .toLowerCase()
+        .replace(/\s*\((all six|spot \d+|season|founding)\)\s*$/i, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+
+      if (!teamSlug) {
+        console.error(`Claim ${claim.id}: no usable team slug from "${claim.team_name}"`);
+        continue;
+      }
+
+      const { error: partnerErr } = await supabase
+        .from("founding_partners")
+        .upsert(
+          {
+            team_slug: teamSlug,
+            partner_name: claim.business_name,
+            // sponsor_claims does not carry a category today. Null rather
+            // than guessed: the category is what the exclusivity is against,
+            // and inventing one would make a promise nobody sold.
+            category: null,
+            season: new Date().getFullYear(),
+          },
+          { onConflict: "team_slug,season" },
+        );
+
+      if (partnerErr) console.error("founding_partners upsert error:", partnerErr);
+      else console.log(`${claim.business_name} is the founding partner for ${teamSlug}`);
     }
 
     return ok();
