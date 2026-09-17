@@ -7,36 +7,22 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
 const FROM_EMAIL = "ty@sidehuddlesports.com";
 const FROM_NAME = "Ty";
-const SPONSOR_URL = "https://sidehuddlesports.com/sponsors";
-// Square hosted payment link for the deposit. The CTA points straight here
-// rather than at the sponsor page: the ask in these emails is the deposit, and
-// a page in between is one more place to lose someone reading on a phone.
-// The board, not a fixed Square link. Checkout is generated per team now — a
-// static link cannot know which team they want, and there is no sale without
-// one.
-const CHECKOUT_URL = "https://sidehuddlesports.com/sponsors";
-// A sponsor should be able to look at the thing before paying for it, so every
-// mail carries all three: buy, read the full pitch, see the app itself.
+// SINGULAR, and the team preselected. /sponsors is the old board; /sponsor is
+// the page that knows which team is being bought.
+const SPONSOR_BASE = "https://sidehuddlesports.com/sponsor";
 const APP_STORE_URL = "https://apps.apple.com/us/app/id6777524558";
 const SCHOOL_PARTNER_VERTICAL = "school partner";
 
-// $100 for the season, paid in full.
+// THE MODEL, AS IT ACTUALLY IS.
 //
-// This used to be $2,500 with a $500 deposit and a balance due "the day we
-// launch". The app launched, and the page now sells $100 — an email quoting
-// $2,500 that links to a $100 page is the fastest way to lose a buyer who was
-// otherwise ready. One number, in both places.
+// This file has quoted $2,500-with-a-deposit, then $100-plus-$500-exclusivity,
+// each of which outlived the page it linked to — an email quoting a price the
+// landing page contradicts loses a buyer who was otherwise ready.
 //
-// The deposit is gone with it: at $100 there is nothing to hold, and a deposit
-// is a second conversation, which is the one thing this price exists to avoid.
-const SEASON_PRICE = "$100";
+// One founding partner per team per season, category exclusive. $2,500 flat,
+// no prorating, no deposit, no tiers to explain.
+const SEASON_PRICE = "$2,500";
 
-// The upgrade, offered once and briefly.
-//
-// Named in step 1 only, as a single line under the price. A business that
-// cares about its category will ask; one that does not should not have to
-// read two offers to find the cheap one.
-const EXCLUSIVE_PRICE = "$500";
 
 // Trademark posture: we describe who the fans are, never claim affiliation.
 // Never render a school or club mark, logo, or the word "official" beside one.
@@ -116,12 +102,6 @@ function fanName(lead: Lead): string {
   return `${slot} ${nick}`;
 }
 
-function fanGroup(lead: Lead): string {
-  const slot = slotName(lead);
-  return slot === "your local team"
-    ? "local fans, friends, parents, and alumni"
-    : `${slot} fans, friends, parents, and alumni`;
-}
 
 function isSchoolPartnerLead(lead: Lead): boolean {
   return lead.vertical === SCHOOL_PARTNER_VERTICAL ||
@@ -140,46 +120,8 @@ function huddleLabel(lead: Lead): string {
 }
 
 // ── HTML shell (Side Huddle branding; structure from brevo_send.py:_body) ──────
-function shell(inner: string): string {
-  return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:24px 0;">
-  <tr><td align="center">
-  <table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-    <tr><td style="background-color:#0a0a0a;padding:20px 32px;">
-      <span style="color:#00c47d;font-size:16px;font-weight:bold;letter-spacing:0.5px;">Side Huddle</span>
-      <span style="color:#888;font-size:13px;margin-left:12px;">The digital tailgate</span>
-    </td></tr>
-    <tr><td style="padding:32px;color:#1a1a1a;font-size:15px;line-height:1.7;">
-${inner}
-    </td></tr>
-    <tr><td style="background:#f8f8f8;padding:20px 32px;border-top:1px solid #eee;">
-      <p style="font-size:13px;color:#888;margin:0 0 4px 0;">— Ty &nbsp;|&nbsp; Side Huddle Sports &nbsp;|&nbsp; <a href="mailto:${FROM_EMAIL}" style="color:#888;">${FROM_EMAIL}</a></p>
-      <p style="font-size:12px;color:#bbb;margin:0 0 6px 0;">Reply "unsubscribe" to opt out.</p>
-      <p style="font-size:11px;color:#c4c4c4;margin:0;line-height:1.5;">${DISCLAIMER}</p>
-    </td></tr>
-  </table>
-  </td></tr>
-</table>
-</body></html>`;
-}
 
-function cta(label: string): string {
-  return `<table cellpadding="0" cellspacing="0" style="margin:4px 0 10px 0;"><tr>
-    <td style="background-color:#00c47d;border-radius:6px;">
-      <a href="${CHECKOUT_URL}" style="display:inline-block;padding:13px 26px;color:#000;font-size:15px;font-weight:bold;text-decoration:none;">${label} &rarr;</a>
-    </td>
-    <td style="width:10px;">&nbsp;</td>
-    <td style="border:1.5px solid #d0d0d0;border-radius:6px;">
-      <a href="${SPONSOR_URL}" style="display:inline-block;padding:12px 22px;color:#1a1a1a;font-size:15px;font-weight:bold;text-decoration:none;">See the full pitch &rarr;</a>
-    </td></tr></table>`;
-}
 
-function appLine(): string {
-  return `<p style="font-size:13px;color:#777;margin:0 0 14px 0;">`
-    + `See the app: <a href="${APP_STORE_URL}" style="color:#00a86b;">${APP_STORE_URL}</a></p>`;
-}
 
 // ── step templates ─────────────────────────────────────────────────────────────
 function subject(step: number, lead: Lead): string {
@@ -202,120 +144,89 @@ function subject(step: number, lead: Lead): string {
   }
 }
 
-// The opening line of a letter about Saturday.
-//
-// This used to lead on lead.sponsor_signal, which is whatever enrichment found.
-// When that is a fan fact — "Home of Northern Summit Browns Backers, 687
-// members" — it is the best sentence in the email. When it is what enrichment
-// usually returns, the letter opened "Parent/student customer base and strong
-// local referral value. That crowd is the reason I'm writing." Nobody sponsors
-// a team because of their referral value. It reads like a database talking.
-//
-// So the fans lead, always, by name. The business signal follows as evidence
-// when we actually have one, and is silently dropped when we do not.
-function signalLine(lead: Lead): string {
-  const slot = slotName(lead);
-  const who = slot === "your local team" ? "Your town's" : `Every ${fanName(lead)}`;
-  const hook = `<p style="margin:0 0 18px 0;">${who} fan group is already watching together — `
-    + `phones out, group chat going, everybody shouting at the same call. `
-    + `<strong>${lead.company}</strong> can be one of the businesses powering those rooms all season.</p>`;
-
-  const signal = (lead.sponsor_signal || "").trim();
-  if (!signal) return hook;
-  return hook + `<p style="margin:0 0 18px 0;">${signal} — that is exactly the crowd already in there.</p>`;
+/** The team page to buy on, with the team already chosen. */
+function sponsorLink(lead: Lead): string {
+  const team = (lead.school || lead.market || "").trim();
+  const slug = team
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return slug ? `${SPONSOR_BASE}?team=${slug}` : SPONSOR_BASE;
 }
 
+/**
+ * The letter, in plain text.
+ *
+ * WHAT CHANGED AND WHY IT MATTERS: every previous version sold reach. Six
+ * businesses, names on a board, a crowd described in the opening line — a
+ * product that does not exist and an audience we cannot evidence. A local
+ * owner checks the number first, and there was no number to stand behind.
+ *
+ * What is actually for sale is a founding story: one business per team per
+ * season, the first one, named as such. That is specific, it is worth
+ * something to somebody local, and every word of it is true today.
+ *
+ * PLAIN TEXT IS THE EMAIL. The HTML is generated from this, so the preview and
+ * the send cannot drift apart. A one-to-one letter about a $2,500 handshake
+ * should not arrive as a newsletter with a button in it.
+ *
+ * No audience numbers, no impressions, never "official" — the disclaimer at
+ * the foot says exactly what we are not.
+ */
 function body(step: number, lead: Lead): string {
-  if (isSchoolPartnerLead(lead)) return schoolPartnerBody(step, lead);
-
-  const slot = slotName(lead);
-  const fans = fanGroup(lead);
+  const slot = isSchoolPartnerLead(lead) ? huddleLabel(lead) : slotName(lead);
+  const link = sponsorLink(lead);
+  const company = lead.company;
 
   if (step === 2) {
-    return shell(`
-      <p style="margin:0 0 18px 0;">Hi ${firstName(lead)} — quick follow-up.</p>
-      <p style="margin:0 0 18px 0;">One of six businesses backing the ${slot} huddles, all season. ${SEASON_PRICE} — that is the whole price.</p>
-      ${cta("Claim the slot")}
-      ${appLine()}`);
+    return [
+      `Hi ${firstName(lead)} \u2014 quick follow-up.`,
+      `The founding partner spot for ${slot} is still open. One business, one season, ${SEASON_PRICE} flat.`,
+      `${link}`,
+      `Ty`,
+    ].join("\n\n");
   }
 
   if (step === 3) {
-    return shell(`
-      <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
-      <p style="margin:0 0 18px 0;">Last note on ${slot}. Six businesses get their name on those huddles this season, and the spots do not come back.</p>
-      ${cta("Claim the slot")}
-      ${appLine()}
-      <p style="font-size:13px;color:#999;margin:0;">Not relevant? Reply "unsubscribe" and I won't follow up.</p>`);
+    return [
+      `Hi ${firstName(lead)},`,
+      `Last note on ${slot}. If it is not for you, no hard feelings.`,
+      `Whoever takes it is the first name on the team, and that only happens once: ${link}`,
+      `Ty`,
+      `Not relevant? Reply "unsubscribe" and I won't follow up.`,
+    ].join("\n\n");
   }
 
-  // step 1 — the whole offer in four lines; anything longer stops being read
-  // on a phone, which is where a local owner opens their mail.
-  return shell(`
-    <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
-    ${signalLine(lead)}
-    <p style="margin:0 0 18px 0;">Side Huddle is the digital tailgate — the app fan groups use to watch the game together. Live scores, big plays and highlights land in the room while they argue about the call.</p>
-    <p style="margin:0 0 18px 0;">Six businesses back the ${slot} huddles — your name on the board in every one of them, all season, in front of ${fans}.</p>
-    <p style="margin:0 0 18px 0;">Not an advert beside the fans. A business behind them, the same way you would back a team at home.</p>
-    <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season, paid once.</strong> No deposit, nothing owed later — less than one radio spot, and it runs every game instead of once. Six spots per team, no seventh.</p>
-    <p style="margin:0 0 18px 0;">Or <strong>${EXCLUSIVE_PRICE} takes all six</strong> — the whole team, the whole season, and no competitor on the board beside you. One business per team.</p>
-    ${cta("Claim the slot")}
-    ${appLine()}
-    <p style="font-size:13px;color:#999;margin:0;">Price goes up each week until kickoff.</p>`);
+  return [
+    `Hi ${firstName(lead)},`,
+    `Side Huddle is where ${slot} fans watch the game together \u2014 their own room, the score and the news landing in it as it happens.`,
+    `I am taking one founding partner per team per season. ${company} would be it for ${slot} \u2014 nobody else in your category.`,
+    `You get founding partner status and the launch story, a small "powered by" on the pregame card at kickoff and under the clips fans post of themselves watching, and co-branded shirts in the team's colors.`,
+    `${SEASON_PRICE} flat for the season. The rate is locked for three seasons and you get first refusal after that.`,
+    `${link}`,
+    `Ty`,
+  ].join("\n\n");
 }
 
-function schoolPartnerBody(step: number, lead: Lead): string {
-  const organization = lead.company;
-  const huddle = huddleLabel(lead);
-
-  if (step === 2) {
-    return shell(`
-      <p style="margin:0 0 18px 0;">Hi ${firstName(lead)} — quick follow-up.</p>
-      <p style="margin:0 0 18px 0;">One of six businesses backing the ${huddle} huddles, all season. ${SEASON_PRICE} — that is the whole price.</p>
-      ${cta("Claim the slot")}
-      ${appLine()}`);
-  }
-
-  if (step === 3) {
-    return shell(`
-      <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
-      <p style="margin:0 0 18px 0;">Last note on ${huddle}. One brand gets to be the only one inside those huddles this season.</p>
-      ${cta("Claim the slot")}
-      ${appLine()}
-      <p style="font-size:13px;color:#999;margin:0;">Not relevant? Reply "unsubscribe" and I won't follow up.</p>`);
-  }
-
-  // These leads already sponsor the athletics program, so the opener names that
-  // fact and nothing else — no comparison to what they pay their rights holder,
-  // which reads as adversarial and invites "so you are worth less".
-  return shell(`
-    <p style="margin:0 0 18px 0;">Hi ${firstName(lead)},</p>
-    <p style="margin:0 0 18px 0;">You already put your name in front of ${huddle} fans, so I'll be quick.</p>
-    <p style="margin:0 0 18px 0;">Side Huddle is the digital tailgate — AI-enhanced team chat where one fanbase splits into hundreds of small huddles, each with a bot pulling live scores, news and highlights into the room.</p>
-    <p style="margin:0 0 18px 0;">We sell one sponsor per category. ${organization} would be the only one across every ${huddle} huddle.</p>
-    <p style="margin:0 0 18px 0;"><strong>${SEASON_PRICE} for the season, paid once.</strong> No deposit and nothing owed later.</p>
-    <p style="margin:0 0 18px 0;">Or <strong>${EXCLUSIVE_PRICE} takes all six</strong> — every position on the team and nobody else on the board.</p>
-    ${cta("Claim the slot")}
-    ${appLine()}
-    <p style="font-size:13px;color:#999;margin:0;">Price goes up each week until kickoff.</p>`);
+/**
+ * Minimal HTML from the text: paragraphs and links, nothing else. If a style
+ * attribute beyond the disclaimer ever appears here, the text version has
+ * stopped being the email.
+ */
+function htmlFromText(text: string): string {
+  const escape = (t: string) =>
+    t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const linkify = (t: string) =>
+    t.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1">$1</a>');
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map((block) => `<p>${linkify(escape(block)).replace(/\n/g, "<br>")}</p>`)
+    .join("\n");
+  return `<!DOCTYPE html><html><body>\n${paragraphs}\n<p style="color:#888;font-size:12px">${escape(DISCLAIMER)}</p>\n</body></html>`;
 }
 
 
-// Strip the HTML shell so a test run shows the words that will actually land in
-// someone's inbox. Reading raw markup in a JSON preview is not a review.
-function asText(html: string): string {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<\/p>|<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&rarr;/g, "\u2192")
-    .replace(/&amp;/g, "&")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-async function brevoSend(apiKey: string, to: string, subj: string, html: string): Promise<void> {
+async function brevoSend(apiKey: string, to: string, subj: string, text: string): Promise<void> {
   const resp = await fetch(BREVO_URL, {
     method: "POST",
     headers: { "api-key": apiKey, "Content-Type": "application/json" },
@@ -323,7 +234,11 @@ async function brevoSend(apiKey: string, to: string, subj: string, html: string)
       sender: { email: FROM_EMAIL, name: FROM_NAME },
       to: [{ email: to }],
       subject: subj,
-      htmlContent: html,
+      // BOTH PARTS. Only htmlContent went before, so a text-only client saw
+      // Brevo's stripped version of our markup — a rendering nobody here had
+      // ever read — instead of the words we wrote.
+      textContent: text,
+      htmlContent: htmlFromText(text),
     }),
   });
   if (!resp.ok) {
@@ -445,8 +360,9 @@ serve(async (req) => {
       }
 
       const subj = subject(step, lead);
-      const html = body(step, lead);
-      previews.push({ to, company: lead.company, subject: subj, text: asText(html) });
+      // The preview is the email itself, not a rendering of it.
+      const text = body(step, lead);
+      previews.push({ to, company: lead.company, subject: subj, text });
 
       if (!live) {
         sent++;
@@ -454,7 +370,7 @@ serve(async (req) => {
       }
 
       try {
-        await brevoSend(apiKey!, to, subj, html);
+        await brevoSend(apiKey!, to, subj, text);
       } catch (e) {
         const msg = `${to}: ${e instanceof Error ? e.message : e}`;
         errors.push(msg);

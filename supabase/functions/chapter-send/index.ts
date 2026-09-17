@@ -108,89 +108,6 @@ function chapterRef(c: Chapter): string {
   return /^the\s/i.test(name) ? name : `the ${name}`;
 }
 
-
-/**
- * Fills "whether they made it___ or not".
- *
- * Only the venue is worth naming here. The city variant used to return
- * " out in Houston", which produced "whether they made it out in Houston or
- * not" — broken English, and exactly the kind of merge seam that makes an
- * email read as generated. A bare " out" fits the sentence in every case.
- */
-function missedOut(c: Chapter): string {
-  if (c.venue) return ` to ${c.venue}`;
-  if (c.city) return " out";
-  return "";
-}
-
-/**
- * Opening line, most specific version available.
- *
- * The venue is the single most personal thing we know about a chapter — naming
- * it in sentence one is the difference between a mail-merge and a note from
- * someone who actually looked. Degrades to the city, then to nothing, so a lead
- * with thin data never gets a sentence with a hole in it.
- *
- * NEVER NAME A DAY HERE. Eight of the fifteen orgs are college football, which
- * plays Saturday — an earlier version opened with "You've got Sundays figured
- * out" and would have been factually wrong to more than half the list.
- * Anything day-shaped ("game day", "on Sundays", "all week") has the same
- * problem and is also the wrong pitch: see the note on the step-1 body.
- */
-function openingLine(c: Chapter): string {
-  if (c.venue) return `You've got a good thing going at ${c.venue}.`;
-  if (c.city) return `You've got a good thing going in ${c.city}.`;
-  return `You've clearly got a good thing going.`;
-}
-
-function shell(inner: string): string {
-  return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:24px 0;">
-  <tr><td align="center">
-  <table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-    <tr><td style="background-color:#0a0a0a;padding:20px 32px;">
-      <span style="color:#FFD700;font-size:16px;font-weight:bold;letter-spacing:0.5px;">Side Huddle</span>
-      <span style="color:#888;font-size:13px;margin-left:12px;">The digital tailgate</span>
-    </td></tr>
-    <tr><td style="padding:32px;color:#1a1a1a;font-size:15px;line-height:1.7;">
-${inner}
-    </td></tr>
-    <tr><td style="background:#f8f8f8;padding:20px 32px;border-top:1px solid #eee;">
-      <p style="font-size:13px;color:#888;margin:0 0 4px 0;">— Ty &nbsp;|&nbsp; Side Huddle Sports &nbsp;|&nbsp; <a href="mailto:${FROM_EMAIL}" style="color:#888;">${FROM_EMAIL}</a></p>
-      <p style="font-size:12px;color:#bbb;margin:0;">You're getting this because your chapter is listed in a public fan-club directory. Reply "unsubscribe" and I won't email again.</p>
-    </td></tr>
-  </table>
-  </td></tr>
-</table>
-</body></html>`;
-}
-
-
-/**
- * The code, made impossible to miss.
- *
- * This is the one thing in the email that has to survive being read on a phone
- * and typed into a different screen a minute later. Big, wide-tracked, and real
- * TEXT — an image of a code cannot be copied, and half of these will be read in
- * a mail client that blocks images by default.
- */
-function codeBlock(code: string): string {
-  return `<table cellpadding="0" cellspacing="0" width="100%" style="margin:6px 0 20px 0;"><tr>
-    <td align="center" style="background-color:#faf7ea;border:2px dashed #d8cfa4;border-radius:10px;padding:18px 12px;">
-      <p style="margin:0 0 6px 0;font-size:12px;letter-spacing:1.5px;color:#8a7f55;text-transform:uppercase;font-weight:bold;">Your code</p>
-      <p style="margin:0;font-size:34px;font-weight:bold;letter-spacing:8px;color:#1a1a1a;font-family:'Courier New',Courier,monospace;">${code}</p>
-    </td></tr></table>`;
-}
-
-function cta(label: string, href: string): string {
-  return `<table cellpadding="0" cellspacing="0" style="margin:4px 0 18px 0;"><tr>
-    <td style="background-color:#FFD700;border-radius:6px;">
-      <a href="${href}" style="display:inline-block;padding:13px 26px;color:#000;font-size:15px;font-weight:bold;text-decoration:none;">${label} &rarr;</a>
-    </td></tr></table>`;
-}
-
 // ── step templates ────────────────────────────────────────────────────────────
 
 function subject(step: number, c: Chapter): string {
@@ -217,120 +134,82 @@ function subject(step: number, c: Chapter): string {
   }
 }
 
-/**
- * The opening line, and the only sentence most of these get.
- *
- * "Somewhere to be" was a place, not a reason — it described a venue and gave a
- * chapter president nothing to want. The tension worth naming is the one every
- * chapter actually has: the group is scattered, and on any given Sunday most of
- * the roster is not at the bar. The room is where they are together anyway.
- *
- * The venue is the most personal thing we know, so it goes in the sentence when
- * we have it. Without one the same idea still holds, just less pointed.
- */
-function hook(c: Chapter, who: string): string {
-  if (c.venue) {
-    return `Side Huddle keeps ${who} together on game day — the ones at ${c.venue}, and the ones who couldn't make it.`;
-  }
-  return `Side Huddle keeps ${who} together on game day — the ones who show up, and the ones who couldn't make it.`;
-}
-
 function body(step: number, c: Chapter): string {
   const who = chapterRef(c);
-  const org = c.org || "your team";
-  const { short: orgShort } = orgNames(org);
-  const code = (c.claim_code || "").trim();
+  const { short: orgShort } = orgNames(c.org || "your team");
 
-  // GAME DAY FIRST. An earlier line read "somewhere to be between game days",
-  // which quietly says the main event is handled elsewhere. It is not — game day
-  // is the whole point, and the days in between are the bonus. Getting that
-  // backwards tells a chapter president you do not know what their group is for.
+  // PLAIN TEXT IS THE EMAIL. The HTML is generated from this, not the other
+  // way round, so what the preview shows is exactly what lands. The old
+  // version built styled HTML and stripped it for preview, which meant the
+  // preview was a lossy copy of the real thing and the real thing was a
+  // newsletter — boxes, a gold code block, a CTA button table — sent by a
+  // person writing one-to-one. A letter from Ty should look like a letter
+  // from Ty.
   //
-  // LEAD WITH WHAT THE CHAPTER GETS. An earlier draft described what the
-  // product DOES — news lands, members talk — and never said what that is worth
-  // to the person reading. A chapter president is not shopping for an app; they
-  // want their group active between game days and more people in it. Say that
-  // first, then how.
+  // AND IT IS AN ENGAGEMENT TOOL, NOT A COMMUNITY TO RUN. Every earlier draft
+  // asked a chapter president to take on a room: claim it, name it, own it.
+  // That is a second job offered to a volunteer who already has one. What they
+  // actually have is a group that goes quiet between games, and what this does
+  // is fill it without them touching anything. The absence of admin work IS
+  // the product; say that instead of handing them a code.
   //
-  // "CLAIM", NOT "I'VE SET ASIDE". Set-aside is a favour that puts them in debt
-  // to a stranger. Claiming is theirs to take, and it is also literally what the
-  // code does — the room does not exist until they redeem it.
-  //
-  // AND IT IS NOT A PRIVATE ROOM. claim_chapter_huddle creates it with
-  // is_private = false and official_status = 'active', which means it is LISTED
-  // and anyone can walk in. An earlier draft called it "a private room for your
-  // members", which was plainly false and exactly the kind of thing a chapter
-  // president finds out about in front of their members. What it actually is:
-  // findable by their people, theirs to lock down whenever they want. That is a
-  // better pitch anyway, because being findable is how the room grows.
-  //
-  // The code carries in EVERY step. Someone who skims step one and comes back a
-  // week later should not have to work out which email had it.
+  // NO CODES. Not in the body, not in a P.S. A code is a task, and every
+  // version that carried one asked for two things at once: install this, and
+  // then do this other thing. 258 sends, 9 clicks, 0 rooms.
 
   if (step === 2) {
-    return shell(`
-      <p style="margin:0 0 18px 0;">Hey ${greeting(c)},</p>
-      <p style="margin:0 0 18px 0;">Following up once — the ${orgShort} room for ${chapterRef(c)} is still open.</p>
-      <p style="margin:0 0 18px 0;">It runs itself. The score, the news and the clip everyone's passing around show up without anyone posting them, so it's somewhere to be on a Tuesday and not just Sunday.</p>
-      ${cta(`Get the app — free`, APP_STORE_URL)}
-      <p style="margin:0 0 18px 0;">Ty</p>
-      ${code ? `<p style="font-size:13.5px;color:#777;margin:0;border-top:1px solid #eee;padding-top:16px;">P.S. Your code is <b style="color:#111;letter-spacing:1px;">${code}</b> if you want the room under your chapter's name.</p>` : ""}`);
+    return [
+      `Hey ${greeting(c)},`,
+      `Following up once. The ${orgShort} room for ${who} is still there if you want it.`,
+      `It fills itself — the score, the news and whatever clip everyone is passing around show up without anyone posting them. Nothing for you to run or moderate.`,
+      `Free on iPhone: ${APP_STORE_URL}`,
+      `Ty`,
+    ].join("\n\n");
   }
 
   if (step === 3) {
-    return shell(`
-      <p style="margin:0 0 18px 0;">Hey ${greeting(c)},</p>
-      <p style="margin:0 0 18px 0;">Last one from me. If it's not for your group, no hard feelings — good luck this season either way.</p>
-      <p style="margin:0 0 18px 0;">The ${orgShort} room stays open if you ever want it.</p>
-      ${cta(`Get the app — free`, APP_STORE_URL)}
-      <p style="margin:0 0 18px 0;">Ty</p>
-      ${code ? `<p style="font-size:13.5px;color:#777;margin:0;border-top:1px solid #eee;padding-top:16px;">P.S. Code <b style="color:#111;letter-spacing:1px;">${code}</b>, ${chapterRef(c)} only. It doesn't expire.</p>` : ""}`);
+    return [
+      `Hey ${greeting(c)},`,
+      `Last one from me. If it is not for your group, no hard feelings — good luck this season either way.`,
+      `The ${orgShort} room stays open if you ever want it: ${APP_STORE_URL}`,
+      `Ty`,
+    ].join("\n\n");
   }
 
-  // SIX LINES, AND ONE ASK.
-  //
-  // The long version explained the product to someone who had not agreed to
-  // hear about it yet, and it asked for two things at once: install the app AND
-  // enter a code. The code is what makes them the room's owner, so it read as a
-  // second job on top of the first. 258 sends, 9 clicks, 0 rooms.
-  //
-  // So: one button, and the code demoted to a P.S. where it is a bonus rather
-  // than a gate. Anyone who installs lands in the live team room either way, so
-  // nobody who ignores the P.S. hits an empty screen.
-  //
-  // The angle is theirs, not ours — and "get people to turn up" was only ever
-  // half of them. A Browns backers club hosts a bar on Sunday; an alumni
-  // association does not, and opening on turnout read as a watch-party pitch to
-  // people who are not running one. What both actually want is a membership
-  // that stays attached to the team, together, in and out of game day. So the
-  // opener leads on that, and the venue line appears only when there is a venue.
-  return shell(`
-    <p style="margin:0 0 18px 0;">Hey ${greeting(c)},</p>
-    <p style="margin:0 0 18px 0;">Your members already care about every snap. They are just watching it apart — a hundred living rooms, a group text nobody reads.</p>
-    <p style="margin:0 0 18px 0;">There's a ${orgShort} room for ${chapterRef(c)}: a digital tailgate. Everybody together for the game, the score and the ${orgShort} news landing on their own${c.venue ? `, and when you post "${c.venue}, 1pm" people actually see it` : `, and the chapter still in one place between game days`}.</p>
-    ${cta(`Get the app — free`, APP_STORE_URL)}
-    <p style="margin:0 0 18px 0;">Ty</p>
-    ${code ? `<p style="font-size:13.5px;color:#777;margin:0;border-top:1px solid #eee;padding-top:16px;">P.S. Want it named for ${who} with you running it? Code <b style="color:#111;letter-spacing:1px;">${code}</b> at signup.</p>` : ""}`);
+  return [
+    `Hey ${greeting(c)},`,
+    // "the Sarasota Browns Backers already cares" — a club name takes a plural
+    // verb in the reader's ear, and half these names end in s. Naming the
+    // members instead sidesteps it for fan clubs and alumni groups alike.
+    `Your members already care about every snap. They are just watching apart, and the group goes quiet between games.`,
+    `A ${orgShort} room fixes the quiet part on its own. The score, the news and the clips land in it without anyone posting them${c.venue ? `, and when you do post "${c.venue}, 1pm" people actually see it` : ``}.`,
+    `There is no admin work. That is the whole tool — nothing for you to run.`,
+    `Free on iPhone: ${APP_STORE_URL}`,
+    `Ty`,
+  ].join("\n\n");
 }
 
-// Strip the HTML shell so a test run shows the words that will actually land in
-// someone's inbox. Reading raw markup in a JSON preview is not a review.
-function asText(html: string): string {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<\/p>|<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&rarr;/g, "\u2192")
-    .replace(/&amp;/g, "&")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+/**
+ * Minimal HTML from the text, because some clients prefer an HTML part and
+ * showing them a wall of unwrapped text is worse than showing them paragraphs.
+ * Paragraphs and links only: no tables, no colours, no buttons. If this ever
+ * grows a style attribute, the text version has stopped being the email.
+ */
+function htmlFromText(text: string): string {
+  const escape = (t: string) =>
+    t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const linkify = (t: string) =>
+    t.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1">$1</a>');
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map((block) => `<p>${linkify(escape(block)).replace(/\n/g, "<br>")}</p>`)
+    .join("\n");
+  return `<!DOCTYPE html><html><body>\n${paragraphs}\n</body></html>`;
 }
 
 // ── sending ───────────────────────────────────────────────────────────────────
 
-async function brevoSend(apiKey: string, to: string, subj: string, html: string): Promise<void> {
+async function brevoSend(apiKey: string, to: string, subj: string, text: string): Promise<void> {
   const resp = await fetch(BREVO_URL, {
     method: "POST",
     headers: { "api-key": apiKey, "Content-Type": "application/json" },
@@ -338,7 +217,11 @@ async function brevoSend(apiKey: string, to: string, subj: string, html: string)
       sender: { email: FROM_EMAIL, name: FROM_NAME },
       to: [{ email: to }],
       subject: subj,
-      htmlContent: html,
+      // BOTH PARTS. Only htmlContent went before, so a text-only client got
+      // Brevo's own stripped version of our markup rather than anything we
+      // wrote or ever looked at.
+      textContent: text,
+      htmlContent: htmlFromText(text),
     }),
   });
   if (!resp.ok) {
@@ -440,13 +323,12 @@ serve(async (req) => {
         email: to,
         member_count: 140,
         sequence_step: step - 1,
-        // A realistic code so a self-test shows the block that matters most.
-        claim_code: "QBCKAK",
+        claim_code: null,
       };
 
       const subj = subject(step, sample);
-      const html = body(step, sample);
-      await brevoSend(apiKeySelf, to, subj, html);
+      const text = body(step, sample);
+      await brevoSend(apiKeySelf, to, subj, text);
       return json({
         mode: "self",
         step,
@@ -471,12 +353,14 @@ serve(async (req) => {
 
     for (const c of batch) {
       const subj = subject(step, c);
-      const html = body(step, c);
-      previews.push({ chapter: c.chapter_name, to: c.email, subject: subj, text: asText(html) });
+      // The preview is the email, character for character — not a rendering of
+      // it, not a strip of it.
+      const text = body(step, c);
+      previews.push({ chapter: c.chapter_name, to: c.email, subject: subj, text });
       if (!live) continue;
 
       try {
-        await brevoSend(apiKey!, c.email, subj, html);
+        await brevoSend(apiKey!, c.email, subj, text);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         errors.push({ chapter: c.chapter_name, error: msg });

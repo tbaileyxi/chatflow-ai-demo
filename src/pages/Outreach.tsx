@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, Mail, MapPin, RefreshCw, Search, Trash2, Copy, AtSign, UploadCloud } from "lucide-react";
+import { Download, Mail, MapPin, RefreshCw, Search, Trash2, Copy, AtSign } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import ChaptersPanel from "@/components/outreach/ChaptersPanel";
 import CreatorsPanel from "@/components/outreach/CreatorsPanel";
-import CoveragePanel from "@/components/outreach/CoveragePanel";
 import BrevoImport from "@/components/outreach/BrevoImport";
 import WorkPanel from "@/components/outreach/WorkPanel";
 import { useToast } from "@/hooks/use-toast";
@@ -89,72 +87,10 @@ type SchoolPartnerProspect = {
 const SCHOOL_PARTNER_VERTICAL = "school partner";
 const OFFICIAL_PARTNER_PREFIX = "official side huddle partner";
 
-const SCHOOL_PARTNER_PROSPECTS: SchoolPartnerProspect[] = [
-  { school: "Clemson", organization: "IPTAY", contactName: "Travis Furbee", contactTitle: "CEO", contactEmail: "tfurbee@clemson.edu", fit: "IPTAY is practically its own consumer brand, not merely a donation office.", batch: "batch1" },
-  { school: "Alabama", organization: "Yea Alabama", contactName: "Doug Killough", contactTitle: "Director of Marketing & Membership", contactEmail: "doug@yea-alabama.com", fit: "Official fan-experience and membership community fit.", batch: "batch1" },
-  { school: "South Carolina", organization: "Gamecock Club", contactName: "Wayne Hiott", contactTitle: "CEO", contactEmail: "wayne@sc.edu", fit: "Exclusive content and fan experiences already support membership growth.", batch: "batch1" },
-  { school: "Georgia", organization: "Georgia Bulldog Club", contactName: "Ford Williams", contactTitle: "Executive Director", contactEmail: "fwilliams@sports.uga.edu", fit: "Huge donor culture, strong status value, and a clearly branded fundraising organization.", batch: "batch1" },
-  { school: "Tennessee", organization: "Tennessee Fund", contactName: "Brady Hart", contactTitle: "Deputy AD and Chief Revenue Officer", contactEmail: "bhart8@utk.edu", fit: "Revenue owner with a direct fit for a new fan-engagement position.", batch: "batch1" },
-  { school: "Florida", organization: "Gator Boosters", contactName: "Paul Vosilla", contactTitle: "Assistant Executive Director, Stewardship", contactEmail: "PaulV@gators.ufl.edu", fit: "Membership, stewardship, and external partner relationship remit.", batch: "batch1" },
-  { school: "Auburn", organization: "Tigers Unlimited", contactName: "Tim Jackson", contactTitle: "Deputy AD, Tigers Unlimited", contactEmail: "tj@auburn.edu", fit: "Powerful branded booster identity with an audience that understands exclusivity.", batch: "batch1" },
-  { school: "LSU", organization: "Tiger Athletic Foundation", contactName: "Matt Borman", contactTitle: "President and CEO", contactEmail: "info@lsutaf.org", fit: "TAF works across donor and NIL-adjacent angles.", batch: "batch1" },
-  { school: "Texas A&M", organization: "12th Man Foundation", contactName: "Travis Dabney", contactTitle: "President and CEO", contactEmail: "travis@12thmanfoundation.com", fit: "12th Man is one of the strongest donor/fan identities in college sports.", batch: "batch1" },
-  { school: "Texas", organization: "Longhorn Foundation", contactName: "Carly Northup", contactTitle: "Executive Senior Associate AD", contactEmail: null, fit: "Massive alumni base and a strong status-and-access culture; route through contact page.", batch: "batch1" },
-  { school: "Ohio State", organization: "Buckeye Club", contactName: "Ben Waite", contactTitle: "Director of Annual Giving", contactEmail: "waite.51@osu.edu", fit: "Huge national fanbase with a specific annual-membership organization.", batch: "batch1" },
-  { school: "Penn State", organization: "Nittany Lion Club", contactName: "Alyssa Francona", contactTitle: "Senior Associate AD for Advancement", contactEmail: "alyssa.francona@psu.edu", fit: "Strong club identity, enormous alumni network, and organized regional chapters.", batch: "batch1" },
-  { school: "Michigan", organization: "Michigan Athletic Development", contactName: "Brian Kegler", contactTitle: "Executive Associate AD for Development", contactEmail: "bkegler@umich.edu", fit: "Huge alumni reach and strong demand for officially associated status.", batch: "batch1" },
-  { school: "Nebraska", organization: "Huskers Athletic Fund", contactName: "Tyler Kai", contactTitle: "Deputy AD for Revenue Generation", contactEmail: "tkai@huskers.com", fit: "Concentrated statewide fan identity; direct revenue-generation owner.", batch: "batch1" },
-  { school: "Oklahoma", organization: "Sooner Club", contactName: "Matt Schaeperkoetter", contactTitle: "Senior Associate AD for Athletics Advancement", contactEmail: "schaeperkoetter@ou.edu", fit: "Sooner Club fundraising plus donor and alumni engagement.", batch: "batch1" },
-  { school: "Notre Dame", organization: "Monogram Club / Rockne Athletics Fund", contactName: "Matt Weldy", contactTitle: "Monogram Club Executive Director", contactEmail: "mweldy@nd.edu", fit: "Prestige, access, former-athlete credibility, and a national audience.", batch: "batch1" },
-  { school: "Oregon", organization: "Duck Athletic Fund", contactName: "Justin Fisher", contactTitle: "Executive Associate AD for Development", contactEmail: "jjfisher@uoregon.edu", fit: "Strong national brand, digital sophistication, and willingness to experiment.", batch: "batch1" },
-  { school: "Florida State", organization: "Seminole Boosters", contactName: "Stephen Ponder", contactTitle: "President and CEO", contactEmail: "Stephen.Ponder@fsu.edu", fit: "Distinct booster brand with a clear executive decision-maker.", batch: "batch1" },
-  { school: "Ole Miss", organization: "Ole Miss Athletics Foundation", contactName: "Drew Ingraham", contactTitle: "Senior Associate AD for External Engagement", contactEmail: "ingraham@olemiss.edu", fit: "External engagement is the internal category this pitch belongs under.", batch: "batch1" },
-  { school: "Kentucky", organization: "K Fund", contactName: "Candice Chaffin", contactTitle: "Senior Associate AD for Development", contactEmail: "candice.chaffin@uky.edu", fit: "Organized fundraising and donor-engagement arm for Kentucky Athletics.", batch: "batch1" },
-  { school: "Arkansas", organization: "Razorback Foundation", contactName: "Ryan White", contactTitle: "Executive Director", contactEmail: "rwhite@razorbackfoundation.com", fit: "Strong statewide identity and a standalone booster brand.", batch: "batch2" },
-  { school: "North Carolina", organization: "The Rams Club", contactName: "Matt Terrell", contactTitle: "Chief Strategy & Communications Officer", contactEmail: "matt@ramsclub.com", fit: "A communications, visibility, and membership-growth channel for Carolina supporters.", batch: "batch2" },
-  { school: "NC State", organization: "Wolfpack Club", contactName: "Donnell Priest", contactTitle: "Director of Premium Seating & Advertising", contactEmail: "donnell.priest@wolfpackclub.com", fit: "Directly oversees advertising and sales inventory.", batch: "batch2" },
-  { school: "Iowa", organization: "I-Club / Iowa Athletics Development", contactName: "Scott Brickman", contactTitle: "Associate AD for NIL Strategy & Revenue Generation", contactEmail: "Scott-Brickman@uiowa.edu", fit: "NIL, strategy, and revenue-generation owner.", batch: "batch2" },
-  { school: "Missouri", organization: "Mizzou Athletics Fund", contactName: "Blair DeBord", contactTitle: "Executive Athletics Director and Chief Revenue Officer", contactEmail: "bdebord@missouri.edu", fit: "Oversees philanthropy, sponsorships, NIL, premium seating, fan engagement, and new business development.", batch: "batch2" },
-  { school: "Mississippi State", organization: "Bulldog Club", contactName: "KK Seago", contactTitle: "Director of Business Partnerships", contactEmail: "kseago@athletics.msstate.edu", fit: "Responsible for third-party NIL and business-development opportunities.", batch: "batch2" },
-  { school: "Wisconsin", organization: "Wisconsin Athletic Development", contactName: "Zachary Epstein", contactTitle: "Director of Annual Giving", contactEmail: "ZAE@athletics.wisc.edu", fit: "Annual-giving leaders care about adding younger supporters and repeated fan touchpoints.", batch: "batch2" },
-  { school: "Kansas", organization: "Williams Education Fund", contactName: "Natalie Terwilliger", contactTitle: "Assistant Director of Annual Giving", contactEmail: "Natalie.T@ku.edu", fit: "Reasonable first contact for a $1,000 season experiment tied to acquiring and engaging Jayhawk supporters.", batch: "batch2" },
-  { school: "Kansas State", organization: "Ahearn Fund", contactName: "Rob Heil", contactTitle: "Senior Associate AD for Development", contactEmail: "rheil@kstatesports.com", fit: "Leads K-State's fundraising operation and has a directly published email.", batch: "batch2" },
-  { school: "Oklahoma State", organization: "POSSE / OSU NIL Alliance", contactName: "Brakston Brock", contactTitle: "Senior Associate AD for NIL Strategy & Revenue Generation", contactEmail: "brakston.brock@okstate.edu", fit: "Sits across both POSSE and the NIL operation.", batch: "batch2" },
-  { school: "Texas Tech", organization: "Red Raider Club", contactName: "Andrea Tirey", contactTitle: "Senior Associate AD for Development", contactEmail: "andrea.tirey@ttu.edu", fit: "Responsible for fundraising operation and can see the value of an exclusive Red Raider position.", batch: "batch2" },
-  { school: "Baylor", organization: "Bear Foundation", contactName: "Chris Lynn", contactTitle: "Executive Director", contactEmail: "Chris_Lynn@baylor.edu", fit: "Runs the Bear Foundation day-to-day operation and annual fund.", batch: "batch2" },
-  { school: "Virginia Tech", organization: "Hokie Club", contactName: "Brad Wurthman", contactTitle: "Executive Associate AD and Chief Revenue Officer", contactEmail: "wurthman@vt.edu", fit: "Revenue ownership makes him likely to understand a low-cost exclusive fan-engagement asset.", batch: "batch2" },
-  { school: "Virginia", organization: "Virginia Athletics Foundation", contactName: "Erin Wissing", contactTitle: "Deputy Executive Director", contactEmail: "erin.wissing@virginia.edu", fit: "Marketing, communications, events, stewardship, and organizational strategy fit.", batch: "batch2" },
-  { school: "West Virginia", organization: "Mountaineer Athletic Club", contactName: "Matt Waggoner", contactTitle: "Director of Development - Annual Giving", contactEmail: "mwaggoner@wvuf.org", fit: "Intense statewide fan identity and direct annual-giving/supporter acquisition remit.", batch: "batch2" },
-  { school: "Miami", organization: "Hurricane Club", contactName: "Kayla Blake Grimes", contactTitle: "Assistant VP, Hurricane Club & Premium Sales", contactEmail: "athleticdevelopment@miami.edu", fit: "Manages the Hurricane Club annual fund and premium sales.", batch: "batch2" },
-  { school: "Michigan State", organization: "Spartan Fund", contactName: "Jacob Kirkham", contactTitle: "Executive Director, Athletics Constituency Programs", contactEmail: "kirkham@ath.msu.edu", fit: "Leads athletics advancement constituency and is senior enough to approve a branded test.", batch: "batch2" },
-  { school: "Washington", organization: "Tyee Club", contactName: "Troy Welin", contactTitle: "Director of the Annual Fund", contactEmail: "welint@uw.edu", fit: "Uses broad supporter participation, making the huddle-growth angle relevant.", batch: "batch2" },
-  { school: "BYU", organization: "Cougar Club", contactName: "Randall Hild", contactTitle: "Associate AD for Development", contactEmail: "randall_hild@byu.edu", fit: "Oversees Cougar Club activities, renewals, events, and membership growth strategies.", batch: "batch2" },
-  { school: "Utah", organization: "Crimson Club", contactName: "JT Tumanuvao", contactTitle: "Director of Annual Giving", contactEmail: "jtumanuvao@huntsman.utah.edu", fit: "Owns annual giving and is a strong entry point for a $1,000 season exclusive test.", batch: "batch2" },
-  { school: "SMU", organization: "Mustang Club", contactName: "Kirsten Brown", contactTitle: "Assistant AD for Development", contactEmail: "kirstenbrown@smu.edu", fit: "A clear booster-club fit for owning the Mustang fan position before growth opens publicly.", batch: "batch3" },
-  { school: "TCU", organization: "Frog Club", contactName: "Nick Parsons", contactTitle: "Associate AD, Loyalty Giving", contactEmail: "nick.parsons@tcu.edu", fit: "Loyalty giving maps directly to repeat fan touchpoints and membership energy.", batch: "batch3" },
-  { school: "Indiana", organization: "Varsity Club", contactName: "Kevin Van Rooy", contactTitle: "Senior Associate AD/Director", contactEmail: "kvanrooy@iu.edu", fit: "Senior annual giving leader for a passionate statewide alumni base.", batch: "batch3" },
-  { school: "UCF", organization: "ChargeOn Fund", contactName: "Latoya Jackson", contactTitle: "Associate AD, Annual Giving", contactEmail: "ljackson@athletics.ucf.edu", fit: "Annual giving owner for a fast-growing fan and alumni base.", batch: "batch3" },
-  { school: "Arizona", organization: "Wildcat Club", contactName: "Trevor Wilkey", contactTitle: "Annual Giving & Development Operations", contactEmail: "trevorwilkey@arizona.edu", fit: "Annual giving and development operations can test a low-cost exclusive fan position.", batch: "batch3" },
-  { school: "Arizona State", organization: "Sun Devil Club", contactName: "Scott Nelson", contactTitle: "VP of Enterprise Development", contactEmail: "Scott.D.Nelson@asu.edu", fit: "Enterprise development owner with a natural fit for a new fan-engagement channel.", batch: "batch3" },
-  { school: "Houston", organization: "Cougar Pride", contactName: "Alvin Franklin", contactTitle: "Chief Revenue Officer", contactEmail: "arfrank4@central.uh.edu", fit: "Revenue leadership can evaluate an exclusive position attached to Cougar fan rooms.", batch: "batch3" },
-  { school: "Boise State", organization: "Bronco Athletic Association", contactName: "Austin Mullen", contactTitle: "Associate AD, Development", contactEmail: "austinmullen@boisestate.edu", fit: "Strong regional identity and direct development ownership.", batch: "batch3" },
-  { school: "Cincinnati", organization: "UCATS", contactName: "Niki Cianciola", contactTitle: "Director, UCATS", contactEmail: "nikol.cianciola@foundation.uc.edu", fit: "UCATS is the branded supporter arm for an audience that can understand exclusivity.", batch: "batch3" },
-  { school: "Illinois", organization: "I FUND", contactName: "Brian Russell", contactTitle: "Chief Commercial Officer", contactEmail: "brussui@illinois.edu", fit: "Commercial leadership should understand a reserved fan-engagement asset.", batch: "batch3" },
-  { school: "Tulane", organization: "Green Wave Club", contactName: "Mike Miller", contactTitle: "Associate AD, Revenue Generation", contactEmail: "mmiller12@tulane.edu", fit: "Revenue generation remit fits a direct $1,000/season founding partnership test.", batch: "batch3" },
-  { school: "Memphis", organization: "Memphis Athletics Fund", contactName: "Chris Condit", contactTitle: "Associate AD, Revenue & Analytics", contactEmail: "chris.condit@memphis.edu", fit: "Revenue and analytics owner can evaluate early traction and supporter growth.", batch: "batch3" },
-  { school: "Boston College", organization: "Flynn Fund", contactName: "Joey McIntyre", contactTitle: "Assistant AD, Annual Giving", contactEmail: "Joseph.McIntyre@bc.edu", fit: "Annual giving owner for a branded athletics fund with alumni and regional reach.", batch: "batch3" },
-  { school: "Colorado", organization: "Buff Club", contactName: "Adrian Pina", contactTitle: "Assistant AD, Annual Giving & Premium Seating", contactEmail: "Adrian.Pina@colorado.edu", fit: "Annual giving and premium seating remit connects to fan access and recurring engagement.", batch: "batch3" },
-  { school: "Duke", organization: "Iron Dukes", contactName: "Jennifer Hughes", contactTitle: "Director, Annual Fund", contactEmail: "jennifer.hughes@duke.edu", fit: "Annual fund leader for a high-affinity donor and alumni audience.", batch: "batch3" },
-  { school: "Georgia Tech", organization: "Alexander-Tharpe Fund", contactName: "Robby Poteat", contactTitle: "Executive Director of Development", contactEmail: "rpoteat@athletics.gatech.edu", fit: "Development executive with a clear path to test a new supporter visibility product.", batch: "batch3" },
-  { school: "Iowa State", organization: "Cyclone Club", contactName: "Blair Danner", contactTitle: "Associate Director, Annual Giving", contactEmail: "bdanner@iastate.edu", fit: "Annual giving and Cyclone Club supporter identity align with the pitch.", batch: "batch3" },
-  { school: "Louisville", organization: "Cardinal Athletic Fund", contactName: "Ryan Tuttle", contactTitle: "Associate Director, Annual Fund", contactEmail: "ryant@gocards.com", fit: "Annual fund owner for a recognizable athletics supporter organization.", batch: "batch3" },
-  { school: "Pittsburgh", organization: "Panther Club/NIL", contactName: "Pat Bostick", contactTitle: "NIL Business Development & Strategic Partnerships", contactEmail: "pbostick@athletics.pitt.edu", fit: "NIL and strategic partnerships remit fits exclusive fan-room visibility.", batch: "batch3" },
-  { school: "Purdue", organization: "John Purdue Club", contactName: "Meghan King", contactTitle: "Revenue Generation & Development", contactEmail: "king556@purdue.edu", fit: "Revenue generation and development owner for a branded supporter club.", batch: "batch3" },
-  { school: "Syracuse", organization: "'Cuse Athletics Fund", contactName: "Antonio Barbosa", contactTitle: "Assistant AD, Annual Fund", contactEmail: "ambarbos@syr.edu", fit: "Annual fund owner with a clear supporter-growth remit.", batch: "batch3" },
-  { school: "USC", organization: "Trojan Athletic Fund", contactName: "Michael Rorabaugh", contactTitle: "Chief Development Officer", contactEmail: "rorabaug@usc.edu", fit: "Chief development owner for a national alumni brand.", batch: "batch3" },
-  { school: "Vanderbilt", organization: "National Commodore Club", contactName: "Mark Carter", contactTitle: "Senior Executive Director", contactEmail: "ncc@vanderbilt.edu", fit: "National Commodore Club is the supporter brand; route the email to Mark Carter through the public inbox.", batch: "batch3" },
-  { school: "Wake Forest", organization: "Deacon Club", contactName: "Barry Faircloth", contactTitle: "Executive Associate AD, Development & Sales", contactEmail: "fairclbw@wfu.edu", fit: "Development and sales leader with a direct path to test a founding partnership.", batch: "batch3" },
-];
+// The 60+ booster-org import is gone with the $1,000 pitch it existed to feed.
+// Those rows were drafted with best_package "$1,000/season" and best_angle
+// "Official Side Huddle Partner for X" — a price we do not charge and a status
+// we cannot grant. Re-importing them would put that back in the table.
 
 const HUDDLE_LABELS: Record<string, string> = {
   Alabama: "Crimson Tide",
@@ -293,7 +229,9 @@ function statusBadge(status: LeadStatus | null) {
 }
 
 function dollars(value: string | null) {
-  return value || "$1,500";
+  // The default used to be $1,500, a number from a model that no longer
+  // exists. A blank field should read as blank, not as a price nobody quoted.
+  return value || "—";
 }
 
 export default function Outreach() {
@@ -312,7 +250,6 @@ export default function Outreach() {
   const [barHunt, setBarHunt] = useState<string | null>(null);
   const [findingEmail, setFindingEmail] = useState<string | null>(null);
   const [sending, setSending] = useState<number | null>(null);
-  const [importingProspects, setImportingProspects] = useState(false);
 
   const [live, setLive] = useState(false);
   const [maxEmails, setMaxEmails] = useState("25");
@@ -584,75 +521,6 @@ export default function Outreach() {
     }
   }
 
-  async function importSchoolPartnerProspects() {
-    setImportingProspects(true);
-    try {
-      const rows = SCHOOL_PARTNER_PROSPECTS.map((p) => ({
-        company: p.organization,
-        vertical: SCHOOL_PARTNER_VERTICAL,
-        region: p.batch === "batch3" ? "College athletics batch 3" : p.batch === "batch2" ? "College athletics batch 2" : "College athletics batch 1",
-        market: p.school,
-        school: p.school,
-        website: null,
-        domain: p.contactEmail ? p.contactEmail.split("@").pop()?.toLowerCase() ?? null : null,
-        contact_name: p.contactName,
-        contact_title: p.contactTitle,
-        contact_email: p.contactEmail,
-        email_confidence: p.contactEmail ? "high" : "manual",
-        priority: "TIER1",
-        sponsor_signal: p.fit,
-        sponsor_score: 20,
-        best_package: "$1,000/season",
-        best_angle: `Official Side Huddle Partner for ${p.school}`,
-        status: "Drafted",
-        notes: p.contactEmail ? `school partner ${p.batch}` : `school partner ${p.batch}; no direct public email listed; route through the contact page.`,
-      }));
-
-      const withEmail = rows.filter((r) => r.contact_email);
-      const withoutEmail = rows.filter((r) => !r.contact_email);
-
-      if (withEmail.length) {
-        const { error } = await (supabase as any)
-          .from("sponsor_leads")
-          .upsert(withEmail, { onConflict: "contact_email" });
-        if (error) throw error;
-      }
-      if (withoutEmail.length) {
-        const { data: existingNoEmail, error: existingError } = await (supabase as any)
-          .from("sponsor_leads")
-          .select("company,school")
-          .eq("vertical", SCHOOL_PARTNER_VERTICAL)
-          .is("contact_email", null);
-        if (existingError) throw existingError;
-        const existingKeys = new Set(
-          ((existingNoEmail || []) as Array<{ company: string; school: string | null }>).map((r) => `${r.company}|${r.school || ""}`),
-        );
-        const missingNoEmail = withoutEmail.filter((r) => !existingKeys.has(`${r.company}|${r.school || ""}`));
-        if (missingNoEmail.length) {
-          const { error } = await (supabase as any)
-            .from("sponsor_leads")
-            .insert(missingNoEmail);
-          if (error) throw error;
-        }
-      }
-
-      toast({
-        title: "School partner batch loaded",
-        description: `${SCHOOL_PARTNER_PROSPECTS.length} prospects drafted; ${withEmail.length} are ready to send.`,
-      });
-      setView("school");
-      setCampaign("school_partner_batch_3");
-      await loadLeads();
-    } catch (e) {
-      toast({
-        title: "Import failed",
-        description: e instanceof Error ? e.message : String(e),
-        variant: "destructive",
-      });
-    } finally {
-      setImportingProspects(false);
-    }
-  }
 
   // Find emails for the bars we already know about, biggest crowd first.
   //
@@ -750,26 +618,40 @@ export default function Outreach() {
     }
   }
 
+  /**
+   * The copy-pitch letter, kept identical in substance to what outreach-send
+   * actually mails. Two versions of one offer is how a prospect ends up quoted
+   * two prices — this page used to promise $1,000 a season with $500 to hold,
+   * "Official Side Huddle Partner" status we cannot grant, placement "across
+   * the rooms" that does not exist, and a free season if a room missed 250
+   * members. None of that was true by the time it was being pasted.
+   */
   function pitchText(l: Lead) {
-    if (isSchoolPartnerLead(l)) {
-      const schoolName = l.school || l.market || "your school";
-      const organization = l.company;
-      const huddleName = huddleLabelForSchool(schoolName);
-      return `Subject: ${pitchSubject(l)}\n\nHi ${l.contact_name?.split(" ")[0] || "there"},\n\nImagine every group of ${huddleName} fans - alumni chapters, students, fraternities, families, tailgates and lifelong friends - having its own private, AI-enhanced ${huddleName} huddle.\n\nLive scores, news, highlights and game-day prompts flow into the room while fans talk with their own people, see where friends are active and jump from huddle to huddle.\n\nNow imagine one organization visible across all of it.\n\nWe think that should be ${organization}.\n\nYou would not have to manage another community or create another content channel. You would be the exclusive partner across every ${huddleName} huddle fans create - sponsoring the fandom at the moments it is most alive.\n\nEvery new room, invitation and fan group grows your presence.\n\nThis school will have a Side Huddle presence. The question is whether ${organization} owns that position, or someone else does.\n\nReserve the ${huddleName} Side Huddle partnership for $1,000 for the season ($500 holds it):\n\nhttps://www.sidehuddlesports.com/sponsors\n\nTy Bailey\nFounder, Side Huddle Sports`;
-    }
     const where = l.school || l.market || l.region || "your local team";
-    const fans = where === "your local team"
-      ? "local fans, friends, parents, and alumni"
-      : `${where} fans, friends, parents, and alumni`;
-    return `Hi ${l.contact_name?.split(" ")[0] || "there"},\n\nI am opening one exclusive local sponsor slot for ${where} on Side Huddle Sports.\n\nSide Huddle is an AI-enhanced private chat experience where ${fans} meet around the team — before games, during games, and all week.\n\nThe ${where} sponsor is placed across the ${where} rooms, inside the conversation, not just on one page or one ad.\n\nYou can hold the ${where} slot today for $500, with $1,000 covering the full season. It locks your exclusivity as the local sponsor for that team.\n\nFounding sponsors keep that rate for as long as they stay, and if the team's huddles don't reach 250 members this season, the next season is on us.\n\nHere is the sponsor page: https://sidehuddlesports.com/sponsors\n\nTy`;
+    const who = l.contact_name?.split(" ")[0] || "there";
+    const slug = where
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    const link = slug
+      ? `https://sidehuddlesports.com/sponsor?team=${slug}`
+      : "https://sidehuddlesports.com/sponsor";
+
+    return [
+      `Subject: ${pitchSubject(l)}`,
+      `Hi ${who},`,
+      `Side Huddle is where ${where} fans watch the game together — a private room with their own people, the score and the news landing in it as it happens.`,
+      `I am taking one founding partner per team per season, and ${l.company} would be it for ${where}. Nobody else in your category, this season or while you keep it.`,
+      `What that is: founding partner status and the launch story that goes with it; a pregame card in the room when the game starts, carrying a small "powered by"; the same line under the clips fans post of themselves watching; and co-branded shirts in the team's colours.`,
+      `$2,500 for the season, flat. The founding rate is locked for three seasons and you get first refusal after that.`,
+      link,
+      `Ty`,
+    ].join("\n\n");
   }
 
   function pitchSubject(l: Lead) {
-    if (isSchoolPartnerLead(l)) {
-      return `The Official Side Huddle Partner for ${l.school || l.market || "your school"}`;
-    }
     const where = l.school || l.market || l.region || "your local team";
-    return `${where} sponsor slot on Side Huddle`;
+    return `founding partner — ${where}`;
   }
 
   async function copyPitch(l: Lead) {
@@ -838,13 +720,12 @@ export default function Outreach() {
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">
-                {audience === "work" ? "Outreach by team" : audience === "coverage" ? "Coverage" : audience === "creators" ? "Creator Outreach" : audience === "chapters" ? "Chapter Outreach" : "Sponsor Prospecting Engine"}
-              </h1>
+              {/* ONE TITLE. It used to rename itself per tab, so the page you
+                  were on was never the page you remembered being on. */}
+              <h1 className="text-3xl font-bold text-foreground">Outreach</h1>
               <p className="text-sm text-muted-foreground">
-                {audience === "chapters"
-                  ? "Fan-club and alumni chapters, ranked by reachability. Contact the president, they bring the group."
-                  : "Build local sponsor maps by school, score the warmest fits, and work the follow-up queue."}
+                Work a team at a time: its fan clubs, its booster group, and the
+                local businesses around it.
               </p>
             </div>
             {audience === "sponsors" && (
@@ -875,51 +756,21 @@ export default function Outreach() {
               Sponsors
             </Button>
             <Button
-              variant={audience === "chapters" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setAudience("chapters")}
-            >
-              Chapters
-            </Button>
-            <Button
               variant={audience === "creators" ? "default" : "outline"}
               size="sm"
               onClick={() => setAudience("creators")}
             >
               Creators
             </Button>
-            {/* Every other tab answers "what is in my list". This one answers
-                "where have I been", which is the question you ask before
-                deciding where to spend a morning. */}
-            <Button
-              variant={audience === "coverage" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setAudience("coverage")}
-            >
-              Where I've been
-            </Button>
           </div>
         </div>
       </div>
 
-      {audience === "work" ? <WorkPanel /> : audience === "coverage" ? <CoveragePanel /> : audience === "creators" ? <CreatorsPanel /> : audience === "chapters" ? <ChaptersPanel /> : (
+      {audience === "work" ? <WorkPanel /> : audience === "creators" ? <CreatorsPanel /> : (
 
       <div className="container mx-auto grid gap-6 px-4 py-8 xl:grid-cols-[390px,1fr]">
         <div className="space-y-6">
           <BrevoImport onDone={loadLeads} />
-
-          <Card className="space-y-4 p-5">
-            <div>
-              <h2 className="text-lg font-semibold">School Partner Batch</h2>
-              <p className="text-sm text-muted-foreground">
-                Load the booster and NIL prospects, with their contact and school context.
-              </p>
-            </div>
-            <Button className="w-full gap-2" variant="secondary" onClick={importSchoolPartnerProspects} disabled={importingProspects}>
-              <UploadCloud className="h-4 w-4" />
-              {importingProspects ? "Loading..." : "Load school partner drafts"}
-            </Button>
-          </Card>
 
           <Card className="space-y-4 p-5">
             <div>
@@ -994,66 +845,12 @@ export default function Outreach() {
             </p>
           </Card>
 
-          <Card className="space-y-4 p-5">
-            <div>
-              <h2 className="text-lg font-semibold">Email Sequence</h2>
-              <p className="text-sm text-muted-foreground">
-                Use after reviewing the priority list. Test mode previews recipients first.
-              </p>
-            </div>
-            <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-              <div>
-                <Label htmlFor="live" className="cursor-pointer">
-                  {live ? "Live send" : "Test mode"}
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  {live ? "Emails will actually send." : "Nothing sends until this is on."}
-                </p>
-              </div>
-              <Switch id="live" checked={live} onCheckedChange={setLive} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="campaign">Campaign</Label>
-              <select
-                id="campaign"
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={campaign}
-                onChange={(e) => setCampaign(e.target.value as Campaign)}
-              >
-                {audiences.map((a) => (
-                  <option key={a.key} value={a.key}>
-                    {a.label} ({a.ready} ready{a.noEmail ? `, ${a.noEmail} need an email` : ""})
-                  </option>
-                ))}
-                <option value="all">Everyone ({leads.length})</option>
-              </select>
-              <p className="text-xs text-muted-foreground">
-                Step 1 only targets unsent leads. Already-sent leads are skipped automatically.
-                {campaign === "all"
-                  ? " Everyone means every unsent lead of every kind."
-                  : ` Table is filtered to ${campaignLabel(campaign)}.`}
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="maxEmails">Max emails</Label>
-              <Input
-                id="maxEmails"
-                type="number"
-                min={1}
-                max={200}
-                value={maxEmails}
-                onChange={(e) => setMaxEmails(e.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {[1, 2, 3].map((step) => (
-                <Button key={step} variant={step === 1 ? "default" : "outline"} onClick={() => runSend(step)} disabled={sending !== null}>
-                  <Mail className="mr-1 h-4 w-4" />
-                  {sending === step ? "..." : `Step ${step}`}
-                </Button>
-              ))}
-            </div>
-          </Card>
+          {/* THE BULK SEQUENCE CARD IS GONE.
+              Step 1/2/3 against a campaign dropdown sent to everyone matching a
+              filter, with no preview of what any one person would receive. The
+              By-team view sends the same letters with "Read the letter" in
+              front of every send, which is the only send path that should
+              exist. */}
 
           {lastResult && (
             <Card className="space-y-2 p-5 text-sm">
@@ -1195,7 +992,7 @@ export default function Outreach() {
                       <TableCell>{scoreBadge(l.sponsor_score)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{l.sponsor_signal || "Local category fit; verify sponsor activity."}</TableCell>
                       <TableCell>
-                        <div className="text-sm">{l.best_angle || "Player of the Week"}</div>
+                        <div className="text-sm">{l.best_angle || "—"}</div>
                         <div className="text-xs text-muted-foreground">{dollars(l.best_package)}</div>
                       </TableCell>
                       <TableCell>

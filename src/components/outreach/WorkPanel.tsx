@@ -60,7 +60,7 @@ export default function WorkPanel() {
   // whether each row is outstanding; the detail is fetched for the one team
   // actually opened.
   const [index, setIndex] = useState<
-    { team: string; kind: "chapter" | "partner" | "business"; open: boolean }[] | null
+    { team: string; kind: "chapter" | "partner" | "business"; open: boolean; contacted: boolean; due: boolean }[] | null
   >(null);
   // Which searches have been run, per team. Without this an empty group means
   // both "nothing found" and "never looked", which are opposite instructions.
@@ -71,17 +71,26 @@ export default function WorkPanel() {
     const [c, s] = await Promise.all([
       supabase
         .from("chapter_leads")
-        .select("org,emailed,unsubscribed,bounced")
+        .select("org,emailed,unsubscribed,bounced,sequence_step")
         .limit(5000),
       supabase
         .from("sponsor_leads")
-        .select("school,vertical,emailed,unsubscribed,bounced")
+        .select("school,vertical,emailed,unsubscribed,bounced,sequence_step")
         .limit(5000),
     ]);
-    const out: { team: string; kind: "chapter" | "partner" | "business"; open: boolean }[] = [];
+    const out: { team: string; kind: "chapter" | "partner" | "business"; open: boolean; contacted: boolean; due: boolean }[] = [];
+    // "Due a follow-up" is the same rule the Group uses when it offers one:
+    // written to once, and no further.
+    const isDue = (r: any) => !!r.emailed && (r.sequence_step ?? 0) === 1;
     for (const r of (c.data ?? []) as any[]) {
       if (!r.org) continue;
-      out.push({ team: String(r.org).trim(), kind: "chapter", open: !r.emailed && !r.unsubscribed && !r.bounced });
+      out.push({
+        team: String(r.org).trim(),
+        kind: "chapter",
+        open: !r.emailed && !r.unsubscribed && !r.bounced,
+        contacted: !!r.emailed,
+        due: isDue(r),
+      });
     }
     for (const r of (s.data ?? []) as any[]) {
       if (!r.school) continue;
@@ -89,6 +98,8 @@ export default function WorkPanel() {
         team: String(r.school).trim(),
         kind: (r.vertical || "").toLowerCase() === SCHOOL_PARTNER ? "partner" : "business",
         open: !r.emailed && !r.unsubscribed && !r.bounced,
+        contacted: !!r.emailed,
+        due: isDue(r),
       });
     }
     setIndex(out);
@@ -151,15 +162,20 @@ export default function WorkPanel() {
 
   // The team list, from the slim index.
   const teams = useMemo(() => {
-    const m = new Map<string, { key: string; total: number; open: number }>();
+    const m = new Map<
+      string,
+      { key: string; total: number; open: number; contacted: number; due: number }
+    >();
     for (const r of index ?? []) {
-      const t = m.get(r.team) ?? { key: r.team, total: 0, open: 0 };
+      const t = m.get(r.team) ?? { key: r.team, total: 0, open: 0, contacted: 0, due: 0 };
       t.total++;
       if (r.open) t.open++;
+      if (r.contacted) t.contacted++;
+      if (r.due) t.due++;
       m.set(r.team, t);
     }
     for (const t of extraTeams) {
-      if (!m.has(t)) m.set(t, { key: t, total: 0, open: 0 });
+      if (!m.has(t)) m.set(t, { key: t, total: 0, open: 0, contacted: 0, due: 0 });
     }
     return [...m.values()].sort((a, b) => b.total - a.total);
   }, [index, extraTeams]);
@@ -365,9 +381,19 @@ export default function WorkPanel() {
                 }`}
               >
                 <p className="text-sm font-medium">{p.key}</p>
+                {/* PROGRESS WHERE THE WORK IS. This used to say only what was
+                    left, and the count of what had been done lived on a
+                    separate "Where I've been" tab — a question you had to
+                    leave the job to answer. Both halves belong on the row. */}
                 <p className="text-xs text-muted-foreground">
-                  {left === 0 ? "nothing left to do" : `${left} still to contact`}
+                  {p.total === 0
+                    ? "nothing here yet"
+                    : `${p.contacted} of ${p.total} contacted`}
+                  {p.due > 0 ? ` · ${p.due} due follow-up` : ""}
                 </p>
+                {left === 0 && p.total > 0 ? (
+                  <p className="text-xs text-muted-foreground">nothing left to do</p>
+                ) : null}
               </button>
             );
           })}
@@ -447,7 +473,7 @@ export default function WorkPanel() {
               title="Local businesses"
               done={progress[place.key]?.has("business")}
               onDone={() => markDone(place.key, "business", 0)}
-              why="They pay $100 to sponsor the team's rooms."
+              why="One founding partner per team, per season. $2,500 flat."
               rows={place.businesses.map((s) => rowFromSponsor(s))}
               busy={busy}
               onSend={(ids, step) => send("sponsors", ids, step)}
