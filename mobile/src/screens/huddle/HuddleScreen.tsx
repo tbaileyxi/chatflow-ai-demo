@@ -63,6 +63,7 @@ import type { RootStackParamList } from "@/navigation/types";
 import { CoachThinking } from "@/components/huddle/CoachThinking";
 import { RoomBackground, isRealRoomPhoto } from "@/components/huddle/RoomBackground";
 import { SpinUpBar } from "@/components/huddle/SpinUpBar";
+import { CommunitySpinUpBar } from "@/components/huddle/CommunitySpinUpBar";
 import { useKnownPeople } from "@/hooks/useFriends";
 
 type Route = RouteProp<RootStackParamList, "Huddle">;
@@ -667,6 +668,19 @@ export function HuddleScreen() {
         {huddle.isGameRoom && huddle.gameId && !huddle.isDm ? (
           <SpinUpBar
             gameId={huddle.gameId}
+            friendsHere={friendsHere}
+            navigation={navigation}
+          />
+        ) : null}
+
+        {/* The same move out of the community room, which is the one room on
+            a team that is full of strangers by design. */}
+        {huddle.isOfficialTeam && huddle.teamId && !huddle.isDm && user ? (
+          <CommunitySpinUpBar
+            userId={user.id}
+            teamId={huddle.teamId}
+            teamName={huddle.teamName ?? null}
+            displayName={profile?.displayName ?? null}
             friendsHere={friendsHere}
             navigation={navigation}
           />

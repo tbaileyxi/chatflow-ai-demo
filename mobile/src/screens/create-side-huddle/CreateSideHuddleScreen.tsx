@@ -32,6 +32,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { followTeam } from "@/lib/follows";
 import { backfillTeamContent } from "@/lib/roomContent";
+import { postAdminWelcome } from "@/lib/teamHuddle";
 import {
   DEV_ROOMS_STORAGE_KEY,
   DEV_TEAMS,
@@ -80,62 +81,6 @@ function useTeamsList() {
       }));
     },
   });
-}
-
-/**
- * The admin's first message.
- *
- * The admin is the only person who can turn a 1-person room into a 40-person
- * room, so this is addressed to them, promises only what the Coach actually
- * does today, and carries exactly one action.
- *
- * Deliberately does NOT say "type @coach" — the Coach answers questions now,
- * but a brand-new empty room has nothing to answer about, and an instruction
- * that produces a shrug is worse than no instruction. It offers instead: the
- * live poller genuinely does post plays into this room during a game.
- */
-async function postAdminWelcome(
-  huddleId: string,
-  huddleName: string,
-  teamName: string | null,
-  knownSystemUserId: string | null,
-) {
-  try {
-    let systemUserId = knownSystemUserId;
-    if (!systemUserId) {
-      const { data } = await supabase.rpc("get_or_create_system_user");
-      systemUserId = (data as string | null) ?? null;
-    }
-    if (!systemUserId) return;
-
-    const team = teamName ?? "your team";
-    // Say what it IS, then what to DO — with the actual button named. The
-    // 48-hour nudge is useless if nobody knew where anything was on day one.
-    // It opens by placing the room against the community one it replaced,
-    // because that is the question a new owner actually has: what is this for
-    // now that I have left the front door?
-    const content =
-      `**Your own ${team} huddle** — same feed as the community room, just ` +
-      `your crew. I'll post news as it breaks and call it live on game days. 🏈\n\n` +
-      `Your half: get your people in. Tap the **+** up top — a huddle of one ` +
-      `is just me talking to myself. Ask **@Coach** (on the **+** below) ` +
-      `anything: the score, who's starting, camp news!\n\n` +
-      `**Room settings**, upper right, if you want this room locked, to ` +
-      `manage members and more.`;
-
-    const { error } = await supabase.from("huddle_messages").insert({
-      huddle_id: huddleId,
-      user_id: systemUserId,
-      content,
-      is_bot_message: true,
-      // Same RLS reason as the backfill above — this row isn't ours.
-      is_team_agent_message: true,
-      message_type: "admin_welcome",
-    });
-    if (error) console.warn("Admin welcome rejected:", error);
-  } catch (err) {
-    console.warn("Admin welcome failed:", err);
-  }
 }
 
 export function CreateSideHuddleScreen() {

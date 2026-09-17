@@ -507,8 +507,8 @@ function YourRoomsSection() {
   // you can post in it; that is not a reason for it to sit in Your Huddles
   // beside the side huddle you actually made — which is why the same fixture
   // turned up twice.
-  const unsorted = (huddles ?? []).filter((huddle) => {
-    if (huddle.isOfficialTeam || huddle.isGameRoom || huddle.isDm) return false;
+  const live = (huddles ?? []).filter((huddle) => {
+    if (huddle.isGameRoom || huddle.isDm) return false;
     // A side huddle past its 2am does not belong in the list. The server-side
     // closer is scheduled with pg_cron, which is not enabled on this project,
     // so nothing was actually closing them — they sat here looking permanent.
@@ -517,6 +517,25 @@ function YourRoomsSection() {
     }
     return true;
   });
+
+  // THE COMMUNITY ROOM IS THE FRONT DOOR, NOT A SECOND ROOM.
+  //
+  // Following a team joins you to its community room, so it arrives in this
+  // list already. It is what a new person has instead of an empty home: one
+  // room per team they follow, with the bot in it.
+  //
+  // It stops being the front door the moment they have people for that team.
+  // Owning or joining a huddle for the same team replaces it — two rooms for
+  // one team on one screen is the shelf problem again, and the community one
+  // is the half with nobody they know in it. Leave that huddle and the
+  // community room comes back on its own, because this is derived per render
+  // rather than stored.
+  const teamsWithOwnRoom = new Set(
+    live.filter((h) => !h.isOfficialTeam && h.teamId).map((h) => h.teamId),
+  );
+  const unsorted = live.filter(
+    (huddle) => !huddle.isOfficialTeam || !teamsWithOwnRoom.has(huddle.teamId),
+  );
 
   // The game each room is about — ONE query for every room, not one per room.
   const { data: gamesByTeam } = useRoomGames(unsorted.map((r) => r.teamId));
