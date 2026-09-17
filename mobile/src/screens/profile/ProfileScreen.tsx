@@ -84,8 +84,9 @@ export function ProfileScreen() {
     removeAllNotifications,
     dmGroups,
     roomGroups,
+    totalCount,
     isLoading: notificationsLoading,
-  } = useInAppNotifications(8);
+  } = useInAppNotifications(30);
 
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
@@ -481,7 +482,11 @@ export function ProfileScreen() {
                   </Pressable>
                 )}
                 <Pressable onPress={() => void removeAllNotifications()} className="active:opacity-60">
-                  <Type variant="captionStrong" tone="muted">Clear all</Type>
+                  <Type variant="captionStrong" tone="muted">
+                    {/* Named, because "Clear all" against a list showing 30 of
+                        114 reads as "clear these 30". It clears the lot. */}
+                    Clear all {totalCount > 0 ? totalCount : ""}
+                  </Type>
                 </Pressable>
               </View>
             )}
@@ -495,6 +500,11 @@ export function ProfileScreen() {
               </Type>
             ) : (
               <View className="gap-4">
+                {totalCount > notifications.length ? (
+                  <Type variant="data" tone="muted" style={{ fontSize: 11 }}>
+                    Showing {notifications.length} of {totalCount}
+                  </Type>
+                ) : null}
                 {/* A message from a person and activity in a room are two
                     different things to be told about, and they were one list.
                     Four rally pings from Broseph read as four unanswered DMs.

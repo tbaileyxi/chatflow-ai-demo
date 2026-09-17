@@ -102,12 +102,16 @@ export function useInAppNotifications(limit = 12) {
   const query = useQuery({
     queryKey,
     enabled: !!user,
-    queryFn: async (): Promise<InAppNotification[]> => {
-      if (!user) return [];
+    queryFn: async (): Promise<{ items: InAppNotification[]; total: number }> => {
+      if (!user) return { items: [], total: 0 };
 
-      const { data, error } = await supabase
+      // Counted, not just fetched. With 114 rows behind a window of 8, every
+      // dismissal refilled from the queue and looked like a button that did
+      // nothing — the delete had worked every time. The screen has to be able
+      // to say how many there actually are.
+      const { data, error, count } = await supabase
         .from("notifications")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(limit);
@@ -135,7 +139,7 @@ export function useInAppNotifications(limit = 12) {
         }
       }
 
-      return mapped;
+      return { items: mapped, total: count ?? 0 };
     },
   });
 
@@ -228,7 +232,8 @@ export function useInAppNotifications(limit = 12) {
     },
   });
 
-  const notifications = query.data ?? [];
+  const notifications = query.data?.items ?? [];
+  const totalCount = query.data?.total ?? notifications.length;
   const unreadCount = notifications.filter((n) => !n.readAt).length;
   const groups = groupNotifications(notifications);
   const dmGroups = groups.filter((g) => g.isDm);
@@ -237,6 +242,8 @@ export function useInAppNotifications(limit = 12) {
   return {
     ...query,
     notifications,
+    /** Everything on the server, not just this page of it. */
+    totalCount,
     groups,
     dmGroups,
     roomGroups,
