@@ -5,13 +5,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "Side Huddle Sports",
   slug: "side-huddle-sports",
   scheme: "sidehuddle",
-  // 1.0.7 is now closed too. Anything new needs 1.0.8.
+  // 1.0.8 (103) is in review, so that train is spoken for: anything new is
+  // 1.0.9. Uploading under a version that is sitting in review is how you end
+  // up replacing the binary a reviewer is halfway through.
   //
   // A version is a "pre-release train", and Apple closes a train once that
   // version has been through review. 1.0.4 is closed: Transporter rejects any
   // build under it with "Invalid Pre-Release Train", no matter how high the
   // build number goes. New work needs a new version, not a new build.
-  version: "1.0.8",
+  version: "1.0.9",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "dark",
@@ -41,7 +43,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // Unique within its version train, so 1.0.5 could start at 1 — kept
     // climbing instead so a number is never reused anywhere and `eas
     // build:list` reads in order.
-    buildNumber: "78",
+    buildNumber: "104",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       // Contacts are hashed on this device and only the hashes are sent, so we

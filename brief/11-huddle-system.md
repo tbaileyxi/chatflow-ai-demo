@@ -62,10 +62,12 @@ Decisions locked 2026-09-17:
       front door worth opening at 9am on a Tuesday
 
 ## Still open
-- [ ] E2 The temp huddle on Home. Client hole fixed (the membership retry was
-      dropping expires_at/is_game_room on ANY error, so rooms came back looking
-      permanent). The specific row needs one query to settle — is its expires_at
-      past or future? `spin_up_side_huddle` is server-side and not in this repo.
+- [x] E2 Two halves, both fixed. Client: the membership retry was dropping
+      expires_at/is_game_room on ANY error, so rooms came back looking
+      permanent. Server: nothing was closing them at all — the closer was
+      scheduled with pg_cron, which is not enabled here, so an expired room
+      stayed live and reachable by link. close_expired_side_huddles() is that
+      closer as a callable function (migration 20260917000002). RUN IT.
 - [ ] F5 (parked) Shared clips deep-link back into the huddle — waiting on locked rooms
 - [ ] G2 Off-day content (X highlights, news) keeping community rooms alive at
       9am Tuesday. Ops, not app code: the bot pipeline feeds these rooms.
