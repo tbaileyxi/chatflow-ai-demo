@@ -189,55 +189,42 @@ function sponsorLink(lead: Lead): string {
  * the foot says exactly what we are not.
  */
 function body(step: number, lead: Lead): string {
-  const slot = isSchoolPartnerLead(lead) ? huddleLabel(lead) : slotName(lead);
+  const team = isSchoolPartnerLead(lead) ? huddleLabel(lead) : slotName(lead);
+  const category = categoryWord(lead);
   const link = sponsorLink(lead);
-  const company = lead.company;
 
+  // COPY IS FIXED. These three letters are reproduced exactly as written —
+  // the merge tags are the only moving parts. Anything that reads oddly here
+  // is a copy decision, not a code one, and belongs in the copy rather than
+  // in a well-meaning edit at render time.
   if (step === 2) {
-    // "Quick follow-up" spends the one line that gets read announcing that a
-    // line is coming. The news is that the slot is open and the category is
-    // still free; lead with it.
     return [
       `Hi ${firstName(lead)},`,
-      `The founding partner slot for ${slot} is still open, and no other ${categoryWord(lead)} has it.`,
-      `${SEASON_PRICE} flat for the season, the rate locked for three.`,
-      `${link}`,
+      `The founding partner slot for ${team} is still open \u2014 no other ${category} has it.`,
+      `${SEASON_PRICE} flat for the season, rate locked for three.`,
+      link,
       `Ty`,
       DISCLAIMER,
     ].join("\n\n");
   }
 
   if (step === 3) {
-    // "The first name on the team" has no noun in it. A reader who skipped
-    // step 1 cannot tell what is being offered — first name of what?
     return [
       `Hi ${firstName(lead)},`,
-      `Last note on ${slot}. If it is not for you, no hard feelings.`,
-      `Whoever takes it is the founding backer of ${slot} fans on Side Huddle, and there is only ever one: ${link}`,
+      `Last note on ${team}. If it's not for you, no hard feelings.`,
+      `Whoever takes it is the founding backer of ${team} fans on Side Huddle, and there's only ever one: ${link}`,
       `Ty`,
       `Not relevant? Reply "unsubscribe" and I won't follow up.`,
-      DISCLAIMER,
+      // ONE disclaimer. It was listed twice here, so step 3 printed it twice.
       DISCLAIMER,
     ].join("\n\n");
   }
 
-  // THE STORY IS THE PRODUCT, so it goes first. The earlier version opened
-  // with what the app is and then listed inventory in one run-on sentence,
-  // which reads as a brochure — and a brochure is judged on reach, which is
-  // the argument we lose. One partner, attached to these fans from the start,
-  // and that only happens once: that is the thing being sold.
-  //
-  // "${company} would be it for ${slot}" also presumed the sale. Holding a
-  // slot for a category is an offer; naming them the partner in paragraph two
-  // is a decision they have not made.
   return [
     `Hi ${firstName(lead)},`,
-    `One business per team gets to be the founding partner of ${slot} fans on Side Huddle \u2014 the name attached to them from day one. That only happens once.`,
-    `Side Huddle is where those fans watch the game together, with the score and the news landing as it happens.`,
-    `I am holding the ${slot} slot for one ${categoryWord(lead)}.`,
-    `Included: founding status and the launch story, a "powered by" on the pregame card and under the clips fans post, and co-branded shirts in team colors.`,
-    `${SEASON_PRICE} flat, the rate locked for three seasons, first refusal after that.`,
-    `${link}`,
+    `One business per team becomes the founding partner of ${team} fans on Side Huddle \u2014 the name attached to them from day one. That only happens once.`,
+    `I'm holding the ${team} slot for one ${category}. ${SEASON_PRICE} flat for the season, rate locked for three, first refusal after that.`,
+    link,
     `Ty`,
     DISCLAIMER,
   ].join("\n\n");

@@ -135,39 +135,18 @@ function subject(step: number, c: Chapter): string {
 }
 
 function body(step: number, c: Chapter): string {
-  const who = chapterRef(c);
-  const { short: orgShort } = orgNames(c.org || "your team");
+  const { short: team } = orgNames(c.org || "your team");
+  const group = (c.chapter_name || "your chapter").trim();
 
-  // PLAIN TEXT IS THE EMAIL. The HTML is generated from this, not the other
-  // way round, so what the preview shows is exactly what lands. The old
-  // version built styled HTML and stripped it for preview, which meant the
-  // preview was a lossy copy of the real thing and the real thing was a
-  // newsletter — boxes, a gold code block, a CTA button table — sent by a
-  // person writing one-to-one. A letter from Ty should look like a letter
-  // from Ty.
-  //
-  // AND IT IS AN ENGAGEMENT TOOL, NOT A COMMUNITY TO RUN. Every earlier draft
-  // asked a chapter president to take on a room: claim it, name it, own it.
-  // That is a second job offered to a volunteer who already has one. What they
-  // actually have is a group that goes quiet between games, and what this does
-  // is fill it without them touching anything. The absence of admin work IS
-  // the product; say that instead of handing them a code.
-  //
-  // NO CODES. Not in the body, not in a P.S. A code is a task, and every
-  // version that carried one asked for two things at once: install this, and
-  // then do this other thing. 258 sends, 9 clicks, 0 rooms.
-
+  // COPY IS FIXED. Reproduced exactly as written; the merge tags are the only
+  // moving parts. The venue sentence that used to appear here is gone with the
+  // rest of the old draft — it is not in this copy.
   if (step === 2) {
     return [
       `Hey ${greeting(c)},`,
-      // "Still there if you want it" is the whole ask phrased as a shrug: it
-      // waits to be wanted instead of saying what to do, and a volunteer
-      // reading on a phone will not turn a shrug into an action for you. The
-      // paragraph under it is the best sentence in either sequence and does
-      // not change.
-      `Following up once on the ${orgShort} room for ${who}.`,
-      `It fills itself — the score, the news and whatever clip everyone is passing around show up without anyone posting them. Nothing for you to run or moderate.`,
-      `One person has to be in it first. Download it and your members can follow you in: ${APP_STORE_URL}`,
+      `Following up once on the ${team} room for ${group}.`,
+      `It fills itself \u2014 the score, the news, whatever clip everyone's passing around. Nothing for you to run or moderate.`,
+      `One person has to be in it first: ${APP_STORE_URL}`,
       `Ty`,
     ].join("\n\n");
   }
@@ -175,21 +154,18 @@ function body(step: number, c: Chapter): string {
   if (step === 3) {
     return [
       `Hey ${greeting(c)},`,
-      `Last one from me. If it is not for your group, no hard feelings — good luck this season either way.`,
-      `The ${orgShort} room is there whenever you want it, and it costs nothing to look: ${APP_STORE_URL}`,
+      `Last one from me. If it's not for the group, no hard feelings \u2014 good luck this season either way.`,
+      `The ${team} room is there whenever you want it, and it costs nothing to look: ${APP_STORE_URL}`,
       `Ty`,
     ].join("\n\n");
   }
 
   return [
     `Hey ${greeting(c)},`,
-    // "the Sarasota Browns Backers already cares" — a club name takes a plural
-    // verb in the reader's ear, and half these names end in s. Naming the
-    // members instead sidesteps it for fan clubs and alumni groups alike.
-    `Your members already care about every snap. They are just watching apart, and the group goes quiet between games.`,
-    `A ${orgShort} room fixes the quiet part on its own. The score, the news and the clips land in it without anyone posting them${c.venue ? `, and when you do post "${c.venue}, 1pm" people actually see it` : ``}.`,
-    `There is no admin work. That is the whole tool — nothing for you to run or moderate.`,
-    `Free on iPhone, and your members can follow you in: ${APP_STORE_URL}`,
+    `Your members care about every snap \u2014 they're just watching apart, and the group goes quiet between games.`,
+    `A ${team} room fixes the quiet part on its own. The score, the news and the clips land in it without anyone posting a thing.`,
+    `No admin work. Nothing to run or moderate.`,
+    `Free on iPhone \u2014 download it and your members can follow you in: ${APP_STORE_URL}`,
     `Ty`,
   ].join("\n\n");
 }
