@@ -31,6 +31,27 @@ function slugify(s: string): string {
 }
 
 /**
+ * "cleveland-browns" → "Cleveland Browns", with no network call.
+ *
+ * The headline used to wait for the teams table before it could say which team
+ * this was, so a link straight from an email painted the generic fallback
+ * first and swapped it a moment later — the one moment the reader decides
+ * whether the page is about them. The slug already carries the answer; the
+ * database is only needed for the id and league the checkout uses, and its row
+ * still wins when it lands because "Texas A&M" cannot be recovered from a slug.
+ */
+const SMALL_WORDS = new Set(['of', 'the', 'at', 'and']);
+function labelFromSlug(slug: string): string | null {
+  const parts = slug.split('-').filter(Boolean);
+  if (parts.length === 0) return null;
+  return parts
+    .map((w, i) =>
+      i > 0 && SMALL_WORDS.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1),
+    )
+    .join(' ');
+}
+
+/**
  * The six things a founding partner gets. Written once, here, because the
  * package is the offer: a list that drifts between the page, the email and the
  * invoice is how a sponsor ends up arguing about what they bought.
