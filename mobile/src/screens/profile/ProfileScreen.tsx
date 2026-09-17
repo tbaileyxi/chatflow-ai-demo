@@ -16,9 +16,10 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { shrinkAvatar } from "@/lib/shrinkImage";
 import * as FileSystem from "expo-file-system/legacy";
-import { Type } from "@/components/ui/Type";
+import { Type, SectionLabel } from "@/components/ui/Type";
 import { useAuth } from "@/hooks/useAuth";
 import { useInAppNotifications } from "@/hooks/useInAppNotifications";
+import type { NotificationGroup } from "@/hooks/useInAppNotifications";
 import { consumeInvite, extractInviteCode } from "@/hooks/useInviteHandler";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
@@ -78,8 +79,11 @@ export function ProfileScreen() {
     unreadCount,
     markRead,
     markAllRead,
-    removeNotification,
+    removeNotifications,
+    markNotificationsRead,
     removeAllNotifications,
+    dmGroups,
+    roomGroups,
     isLoading: notificationsLoading,
   } = useInAppNotifications(8);
 
@@ -241,6 +245,100 @@ export function ProfileScreen() {
     .charAt(0)
     .toUpperCase();
 
+  /** One row for a group of identical pings. */
+  const renderNotificationGroup = (group: NotificationGroup) => {
+    const d = group.data;
+    const isInvite =
+      group.type === "room_invite" ||
+      (!!d &&
+        typeof d === "object" &&
+        !Array.isArray(d) &&
+        typeof (d as { url?: string }).url === "string");
+
+    return (
+      <Pressable
+        key={group.id}
+        className={`rounded-xl border p-3 active:opacity-80 ${
+          group.unread ? "border-primary/35 bg-primary/10" : "border-border bg-muted/20"
+        }`}
+        onPress={() => {
+          // Opening the newest answers all of them.
+          void markNotificationsRead(group.ids);
+          void handleOpenNotification(group.id);
+        }}
+      >
+        <View className="flex-row items-start gap-2">
+          {group.unread ? (
+            <View className="mt-2 h-2 w-2 rounded-full bg-primary" />
+          ) : null}
+          <View className="flex-1">
+            <View className="flex-row items-start justify-between gap-2">
+              <View className="flex-1 flex-row items-center gap-1.5">
+                <Type variant="captionStrong" numberOfLines={1} className="shrink">
+                  {group.title}
+                </Type>
+                {group.isDm ? (
+                  <View
+                    className="rounded-full px-1.5 py-0.5"
+                    style={{ borderWidth: 1, borderColor: colors.border }}
+                  >
+                    <Type variant="data" tone="muted" style={{ fontSize: 9, letterSpacing: 1 }}>
+                      DM
+                    </Type>
+                  </View>
+                ) : null}
+                {group.count > 1 ? (
+                  <Type variant="data" tone="muted" style={{ fontSize: 11 }}>
+                    ×{group.count}
+                  </Type>
+                ) : null}
+              </View>
+              <Type variant="captionStrong" tone="muted">
+                {formatNotificationTime(group.createdAt)}
+              </Type>
+              {/* An X, not a swipe. The swipe never claimed the gesture inside
+                  a scrolling list, and the red panel it revealed sat BEHIND
+                  rows whose own background is 10% opaque — so every row went
+                  red and nothing could be deleted. It clears the whole run. */}
+              <Pressable
+                onPress={() => void removeNotifications(group.ids)}
+                hitSlop={10}
+                className="-mr-1 -mt-0.5 p-1 active:opacity-60"
+              >
+                <X color={colors.mutedForeground} size={15} />
+              </Pressable>
+            </View>
+            <Type variant="caption" tone="muted" className="mt-1">
+              {group.body}
+            </Type>
+
+            {/* Pending invite: explicit Join + Dismiss so it's obvious how to
+                act (not a guess-the-tap). */}
+            {isInvite && group.unread ? (
+              <View className="mt-2.5 flex-row items-center gap-2">
+                <Pressable
+                  onPress={() => void handleOpenNotification(group.id)}
+                  className="flex-1 items-center rounded-lg bg-primary py-2 active:opacity-80"
+                >
+                  <Type variant="captionStrong" style={{ color: colors.primaryForeground }}>
+                    Join huddle
+                  </Type>
+                </Pressable>
+                <Pressable
+                  onPress={() => void markNotificationsRead(group.ids)}
+                  className="h-9 w-9 items-center justify-center rounded-lg border border-border active:opacity-70"
+                  hitSlop={8}
+                >
+                  <X color={colors.mutedForeground} size={16} />
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
+
   const handleOpenNotification = async (notificationId: string) => {
     const notification = notifications.find((n) => n.id === notificationId);
     if (!notification) return;
@@ -396,82 +494,26 @@ export function ProfileScreen() {
                 Friend check-ins, game alerts, bot drops, invites, and pick results will collect here.
               </Type>
             ) : (
-              <View className="gap-2">
-                {notifications.map((notification) => {
-                  const d = notification.data;
-                  const isInvite =
-                    notification.type === "room_invite" ||
-                    (!!d &&
-                      typeof d === "object" &&
-                      !Array.isArray(d) &&
-                      typeof (d as { url?: string }).url === "string");
-                  return (
-                    <Pressable
-                      key={notification.id}
-                      className={`rounded-xl border p-3 active:opacity-80 ${
-                        notification.readAt
-                          ? "border-border bg-muted/20"
-                          : "border-primary/35 bg-primary/10"
-                      }`}
-                      onPress={() => handleOpenNotification(notification.id)}
-                    >
-                      <View className="flex-row items-start gap-2">
-                        {!notification.readAt && (
-                          <View className="mt-2 h-2 w-2 rounded-full bg-primary" />
-                        )}
-                        <View className="flex-1">
-                          <View className="flex-row items-start justify-between gap-2">
-                            <Type variant="captionStrong" className="flex-1">
-                              {notification.title}
-                            </Type>
-                            <Type variant="captionStrong" tone="muted">
-                              {formatNotificationTime(notification.createdAt)}
-                            </Type>
-                            {/* An X, not a swipe. The swipe never claimed the
-                                gesture inside a scrolling list, and the red
-                                panel it revealed sat BEHIND rows whose own
-                                background is 10% opaque — so every row went
-                                red and nothing could be deleted. */}
-                            <Pressable
-                              onPress={() => void removeNotification(notification.id)}
-                              hitSlop={10}
-                              className="-mr-1 -mt-0.5 p-1 active:opacity-60"
-                            >
-                              <X color={colors.mutedForeground} size={15} />
-                            </Pressable>
-                          </View>
-                          <Type variant="caption" tone="muted" className="mt-1">
-                            {notification.body}
-                          </Type>
-
-                          {/* Pending invite: explicit Join + Dismiss so it's
-                              obvious how to act (not a guess-the-tap). */}
-                          {isInvite && !notification.readAt && (
-                            <View className="mt-2.5 flex-row items-center gap-2">
-                              <Pressable
-                                onPress={() => handleOpenNotification(notification.id)}
-                                className="flex-1 items-center rounded-lg bg-primary py-2 active:opacity-80"
-                              >
-                                <Type variant="captionStrong"
-                                  
-                                  style={{ color: colors.primaryForeground }}>
-                                  Join huddle
-                                </Type>
-                              </Pressable>
-                              <Pressable
-                                onPress={() => markRead(notification.id)}
-                                className="h-9 w-9 items-center justify-center rounded-lg border border-border active:opacity-70"
-                                hitSlop={8}
-                              >
-                                <X color={colors.mutedForeground} size={16} />
-                              </Pressable>
-                            </View>
-                          )}
-                        </View>
-                      </View>
-                    </Pressable>
-                  );
-                })}
+              <View className="gap-4">
+                {/* A message from a person and activity in a room are two
+                    different things to be told about, and they were one list.
+                    Four rally pings from Broseph read as four unanswered DMs.
+                    Messages sit first, under their own label, and a run of
+                    pings from the same person in the same room is one row. */}
+                {dmGroups.length > 0 ? (
+                  <View className="gap-2">
+                    <SectionLabel>Messages</SectionLabel>
+                    {dmGroups.map((group) => renderNotificationGroup(group))}
+                  </View>
+                ) : null}
+                {roomGroups.length > 0 ? (
+                  <View className="gap-2">
+                    {dmGroups.length > 0 ? (
+                      <SectionLabel>In your rooms</SectionLabel>
+                    ) : null}
+                    {roomGroups.map((group) => renderNotificationGroup(group))}
+                  </View>
+                ) : null}
               </View>
             )}
           </CardContent>
