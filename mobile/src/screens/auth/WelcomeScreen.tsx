@@ -49,12 +49,10 @@ export function WelcomeScreen() {
         >
           Never watch a game alone.
         </Type>
-        {/* It said "Tap anywhere" and nothing happened — the ripple fired
-            and that was all, so the one instruction on the first screen of
-            the app was false. */}
-        <Type center variant="eyebrow" tone="tertiary" className="mt-8">
-          Tap anywhere to begin
-        </Type>
+        {/* One instruction, one target. This used to read "Tap anywhere to
+            begin" above a Get started button — two CTAs competing on the one
+            screen that should ask for exactly one thing. The screen-wide tap
+            still works; it just no longer argues with the button. */}
       </View>
 
       <View className="px-8 pb-8" pointerEvents="box-none">

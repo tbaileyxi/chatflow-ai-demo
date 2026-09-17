@@ -826,19 +826,22 @@ export function HuddleSettingsScreen() {
                       something he isn't the one doing — it is the visitor who
                       asks. It stays as the visitor's button on the join screen,
                       where it is the right words for the right person. */}
+                  {/* Same two tier names the create screen uses. A room
+                      called "Open" there and "Friends" here is two names for
+                      one thing, and the owner has to work out they match. */}
                   <Type variant="bodyStrong">
-                    {huddle.isPrivate ? "Private" : "Open"}
+                    {huddle.isPrivate ? "Locked" : "Friends"}
                   </Type>
                   {/* WAS: "Open by Invite", which wasn't true — an open room can
                       be joined by anyone who finds it, invite or not. */}
                   <Type variant="caption" tone="muted" className="leading-5">
                     {huddle.isPrivate
-                      ? "You decide who comes in."
-                      : "Friends can jump in. Strangers can't find it."}
+                      ? "Invitation and request to join only."
+                      : "Your friends can walk straight in."}
                   </Type>
                 </View>
                 <Button variant="outline" size="sm" onPress={togglePrivate}>
-                  {huddle.isPrivate ? "Make it open" : "Make it private"}
+                  {huddle.isPrivate ? "Unlock it" : "Lock it"}
                 </Button>
               </View>
 

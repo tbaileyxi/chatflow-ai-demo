@@ -40,6 +40,10 @@ function normalizePhone(raw: string): string | null {
   return null;
 }
 
+const PROFILE_STEP = 0;
+const TEAM_STEP = 1;
+const CONTACTS_STEP = 2;
+
 export function OnboardingScreen() {
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState(0);
@@ -53,16 +57,11 @@ export function OnboardingScreen() {
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
 
-  const slides = [
-    {
-      title: "See friends watching.",
-      body: "Friends Now shows who is already in a room so you can jump in fast.",
-    },
-    {
-      title: "Start a room.",
-      body: "Pick a team or event, invite people, and the room stays hidden from strangers.",
-    },
-  ];
+  // The two marketing slides that used to open this are gone. They explained
+  // Friends Now and starting a room to somebody who had seen neither, one
+  // screen before they could see both, and they made the step counter lie:
+  // "Step 1 of 2" in front of a flow with three more steps behind it. The bot
+  // teaches those two things in context, in the room, where they are real.
 
   // Someone a friend invited is not a cold visitor and shouldn't be treated
   // like one. They arrived because a specific person wanted them in a specific
@@ -81,26 +80,22 @@ export function OnboardingScreen() {
       const code = await peekPendingInvite();
       if (cancelled || !code) return;
       setInvited(true);
-      // Skip the marketing slides — they came for a room, not a pitch.
-      setStep(slides.length);
+      // Straight to the name — they came for a room, not a pitch.
+      setStep(PROFILE_STEP);
     })();
     return () => {
       cancelled = true;
     };
-    // slides.length is a constant; this runs once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Slides, then: name/phone → pick a team → find your people.
-  const profileStep = slides.length;
-  const teamStep = slides.length + 1;
-  const contactsStep = slides.length + 2;
+  // name/phone → pick a team → find your people.
+  const profileStep = PROFILE_STEP;
+  const teamStep = TEAM_STEP;
+  const contactsStep = CONTACTS_STEP;
   const onProfileStep = step === profileStep;
   const onTeamStep = step === teamStep;
   const onContactsStep = step === contactsStep;
-  const activeSlide =
-    onProfileStep || onTeamStep || onContactsStep ? null : slides[step];
-
   // Save name + phone, then move to contact matching. The phone has to land
   // BEFORE we match so this user is findable by the people they're about to
   // scan for.
@@ -324,25 +319,7 @@ export function OnboardingScreen() {
                       </>
                     ) : null}
                   </>
-                ) : (
-                  <>
-                    {/* The icon tile is gone. A generic glyph in a rounded
-                        square is the house style of every onboarding deck ever
-                        shipped, and it said nothing this screen doesn't say in
-                        words. The eyebrow does the work instead: it numbers
-                        the step, in the same mono that labels every section in
-                        the app. */}
-                    <Type variant="eyebrow" tone="primary">
-                      {`Step ${step + 1} of ${slides.length}`}
-                    </Type>
-                    <Type variant="display" className="mt-4">
-                      {activeSlide?.title}
-                    </Type>
-                    <Type variant="title" tone="muted" className="mt-4">
-                      {activeSlide?.body}
-                    </Type>
-                  </>
-                )}
+                ) : null}
 
                 {/* Hidden for invited users: they have exactly one step, and
                     five dots with the third lit would say "you're 3 of 5" to
@@ -353,7 +330,6 @@ export function OnboardingScreen() {
                   pointerEvents="none"
                 >
                   {[
-                    ...slides,
                     { title: "__profile__" },
                     { title: "__team__" },
                     { title: "__contacts__" },
@@ -423,10 +399,8 @@ export function OnboardingScreen() {
                   . Side Huddle has zero tolerance for objectionable content.
                 </Type>
               ) : null}
-              {/* Not for invited users. They start at the name step, so Back
-                  would rewind them into the marketing slides they were
-                  deliberately skipped past — offering to show someone a pitch
-                  for a product they've already decided to join. */}
+              {/* The name is the first step now, so there is nothing behind
+                  it to go back to. Back appears from the team step on. */}
               {step > 0 && !invited ? (
                 <Pressable
                   className="rounded-full px-5 py-3 active:opacity-80"

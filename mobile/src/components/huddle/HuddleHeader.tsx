@@ -333,6 +333,14 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
           </View>
 
           <View className="overflow-hidden">
+            {/* "◷ 2am" is a countdown with no stated consequence, and people
+                read a deadline as "I am about to lose this". Say what actually
+                happens once, under the name, only in the rooms it applies to. */}
+            {huddle.expiresAt && !huddle.isGameRoom ? (
+              <Type variant="data" tone="muted" className="mt-0.5" numberOfLines={1}>
+                Closes at 2am — nothing is deleted. Keep it in Settings.
+              </Type>
+            ) : null}
             {hasGame || huddle.isDm ? null : (
               <Type variant="data" tone="muted" className="mt-0.5">
                 {huddle.memberCount}{" "}

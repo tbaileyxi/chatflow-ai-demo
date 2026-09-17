@@ -102,11 +102,26 @@ export function useUserHuddles() {
         .select(CORE.replace("%EXTRA%", "expires_at, is_game_room, is_dm,"))
         .eq("user_id", user.id);
 
-      if (memError) {
+      // ...but ONLY for that one case. This used to retry on any error at
+      // all, and the retry drops expires_at, is_game_room and is_dm — so a
+      // transient failure or an RLS change came back as a list where every
+      // room looks permanent and none of them look like a game room. That is
+      // how a spun-up room that died at 2am keeps sitting in Your Huddles
+      // wearing a crown: the filters that would have removed it were reading
+      // columns the fallback never asked for.
+      const missingColumn =
+        memError?.code === "42703" ||
+        /column .* does not exist|could not find the .* column/i.test(
+          memError?.message ?? "",
+        );
+
+      if (memError && missingColumn) {
         ({ data: memberships, error: memError } = await (supabase as any)
           .from("huddle_members")
           .select(CORE.replace("%EXTRA%", ""))
           .eq("user_id", user.id));
+      } else if (memError) {
+        console.warn("[huddles] membership select failed", memError);
       }
 
       if (memError || !memberships) return [];

@@ -8,6 +8,7 @@ import {
   ScrollView,
   Share,
   Switch,
+  Keyboard,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -110,15 +111,17 @@ async function postAdminWelcome(
     const team = teamName ?? "your team";
     // Say what it IS, then what to DO — with the actual button named. The
     // 48-hour nudge is useless if nobody knew where anything was on day one.
+    // It opens by placing the room against the community one it replaced,
+    // because that is the question a new owner actually has: what is this for
+    // now that I have left the front door?
     const content =
-      `🏟️ **${huddleName} is your huddle.**\n\n` +
-      `I've got ${team} covered — news as it breaks, and when they play I'm in ` +
-      `here calling it live. Scores, big plays, all in this thread.\n\n` +
-      `Your half: get your people in. Tap the **+** up top to invite them — ` +
-      `a huddle of one is just me talking to myself.\n\n` +
-      `Ask me anything with **@coach** — the score, who's starting, camp news.\n` +
-      `Going private or managing who's in? That's **Settings**, top right.\n\n` +
-      `**→ Add your crew**`;
+      `**Your own ${team} huddle** — same feed as the community room, just ` +
+      `your crew. I'll post news as it breaks and call it live on game days. 🏈\n\n` +
+      `Your half: get your people in. Tap the **+** up top — a huddle of one ` +
+      `is just me talking to myself. Ask **@Coach** (on the **+** below) ` +
+      `anything: the score, who's starting, camp news!\n\n` +
+      `**Room settings**, upper right, if you want this room locked, to ` +
+      `manage members and more.`;
 
     const { error } = await supabase.from("huddle_messages").insert({
       huddle_id: huddleId,
@@ -363,6 +366,9 @@ export function CreateSideHuddleScreen() {
               onChangeText={setName}
               maxLength={50}
               autoFocus
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
+              blurOnSubmit
               className="rounded-[14px] px-4"
               style={{
                 color: colors.foreground,
@@ -389,8 +395,8 @@ export function CreateSideHuddleScreen() {
             )}
             <Type variant="caption" tone="muted">
               {askToJoin
-                ? "Private — you approve everyone. Invites and requests to join."
-                : "Friends can jump in. Strangers can't find it."}
+                ? "Locked — invitation and request to join only."
+                : "Your friends can walk straight in."}
             </Type>
           </View>
 
@@ -430,6 +436,7 @@ export function CreateSideHuddleScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
           >
             <Pressable
@@ -439,7 +446,10 @@ export function CreateSideHuddleScreen() {
                   ? "bg-primary"
                   : "border border-border bg-transparent",
               )}
-              onPress={() => setFilterLeague(null)}
+              onPress={() => {
+                Keyboard.dismiss();
+                setFilterLeague(null);
+              }}
             >
               <Type variant="data" tone={!filterLeague ? "onPrimary" : "muted"}>
                 All
@@ -454,7 +464,10 @@ export function CreateSideHuddleScreen() {
                     ? "bg-primary"
                     : "border border-border bg-transparent",
                 )}
-                onPress={() => setFilterLeague(filterLeague === l ? null : l)}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setFilterLeague(filterLeague === l ? null : l);
+                }}
               >
                 <Type variant="data" tone={filterLeague === l ? "onPrimary" : "muted"}>
                   {l}
@@ -466,6 +479,7 @@ export function CreateSideHuddleScreen() {
 
         {/* Team grid */}
         <ScrollView
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
             flexDirection: "row",
             flexWrap: "wrap",
@@ -486,7 +500,13 @@ export function CreateSideHuddleScreen() {
                     ? "border-primary bg-primary/10"
                     : "border-border bg-card",
                 )}
-                onPress={() => setSelectedTeamId(selected ? null : team.id)}
+                onPress={() => {
+                  // The name field autofocuses, so the keyboard is up when you
+                  // reach the grid. Without this it stayed up over the teams
+                  // and the first tap was spent dismissing it.
+                  Keyboard.dismiss();
+                  setSelectedTeamId(selected ? null : team.id);
+                }}
               >
                 <View className="relative">
                   <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted">
@@ -529,13 +549,16 @@ export function CreateSideHuddleScreen() {
       <View className="absolute bottom-0 left-0 right-0 border-t border-border bg-background px-4 pb-8 pt-4">
         <View className="mb-3 flex-row items-center justify-between">
           <View className="flex-1 pr-3">
+            {/* The heading is the room's tier, not the name of the switch. A
+                label that says "Private" while the room is the friends-tier
+                one describes the control instead of the thing being made. */}
             <Type variant="captionStrong">
-              Private
+              {askToJoin ? "Locked" : "Friends"}
             </Type>
             <Type variant="caption" tone="muted">
               {askToJoin
-                ? "You approve everyone — invites and requests to join."
-                : "Off: your friends walk straight in. Nobody else can find it."}
+                ? "Invitation and request to join only."
+                : "Your friends can walk straight in."}
             </Type>
           </View>
           <Switch
