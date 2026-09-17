@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useCanonical } from '@/hooks/useCanonical';
 
 /**
  * ONE SPONSOR PAGE, personalised by ?team=slug.
@@ -15,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
  * no cheaper option to fall back to, which is the point: exclusivity is the
  * product rather than an upsell.
  *
- * NO TEAM LOGOS ANYWHERE. Team colours and the city name are ours to write;
+ * NO TEAM LOGOS ANYWHERE. Team colors and the city name are ours to write;
  * the marks are not.
  */
 
@@ -58,7 +59,7 @@ const PACKAGE = [
   {
     title: 'Co-branded shirts',
     body:
-      'Shirts in the team’s colours carrying both names. You cover roughly $10–$15 a shirt.',
+      'Shirts in the team’s colors carrying both names. You cover roughly $10–$15 a shirt.',
   },
   {
     title: 'The rate, locked',
@@ -68,6 +69,10 @@ const PACKAGE = [
 ];
 
 export default function Sponsor() {
+  // One sponsor page. ?team= personalises it; it does not make a new document,
+  // so every variant points at /sponsor.
+  useCanonical('/sponsor');
+
   const [params] = useSearchParams();
   const slug = (params.get('team') || '').trim();
   const paid = params.get('paid') === '1';
@@ -99,8 +104,8 @@ export default function Sponsor() {
     );
   }, [slug, teams]);
 
-  const teamLabel = team ? `${team.city} ${team.name}` : null;
-  const fansLabel = teamLabel ?? 'your team’s';
+  // The database row when we have it, the slug's own words until then.
+  const teamLabel = team ? `${team.city} ${team.name}` : labelFromSlug(slug);
 
   const claim = async () => {
     setBusy(true);
@@ -112,8 +117,18 @@ export default function Sponsor() {
           body: {
             businessName: brand.trim(),
             website: site.trim(),
-            teams: team
-              ? [{ teamKey: `${team.id}:founding`, teamName: teamLabel, league: team.league }]
+            // The slug is enough to sell against. Waiting for the teams
+            // table would mean the button above the fold does nothing for the
+            // first second of the page's life, which is the second it is most
+            // likely to be pressed.
+            teams: teamLabel
+              ? [
+                  {
+                    teamKey: `${team?.id ?? slug}:founding`,
+                    teamName: teamLabel,
+                    league: team?.league ?? null,
+                  },
+                ]
               : [],
           },
         },
@@ -155,21 +170,31 @@ export default function Sponsor() {
             : <>Back your team’s fans on Side Huddle.</>}
         </h1>
         <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/75">
-          Side Huddle is where fans watch the game together in a private room with
-          their own people. One business per team becomes its founding partner —
-          the name attached to those fans from the start.
+          Side Huddle is where fans watch the game together — their crew, with
+          the score and the news landing in the room as it happens. One business
+          per team becomes its founding partner, the name attached to those fans
+          from the start.
         </p>
         <p className="mt-4 text-lg font-bold">
           {SEASON_PRICE} for the season, flat.
         </p>
+        <p className="mt-1.5 text-sm text-white/60">
+          The founding window closes around Week 8. After that it is a waitlist.
+        </p>
 
+        {/* THE BUY BUTTON IS THE ACTION, not a jump link to a form that had
+            no button in it. Self-serve funnel: above the fold and again in the
+            claim section, both going to checkout. */}
         <div className="mt-7 flex flex-wrap items-center gap-3">
-          <a
-            href="#claim"
-            className="rounded-lg bg-[#FFD700] px-5 py-3 font-black text-[#0A0A0C]"
+          <button
+            onClick={claim}
+            disabled={busy}
+            className="rounded-lg bg-[#FFD700] px-5 py-3 font-black text-[#0A0A0C] disabled:opacity-50"
           >
-            Claim {teamLabel ?? 'a team'}
-          </a>
+            {busy
+              ? 'Opening checkout…'
+              : `Claim ${teamLabel ?? 'a team'} — ${SEASON_PRICE}`}
+          </button>
           <a
             href={APP_STORE_URL}
             className="rounded-lg border border-white/15 px-5 py-3 font-semibold text-white/85"
@@ -179,7 +204,9 @@ export default function Sponsor() {
         </div>
 
         <h2 className="mt-16 text-2xl font-black">What a founding partner gets</h2>
-        <ol className="mt-6 space-y-6">
+        {/* An <ol> numbers its own items, so printing "01" inside each one
+            rendered "1. 01". This is a plain list and the number is drawn once. */}
+        <ul className="mt-6 space-y-6">
           {PACKAGE.map((item, i) => (
             <li key={item.title} className="border-t border-white/10 pt-5">
               <p className="font-mono text-[11px] tracking-[0.14em] text-white/40">
@@ -189,19 +216,13 @@ export default function Sponsor() {
               <p className="mt-1.5 leading-relaxed text-white/70">{item.body}</p>
             </li>
           ))}
-        </ol>
+        </ul>
 
         <div id="claim" className="mt-16 rounded-2xl border border-white/12 p-6">
           <h2 className="text-2xl font-black">
             Claim {teamLabel ?? 'your team'}
           </h2>
-          {!team ? (
-            <p className="mt-2 text-sm text-white/60">
-              Open this page from your team’s link, or tell me which team and
-              I’ll send it: ty@sidehuddlesports.com
-            </p>
-          ) : (
-            <>
+          <>
               <p className="mt-2 text-sm text-white/60">
                 {SEASON_PRICE} for the {new Date().getFullYear()} season. Nothing owed later.
               </p>
@@ -227,8 +248,11 @@ export default function Sponsor() {
               >
                 {busy ? 'Opening checkout…' : `Claim it — ${SEASON_PRICE}`}
               </button>
-            </>
-          )}
+              {/* The fallback, and only the fallback. */}
+              <p className="mt-3 text-xs text-white/45">
+                Rather talk first? ty@sidehuddlesports.com
+              </p>
+          </>
         </div>
 
         <p className="mt-10 text-xs leading-relaxed text-white/40">

@@ -39,9 +39,14 @@ import { STORE_CAMPAIGN } from '@/lib/appStore';
 
 
 import LiveRoomWindow from '@/components/site/LiveRoomWindow';
+import { useCanonical } from "@/hooks/useCanonical";
 
 export default function TeamLanding() {
   const { slug = '' } = useParams();
+  // Lowercased on purpose: /t/Browns and /t/browns are one page and should
+  // name the same canonical, which is half of what the duplicate flag was
+  // complaining about.
+  useCanonical(`/t/${slug.toLowerCase()}`);
   const team = ALL_TEAMS[slug.toLowerCase()];
   if (!team) return <Navigate to="/" replace />;
   const { name, accent, ink } = team;
