@@ -310,9 +310,59 @@ serve(async (req) => {
   }
 
   try {
-    const { sequenceStep = 1, mode = "test", maxEmails = 40, campaign = "all", ids } = await req.json();
+    const { sequenceStep = 1, mode = "test", maxEmails = 40, campaign = "all", ids, testTo = null } = await req.json();
     const step = Number(sequenceStep);
     if (![1, 2, 3].includes(step)) return json({ error: "sequenceStep must be 1, 2, or 3" }, 400);
+
+    // ── mode "self": the real email to one address, and nothing else.
+    //
+    // Until now the only way to see what a sponsor actually receives was to
+    // send it to a sponsor. "test" returns text without sending, which cannot
+    // show how the subject reads in a crowded inbox or whether the text and
+    // HTML parts agree once a client has had them. This sends the genuine
+    // article to an address you control.
+    //
+    // It deliberately does NOT read or write sponsor_leads: nothing is marked
+    // emailed, no sequence advances, no real prospect is spent.
+    if (mode === "self") {
+      const to = String(testTo || "").trim();
+      if (!to.includes("@")) {
+        return json({ error: 'mode "self" needs testTo: "you@example.com"' }, 400);
+      }
+      const apiKeySelf = Deno.env.get("BREVO_API_KEY");
+      if (!apiKeySelf) return json({ error: "BREVO_API_KEY not configured" }, 500);
+
+      const sample = {
+        id: "self-test",
+        company: "Wally's Auto Group",
+        contact_name: "Dana Whitfield",
+        contact_email: to,
+        vertical: "auto dealer",
+        school: "Cleveland Browns",
+        market: "Cleveland, OH",
+        region: "OH",
+        sponsor_signal: null,
+        best_package: null,
+        best_angle: null,
+        domain: "wallysauto.com",
+        website: null,
+        sequence_step: step - 1,
+        emailed: false,
+      } as unknown as Lead;
+
+      const subj = subject(step, sample);
+      const text = body(step, sample);
+      await brevoSend(apiKeySelf, to, subj, text);
+      return json({
+        mode: "self",
+        step,
+        to,
+        subject: subj,
+        text,
+        note: "Real email sent. No sponsor_leads row was read or written.",
+      });
+    }
+
     const live = mode === "live";
     const cap = Math.min(Math.max(Number(maxEmails) || 40, 1), 200);
 
