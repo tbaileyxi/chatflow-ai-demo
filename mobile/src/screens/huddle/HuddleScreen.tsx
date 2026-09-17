@@ -817,6 +817,7 @@ export function HuddleScreen() {
                   isOwnMessage={msg.userId === user?.id}
                   huddleId={huddleId}
                   huddleName={huddle.name}
+                  huddleIsLocked={huddle.isPrivate}
                   reactions={reactionsMap?.get(msg.id)}
                   onReact={(emoji) =>
                     toggleReaction(msg.id, emoji, huddleId)

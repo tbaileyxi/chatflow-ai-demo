@@ -127,6 +127,8 @@ type Props = {
   isOwnMessage: boolean;
   huddleId: string;
   huddleName?: string;
+  /** Locked rooms share the moment but never the door — see handleShare. */
+  huddleIsLocked?: boolean;
   reactions?: ReactionSummary[];
   onReact?: (emoji: string) => void;
   onReply?: () => void;
@@ -197,6 +199,7 @@ export function ChatMessage({
   isOwnMessage,
   huddleId,
   huddleName,
+  huddleIsLocked = false,
   reactions,
   onReact,
   onReply,
@@ -455,9 +458,15 @@ export function ChatMessage({
     // from. Without it a clip, a take and a joke all previewed as the same room
     // background — the card showed the door instead of what was behind it. The
     // destination is unchanged: it still opens this room.
-    const roomUrl = huddleId
+    //
+    // EXCEPT FROM A LOCKED ROOM. There the deep link is a contradiction: the
+    // room exists because its owner approves every person who comes in, and a
+    // link that opens it is a way around the approval they set up. Sharing
+    // still works — you can send the moment to anyone — it just travels
+    // without the door. They get the app, and they still have to ask.
+    const roomUrl = huddleId && !huddleIsLocked
       ? `https://www.sidehuddlesports.com/h/${huddleId}?m=${message.id}`
-      : undefined;
+      : "https://www.sidehuddlesports.com";
     setTimeout(() => {
       Share.share({
         // The link goes in `url` ONLY. Putting it in the message as well made
