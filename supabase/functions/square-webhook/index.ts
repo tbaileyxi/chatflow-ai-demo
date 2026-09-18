@@ -119,20 +119,31 @@ serve(async (req) => {
       // team_key holds a teams.id uuid for anything bought through the current
       // board. Older rows key on "NFL|Chicago|Bears" and cannot be resolved to
       // a team, so they are skipped rather than guessed at.
-      const teamId = String(claim.team_key ?? "");
+      // Keys arrive as "<team uuid>:founding" (and older ones as "<uuid>:3" or
+      // "<uuid>:all"). Only the uuid half identifies the team. Reading the
+      // whole string as the id failed the uuid test on every new claim and
+      // skipped it — before the founding_partners row was ever written.
+      const teamId = String(claim.team_key ?? "").split(":")[0];
       const isUuid =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(teamId);
       if (!isUuid) {
         console.log(`Claim ${claim.id}: team_key "${teamId}" is not a team id — no sponsor row written`);
         continue;
       }
-      if (!claim.business_name || !claim.website) {
-        console.error(`Claim ${claim.id}: missing business_name/website, cannot create team_sponsors row`);
+      if (!claim.business_name) {
+        console.error(`Claim ${claim.id}: missing business_name, cannot record a partner`);
         continue;
       }
+      // The claim form no longer asks for a website. The legacy team_sponsors
+      // row needs a link to render, so it is skipped without one — but the
+      // founding_partners row below does not, and must never be skipped for
+      // lack of one. That table is what the product reads; a paid partner
+      // missing from it appears nowhere.
+      const hasSite = !!claim.website;
 
       // One active sponsor per team is enforced by a partial unique index, so
       // retire whatever was there before rather than colliding with it.
+      if (hasSite) {
       const { error: retireErr } = await supabase
         .from("team_sponsors")
         .update({ is_active: false })
@@ -152,6 +163,7 @@ serve(async (req) => {
 
       if (sponsorErr) console.error("team_sponsors insert error:", sponsorErr);
       else console.log(`${claim.business_name} is now live on ${claim.team_name}`);
+      }
 
       // AND THE TABLE THE PRODUCT ACTUALLY READS.
       //

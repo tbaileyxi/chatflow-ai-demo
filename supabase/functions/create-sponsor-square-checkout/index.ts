@@ -67,7 +67,7 @@ serve(async (req) => {
     // `exclusive` is still accepted and ignored: every partnership is
     // exclusive now, and an old page or a stale tab sending it should not be
     // charged differently for saying so.
-    const { teams, businessName, website } = await req.json();
+    const { teams, businessName, website, contactName, email } = await req.json();
     if (!Array.isArray(teams) || teams.length === 0) {
       return json({ error: "Select at least one team." }, 400);
     }
@@ -78,9 +78,16 @@ serve(async (req) => {
     const brand = String(businessName || "").trim();
     const site = String(website || "").trim();
     if (!brand) return json({ error: "Add your business name." }, 400);
-    if (!site) return json({ error: "Add your website." }, 400);
+    // Website is optional now: the claim form asks for a name and an email,
+    // which is what it takes to reach somebody, and a business with no site is
+    // still a business.
+    const who = String(contactName ?? "").trim();
+    const mail = String(email ?? "").trim();
+    if (!who) return json({ error: "Add your name." }, 400);
+    if (!mail || !mail.includes("@")) return json({ error: "Add an email we can reach you at." }, 400);
     // Accept "murphys.com" as well as a full URL — nobody types https://.
-    const siteUrl = /^https?:\/\//i.test(site) ? site : `https://${site}`;
+    // Empty stays empty — "https://" on its own is not a website.
+    const siteUrl = !site ? null : /^https?:\/\//i.test(site) ? site : `https://${site}`;
 
     const cleanTeams = teams.map((team: unknown) => {
       const candidate = team as { teamKey?: unknown; teamName?: unknown; league?: unknown };
@@ -97,7 +104,8 @@ serve(async (req) => {
     const accessToken = Deno.env.get("SQUARE_ACCESS_TOKEN");
     const locationId = Deno.env.get("SQUARE_LOCATION_ID");
     if (!accessToken || !locationId) {
-      return json({ error: "Square is not configured yet (missing SQUARE_ACCESS_TOKEN / SQUARE_LOCATION_ID)." }, 500);
+      console.error("Square is not configured: missing SQUARE_ACCESS_TOKEN / SQUARE_LOCATION_ID");
+      return json({ error: "Checkout is down for a moment. Email ty@sidehuddlesports.com and it'll be sorted today." }, 500);
     }
     const squareBase = (Deno.env.get("SQUARE_ENV") || "sandbox") === "production"
       ? "https://connect.squareup.com"
@@ -115,7 +123,7 @@ serve(async (req) => {
 
     if (availabilityError) {
       console.error("Sponsor availability check failed:", availabilityError);
-      return json({ error: "Could not verify team availability." }, 500);
+      return json({ error: "Couldn't check that team just now. Try again in a minute." }, 500);
     }
     if (unavailable?.length) {
       return json({
@@ -156,7 +164,7 @@ serve(async (req) => {
         // Team list is recorded on the order note so you can see what was bought.
         // The teams ride on the order note, so a payment is always matchable
         // to the slots it bought without asking the buyer to say it twice.
-        payment_note: `founding partner · season · ${teamList}`.slice(0, 500),
+        payment_note: `founding partner · ${teamList} · ${who} <${mail}>`.slice(0, 500),
       }),
     });
 
@@ -181,6 +189,7 @@ serve(async (req) => {
       // One plan exists now. The column stays so old rows still read.
       plan: "founding",
       business_name: brand,
+      sponsor_email: mail,
       website: siteUrl,
       amount_paid_cents: 0,   // set by square-webhook when the payment lands
       balance_due_cents: 0,   // nothing owed later — $2,500 is the whole price
