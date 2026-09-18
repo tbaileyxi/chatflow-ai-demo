@@ -19,6 +19,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { Type, SectionLabel } from "@/components/ui/Type";
 import { useAuth } from "@/hooks/useAuth";
 import { useInAppNotifications } from "@/hooks/useInAppNotifications";
+import { primaryTeamSlug } from "@/lib/follows";
 import type { NotificationGroup } from "@/hooks/useInAppNotifications";
 import { consumeInvite, extractInviteCode } from "@/hooks/useInviteHandler";
 import { useProfile } from "@/hooks/useProfile";
@@ -665,11 +666,16 @@ export function ProfileScreen() {
             )}
             <Button
               variant="outline"
-              onPress={() =>
-                Linking.openURL("https://www.sidehuddlesports.com/sponsors").catch(
-                  () => {},
-                )
-              }
+              // Safari, not an in-app webview: the page ends in a checkout, and
+              // a card number belongs in the browser people already trust.
+              // Preselects their first team; no team, no ?team=.
+              onPress={async () => {
+                const slug = await primaryTeamSlug().catch(() => null);
+                const url = slug
+                  ? `https://www.sidehuddlesports.com/sponsor?team=${slug}`
+                  : "https://www.sidehuddlesports.com/sponsor";
+                Linking.openURL(url).catch(() => {});
+              }}
             >
               <View className="flex-row items-center gap-2">
                 <Megaphone color={colors.primary} size={16} />

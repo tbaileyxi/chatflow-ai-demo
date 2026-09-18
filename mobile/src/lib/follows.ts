@@ -76,3 +76,32 @@ export async function unfollowTeam(teamId: string): Promise<boolean> {
   }
   return true;
 }
+
+/**
+ * The /sponsor slug for someone's primary team — the first team they picked,
+ * which is the earliest follow. Null when they follow nothing.
+ *
+ * Built from city and name the same way the sponsor page and founding_partners
+ * build it ("buffalo-bills"), because a slug made any other way silently misses.
+ */
+export async function primaryTeamSlug(): Promise<string | null> {
+  // Filtered to this user explicitly: user_follows is readable by everyone
+  // (SELECT USING true), so without it this returns the earliest follow in the
+  // whole app rather than theirs.
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth?.user?.id;
+  if (!uid) return null;
+  const { data } = await supabase
+    .from("user_follows")
+    .select("created_at, teams!team_id (city, name)")
+    .eq("user_id", uid)
+    .order("created_at", { ascending: true })
+    .limit(1);
+  const team = (data?.[0] as any)?.teams;
+  if (!team?.name) return null;
+  return `${team.city ?? ""} ${team.name}`
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
