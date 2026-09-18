@@ -106,6 +106,7 @@ serve(async (req) => {
     x_fallback_posts: 0,
     covered_targets: 0,
     plays_scoring: 0,      // plays the provider says put points on the board
+    voice_skipped_stale: 0, // takes dropped for being older than the shelf life
     gate_candidates: 0,    // what gateEvents returned, BEFORE dedupe
     deduped_out: 0,        // dropped because that score state already posted
     posts: 0,
@@ -669,7 +670,29 @@ serve(async (req) => {
             // fixed share of plays — a blowout produces almost none and a
             // one-score fourth quarter produces most of them.
             const VOICE_MIN = Number(Deno.env.get("INGAME_VOICE_MIN") || 70);
-            const worthAVoice = (g.facts.excitementScore ?? 0) >= VOICE_MIN;
+
+            // LATE COMMENTARY IS WORSE THAN NO COMMENTARY.
+            //
+            // The poller ticks on a schedule, the model takes time to answer,
+            // and a take on a play from five minutes ago lands in a room that
+            // has moved two drives on. It does not read as slow; it reads as
+            // stupid, and it is the single thing that makes the bot look like
+            // it is not watching.
+            //
+            // The FACTUAL line still posts however old it is — catching up on
+            // what happened is useful. Only the opinion is dropped, because an
+            // opinion has a shelf life and a score does not.
+            const playAgeMs = g.play.occurredAt
+              ? Date.now() - Date.parse(g.play.occurredAt)
+              : 0;
+            const VOICE_MAX_AGE_MS =
+              Number(Deno.env.get("INGAME_VOICE_MAX_AGE_SEC") || 150) * 1000;
+            const tooLateToTalk =
+              Number.isFinite(playAgeMs) && playAgeMs > VOICE_MAX_AGE_MS;
+
+            const worthAVoice =
+              (g.facts.excitementScore ?? 0) >= VOICE_MIN && !tooLateToTalk;
+            if (tooLateToTalk) summary.voice_skipped_stale = (summary.voice_skipped_stale ?? 0) + 1;
 
             // Real box-score stat leaders for ALL sports (ESPN). This is the
             // smart-bot fuel: "Brunson 31 PTS, 7 AST" / "Soto 3 H, 2 RBI".

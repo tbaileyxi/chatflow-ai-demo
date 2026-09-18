@@ -323,12 +323,30 @@ function bigNonScoringMoment(
   // the bot having an opinion. That is the whole point: more plays, not more
   // narration.
   //
-  // TIGHT ON PURPOSE. First downs are excluded, and they are the reason —
-  // roughly forty a game, one every ninety seconds, which would push the
-  // actual conversation off the screen. A bot that narrates every snap gets
-  // muted, and then it never gets to say the thing that mattered. They can be
-  // added here later; they cannot be un-muted later.
+  // TIGHT ON PURPOSE. First downs are STILL excluded — roughly forty a game,
+  // one every ninety seconds, which would push the actual conversation off the
+  // screen. A bot that narrates every snap gets muted, and then it never gets
+  // to say the thing that mattered. The tier below fills the gap between
+  // scores without going that far: explosive gains and third downs are perhaps
+  // a dozen a game, and each one is a thing somebody in the room would say out
+  // loud.
   if (/\bsack(ed)?\b/.test(t)) return { note: "Sack", weight: 45 };
+  // A DRIVE, NOT JUST ITS ENDING.
+  //
+  // Buffalo scored at 8:28, 8:42 and 9:04 and the room heard nothing in
+  // between — twenty minutes of silence three times over, because everything
+  // between touchdowns was filtered out. A gamecast that only speaks when
+  // points change is a scoreboard, and the room already has one at the top of
+  // the screen.
+  //
+  // These are the plays that move a drive rather than end it. Still under the
+  // voice threshold, so they arrive as the provider's own sentence and never
+  // as the bot having a take about a 12-yard completion.
+  const gain = /\bfor (\d{1,3}) yard/.exec(t);
+  if (gain && Number(gain[1]) >= 20) {
+    return { note: `${gain[1]}-yard gain`, weight: 50 };
+  }
+  if (/\b3rd down\b|\bthird down\b/.test(t)) return { note: "Third down", weight: 45 };
   if (/\b4th down\b|\bfourth down\b/.test(t)) return { note: "Fourth down", weight: 55 };
   if (/\bfield goal\b.*\b(no good|missed|blocked)\b/.test(t)) {
     return { note: "Missed field goal", weight: 60 };
