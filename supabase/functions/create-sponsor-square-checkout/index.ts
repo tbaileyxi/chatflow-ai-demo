@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { seasonPriceCents } from "../_shared/founding.ts";
 
 // Sponsor checkout via Square Payment Links (Online Checkout).
 //
@@ -42,13 +43,11 @@ const corsHeaders = {
  * upsell and no second number to explain. No prorating, whenever in the season
  * it is bought.
  *
- * $500 is the founding rate (the page shows $2,500 struck through). Change it
- * here and in PRICE on src/pages/Sponsor.tsx together.
+ * $500 until the founding deadline, $2,500 after — read at the moment of
+ * checkout from _shared/founding.ts, so the charge flips on its own.
  */
-const SEASON_PRICE_CENTS = 50000;
-
 function totalCents(count: number) {
-  return count * SEASON_PRICE_CENTS;
+  return count * seasonPriceCents();
 }
 
 serve(async (req) => {

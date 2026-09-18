@@ -19,13 +19,13 @@ Founding sponsors get all three placements per team:
 2. **One sponsored message/week** in team feed (with optional QR / promo code)
 3. **"Powered by [Brand]"** attribution on every AI bot card across every huddle
 
-**Pricing:** $250/mo per team. Bundles: 3/$650, 6/$1,200, 10+/$1,800 ($180/team floor). Exclusive — one sponsor per team. Founding rate locked through first active season.
+**Pricing:** $500 founding rate for the season. One partner per team. (After the founding deadline, $2,500 flat for the season. Never mention rate locks, multi-season locks, or first refusal.)
 
 **Media-buy framing (the essence — lead with this):** Side Huddle is **the best media buy in sports for reaching a single team's most engaged fans, dollar-for-dollar**. Compare:
 - Local radio spot: $500–1,500/week — one-shot, untargeted, no attribution
 - Local TV: $2,000–5,000 — mass, untargeted, no attribution
 - Stadium signage: $50K+/season — passive, no engagement
-- **Side Huddle: hundreds of live in-conversation impressions per game, all season, per-team exclusive, native "Powered by [Brand]" attribution on every bot card — starting at $250/team/mo.**
+- **Side Huddle: hundreds of live in-conversation impressions per game, all season, per-team exclusive, native "Powered by [Brand]" attribution on every bot card — $500 founding rate for the season.**
 
 Every first DM and email **must frame this as a media-buy upgrade, not a sponsorship ask**. The prospect is already spending on radio / local TV / digital — Side Huddle just outperforms those line items per dollar for the team's fanbase.
 

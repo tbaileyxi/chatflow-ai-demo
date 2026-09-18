@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { priceLine } from "@/lib/founding";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -272,7 +273,7 @@ export default function WorkPanel() {
   // The email itself, before it goes anywhere.
   //
   // Nothing on this page has ever shown the letter, which is why "first letter"
-  // means nothing and why a $2,500 price sat in it for weeks after the offer
+  // means nothing and why an old price sat in it for weeks after the offer
   // became $100. The send function already builds a preview in test mode; it
   // was simply never displayed.
   const [preview, setPreview] = useState<{ subject: string; text: string; to: string; n: number } | null>(null);
@@ -630,7 +631,7 @@ export default function WorkPanel() {
               title="Local businesses"
               done={progress[place.key]?.has("business")}
               onDone={() => markDone(place.key, "business", 0)}
-              why="One founding partner per team, per season. $2,500 flat."
+              why={priceLine()}
               rows={place.businesses.map((s) => rowFromSponsor(s))}
               busy={busy}
               onSend={(ids, step) => send("sponsors", ids, step)}

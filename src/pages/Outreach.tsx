@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { priceLine } from "@/lib/founding";
 import { Download, Mail, MapPin, RefreshCw, Search, Trash2, Copy, AtSign } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -641,9 +642,9 @@ export default function Outreach() {
       `Subject: ${pitchSubject(l)}`,
       `Hi ${who},`,
       `Side Huddle is where ${where} fans watch the game together — a private room with their own people, the score and the news landing in it as it happens.`,
-      `I am taking one founding partner per team per season, and ${l.company} would be it for ${where}. Nobody else in your category, this season or while you keep it.`,
+      `I am taking one founding partner per team per season, and ${l.company} would be it for ${where}. Nobody else in your category this season.`,
       `What that is: founding partner status and the launch story that goes with it; a pregame card in the room when the game starts, carrying a small "powered by"; the same line under the clips fans post of themselves watching; and co-branded shirts in the team's colours.`,
-      `$2,500 for the season, flat. The founding rate is locked for three seasons and you get first refusal after that.`,
+      priceLine(),
       link,
       `Ty`,
     ].join("\n\n");

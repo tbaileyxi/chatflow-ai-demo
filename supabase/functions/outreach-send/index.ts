@@ -19,9 +19,11 @@ const SCHOOL_PARTNER_VERTICAL = "school partner";
 // each of which outlived the page it linked to — an email quoting a price the
 // landing page contradicts loses a buyer who was otherwise ready.
 //
-// One founding partner per team per season, category exclusive. $2,500 flat,
-// no prorating, no deposit, no tiers to explain.
-const SEASON_PRICE = "$2,500";
+// One founding partner per team per season, category exclusive. One price,
+// no prorating, no deposit, no tiers to explain: $500 at the founding rate,
+// $2,500 after the deadline. priceLine() flips on its own; the page and the
+// checkout read the same deadline.
+import { priceLine } from "../_shared/founding.ts";
 
 
 // Trademark posture: we describe who the fans are, never claim affiliation.
@@ -182,7 +184,7 @@ function sponsorLink(lead: Lead): string {
  * something to somebody local, and every word of it is true today.
  *
  * PLAIN TEXT IS THE EMAIL. The HTML is generated from this, so the preview and
- * the send cannot drift apart. A one-to-one letter about a $2,500 handshake
+ * the send cannot drift apart. A one-to-one letter about a single-team handshake
  * should not arrive as a newsletter with a button in it.
  *
  * No audience numbers, no impressions, never "official" — the disclaimer at
@@ -201,7 +203,7 @@ function body(step: number, lead: Lead): string {
     return [
       `Hi ${firstName(lead)},`,
       `The founding partner slot for ${team} is still open \u2014 no other ${category} has it.`,
-      `${SEASON_PRICE} flat for the season, rate locked for three.`,
+      priceLine(),
       link,
       `Ty`,
       DISCLAIMER,
@@ -223,7 +225,7 @@ function body(step: number, lead: Lead): string {
   return [
     `Hi ${firstName(lead)},`,
     `One business per team becomes the founding partner of ${team} fans on Side Huddle \u2014 the name attached to them from day one. That only happens once.`,
-    `I'm holding the ${team} slot for one ${category}. ${SEASON_PRICE} flat for the season, rate locked for three, first refusal after that.`,
+    `I'm holding the ${team} slot for one ${category}. ${priceLine()}`,
     link,
     `Ty`,
     DISCLAIMER,

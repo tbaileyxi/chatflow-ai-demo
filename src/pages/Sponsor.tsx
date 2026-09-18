@@ -2,23 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useCanonical } from '@/hooks/useCanonical';
+import { FOUNDING_END, FOUNDING_PRICE, LIST_PRICE, isFoundingOpen } from '@/lib/founding';
 
 /**
  * ONE SPONSOR PAGE, personalised by ?team=slug.
  *
- * Sells one thing: a founding partner per team per season, at the founding
- * rate ($500, with the $2,500 list price struck through). The
+ * Sells one thing: a partner per team per season. Until the founding deadline
+ * (src/lib/founding.ts) that is $500 with $2,500 struck through; after it the
+ * page flips on its own to $2,500 flat and says the window has closed. The
  * partner's name sits under every reaction clip fans post and on the pregame
  * card at kickoff — and nowhere else. No logos (the marks are not ours), no
  * audience numbers (we do not have them), never "official" (we are not).
  */
-
-/** When the founding rate ends, Eastern time. Change this one line to move it. */
-const FOUNDING_DEADLINE = '2026-10-02T23:59:59-04:00';
-
-/** Per team. PRICE must match SEASON_PRICE_CENTS in create-sponsor-square-checkout. */
-const LIST_PRICE = 2500;
-const PRICE = 500;
 
 const AUDIENCE = ['Alumni', 'Fraternities', 'Influencers', 'Tailgate groups', 'Fan club chapters'];
 
@@ -72,8 +67,31 @@ const PACKAGE = [
   'Co-branded shirts in the team\u2019s colors.',
 ];
 
+/**
+ * True until the founding deadline, then false — flipping while the page is
+ * open, so nobody sits on a $500 page after the window has shut. Re-armed at
+ * most a day at a time (a timer cannot be set weeks out).
+ */
+function useFoundingOpen(): boolean {
+  const [open, setOpen] = useState(() => isFoundingOpen());
+  useEffect(() => {
+    if (!open) return;
+    let t: ReturnType<typeof setTimeout>;
+    const arm = () => {
+      const ms = FOUNDING_END - Date.now();
+      if (ms <= 0) return setOpen(false);
+      t = setTimeout(arm, Math.min(ms + 50, 86_400_000));
+    };
+    arm();
+    return () => clearTimeout(t);
+  }, [open]);
+  return open;
+}
+
 export default function Sponsor() {
   useCanonical('/sponsor');
+  const open = useFoundingOpen();
+  const PRICE = open ? FOUNDING_PRICE : LIST_PRICE;
 
   const [params] = useSearchParams();
   const slug = (params.get('team') || '').trim().toLowerCase();
@@ -288,9 +306,18 @@ export default function Sponsor() {
           </p>
 
           <div className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1 sm:mt-7">
-            <s className="text-2xl font-bold text-white/45 decoration-white/70">{money(LIST_PRICE)}</s>
-            <span className="text-5xl font-black leading-none text-[#FFD60A]">{money(PRICE)}</span>
-            <span className="text-base font-semibold text-white">Founding rate — one per team.</span>
+            {open ? (
+              <>
+                <s className="text-2xl font-bold text-white/45 decoration-white/70">{money(LIST_PRICE)}</s>
+                <span className="text-5xl font-black leading-none text-[#FFD60A]">{money(FOUNDING_PRICE)}</span>
+                <span className="text-base font-semibold text-white">Founding rate — one per team.</span>
+              </>
+            ) : (
+              <>
+                <span className="text-5xl font-black leading-none text-[#FFD60A]">{money(LIST_PRICE)}</span>
+                <span className="text-base font-semibold text-white">Flat for the season — one per team.</span>
+              </>
+            )}
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 sm:mt-6">
@@ -301,7 +328,11 @@ export default function Sponsor() {
             >
               Claim your team
             </button>
-            <Countdown />
+            {open ? (
+              <Countdown />
+            ) : (
+              <p className="text-sm font-semibold text-[#FFD60A]">The founding window has closed.</p>
+            )}
           </div>
         </div>
       </section>
@@ -544,7 +575,7 @@ function Field({
 
 /** Time left on the founding rate. Renders nothing once the deadline passes. */
 function Countdown() {
-  const end = useMemo(() => Date.parse(FOUNDING_DEADLINE), []);
+  const end = FOUNDING_END;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
