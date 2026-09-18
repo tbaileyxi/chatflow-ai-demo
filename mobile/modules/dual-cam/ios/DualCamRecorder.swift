@@ -68,7 +68,9 @@ final class DualCamRecorder: NSObject {
   /// False: back camera is the frame, your face is the inset. True swaps
   /// them. Set from JS by the flip button on the capture screen, and read on
   /// the buffer queue, so it has to be atomic with respect to it.
-  var swapped = false
+  /// Selfie leads. See DualCamScreen: the reaction is the thing only this
+  /// person can film; the game is on television.
+  var swapped = true
 
   private var latestFrontImage: CIImage?
   /// The newest back frame, kept so a still can be taken without spinning up a

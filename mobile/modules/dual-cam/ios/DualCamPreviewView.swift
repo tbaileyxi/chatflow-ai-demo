@@ -18,7 +18,7 @@ final class DualCamPreviewView: ExpoView {
   private let frontFrame = UIView()
   /// Mirrors DualCamRecorder.swapped. The preview has to agree with the
   /// composite or people frame a shot that comes out inverted.
-  var swapped = false { didSet { setNeedsLayout() } }
+  var swapped = true { didSet { setNeedsLayout() } }
 
   required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)

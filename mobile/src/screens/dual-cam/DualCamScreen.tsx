@@ -31,8 +31,9 @@ const TAP_MS = 350;
  * has trained people — press, film, release — because that is what a
  * three-second reaction wants.
  *
- * The back camera is the frame and your face sits in the corner, the same
- * arrangement the recorder composites, so what you line up is what you get.
+ * Your face is the frame and the game sits in the corner, the same arrangement
+ * the recorder composites, so what you line up is what you get. The swap button
+ * puts the field back in front for anyone who wants it that way.
  *
  * The score line sits under the preview rather than over it. It is burned into
  * the message, not the video: rendering it into the frame would bake a
@@ -48,7 +49,14 @@ export function DualCamScreen() {
   const [recording, setRecording] = useState(false);
   /** Which camera is the frame. Back by default — the game is the subject,
       your face is the reaction to it. */
-  const [swapped, setSwapped] = useState(false);
+  // SELFIE IN FRONT BY DEFAULT.
+  //
+  // The back camera was the frame and the face was the corner inset, which is
+  // the arrangement every camera app uses and the wrong one here: the thing
+  // nobody else can film is the person's reaction, and the game is on
+  // television. The face leads, the game sits in the corner, and the swap
+  // button still puts it back for anyone who wants the field big.
+  const [swapped, setSwapped] = useState(true);
   const [elapsed, setElapsed] = useState(0);
 
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -92,6 +100,16 @@ export function DualCamScreen() {
       DualCam.dismiss();
     };
   }, [navigation]);
+
+  // The recorder starts at its own default, and the screen's state is only
+  // pushed across when somebody taps swap — so a default set in one place and
+  // not the other composites a video that does not match the preview. Say it
+  // once on mount.
+  useEffect(() => {
+    DualCam.setSwapped(swapped);
+    // Mount only: every later change goes through the button, which sets both.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const hand = useCallback(
     (uri: string, isVideo: boolean) => {

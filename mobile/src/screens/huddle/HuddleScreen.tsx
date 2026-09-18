@@ -264,6 +264,7 @@ export function HuddleScreen() {
   // fixture room that belongs to both teams, not behind a locked door, not in
   // a DM between two people.
   const partnerName = useFoundingPartner({
+    teamCity: huddle?.teamCity ?? null,
     teamName: huddle?.teamName ?? null,
     eligible: !!huddle && !huddle.isGameRoom && !huddle.isPrivate && !huddle.isDm,
   });

@@ -13,10 +13,22 @@ import { supabase } from "@/integrations/supabase/client";
  *   - DMs are two people.
  */
 export function useFoundingPartner(params: {
+  /** The team's city — "Buffalo". Required: see the slug note below. */
+  teamCity: string | null | undefined;
+  /** The team's name — "Bills". */
   teamName: string | null | undefined;
   eligible: boolean;
 }): string | null {
-  const slug = (params.teamName ?? "")
+  // ONE SLUG FORMAT, BUILT IN ONE PLACE.
+  //
+  // This used to take teamName alone, which is "Bills", and looked up "bills".
+  // The rows are keyed "buffalo-bills" — city and name — which is what the
+  // pregame card function builds and what /sponsor?team= uses. So the card
+  // found its partner and the caption never did, on every team, for photos and
+  // video alike. The two halves of one feature disagreed about the key.
+  const slug = [params.teamCity, params.teamName]
+    .filter(Boolean)
+    .join(" ")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
