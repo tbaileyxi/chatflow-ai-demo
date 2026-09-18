@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { kickoffLabel } from "@/lib/gameTime";
 import { supabase } from "@/integrations/supabase/client";
 import { gameStatusLabel } from "@/hooks/useRoomGames";
 import { makeTeamNamer } from "@/lib/teamName";
@@ -273,10 +274,7 @@ export function useAllGames(followedTeamIds: string[]) {
             ? gameStatusLabel(g.sport_key, g.period, g.clock)
             : final
               ? "FINAL"
-              : new Date(g.start_time).toLocaleTimeString("en-US", {
-                  hour: "numeric",
-                  minute: "2-digit",
-                }),
+              : kickoffLabel(g.start_time),
           home: side(g.home_team_id, live || final ? g.home_score : null),
           away: side(g.away_team_id, live || final ? g.away_score : null),
           yours:

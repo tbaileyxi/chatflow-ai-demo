@@ -64,6 +64,11 @@ export function teamAbbr(place: string | null | undefined): string {
   if (!p) return "TBD";
 
   const words = p.split(/\s+/).filter(Boolean);
+  // "Kansas State" is KSU and "Penn State" PSU on every scorebug; initials
+  // alone made them KS and PS, and put "MS at SC" in a room header.
+  if (words.length === 2 && /^state$/i.test(words[1])) {
+    return `${words[0].charAt(0)}SU`.toUpperCase();
+  }
   if (words.length > 1) {
     // "St. Louis" → STL, not SL: keep a leading initial's letters when the
     // word is an abbreviation already.

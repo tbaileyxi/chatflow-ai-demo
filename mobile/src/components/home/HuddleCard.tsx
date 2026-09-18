@@ -264,7 +264,8 @@ function ScoreStrip({ game, live }: { game: RoomGame; live: boolean }) {
       <Type
         variant="data"
         tone={live ? "primary" : "tertiary"}
-        style={{ marginLeft: "auto", fontSize: 10 }}
+        numberOfLines={1}
+        style={{ marginLeft: "auto", fontSize: 10, flexShrink: 0 }}
       >
         {game.statusLabel}
       </Type>

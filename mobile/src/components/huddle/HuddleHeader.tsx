@@ -10,6 +10,7 @@ import { Type } from "@/components/ui/Type";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/theme/type";
 import { teamAbbr } from "@/lib/teamName";
+import { kickoffLabel } from "@/lib/gameTime";
 import {
   useLiveGameContext,
   getGameState,
@@ -56,36 +57,6 @@ function PulsingDot() {
       style={{ opacity, width: 6, height: 6, borderRadius: 3, backgroundColor: "#EF4444" }}
     />
   );
-}
-
-function formatStartTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
-function formatNextGameDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const gameDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const diffDays = Math.round((gameDay.getTime() - today.getTime()) / 86400000);
-
-  const time = formatStartTime(dateStr);
-  if (diffDays === 0) return `Today ${time}`;
-  if (diffDays === 1) return `Tomorrow ${time}`;
-  // Weekday alone past tomorrow, and the date only once it is more than a
-  // week out. "Sun, Sep 20 4:25 PM" does not fit the header pill next to a
-  // room name and clipped to "Sun, Se…", which reads as a bug rather than a
-  // date. Inside a week, the weekday is the only part anybody uses.
-  const dayStr =
-    diffDays < 7
-      ? date.toLocaleDateString("en-US", { weekday: "short" })
-      : date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  return `${dayStr} ${time}`;
 }
 
 /**
@@ -170,21 +141,28 @@ function ScoreLine({ game, gameState }: { game: GameContext; gameState: GameStat
   if (gameState === "postgame") {
     return (
       <Type variant="caption" tone="muted" className="mt-0.5" numberOfLines={1}>
-        {away} <Type variant="dataStrong">{game.awayScore ?? 0}</Type>
+        {teamAbbr(away)} <Type variant="dataStrong">{game.awayScore ?? 0}</Type>
         {" · "}
-        {home} <Type variant="dataStrong">{game.homeScore ?? 0}</Type>
+        {teamAbbr(home)} <Type variant="dataStrong">{game.homeScore ?? 0}</Type>
         <Type variant="dataStrong" tone="success"> FINAL</Type>
       </Type>
     );
   }
 
-  // Caption, not data. Live state is numbers and belongs in mono; this line is
-  // two team names and a date, and mono made it wide enough to clip mid-date
-  // in the header pill — "Sun, Se…".
+  // THE TIME IS THE POINT OF THIS LINE, so it can never be the part that
+  // gets cut. It was one string — "Mississippi State at South Carolina ·
+  // Tomorrow 12:00 PM" — and the names ate the width until the time clipped
+  // to "T…". Scorebug abbreviations, as the live line already uses, and the
+  // time in its own piece that does not shrink.
   return (
-    <Type variant="caption" tone="muted" className="mt-0.5" numberOfLines={1}>
-      {away} at {home} · {formatNextGameDate(game.startTime)}
-    </Type>
+    <View className="mt-0.5 flex-row items-center">
+      <Type variant="caption" tone="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
+        {teamAbbr(away)} at {teamAbbr(home)}
+      </Type>
+      <Type variant="caption" tone="muted" numberOfLines={1} style={{ flexShrink: 0 }}>
+        {" · "}{kickoffLabel(game.startTime)}
+      </Type>
+    </View>
   );
 }
 
