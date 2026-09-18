@@ -186,8 +186,16 @@ export function useUserHuddles() {
         }
       }
 
+      // A SIDE HUDDLE PAST ITS 2AM IS OVER, in every list — Home, the swipe
+      // between rooms, anywhere this hook feeds. Only Home used to check, so
+      // closed rooms turned up again one swipe away.
+      const now = Date.now();
       return (memberships as any[])
         .filter((m) => m.huddles)
+        .filter((m) => {
+          const exp = (m.huddles as any).expires_at;
+          return !exp || new Date(exp).getTime() >= now;
+        })
         .map((m) => {
           const h = m.huddles as any;
           const team = h.teams;
