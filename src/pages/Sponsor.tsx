@@ -256,29 +256,46 @@ export default function Sponsor() {
       </section>
 
       <main className="mx-auto max-w-5xl px-5">
-        {/* [2] PRODUCT PREVIEW — two phones, chat open. No section label:
-            the phones and their captions carry it. */}
-        <section className="grid justify-items-center gap-12 py-12 md:grid-cols-2 md:items-start">
-          <figure className="m-0 w-full max-w-[330px]">
-            <PhoneFrame aspect="863 / 1196">
-              <ChatWithCard />
+        {/* [2] PRODUCT PREVIEW — two full-size phones on a real room (Bills
+            mafia, from the app). No section label: the phones and their
+            captions carry it. The gold boxes mark where the buyer's name goes. */}
+        <section className="grid justify-items-center gap-14 py-14 md:grid-cols-2 md:items-start">
+          <figure className="m-0 w-full max-w-[380px]">
+            <PhoneFrame>
+              <img
+                src="/sponsor/room-card-joes-cars.png"
+                alt="A Side Huddle room with the pregame card, powered by Joe's Cars"
+                className="block h-full w-full"
+              />
+              {/* The card lands at the bottom of the chat, above the composer.
+                  Box = the cleared chat area of the screenshot, in percent. */}
+              <div
+                className="absolute inset-x-[4%] flex flex-col justify-end pb-[3%]"
+                style={{ top: '39.33%', bottom: '14.4%' }}
+              >
+                <PregameCardPreview partner="Joe's Cars" callout />
+              </div>
             </PhoneFrame>
             <figcaption className="mt-5 text-center text-white/80">
               Your name on the pregame card at kickoff.
             </figcaption>
           </figure>
 
-          <figure className="m-0 w-full max-w-[330px]">
-            <PhoneFrame aspect="863 / 1196">
-              {/* The real in-app screenshot: a Tulane reaction clip in line in
-                  the chat, "powered by" under it. Only the black border around
-                  the export was trimmed so it fits the phone; every part of the
-                  chat is in it. */}
+          <figure className="m-0 w-full max-w-[380px]">
+            <PhoneFrame>
+              {/* A real room screenshot; the reaction clip in it is the
+                  Tulane dual-cam, with the app's powered-by line under it. */}
               <img
-                src="/sponsor/sponsor-clip-inapp-tulane.png"
-                alt="A reaction clip in line in a Side Huddle chat, with powered by Joe's Cars under it"
-                className="block h-full w-full object-cover"
+                src="/sponsor/room-clip-joes-cars.png"
+                alt="A reaction clip in a Side Huddle room, with powered by Joe's Cars under it"
+                className="block h-full w-full"
               />
+              {/* Around the powered-by line: measured from the image. */}
+              <div
+                className="pointer-events-none absolute rounded-md border-2 border-[#FFD60A]"
+                style={{ left: '22.6%', top: '81.3%', width: '37.4%', height: '2.35%', boxShadow: '0 0 16px rgba(255,214,10,0.5)' }}
+              />
+              <YourNameTag style={{ left: '61.6%', top: '82.47%', transform: 'translateY(-50%)' }} />
             </PhoneFrame>
             <figcaption className="mt-5 text-center text-white/80">
               Your name under every reaction clip.
@@ -449,54 +466,29 @@ function Field({
 }
 
 /**
- * An iPhone, drawn: bezel, rounded screen, dynamic island. Both surfaces sit
- * in one so they read as the same product side by side. Screen aspect matches
- * the screenshot (863×1196), so it shows uncropped.
+ * A full-size iPhone: bezel, rounded screen, dynamic island. The screen is the
+ * screenshot's own shape (1080×2334), so nothing in it is cropped.
  */
-function PhoneFrame({ aspect, children }: { aspect: string; children: React.ReactNode }) {
+function PhoneFrame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative rounded-[2.6rem] border border-white/15 bg-[#1A1A1D] p-[10px] shadow-[0_30px_70px_rgba(0,0,0,0.6)]">
-      <div className="relative overflow-hidden rounded-[2rem] bg-black" style={{ aspectRatio: aspect }}>
+    <div className="relative rounded-[3.4rem] bg-[#1C1C1F] p-[11px] shadow-[0_40px_90px_rgba(0,0,0,0.65)] ring-1 ring-white/15">
+      <div className="relative overflow-hidden rounded-[2.75rem] bg-black" style={{ aspectRatio: '1080 / 2334' }}>
         {children}
-        <div className="pointer-events-none absolute left-1/2 top-2 h-6 w-24 -translate-x-1/2 rounded-full bg-black" />
+        <div className="pointer-events-none absolute left-1/2 top-[1.1%] h-[3.3%] w-[31%] -translate-x-1/2 rounded-full bg-black" />
       </div>
     </div>
   );
 }
 
-/**
- * A room with the pregame card in it, the way the app shows it: the play feed
- * above, the card, a message under it, and the composer at the bottom. Styled
- * to sit beside the real screenshot without looking like a different product.
- */
-function ChatWithCard() {
+/** The gold tag that says what the boxed line is for. */
+function YourNameTag({ style, className = '' }: { style?: React.CSSProperties; className?: string }) {
   return (
-    <div className="flex h-full flex-col bg-[#0B0B0D] pt-10">
-      <div className="flex-1 space-y-3 overflow-hidden px-3">
-        <div className="rounded-[10px] border border-white/[0.07] border-l-[3px] border-l-[#FFD700]/60 bg-white/[0.035] px-3 py-2">
-          <p className="text-[12px] leading-snug text-[#8E8E98]">
-            (Shotgun) J.Goff pass short right to A.St. Brown for 9 yards.
-          </p>
-        </div>
-        <PregameCardPreview partner="Joe's Cars" />
-        <div className="flex items-start gap-2">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#C9A8F0] text-[11px] font-bold text-[#2a1a40]">
-            M
-          </div>
-          <p className="text-[13px] text-white/90">
-            <span className="font-semibold text-[#C9A8F0]">Marcus</span> 20 minutes, get in here
-          </p>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 border-t border-white/5 bg-[#101012] px-3 py-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-lg text-white/60">+</div>
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white">
-          <div className="h-4 w-4 rounded-full border-2 border-black" />
-        </div>
-        <p className="flex-1 text-[13px] text-white/35">Message…</p>
-        <div className="h-8 w-8 rounded-full bg-[#FFD700]/70" />
-      </div>
-    </div>
+    <span
+      className={`pointer-events-none absolute whitespace-nowrap rounded bg-[#FFD60A] px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#0A0A0A] shadow-[0_4px_14px_rgba(0,0,0,0.5)] ${className}`}
+      style={style}
+    >
+      Your name here
+    </span>
   );
 }
 
@@ -506,7 +498,7 @@ function ChatWithCard() {
  * and the one sponsor line. A real game. The sponsor line shows whatever
  * business name the reader has typed, so they see their own name in it.
  */
-function PregameCardPreview({ partner }: { partner: string }) {
+function PregameCardPreview({ partner, callout = false }: { partner: string; callout?: boolean }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-white/12 bg-[#16161A] shadow-[0_18px_40px_rgba(0,0,0,0.55)]">
       <div className="h-[3px] bg-[#FFD700]" />
@@ -523,8 +515,14 @@ function PregameCardPreview({ partner }: { partner: string }) {
         <Side abbr="BUF" name="Buffalo Bills" color="#00338D" />
       </div>
       <p className="px-4 pb-3.5 text-sm text-white/85">Bills at home in front of their own room.</p>
-      <div className="border-t border-white/[0.08] px-4 py-2.5">
-        <span className="font-mono text-[11px] tracking-wide text-white/50">powered by {partner}</span>
+      <div className="border-t border-white/[0.08] px-2 py-1.5">
+        <div
+          className={`relative flex items-center rounded-md border-2 px-2 py-1 ${callout ? 'border-[#FFD60A]' : 'border-transparent'}`}
+          style={callout ? { boxShadow: '0 0 16px rgba(255,214,10,0.5)' } : undefined}
+        >
+          <span className="font-mono text-[11px] tracking-wide text-white/60">powered by {partner}</span>
+          {callout ? <YourNameTag className="right-1.5 top-1/2 -translate-y-1/2" /> : null}
+        </div>
       </div>
     </div>
   );
