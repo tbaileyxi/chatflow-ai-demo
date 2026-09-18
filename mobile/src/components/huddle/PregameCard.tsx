@@ -23,8 +23,10 @@ export type PregameCardData = {
   kind: "pregame_card";
   week: string | null;
   kickoff: string;
-  home: { abbr: string; name: string };
-  away: { abbr: string; name: string };
+  // color and ink come from ESPN via the poster. Older cards have neither and
+  // render in grey, which is what every card did before.
+  home: { abbr: string; name: string; color?: string | null; ink?: string | null };
+  away: { abbr: string; name: string; color?: string | null; ink?: string | null };
   spread: string | null;
   total: string | null;
   hype: string | null;
@@ -111,9 +113,9 @@ export function PregameCard({ data, messageId }: { data: PregameCardData; messag
         className="mx-3 mb-3 mt-1 flex-row items-center gap-3 rounded-xl px-3 py-3"
         style={{ backgroundColor: "rgba(0,0,0,0.35)" }}
       >
-        <MatchupSide abbr={data.away.abbr} name={data.away.name} />
+        <MatchupSide side={data.away} />
         <Type variant="data" tone="muted" style={{ fontSize: 11 }}>at</Type>
-        <MatchupSide abbr={data.home.abbr} name={data.home.name} />
+        <MatchupSide side={data.home} />
       </View>
 
       {data.spread || data.total ? (
@@ -147,20 +149,24 @@ export function PregameCard({ data, messageId }: { data: PregameCardData; messag
   );
 }
 
-function MatchupSide({ abbr, name }: { abbr: string; name: string }) {
+function MatchupSide({ side }: { side: PregameCardData["home"] }) {
+  // The team's own color, from ESPN. Colors and a city abbreviation are ours to
+  // draw; a logo is not, and there is none here.
   return (
     <View className="flex-1 flex-row items-center gap-2">
       <View
         className="h-11 w-11 items-center justify-center rounded-lg"
         style={{
-          backgroundColor: colors.muted,
+          backgroundColor: side.color ?? colors.muted,
           borderWidth: 1,
-          borderColor: "rgba(255,255,255,0.08)",
+          borderColor: "rgba(255,255,255,0.10)",
         }}
       >
-        <Type variant="data" style={{ fontSize: 14, color: colors.foreground }}>{abbr}</Type>
+        <Type variant="data" style={{ fontSize: 14, color: side.ink ?? colors.foreground }}>
+          {side.abbr}
+        </Type>
       </View>
-      <Type variant="captionStrong" numberOfLines={1} className="shrink">{name}</Type>
+      <Type variant="captionStrong" numberOfLines={1} className="shrink">{side.name}</Type>
     </View>
   );
 }

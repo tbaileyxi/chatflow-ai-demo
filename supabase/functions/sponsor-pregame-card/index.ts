@@ -32,7 +32,69 @@ function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-/** CLE, PIT, KC — the city if we have one, the name if we don't. */
+/**
+ * Team colors and abbreviations, from ESPN.
+ *
+ * The blocks on the card were grey because nothing we store has a color for
+ * most teams — src/lib/teams.ts has twenty hand-picked, and the Lions are not
+ * one of them. ESPN publishes the official color and abbreviation for every
+ * team in every league, which also retires the guess below that turned "New
+ * York" into "NY" for two different teams.
+ *
+ * One request per league per run, and a failure costs the color, never the card.
+ */
+type Look = { abbr: string; color: string; ink: string };
+
+const ESPN_PATH: Record<string, string> = {
+  americanfootball_nfl: "football/nfl",
+  americanfootball_ncaaf: "football/college-football",
+  basketball_nba: "basketball/nba",
+  basketball_ncaab: "basketball/mens-college-basketball",
+  baseball_mlb: "baseball/mlb",
+  icehockey_nhl: "hockey/nhl",
+};
+
+/** Black or white, whichever reads on this background. */
+function inkFor(hex: string): string {
+  const h = hex.replace("#", "");
+  if (h.length !== 6) return "#FFFFFF";
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return L > 0.45 ? "#000000" : "#FFFFFF";
+}
+
+async function espnLooks(sportKey: string): Promise<Map<string, Look>> {
+  const out = new Map<string, Look>();
+  const path = ESPN_PATH[sportKey];
+  if (!path) return out;
+  try {
+    const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${path}/teams?limit=400`);
+    const data = await res.json();
+    for (const t of data?.sports?.[0]?.leagues?.[0]?.teams ?? []) {
+      const team = t.team;
+      if (!team?.displayName) continue;
+      // A near-black primary disappears on a dark card, so the alternate wins
+      // when the primary is too dark to see.
+      let color = team.color ? `#${team.color}` : null;
+      const alt = team.alternateColor ? `#${team.alternateColor}` : null;
+      if (color && alt && inkFor(color) === "#FFFFFF") {
+        const h = color.replace("#", "");
+        const sum = parseInt(h.slice(0, 2), 16) + parseInt(h.slice(2, 4), 16) + parseInt(h.slice(4, 6), 16);
+        if (sum < 60) color = alt;
+      }
+      if (!color) continue;
+      const look = { abbr: team.abbreviation ?? "", color, ink: inkFor(color) };
+      out.set(team.displayName.toLowerCase(), look);
+      if (team.shortDisplayName) out.set(team.shortDisplayName.toLowerCase(), look);
+    }
+  } catch {
+    // No colors this run. The card still posts, in grey.
+  }
+  return out;
+}
+
+/** CLE, PIT, KC — the fallback when ESPN has nothing for this team. */
 function abbr(city: string | null, name: string): string {
   const base = (city || name || "").trim();
   const words = base.split(/\s+/).filter(Boolean);
@@ -102,11 +164,22 @@ serve(async (req) => {
 
     let posted = 0;
     const cards: unknown[] = [];
+    const looksByLeague = new Map<string, Map<string, Look>>();
     const failures: string[] = [];
 
     for (const g of games as any[]) {
       const home = g.home, away = g.away;
       if (!home?.name || !away?.name) continue;
+
+      const sportKey = g.sport_key || "";
+      if (!looksByLeague.has(sportKey)) looksByLeague.set(sportKey, await espnLooks(sportKey));
+      const looks = looksByLeague.get(sportKey)!;
+      const lookFor = (t: any): Look | null => {
+        const full = `${t.city ?? ""} ${t.name}`.trim().toLowerCase();
+        return looks.get(full) ?? looks.get(String(t.name).toLowerCase()) ?? null;
+      };
+      const homeLook = lookFor(home);
+      const awayLook = lookFor(away);
 
       const kickoff = new Date(g.start_time).toLocaleTimeString("en-US", {
         hour: "numeric", minute: "2-digit", timeZone: "America/New_York",
@@ -172,8 +245,18 @@ serve(async (req) => {
           gameId: g.id,
           week: g.sport_key?.includes("football") ? "Week " + Math.max(1, Math.ceil((now - Date.parse(`${season}-09-04`)) / (7 * 864e5))) : null,
           kickoff,
-          home: { abbr: abbr(home.city, home.name), name: `${home.city ?? ""} ${home.name}`.trim() },
-          away: { abbr: abbr(away.city, away.name), name: `${away.city ?? ""} ${away.name}`.trim() },
+          home: {
+            abbr: homeLook?.abbr || abbr(home.city, home.name),
+            name: `${home.city ?? ""} ${home.name}`.trim(),
+            color: homeLook?.color ?? null,
+            ink: homeLook?.ink ?? null,
+          },
+          away: {
+            abbr: awayLook?.abbr || abbr(away.city, away.name),
+            name: `${away.city ?? ""} ${away.name}`.trim(),
+            color: awayLook?.color ?? null,
+            ink: awayLook?.ink ?? null,
+          },
           spread: spreadLine ? `Spread ${spreadLine}` : null,
           total: totalLine ? `O/U ${totalLine}` : null,
           // The away team is not at home. This said "at home" on every card,
