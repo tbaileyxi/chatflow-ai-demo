@@ -12,7 +12,6 @@ import { useCanonical } from '@/hooks/useCanonical';
  * audience numbers (we do not have them), never "official" (we are not).
  */
 
-const APP_STORE_URL = 'https://apps.apple.com/us/app/id6777524558';
 const PRICE = 2500;
 const money = (n: number) => `$${n.toLocaleString('en-US')}`;
 
@@ -58,10 +57,10 @@ async function humanError(err: unknown): Promise<string> {
 
 const PACKAGE = [
   'Category exclusivity — one partner per team, per season.',
-  'Founding partner status, and the launch story that goes with it.',
+  'Founding-partner status and the launch-story naming.',
   'Your name on the pregame card at kickoff.',
   'A "powered by" line under the reaction clips fans post.',
-  'Co-branded shirts in the team’s colors.',
+  'Co-branded shirts in the team\u2019s colors.',
   `${money(PRICE)} rate locked for three seasons, with first refusal after.`,
 ];
 
@@ -197,7 +196,8 @@ export default function Sponsor() {
         </div>
       ) : null}
 
-      {/* [1] HERO */}
+      {/* [1] HERO — reads cold: somebody from a cold email, who has never
+          heard of Side Huddle, gets the offer from these two lines alone. */}
       <section
         className="relative overflow-hidden"
         style={{
@@ -205,79 +205,85 @@ export default function Sponsor() {
             'radial-gradient(60% 55% at 50% 0%, rgba(255,214,10,0.10) 0%, rgba(10,10,10,0) 70%), #0A0A0A',
         }}
       >
-        <div className="mx-auto max-w-5xl px-5 pb-16 pt-20 sm:pt-28">
+        <div className="mx-auto max-w-5xl px-5 pb-12 pt-16 sm:pt-20">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">
             Founding partner
           </p>
           <h1 className="mt-4 max-w-3xl text-[2.6rem] font-black leading-[1.02] tracking-tight sm:text-6xl">
-            One team. One dealer. All season.
+            One Team. Your Brand. All Season.
           </h1>
-          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/75">
-            {team
-              ? `Your name under every ${team} reaction clip and on every ${team} pregame card. ${money(PRICE)} for the season.`
-              : `Your name under your team's reaction clips and on your team's pregame card. ${money(PRICE)} for the season.`}
+          <p className="mt-6 max-w-2xl text-lg leading-relaxed" style={{ color: '#F5F5F5' }}>
+            Side Huddle Sports powers the fans with AI-powered chat rooms. Every emotional reaction,
+            powered by you.
           </p>
           <button
             onClick={scrollToClaim}
             className="mt-8 rounded-lg px-6 py-3.5 text-base font-black text-[#0A0A0A]"
             style={{ backgroundColor: '#FFD60A' }}
           >
-            {team ? `Claim ${team} — ${money(PRICE)}` : `Claim a team — ${money(PRICE)}`}
+            Claim your team
           </button>
-          <p className="mt-4 text-sm text-white/50">
-            Founding window closes around Week 8 — after that, waitlist.
-          </p>
         </div>
       </section>
 
       <main className="mx-auto max-w-5xl px-5">
-        {/* [2] SURFACES */}
-        <section className="grid justify-items-center gap-12 py-14 md:grid-cols-2 md:items-start">
-          <figure className="m-0 w-full max-w-[380px]">
-            <PhoneFrame tag="PRODUCT PREVIEW">
-              <img
-                src="/sponsor/clip-in-room.png"
-                alt="A fan's reaction clip in a room, with a powered-by line under it"
-                className="block h-full w-full object-cover"
-              />
-              {/* The screenshot's own caption said "powered by Joe's Cars" — a
-                  test name that reads as a slot already sold. The band is
-                  covered with the reader's typed business name instead, the
-                  same thing the card beside it does. Positioned in percent of
-                  the image, so it tracks the band at every width. */}
-              <div
-                className="absolute inset-x-0 flex items-center justify-center bg-[#0D0D0D]"
-                style={{ top: '81.6%', height: '7.02%' }}
-              >
-                <span className="text-[10px] text-[#9A9A9A] sm:text-[11px]">
-                  powered by {brand.trim() || 'Your business'}
-                </span>
+        {/* [2] PRODUCT PREVIEW — the two reaction-clip visuals side by
+            side under one caption, then the pregame card under its own. */}
+        <section className="grid gap-12 py-12 lg:grid-cols-[2fr,1fr] lg:items-start">
+          <figure className="m-0">
+            <div className="grid grid-cols-1 justify-items-center gap-6 sm:grid-cols-2">
+              <div className="w-full max-w-[300px]">
+                <PhoneFrame tag="PRODUCT PREVIEW" aspect="860 / 1272">
+                  <img
+                    src="/sponsor/sponsor-clip-tulane-poweredby.png"
+                    alt="A fan selfie at the game with a powered-by line under it"
+                    className="block h-full w-full object-cover"
+                  />
+                </PhoneFrame>
               </div>
-            </PhoneFrame>
-            <figcaption className="mt-4 text-center text-white/75">
-              Your name under every reaction clip the fans post — the most-shared thing in the room.
+              <div className="w-full max-w-[300px]">
+                <PhoneFrame tag="PRODUCT PREVIEW" aspect="863 / 1196">
+                  <img
+                    src="/sponsor/sponsor-clip-inapp-tulane.png"
+                    alt="A reaction clip in a Side Huddle room with a powered-by line under it"
+                    className="block h-full w-full object-cover"
+                  />
+                  {/* The screenshot's own line read "powered by Joe's Cars", a
+                      test name that reads to a cold visitor as a slot already
+                      sold. Covered with the name typed below. */}
+                  <div
+                    className="absolute inset-x-0 flex items-center justify-center bg-[#0D0D0D]"
+                    style={{ top: '81.6%', height: '7.02%' }}
+                  >
+                    <span className="text-[10px] text-[#9A9A9A] sm:text-[11px]">
+                      powered by {brand.trim() || 'Your business'}
+                    </span>
+                  </div>
+                </PhoneFrame>
+              </div>
+            </div>
+            <figcaption className="mt-5 text-center text-white/80">
+              Your name under every reaction clip.
             </figcaption>
           </figure>
 
-          <figure className="m-0 w-full max-w-[380px]">
-            <PhoneFrame tag="PREVIEW">
-              <div className="flex h-full flex-col justify-center bg-[#0B0B0D] px-3">
-                <PregameCardPreview partner={brand.trim() || 'Your business'} />
-              </div>
-            </PhoneFrame>
-            <figcaption className="mt-4 text-center text-white/75">
-              Your name on the pregame card at kickoff, when the whole fanbase is watching.
+          <figure className="m-0 flex flex-col items-center">
+            <div className="w-full max-w-[300px]">
+              <PhoneFrame tag="PREVIEW" aspect="863 / 1196">
+                <div className="flex h-full flex-col justify-center bg-[#0B0B0D] px-3">
+                  <PregameCardPreview partner={brand.trim() || 'Your business'} />
+                </div>
+              </PhoneFrame>
+            </div>
+            <figcaption className="mt-5 text-center text-white/80">
+              Your name on the pregame card at kickoff.
             </figcaption>
           </figure>
         </section>
 
         {/* [2b] APP STRIP */}
         <p className="pb-14 text-center text-sm text-white/45">
-          Side Huddle Sports is the digital tailgate: Snap meets ESPN — your crew, the game, one
-          room.{' '}
-          <a href={APP_STORE_URL} className="text-white/70 underline underline-offset-4">
-            See the app →
-          </a>
+          The digital tailgate. Snap meets ESPN — your crew, the game, one room.
         </p>
 
         {/* [3] WHAT YOU GET */}
@@ -297,8 +303,8 @@ export default function Sponsor() {
         <section className="border-t border-white/10 py-14">
           <h2 className="text-xl font-black">Terms</h2>
           <ul className="mt-5 space-y-2 text-white/75">
-            <li>{money(PRICE)} flat for the season. No prorating.</li>
-            <li>Founding window closes around Week 8, then it's a waitlist.</li>
+            <li>{money(PRICE)} flat for the season, no prorating.</li>
+            <li>Founding window closes around Week 8 — after that, waitlist.</li>
             <li>Each sport-season is its own unit.</li>
           </ul>
         </section>
@@ -383,11 +389,7 @@ export default function Sponsor() {
             </button>
 
             <p className="mt-4 text-sm text-white/50">
-              Rather talk first? ty@sidehuddlesports.com · or{' '}
-              <a href={APP_STORE_URL} className="underline underline-offset-4">
-                see the app
-              </a>
-              .
+              Rather talk first? ty@sidehuddlesports.com
             </p>
           </div>
         </section>
@@ -431,10 +433,16 @@ function Field({
  * in one so they read as the same product side by side. Screen aspect matches
  * the screenshot (863×1196), so it shows uncropped.
  */
-function PhoneFrame({ tag, children }: { tag: string; children: React.ReactNode }) {
+function PhoneFrame({
+  tag, aspect, children,
+}: {
+  tag: string;
+  aspect: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="relative rounded-[2.6rem] border border-white/15 bg-[#1A1A1D] p-[10px] shadow-[0_30px_70px_rgba(0,0,0,0.6)]">
-      <div className="relative overflow-hidden rounded-[2rem] bg-black" style={{ aspectRatio: '863 / 1196' }}>
+      <div className="relative overflow-hidden rounded-[2rem] bg-black" style={{ aspectRatio: aspect }}>
         {children}
         <div className="pointer-events-none absolute left-1/2 top-2 h-6 w-24 -translate-x-1/2 rounded-full bg-black" />
       </div>
@@ -477,14 +485,16 @@ function PregameCardPreview({ partner }: { partner: string }) {
 
 function Side({ abbr, name, color }: { abbr: string; name: string; color: string }) {
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2">
+    // Block over name, not beside it: in a phone-width frame the names were
+    // truncating to "Det…", and a matchup nobody can read is not a matchup.
+    <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center">
       <div
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 font-mono text-xs font-semibold text-white"
         style={{ backgroundColor: color }}
       >
         {abbr}
       </div>
-      <span className="truncate text-[13px] font-semibold">{name}</span>
+      <span className="text-[12px] font-semibold leading-tight">{name}</span>
     </div>
   );
 }
