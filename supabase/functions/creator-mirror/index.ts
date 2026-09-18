@@ -11,9 +11,21 @@
 // we are billed for it. An earlier version routed this through xAI to avoid a
 // cost that turned out not to apply, and got prose with no post ids back.
 //
+// THE RULES (Ty, 2026-09-18):
+//   1. Rank the last 12h of their posts by likes + reposts + replies, best first.
+//   2. At most 4 posts per room per day (Eastern), at least 90 minutes apart.
+//   3. Between games only. No pulling from 6h before kickoff to 2h after the
+//      final whistle for the room's team. This never stands in for the creator
+//      being in the room on gameday.
+//   4. Only rooms the creator owns: the room's owner is registered in
+//      creator_accounts with the same handle. Never team rooms, game huddles,
+//      DMs, or anyone else's room.
+//
 // Actions:
-//   {}                        mirror every huddle that has an x_handle
-//   { handle, huddle_id }     mirror one, for testing before anyone is contacted
+//   {}                        mirror every room that passes rule 4
+//   { handle, huddle_id }     mirror one room, same rules
+//   { huddle_id, dry: true }  preview one room's pick without posting; scope is
+//                             reported but not enforced, since nothing is written
 //   { probe_lists: "handle" } report whether this API tier can read X Lists
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -30,8 +42,8 @@ const json = (b: unknown, status = 200) =>
 
 // A creator posts thirty times a day: replies, reposts, jokes about lunch.
 // Mirroring all of it turns their room into a feed dump and they would be the
-// first to hate it. These are the only three knobs that matter.
-const MIN_LIKES   = Number(Deno.env.get("MIRROR_MIN_LIKES") || 25);
+// first to hate it.
+const DAILY_CAP   = Number(Deno.env.get("MIRROR_DAILY_CAP") || 4);
 // ONE post per room per window, not a batch.
 //
 // Three arriving together reads as a dump, which is the opposite of the thing
@@ -41,6 +53,60 @@ const MIN_LIKES   = Number(Deno.env.get("MIRROR_MIN_LIKES") || 25);
 const PER_RUN     = Number(Deno.env.get("MIRROR_PER_RUN") || 1);
 const GAP_MIN     = Number(Deno.env.get("MIRROR_GAP_MINUTES") || 90);
 const LOOKBACK_H  = Number(Deno.env.get("MIRROR_LOOKBACK_HOURS") || 12);
+
+// Gameday blackout, per rule 3.
+const PRE_GAME_H  = 6;
+const POST_GAME_H = 2;
+// games has no final-whistle column. A final game's recap is posted within a
+// couple of minutes of the whistle, so that is used when present; otherwise the
+// usual length of a game in that league.
+const GAME_LEN_H: Record<string, number> = {
+  americanfootball_nfl: 3.5, americanfootball_ncaaf: 3.5,
+  basketball_nba: 2.5, basketball_ncaab: 2.5, basketball_wnba: 2.5,
+  baseball_mlb: 3.25, icehockey_nhl: 2.75,
+};
+
+async function inBlackout(supabase: any, teamId: string | null): Promise<string | null> {
+  if (!teamId) return null;
+  const now = Date.now();
+  const from = new Date(now - 12 * 3600e3).toISOString();
+  const to = new Date(now + PRE_GAME_H * 3600e3).toISOString();
+  const { data } = await supabase
+    .from("games")
+    .select("id, sport_key, start_time, status, recap_posted_at")
+    .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+    .gte("start_time", from)
+    .lte("start_time", to);
+  for (const g of data ?? []) {
+    const kick = Date.parse(g.start_time);
+    const len = (GAME_LEN_H[g.sport_key] ?? 3.5) * 3600e3;
+    let end: number;
+    if (g.status === "final") {
+      const recap = g.recap_posted_at ? Date.parse(g.recap_posted_at) : NaN;
+      end = recap > kick ? recap : kick + len;
+    } else if (g.status === "in_progress") {
+      end = Math.max(now, kick + len);
+    } else {
+      end = kick + len;
+    }
+    if (now >= kick - PRE_GAME_H * 3600e3 && now <= end + POST_GAME_H * 3600e3) {
+      return `${g.id} (${g.status}, kickoff ${g.start_time})`;
+    }
+  }
+  return null;
+}
+
+// Midnight today, US Eastern, as an ISO instant.
+function easternMidnight(): string {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(now);
+  const v = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const sinceMidnight = ((v("hour") % 24) * 3600 + v("minute") * 60 + v("second")) * 1000;
+  return new Date(now.getTime() - sinceMidnight - now.getMilliseconds()).toISOString();
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -355,19 +421,40 @@ serve(async (req) => {
   }
 
   // ── Which rooms to mirror ─────────────────────────────────────────────────
-  let rooms: Array<{ id: string; x_handle: string; name: string | null }> = [];
-  if (body.handle && body.huddle_id) {
-    rooms = [{ id: body.huddle_id, x_handle: body.handle.replace(/^@/, ""), name: null }];
-  } else {
-    const { data, error } = await supabase
-      .from("huddles")
-      .select("id, name, x_handle")
-      .not("x_handle", "is", null)
-      .neq("x_handle", "");
-    if (error) return json({ error: error.message }, 500);
-    rooms = (data ?? []) as any;
+  // Rule 4: only a room its creator owns. The owner must be registered in
+  // creator_accounts under the same handle the room is wired to — an x_handle
+  // on its own proves nothing, anyone could type a creator's name into it.
+  type Room = { id: string; x_handle: string; name: string | null; team_id: string | null };
+  let q = supabase
+    .from("huddles")
+    .select("id, name, x_handle, owner_id, team_id, is_official_team_huddle, is_game_room, is_dm, event_id, game_id")
+    .not("x_handle", "is", null)
+    .neq("x_handle", "");
+  if (body.huddle_id) q = q.eq("id", body.huddle_id);
+  const { data: wired, error: wiredErr } = await q;
+  if (wiredErr) return json({ error: wiredErr.message }, 500);
+
+  const owners = [...new Set((wired ?? []).map((r: any) => r.owner_id).filter(Boolean))];
+  const { data: creators } = owners.length
+    ? await supabase.from("creator_accounts").select("user_id, x_handle").in("user_id", owners)
+    : { data: [] as any[] };
+  const handleOf = new Map((creators ?? []).map((c: any) => [c.user_id, String(c.x_handle).replace(/^@/, "").toLowerCase()]));
+
+  const rooms: Room[] = [];
+  const out_of_scope: string[] = [];
+  for (const r of (wired ?? []) as any[]) {
+    const h = String(r.x_handle).replace(/^@/, "");
+    const why =
+      r.is_official_team_huddle ? "team room" :
+      (r.is_game_room || r.event_id || r.game_id) ? "game huddle" :
+      r.is_dm ? "DM" :
+      handleOf.get(r.owner_id) !== h.toLowerCase() ? "owner is not @" + h :
+      body.handle && body.handle.replace(/^@/, "").toLowerCase() !== h.toLowerCase() ? "handle does not match room" :
+      null;
+    if (why) out_of_scope.push(`${r.name ?? r.id}: ${why}`);
+    if (!why || (body.dry && body.huddle_id)) rooms.push({ id: r.id, x_handle: h, name: r.name, team_id: r.team_id });
   }
-  if (!rooms.length) return json({ ok: true, rooms: 0, note: "no huddles have an x_handle yet" });
+  if (!rooms.length) return json({ ok: true, rooms: 0, out_of_scope, note: "no room passes the creator-owns-it rule" });
 
   const { data: botUserId } = await supabase.rpc("get_or_create_system_user");
   const summary = {
@@ -378,18 +465,48 @@ serve(async (req) => {
     posted: 0,
     skipped_seen: 0,
     skipped_reply_or_repost: 0,
-    skipped_low: 0,
     errors: [] as string[],
     halted: null as string | null,
     preview: [] as string[],
     candidates_kept: 0 as number | undefined,
     skipped_promo: 0 as number | undefined,
     skipped_too_soon: 0 as number | undefined,
+    skipped_daily_cap: 0,
+    skipped_gameday: [] as string[],
+    out_of_scope,
   };
 
   for (const room of rooms) {
     summary.checked++;
     try {
+      // Rule 3: gameday is the creator's to be in the room live. Checked before
+      // the X read, so a blacked-out room costs nothing.
+      const game = await inBlackout(supabase, room.team_id);
+      if (game) { summary.skipped_gameday.push(`${room.name ?? room.id}: ${game}`); continue; }
+
+      // Rule 2: four a day, ninety minutes apart.
+      const { count: today } = await supabase
+        .from("huddle_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("huddle_id", room.id)
+        .eq("message_type", "creator_post")
+        .gte("created_at", easternMidnight());
+      if ((today ?? 0) >= DAILY_CAP) { summary.skipped_daily_cap++; continue; }
+
+      const { data: recent } = await supabase
+        .from("huddle_messages")
+        .select("created_at")
+        .eq("huddle_id", room.id)
+        .eq("message_type", "creator_post")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const gap = body.gap_minutes ?? GAP_MIN;
+      if (recent?.created_at && Date.parse(recent.created_at) > Date.now() - gap * 60000) {
+        summary.skipped_too_soon = (summary.skipped_too_soon ?? 0) + 1;
+        continue;
+      }
+
       // X's own recent search, not an LLM.
       //
       // The first version asked xAI to find their posts, because the official
@@ -432,29 +549,14 @@ serve(async (req) => {
         .map((d: any) => d.id as string);
       if (!ids.length) continue;
 
-      // Has this room heard from him recently?
-      const { data: recent } = await supabase
-        .from("huddle_messages")
-        .select("created_at")
-        .eq("huddle_id", room.id)
-        .eq("message_type", "creator_post")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const gap = body.gap_minutes ?? GAP_MIN;
-      if (recent?.created_at && Date.parse(recent.created_at) > Date.now() - gap * 60000) {
-        summary.skipped_too_soon = (summary.skipped_too_soon ?? 0) + 1;
-        continue;
-      }
-
       const posts = await fetchPosts(ids);
       summary.candidates += posts.length;
 
-      // Oldest first, so the room follows his day in order rather than starting
-      // with the newest and working backwards. Anything older than the lookback
-      // window is simply never posted — that is what stops a newly wired room
-      // dripping out yesterday's takes for the next day and a half.
-      posts.sort((a, b) => Date.parse(a.createdAt ?? "0") - Date.parse(b.createdAt ?? "0"));
+      // Rule 1: their best post of the last twelve hours goes first — likes,
+      // reposts and replies together. Already-posted ones fall through on the
+      // seen_events claim below, so the next run takes the next best.
+      const score = (p: typeof posts[number]) => p.likes + p.reposts + p.replies;
+      posts.sort((a, b) => score(b) - score(a));
 
       // Quote tweets carry their meaning in the post they quote — and often the
       // media too. Pulled in the same batched read, so it costs one extra call
@@ -469,7 +571,6 @@ serve(async (req) => {
       for (const p of posts) {
         if (postedHere >= PER_RUN) break;
         if (p.isReply || p.isRepost) { summary.skipped_reply_or_repost++; continue; }
-        if (p.likes < MIN_LIKES)     { summary.skipped_low++; continue; }
 
         // Drop the newsletter dumps. "JHiTB! From the fine folks at @sportsmockery
         // • Contextualizing Tyson Bagent • Emails on Malik…" is a promo for
@@ -505,9 +606,12 @@ serve(async (req) => {
         // Posting a test into a live room is not undoable in front of the people
         // sitting in it.
         if (body.dry) {
+          const { data: done } = await supabase.from("seen_events").select("event_id")
+            .eq("event_id", `xmirror:${p.postId}`).maybeSingle();
+          if (done) { summary.skipped_seen++; continue; }
           postedHere++;
           summary.candidates_kept = (summary.candidates_kept ?? 0) + 1;
-          summary.preview.push(`${p.likes} likes · ${mediaVideo ? "video" : mediaImage ? "image" : "text"} · ${clean.slice(0, 100).replace(/\n/g, " | ")}`);
+          summary.preview.push(`${score(p)} eng · ${mediaVideo ? "video" : mediaImage ? "image" : "text"} · ${clean.slice(0, 100).replace(/\n/g, " | ")}`);
           continue;
         }
 

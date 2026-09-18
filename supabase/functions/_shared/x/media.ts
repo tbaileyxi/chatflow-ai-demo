@@ -110,6 +110,7 @@ function fxToPost(tw: any): XPost {
     authorHandle: handle,
     text: tw.text ?? "",
     likes: tw.likes ?? 0,
+    reposts: tw.retweets ?? 0,
     replies: tw.replies ?? 0,
     isReply: Boolean(tw.replying_to),
     isRepost: false,
@@ -242,6 +243,8 @@ export interface XPost {
   authorHandle: string | null;
   text: string;
   likes: number;
+  /** Reposts, with likes and replies, rank posts by total engagement. */
+  reposts: number;
   replies: number;
   isReply: boolean;
   isRepost: boolean;
@@ -310,6 +313,7 @@ export async function fetchPosts(postIds: string[]): Promise<XPost[]> {
       authorHandle: handle,
       text: post.text ?? "",
       likes: post?.public_metrics?.like_count ?? 0,
+      reposts: post?.public_metrics?.retweet_count ?? 0,
       replies: post?.public_metrics?.reply_count ?? 0,
       isReply: refs.some((r: any) => r.type === "replied_to"),
       isRepost: refs.some((r: any) => r.type === "retweeted"),
