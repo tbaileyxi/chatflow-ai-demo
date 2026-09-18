@@ -84,7 +84,8 @@ export interface InGameFacts {
   scorer?: string;
   pointsScored?: number;
   play?: string;                      // real ESPN play text — names the player
-  scoreLine: string;                  // e.g. "Knicks 88, Spurs 85"
+  // Absent on plays that did not change the score — see brain.ts.
+  scoreLine?: string;                 // e.g. "Knicks 88, Spurs 85"
   gameTime: string;                   // e.g. "3:40 Q4"
   winProbSwingPct?: number;           // |Δ win prob| * 100, integer
   runText?: string;                   // e.g. "12-0 run"

@@ -97,7 +97,16 @@ export function gateEvents(allPlaysChronological: PlayEvent[]): GatedEvent[] {
         play,
         facts: {
           event: moment.note,
-          scoreLine: scoreLineText(game, play.scoreAfter),
+          // NO SCORE ON A PLAY THAT DID NOT CHANGE IT.
+          //
+          // Every line carried "— Lions 0, Bills 14" whether or not anything
+          // scored, which is wrong twice: the score is already pinned at the
+          // top of the room, and repeating it after a sack makes a routine
+          // play look like a scoring play. plainLine() drops the dash and the
+          // trailing figure when this is absent, so the sentence just ends.
+          scoreLine: (play.pointsScored ?? 0) > 0
+            ? scoreLineText(game, play.scoreAfter)
+            : undefined,
           gameTime: gameTimeText(play, game.league),
           play: (play.description || "").slice(0, 200) || undefined,
           excitementScore: moment.weight,
