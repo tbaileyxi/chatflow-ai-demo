@@ -68,10 +68,26 @@ export function PregameCard({ data, messageId }: { data: PregameCardData; messag
   };
 
   return (
+    // A CARD WITH DIMENSION, not a rectangle with a hairline.
+    //
+    // It sits above the conversation rather than in it: raised off the
+    // background with a shadow, a gold rule across the top so it reads as the
+    // room's own furniture, and a darker plate behind the matchup so the
+    // teams have a surface of their own instead of floating in the fill.
     <View
-      className="mx-3 my-2 overflow-hidden rounded-2xl border"
-      style={{ borderColor: colors.border, backgroundColor: colors.card }}
+      className="mx-3 my-3 overflow-hidden rounded-2xl"
+      style={{
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.10)",
+        shadowColor: "#000",
+        shadowOpacity: 0.45,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 8,
+      }}
     >
+      <View style={{ height: 3, backgroundColor: colors.primary }} />
       <View className="flex-row items-center gap-2 px-4 pt-3">
         {data.week ? (
           <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: colors.muted }}>
@@ -88,9 +104,13 @@ export function PregameCard({ data, messageId }: { data: PregameCardData; messag
         </Pressable>
       </View>
 
-      {/* The matchup: two colour blocks with abbreviations, and the plain
-          names under them so nobody has to decode CLE. */}
-      <View className="flex-row items-center gap-3 px-4 py-3">
+      {/* The matchup: two color blocks with abbreviations, and the plain
+          names under them so nobody has to decode CLE. On its own plate, so
+          it reads as the scoreboard part of the card. */}
+      <View
+        className="mx-3 mb-3 mt-1 flex-row items-center gap-3 rounded-xl px-3 py-3"
+        style={{ backgroundColor: "rgba(0,0,0,0.35)" }}
+      >
         <MatchupSide abbr={data.away.abbr} name={data.away.name} />
         <Type variant="data" tone="muted" style={{ fontSize: 11 }}>at</Type>
         <MatchupSide abbr={data.home.abbr} name={data.home.name} />
@@ -131,10 +151,14 @@ function MatchupSide({ abbr, name }: { abbr: string; name: string }) {
   return (
     <View className="flex-1 flex-row items-center gap-2">
       <View
-        className="h-9 w-9 items-center justify-center rounded-lg"
-        style={{ backgroundColor: colors.muted }}
+        className="h-11 w-11 items-center justify-center rounded-lg"
+        style={{
+          backgroundColor: colors.muted,
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.08)",
+        }}
       >
-        <Type variant="data" style={{ fontSize: 12, color: colors.foreground }}>{abbr}</Type>
+        <Type variant="data" style={{ fontSize: 14, color: colors.foreground }}>{abbr}</Type>
       </View>
       <Type variant="captionStrong" numberOfLines={1} className="shrink">{name}</Type>
     </View>

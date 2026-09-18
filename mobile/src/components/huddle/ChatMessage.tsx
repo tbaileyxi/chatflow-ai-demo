@@ -541,12 +541,27 @@ export function ChatMessage({
     const score = rawScore ? "— " + rawScore.replace(/ /g, " ") : null;
 
     return (
-      <View className="px-5 py-1">
+      <View className="px-4 py-1">
+        {/* A BOUNDARY, NOT A HINT.
+            A 2px left rule and nothing else left the play feed floating in the
+            same space as the conversation, so a run of plays read as somebody
+            talking in grey. It is a panel now: its own fill, its own edge, and
+            a gold spine down the left that says where it came from. */}
         <View
           style={{
-            borderLeftWidth: 2,
-            borderLeftColor: colors.primary + "40",
-            paddingLeft: 10,
+            borderLeftWidth: 3,
+            borderLeftColor: colors.primary + "99",
+            borderTopWidth: 1,
+            borderRightWidth: 1,
+            borderBottomWidth: 1,
+            borderTopColor: "rgba(255,255,255,0.07)",
+            borderRightColor: "rgba(255,255,255,0.07)",
+            borderBottomColor: "rgba(255,255,255,0.07)",
+            borderRadius: 10,
+            backgroundColor: "rgba(255,255,255,0.035)",
+            paddingLeft: 11,
+            paddingRight: 11,
+            paddingVertical: 8,
           }}
         >
           <Type
