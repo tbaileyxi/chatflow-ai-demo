@@ -3,13 +3,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 // Sponsor checkout via Square Payment Links (Online Checkout).
 //
-// $100 per team per season, paid in full. No deposit, no balance at the opener,
-// no tier ladder — every one of those was a second conversation, and the whole
-// reason the price is $100 is that there is no conversation.
+// One price per team for the season, paid in full. No deposit, no balance at
+// the opener, no tier ladder — every one of those was a second conversation.
 //
 // The link is built HERE rather than pointing at a fixed Square link, and that
 // is the entire point: a fixed link cannot know that somebody picked four
-// teams. It would charge $100 and ask them to retype the teams they already
+// teams. It would charge for one and ask them to retype the teams they already
 // chose. This sends the exact total and puts the team list on the order note,
 // so the buyer picks on the page and then only pays.
 //
@@ -39,11 +38,14 @@ const corsHeaders = {
  * This sold six positions per team at $100, with $500 to take all six — a
  * ladder that made the cheap option the default and category exclusivity a
  * thing you paid extra for. The model is now one founding partner per team per
- * season at $2,500 flat: exclusivity IS the product, so there is nothing to
+ * season, one flat price: exclusivity IS the product, so there is nothing to
  * upsell and no second number to explain. No prorating, whenever in the season
  * it is bought.
+ *
+ * $500 is the founding rate (the page shows $2,500 struck through). Change it
+ * here and in PRICE on src/pages/Sponsor.tsx together.
  */
-const SEASON_PRICE_CENTS = 250000;
+const SEASON_PRICE_CENTS = 50000;
 
 function totalCents(count: number) {
   return count * SEASON_PRICE_CENTS;
@@ -192,7 +194,7 @@ serve(async (req) => {
       sponsor_email: mail,
       website: siteUrl,
       amount_paid_cents: 0,   // set by square-webhook when the payment lands
-      balance_due_cents: 0,   // nothing owed later — $2,500 is the whole price
+      balance_due_cents: 0,   // nothing owed later — the one price is the whole price
       square_checkout_id: paymentLink.id ?? null,
       square_order_id: orderId,
     }));

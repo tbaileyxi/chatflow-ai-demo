@@ -6,13 +6,22 @@ import { useCanonical } from '@/hooks/useCanonical';
 /**
  * ONE SPONSOR PAGE, personalised by ?team=slug.
  *
- * Sells one thing: a founding partner per team per season, $2,500 flat. The
+ * Sells one thing: a founding partner per team per season, at the founding
+ * rate ($500, with the $2,500 list price struck through). The
  * partner's name sits under every reaction clip fans post and on the pregame
  * card at kickoff — and nowhere else. No logos (the marks are not ours), no
  * audience numbers (we do not have them), never "official" (we are not).
  */
 
-const PRICE = 2500;
+/** When the founding rate ends, Eastern time. Change this one line to move it. */
+const FOUNDING_DEADLINE = '2026-10-02T23:59:59-04:00';
+
+/** Per team. PRICE must match SEASON_PRICE_CENTS in create-sponsor-square-checkout. */
+const LIST_PRICE = 2500;
+const PRICE = 500;
+
+const AUDIENCE = ['Alumni', 'Fraternities', 'Influencers', 'Tailgate groups', 'Fan club chapters'];
+
 const money = (n: number) => `$${n.toLocaleString('en-US')}`;
 
 type Team = { id: string; city: string; name: string; league: string | null };
@@ -61,7 +70,6 @@ const PACKAGE = [
   'Your name on the pregame card at kickoff.',
   'A "powered by" line under the reaction clips fans post.',
   'Co-branded shirts in the team\u2019s colors.',
-  `${money(PRICE)} rate locked for three seasons, with first refusal after.`,
 ];
 
 export default function Sponsor() {
@@ -124,6 +132,36 @@ export default function Sponsor() {
     })();
     return () => { cancelled = true; };
   }, [attempt]);
+
+  // Claims land while the page is open. Re-read them so the counter and the
+  // Taken tags stay true without a reload.
+  useEffect(() => {
+    const t = setInterval(async () => {
+      const { data, error } = await (supabase as any)
+        .from('founding_partners')
+        .select('team_slug')
+        .eq('season', new Date().getFullYear());
+      if (!error && data) setTaken(new Set((data as { team_slug: string }[]).map((r) => r.team_slug)));
+    }, 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    setPicked((prev) => {
+      const next = new Set(
+        [...prev].filter((id) => {
+          const t = teams.find((x) => x.id === id);
+          return !t || !taken.has(slugOf(t));
+        }),
+      );
+      return next.size === prev.size ? prev : next;
+    });
+  }, [taken, teams]);
+
+  const nflTeams = teams.filter((t) => (t.league || '').toUpperCase() === 'NFL');
+  const nflClaimed = nflTeams.filter((t) => taken.has(slugOf(t))).length;
+
+  const ticker = useTicker(teams);
 
   const linkTeam = useMemo(
     () => (slug ? teams.find((t) => slugOf(t) === slug) ?? null : null),
@@ -234,32 +272,65 @@ export default function Sponsor() {
             'radial-gradient(60% 55% at 50% 0%, rgba(255,214,10,0.10) 0%, rgba(10,10,10,0) 70%), #0A0A0A',
         }}
       >
-        <div className="mx-auto max-w-5xl px-5 pb-12 pt-16 sm:pt-20">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">
+        <div className="mx-auto max-w-5xl px-5 pb-6 pt-7 sm:pb-10 sm:pt-16">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#FFD60A]">
             Founding partner
           </p>
-          <h1 className="mt-4 max-w-3xl text-[2.6rem] font-black leading-[1.02] tracking-tight sm:text-6xl">
+          <h1 className="mt-3 max-w-3xl sm:mt-4 text-[2.6rem] font-black leading-[1.02] tracking-tight sm:text-6xl">
             One Team. Your Brand. All Season.
           </h1>
-          <p className="mt-6 max-w-2xl text-lg leading-relaxed" style={{ color: '#F5F5F5' }}>
+          <p className="mt-4 max-w-2xl text-[17px] leading-relaxed sm:mt-6 sm:text-lg" style={{ color: '#F5F5F5' }}>
             Side Huddle Sports powers the fans with AI-powered chat rooms. Every emotional reaction,
             powered by you.
           </p>
-          <button
-            onClick={scrollToClaim}
-            className="mt-8 rounded-lg px-6 py-3.5 text-base font-black text-[#0A0A0A]"
-            style={{ backgroundColor: '#FFD60A' }}
-          >
-            Claim your team
-          </button>
+          <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-white/85 sm:mt-3 sm:text-base">
+            Side Huddle is the app where fans watch every game together — on camera, in live chat rooms.
+          </p>
+
+          <div className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1 sm:mt-7">
+            <s className="text-2xl font-bold text-white/45 decoration-white/70">{money(LIST_PRICE)}</s>
+            <span className="text-5xl font-black leading-none text-[#FFD60A]">{money(PRICE)}</span>
+            <span className="text-base font-semibold text-white">Founding rate — one per team.</span>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 sm:mt-6">
+            <button
+              onClick={scrollToClaim}
+              className="rounded-lg px-6 py-3.5 text-base font-black text-[#0A0A0A]"
+              style={{ backgroundColor: '#FFD60A' }}
+            >
+              Claim your team
+            </button>
+            <Countdown />
+          </div>
         </div>
       </section>
 
+      {/* [1b] TICKER — real rooms and their team's next game. Nothing here is
+          written by hand; with no data it does not render. */}
+      <Ticker items={ticker} />
+
       <main className="mx-auto max-w-5xl px-5">
+        {/* [1c] AUDIENCE */}
+        <section className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:gap-5 sm:py-7">
+          <h2 className="shrink-0 text-base font-black text-white">Your brand in front of:</h2>
+          <ul className="flex flex-wrap gap-1.5 sm:gap-2">
+            {AUDIENCE.map((a) => (
+              <li
+                key={a}
+                className="flex items-center gap-1.5 rounded-full border border-[#FFD60A]/40 bg-black px-2.5 py-1 text-[13px] font-semibold text-white sm:gap-2 sm:px-3.5 sm:py-1.5 sm:text-sm"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-[#FFD60A]" />
+                {a}
+              </li>
+            ))}
+          </ul>
+        </section>
+
         {/* [2] PRODUCT PREVIEW — two full-size phones on a real room (Bills
             mafia, from the app). No section label: the phones and their
             captions carry it. The gold boxes mark where the buyer's name goes. */}
-        <section className="grid justify-items-center gap-14 py-14 md:grid-cols-2 md:items-start">
+        <section className="grid justify-items-center gap-14 pb-14 pt-6 md:grid-cols-2 md:items-start">
           <figure className="m-0 w-full max-w-[380px]">
             <PhoneFrame>
               <img
@@ -304,7 +375,7 @@ export default function Sponsor() {
         </section>
 
         {/* [2b] APP STRIP */}
-        <p className="pb-14 text-center text-sm text-white/45">
+        <p className="pb-14 text-center text-sm text-white/70">
           The digital tailgate. Snap meets ESPN — your crew, the game, one room.
         </p>
 
@@ -325,8 +396,8 @@ export default function Sponsor() {
         <section className="border-t border-white/10 py-14">
           <h2 className="text-xl font-black">Terms</h2>
           <ul className="mt-5 space-y-2 text-white/75">
-            <li>{money(PRICE)} flat for the season, no prorating.</li>
-            <li>Founding window closes around Week 8 — after that, waitlist.</li>
+            <li>{money(PRICE)} per team, flat for the season, no prorating.</li>
+            <li>This season only.</li>
             <li>Each sport-season is its own unit.</li>
           </ul>
         </section>
@@ -334,6 +405,11 @@ export default function Sponsor() {
         {/* [5] CLAIM */}
         <section id="claim" className="border-t border-white/10 py-14">
           <div className="max-w-2xl rounded-2xl border border-white/12 bg-white/[0.02] p-6">
+            {teamsState === 'ready' && nflTeams.length ? (
+              <p className="mb-3 text-sm font-bold text-[#FFD60A]">
+                {nflClaimed} of {nflTeams.length} NFL teams claimed
+              </p>
+            ) : null}
             <h2 className="text-xl font-black">Claim it</h2>
 
             <div className="mt-5 space-y-5 rounded-lg border border-white/10 p-4">
@@ -366,7 +442,7 @@ export default function Sponsor() {
                             {t.city} {t.name}
                           </span>
                           {isTaken ? (
-                            <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/50">
+                            <span className="rounded border border-[#FFD60A]/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#FFD60A]">
                               Taken
                             </span>
                           ) : null}
@@ -410,8 +486,9 @@ export default function Sponsor() {
               <Field id="sp-email" label="Email" type="email" value={email} onChange={setEmail} />
             </div>
 
-            <p className="mt-6 text-sm text-white/75">
-              Total: {money(PRICE)} × {n} {n === 1 ? 'team' : 'teams'} = {money(total)}
+            <p className="mt-6 text-sm text-white/85">
+              Total: {money(PRICE)} × {n} {n === 1 ? 'team' : 'teams'} ={' '}
+              <span className="font-black text-[#FFD60A]">{money(total)}</span>
             </p>
 
             {err ? <p className="mt-3 text-sm text-red-400">{err}</p> : null}
@@ -461,6 +538,137 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-white focus:border-[#FFD60A] focus:outline-none"
       />
+    </div>
+  );
+}
+
+/** Time left on the founding rate. Renders nothing once the deadline passes. */
+function Countdown() {
+  const end = useMemo(() => Date.parse(FOUNDING_DEADLINE), []);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const left = Math.floor((end - now) / 1000);
+  if (!(left > 0)) return null;
+  const pad = (v: number) => String(v).padStart(2, '0');
+  const d = Math.floor(left / 86400);
+  const h = Math.floor((left % 86400) / 3600);
+  const m = Math.floor((left % 3600) / 60);
+  return (
+    <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-white">
+      <span className="font-semibold">Founding rate ends in:</span>
+      <span className="font-mono text-lg font-bold tabular-nums text-[#FFD60A]">
+        {d}d {pad(h)}h {pad(m)}m {pad(left % 60)}s
+      </span>
+    </p>
+  );
+}
+
+/**
+ * Ticker lines from the app's own data: each public room, with its team's next
+ * game ("Browns in CHS • Cleveland at Tampa Bay · Sun 1:00 PM"). Private rooms
+ * and DMs are never read into it. When there are few rooms, the week's real
+ * matchups fill in. Nothing is made up; no data, no lines.
+ */
+function useTicker(teams: Team[]): string[] {
+  const [items, setItems] = useState<string[]>([]);
+  useEffect(() => {
+    if (!teams.length) return;
+    let cancelled = false;
+    void (async () => {
+      const now = new Date();
+      const weekOut = new Date(now.getTime() + 7 * 86400e3);
+      const [roomsRes, gamesRes] = await Promise.all([
+        (supabase as any)
+          .from('huddles')
+          .select('name, team_id, expires_at')
+          .eq('is_private', false)
+          .eq('is_dm', false)
+          .eq('is_game_room', false)
+          .not('team_id', 'is', null)
+          .order('last_message_at', { ascending: false, nullsFirst: false })
+          .limit(150),
+        supabase
+          .from('games')
+          .select('home_team_id, away_team_id, start_time, status')
+          .gte('start_time', now.toISOString())
+          .lte('start_time', weekOut.toISOString())
+          .neq('status', 'final')
+          .order('start_time')
+          .limit(500),
+      ]);
+      if (cancelled || gamesRes.error || !gamesRes.data) return;
+
+      const byId = new Map(teams.map((t) => [t.id, t]));
+      const when = (iso: string) =>
+        new Date(iso).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+      type G = { home_team_id: string; away_team_id: string; start_time: string };
+      const label = (g: G) => {
+        const home = byId.get(g.home_team_id);
+        const away = byId.get(g.away_team_id);
+        return home && away ? `${away.city} at ${home.city} · ${when(g.start_time)}` : null;
+      };
+      const next = new Map<string, G>();
+      for (const g of gamesRes.data as G[]) {
+        for (const id of [g.home_team_id, g.away_team_id]) if (!next.has(id)) next.set(id, g);
+      }
+
+      const out: string[] = [];
+      const seen = new Set<string>();
+      const used = new Set<G>();
+      for (const r of (roomsRes.data ?? []) as { name: string; team_id: string; expires_at: string | null }[]) {
+        const name = (r.name || '').trim();
+        if (!name || /\btest\b|closed/i.test(name)) continue;
+        if (r.expires_at && Date.parse(r.expires_at) < now.getTime()) continue;
+        if (seen.has(name.toLowerCase())) continue;
+        const g = next.get(r.team_id);
+        const m = g && label(g);
+        if (!m) continue;
+        seen.add(name.toLowerCase());
+        used.add(g!);
+        out.push(`${name} • ${m}`);
+        if (out.length >= 24) break;
+      }
+      for (const g of gamesRes.data as G[]) {
+        if (out.length >= 12) break;
+        const m = !used.has(g) && label(g);
+        if (m) out.push(m);
+      }
+      setItems(out);
+    })();
+    return () => { cancelled = true; };
+  }, [teams]);
+  return items;
+}
+
+function Ticker({ items }: { items: string[] }) {
+  if (!items.length) return null;
+  const secs = Math.max(30, items.length * 7);
+  return (
+    <div className="overflow-hidden border-y border-[#FFD60A]/30 bg-black">
+      <style>{`
+        @keyframes sh-ticker { from { transform: translateX(0) } to { transform: translateX(-50%) } }
+        .sh-ticker { animation: sh-ticker var(--sh-ticker-d) linear infinite }
+        .sh-ticker:hover { animation-play-state: paused }
+        @media (prefers-reduced-motion: reduce) { .sh-ticker { animation: none } }
+      `}</style>
+      <div
+        className="sh-ticker flex w-max items-center py-2.5"
+        style={{ ['--sh-ticker-d' as string]: `${secs}s` } as React.CSSProperties}
+      >
+        {[...items, ...items].map((t, i) => (
+          <span
+            key={i}
+            aria-hidden={i >= items.length || undefined}
+            className="flex items-center whitespace-nowrap text-[13px] font-semibold tracking-wide text-[#FFD60A]"
+          >
+            <span className="px-5">{t}</span>
+            <span className="text-[8px] text-[#FFD60A]/50">◆</span>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
