@@ -59,33 +59,23 @@ function labelFromSlug(slug: string): string | null {
 const PACKAGE = [
   {
     title: 'Category exclusivity',
-    body:
-      'One partner per team per season. Nobody else in your category on that team while you hold it.',
+    body: 'One partner per team, per season. Nobody else in your category while you hold it.',
   },
   {
-    title: 'Founding partner status',
-    body:
-      'Named as the first partner for the team, and the launch story that goes with being first.',
+    title: 'The launch story',
+    body: 'Named as the team\u2019s first partner, in the announcement and on this page.',
   },
   {
     title: 'The pregame card',
-    body:
-      'One shareable card in the room at kickoff, with a small "powered by" at the bottom. Dismissible, and never mid-game.',
+    body: 'One card in the room at kickoff. Dismissible, never mid-game.',
   },
   {
     title: 'The clip caption',
-    body:
-      'A tiny grey "powered by" line under clips fans post of themselves watching. Under the clip, never on the video.',
+    body: 'A line under clips fans post of themselves watching. Under them, never on them.',
   },
   {
     title: 'Co-branded shirts',
-    body:
-      'Shirts in the team’s colors carrying both names. You cover roughly $10–$15 a shirt.',
-  },
-  {
-    title: 'The rate, locked',
-    body:
-      `${SEASON_PRICE} for the season, flat, whenever in the season you take it. Locked for three seasons, with first refusal after that.`,
+    body: 'Team colors, both names. You cover roughly $10\u2013$15 a shirt.',
   },
 ];
 
@@ -182,98 +172,126 @@ export default function Sponsor() {
           </div>
         ) : null}
 
-        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#FFD700]">
-          Founding partner
-        </p>
-        <h1 className="mt-3 text-4xl font-black leading-[1.05] sm:text-5xl">
-          {teamLabel
-            ? <>Back {teamLabel} fans on Side Huddle.</>
-            : <>Back your team’s fans on Side Huddle.</>}
+        {/* 1. THE STORY, IN ONE BREATH.
+            Being first is the entire reason to buy this, and it was sitting in
+            item 02 of a numbered list under a paragraph explaining what the app
+            is. A dealer does not buy "a small powered-by at the bottom" — he
+            buys being the first name on the team. So that is the headline, the
+            price is under it, and the button is next to it. What Side Huddle is
+            can wait until he wants to know. */}
+        <h1 className="text-4xl font-black leading-[1.02] sm:text-[3.4rem]">
+          Be the first name on the{' '}
+          <span className="text-[#FFD700]">{teamLabel ?? 'team'}</span>.
         </h1>
         <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/75">
-          Side Huddle is where fans watch the game together — their crew, with
-          the score and the news landing in the room as it happens. One business
-          per team becomes its founding partner, the name attached to those fans
-          from the start.
-        </p>
-        <p className="mt-4 text-lg font-bold">
-          {SEASON_PRICE} for the season, flat.
-        </p>
-        <p className="mt-1.5 text-sm text-white/60">
-          The founding window closes around Week 8. After that it is a waitlist.
+          One business per team, per season. It is a thing that happens once,
+          and then never again for as long as you keep it.
         </p>
 
-        {/* THE BUY BUTTON IS THE ACTION, not a jump link to a form that had
-            no button in it. Self-serve funnel: above the fold and again in the
-            claim section, both going to checkout. */}
         <div className="mt-7 flex flex-wrap items-center gap-3">
           <button
             onClick={claim}
             disabled={busy}
             className="rounded-lg bg-[#FFD700] px-5 py-3 font-black text-[#0A0A0C] disabled:opacity-50"
           >
-            {busy
-              ? 'Opening checkout…'
-              : `Claim ${teamLabel ?? 'a team'} — ${SEASON_PRICE}`}
+            {busy ? 'Opening checkout\u2026' : `Claim it \u2014 ${SEASON_PRICE}`}
           </button>
-          <a
-            href={APP_STORE_URL}
-            className="rounded-lg border border-white/15 px-5 py-3 font-semibold text-white/85"
-          >
-            See the app first
-          </a>
+          <span className="text-sm text-white/60">{SEASON_PRICE} for the season, flat.</span>
         </div>
 
-        <h2 className="mt-16 text-2xl font-black">What a founding partner gets</h2>
-        {/* An <ol> numbers its own items, so printing "01" inside each one
-            rendered "1. 01". This is a plain list and the number is drawn once. */}
-        <ul className="mt-6 space-y-6">
-          {PACKAGE.map((item, i) => (
-            <li key={item.title} className="border-t border-white/10 pt-5">
-              <p className="font-mono text-[11px] tracking-[0.14em] text-white/40">
-                {String(i + 1).padStart(2, '0')}
-              </p>
-              <h3 className="mt-1 text-lg font-bold">{item.title}</h3>
-              <p className="mt-1.5 leading-relaxed text-white/70">{item.body}</p>
+        {/* 2. SHOW IT. The two surfaces at full width, because "this is what
+            $2,500 buys" is a picture, not a sentence fragment. The slots render
+            only when the screenshots exist — an empty frame says more honestly
+            that they are coming than a mockup would say falsely. */}
+        <section className="mt-14 grid gap-8 sm:grid-cols-2">
+          <figure className="m-0">
+            <div className="overflow-hidden rounded-2xl border border-white/12 bg-black">
+              <img
+                src="/sponsor/pregame-card.png"
+                alt="The pregame card in a room, with a small powered-by line at the bottom"
+                className="block w-full"
+                loading="lazy"
+                onError={(e) => { (e.currentTarget.closest('figure') as HTMLElement).style.display = 'none'; }}
+              />
+            </div>
+            <figcaption className="mt-2 text-xs text-white/45">
+              The pregame card, in the room at kickoff. Product preview.
+            </figcaption>
+          </figure>
+          <figure className="m-0">
+            <div className="overflow-hidden rounded-2xl border border-white/12 bg-black">
+              <img
+                src="/sponsor/clip-caption.png"
+                alt="A powered-by line under a clip a fan posted of themselves watching"
+                className="block w-full"
+                loading="lazy"
+                onError={(e) => { (e.currentTarget.closest('figure') as HTMLElement).style.display = 'none'; }}
+              />
+            </div>
+            <figcaption className="mt-2 text-xs text-white/45">
+              Under a fan’s own clip. Product preview.
+            </figcaption>
+          </figure>
+        </section>
+
+        {/* 3. THE LINE. It was the best sentence on the page this replaced, and
+            it went out with the model it happened to be sitting in. */}
+        <p className="mt-14 max-w-2xl text-2xl font-bold leading-snug sm:text-3xl">
+          Not an advert beside the fans. A business behind them.
+        </p>
+        <p className="mt-4 max-w-xl leading-relaxed text-white/70">
+          Side Huddle is where they watch the game together — their own crew,
+          the score and the news landing in the room as it happens. You are in
+          two moments of it, and nowhere else.
+        </p>
+
+        {/* 4. The detail, for whoever is still reading. */}
+        <h2 className="mt-14 text-xl font-black">What it includes</h2>
+        <ul className="mt-5 space-y-4">
+          {PACKAGE.map((item) => (
+            <li key={item.title} className="border-t border-white/10 pt-4">
+              <h3 className="font-bold">{item.title}</h3>
+              <p className="mt-1 text-sm leading-relaxed text-white/70">{item.body}</p>
             </li>
           ))}
         </ul>
 
-        <div id="claim" className="mt-16 rounded-2xl border border-white/12 p-6">
-          <h2 className="text-2xl font-black">
-            Claim {teamLabel ?? 'your team'}
-          </h2>
-          <>
-              <p className="mt-2 text-sm text-white/60">
-                {SEASON_PRICE} for the {new Date().getFullYear()} season. Nothing owed later.
-              </p>
-              <div className="mt-5 space-y-3">
-                <input
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  placeholder="Business name"
-                  className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-white placeholder:text-white/35"
-                />
-                <input
-                  value={site}
-                  onChange={(e) => setSite(e.target.value)}
-                  placeholder="Website"
-                  className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-white placeholder:text-white/35"
-                />
-              </div>
-              {err ? <p className="mt-3 text-sm text-red-400">{err}</p> : null}
-              <button
-                onClick={claim}
-                disabled={busy || !brand.trim()}
-                className="mt-5 w-full rounded-lg bg-[#FFD700] px-5 py-3 font-black text-[#0A0A0C] disabled:opacity-50"
-              >
-                {busy ? 'Opening checkout…' : `Claim it — ${SEASON_PRICE}`}
-              </button>
-              {/* The fallback, and only the fallback. */}
-              <p className="mt-3 text-xs text-white/45">
-                Rather talk first? ty@sidehuddlesports.com
-              </p>
-          </>
+        {/* 5. Terms last, where terms belong. */}
+        <div id="claim" className="mt-14 rounded-2xl border border-white/12 p-6">
+          <h2 className="text-xl font-black">The terms</h2>
+          <ul className="mt-4 space-y-2 text-sm leading-relaxed text-white/75">
+            <li>{SEASON_PRICE} flat for the season. No prorating, whenever you take it.</li>
+            <li>The founding rate is locked for three seasons.</li>
+            <li>First refusal on the season after that.</li>
+            <li>The founding window closes around Week 8. After that it is a waitlist.</li>
+          </ul>
+
+          <div className="mt-6 space-y-3">
+            <input
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              placeholder="Business name"
+              className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-white placeholder:text-white/35"
+            />
+            <input
+              value={site}
+              onChange={(e) => setSite(e.target.value)}
+              placeholder="Website"
+              className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-white placeholder:text-white/35"
+            />
+          </div>
+          {err ? <p className="mt-3 text-sm text-red-400">{err}</p> : null}
+          <button
+            onClick={claim}
+            disabled={busy || !brand.trim()}
+            className="mt-5 w-full rounded-lg bg-[#FFD700] px-5 py-3 font-black text-[#0A0A0C] disabled:opacity-50"
+          >
+            {busy ? 'Opening checkout\u2026' : `Claim ${teamLabel ?? 'it'} \u2014 ${SEASON_PRICE}`}
+          </button>
+          <p className="mt-3 text-xs text-white/45">
+            Rather talk first? ty@sidehuddlesports.com · or{' '}
+            <a href={APP_STORE_URL} className="underline">see the app</a>.
+          </p>
         </div>
 
         <p className="mt-10 text-xs leading-relaxed text-white/40">
