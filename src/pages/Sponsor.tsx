@@ -82,19 +82,48 @@ export default function Sponsor() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // NEVER STUCK ON "LOADING". The list used to show "Loading teams…" whenever
+  // it was empty — including when the request had failed — so a failed fetch
+  // looked like a slow one forever, with no total and no way to pay. Loading,
+  // failed and ready are now three different states, and failure says so and
+  // offers a retry.
+  const [teamsState, setTeamsState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
+    let cancelled = false;
+    setTeamsState('loading');
     void (async () => {
-      const [{ data: t }, { data: fp }] = await Promise.all([
-        supabase.from('teams').select('id, city, name, league').eq('status', 'active').order('name'),
-        (supabase as any)
-          .from('founding_partners')
-          .select('team_slug')
-          .eq('season', new Date().getFullYear()),
-      ]);
-      setTeams((t ?? []) as Team[]);
-      setTaken(new Set(((fp ?? []) as { team_slug: string }[]).map((r) => r.team_slug)));
+      try {
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 10000),
+        );
+        const [teamsRes, fpRes] = await Promise.race([
+          Promise.all([
+            supabase.from('teams').select('id, city, name, league').eq('status', 'active').order('name'),
+            (supabase as any)
+              .from('founding_partners')
+              .select('team_slug')
+              .eq('season', new Date().getFullYear()),
+          ]),
+          timeout,
+        ]);
+        if (cancelled) return;
+        if (teamsRes.error || !teamsRes.data || teamsRes.data.length === 0) {
+          setTeamsState('failed');
+          return;
+        }
+        setTeams(teamsRes.data as Team[]);
+        // A failed partners read must not block the sale; it just means
+        // nothing shows as taken, and the checkout still refuses a taken team.
+        setTaken(new Set(((fpRes.data ?? []) as { team_slug: string }[]).map((r) => r.team_slug)));
+        setTeamsState('ready');
+      } catch {
+        if (!cancelled) setTeamsState('failed');
+      }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [attempt]);
 
   const linkTeam = useMemo(
     () => (slug ? teams.find((t) => slugOf(t) === slug) ?? null : null),
@@ -227,56 +256,32 @@ export default function Sponsor() {
       </section>
 
       <main className="mx-auto max-w-5xl px-5">
-        {/* [2] PRODUCT PREVIEW — the two reaction-clip visuals side by
-            side under one caption, then the pregame card under its own. */}
-        <section className="grid gap-12 py-12 lg:grid-cols-[2fr,1fr] lg:items-start">
-          <figure className="m-0">
-            <div className="grid grid-cols-1 justify-items-center gap-6 sm:grid-cols-2">
-              <div className="w-full max-w-[300px]">
-                <PhoneFrame tag="PRODUCT PREVIEW" aspect="860 / 1272">
-                  <img
-                    src="/sponsor/sponsor-clip-tulane-poweredby.png"
-                    alt="A fan selfie at the game with a powered-by line under it"
-                    className="block h-full w-full object-cover"
-                  />
-                </PhoneFrame>
-              </div>
-              <div className="w-full max-w-[300px]">
-                <PhoneFrame tag="PRODUCT PREVIEW" aspect="863 / 1196">
-                  <img
-                    src="/sponsor/sponsor-clip-inapp-tulane.png"
-                    alt="A reaction clip in a Side Huddle room with a powered-by line under it"
-                    className="block h-full w-full object-cover"
-                  />
-                  {/* The screenshot's own line read "powered by Joe's Cars", a
-                      test name that reads to a cold visitor as a slot already
-                      sold. Covered with the name typed below. */}
-                  <div
-                    className="absolute inset-x-0 flex items-center justify-center bg-[#0D0D0D]"
-                    style={{ top: '81.6%', height: '7.02%' }}
-                  >
-                    <span className="text-[10px] text-[#9A9A9A] sm:text-[11px]">
-                      powered by {brand.trim() || 'Your business'}
-                    </span>
-                  </div>
-                </PhoneFrame>
-              </div>
-            </div>
+        {/* [2] PRODUCT PREVIEW — two phones, chat open. No section label:
+            the phones and their captions carry it. */}
+        <section className="grid justify-items-center gap-12 py-12 md:grid-cols-2 md:items-start">
+          <figure className="m-0 w-full max-w-[330px]">
+            <PhoneFrame aspect="863 / 1196">
+              <ChatWithCard />
+            </PhoneFrame>
             <figcaption className="mt-5 text-center text-white/80">
-              Your name under every reaction clip.
+              Your name on the pregame card at kickoff.
             </figcaption>
           </figure>
 
-          <figure className="m-0 flex flex-col items-center">
-            <div className="w-full max-w-[300px]">
-              <PhoneFrame tag="PREVIEW" aspect="863 / 1196">
-                <div className="flex h-full flex-col justify-center bg-[#0B0B0D] px-3">
-                  <PregameCardPreview partner={brand.trim() || 'Your business'} />
-                </div>
-              </PhoneFrame>
-            </div>
+          <figure className="m-0 w-full max-w-[330px]">
+            <PhoneFrame aspect="863 / 1196">
+              {/* The real in-app screenshot: a Tulane reaction clip in line in
+                  the chat, "powered by" under it. Only the black border around
+                  the export was trimmed so it fits the phone; every part of the
+                  chat is in it. */}
+              <img
+                src="/sponsor/sponsor-clip-inapp-tulane.png"
+                alt="A reaction clip in line in a Side Huddle chat, with powered by Joe's Cars under it"
+                className="block h-full w-full object-cover"
+              />
+            </PhoneFrame>
             <figcaption className="mt-5 text-center text-white/80">
-              Your name on the pregame card at kickoff.
+              Your name under every reaction clip.
             </figcaption>
           </figure>
         </section>
@@ -354,7 +359,22 @@ export default function Sponsor() {
                   </div>
                 </fieldset>
               ))}
-              {teams.length === 0 ? <p className="text-sm text-white/50">Loading teams…</p> : null}
+              {teamsState === 'loading' ? (
+                <p className="text-sm text-white/50">Loading teams…</p>
+              ) : null}
+              {teamsState === 'failed' ? (
+                <p className="text-sm text-white/70">
+                  The team list didn't load.{' '}
+                  <button
+                    type="button"
+                    onClick={() => setAttempt((a) => a + 1)}
+                    className="underline underline-offset-4"
+                  >
+                    Try again
+                  </button>{' '}
+                  or email ty@sidehuddlesports.com.
+                </p>
+              ) : null}
             </div>
 
             {n > 0 ? (
@@ -433,22 +453,49 @@ function Field({
  * in one so they read as the same product side by side. Screen aspect matches
  * the screenshot (863×1196), so it shows uncropped.
  */
-function PhoneFrame({
-  tag, aspect, children,
-}: {
-  tag: string;
-  aspect: string;
-  children: React.ReactNode;
-}) {
+function PhoneFrame({ aspect, children }: { aspect: string; children: React.ReactNode }) {
   return (
     <div className="relative rounded-[2.6rem] border border-white/15 bg-[#1A1A1D] p-[10px] shadow-[0_30px_70px_rgba(0,0,0,0.6)]">
       <div className="relative overflow-hidden rounded-[2rem] bg-black" style={{ aspectRatio: aspect }}>
         {children}
         <div className="pointer-events-none absolute left-1/2 top-2 h-6 w-24 -translate-x-1/2 rounded-full bg-black" />
       </div>
-      <span className="absolute right-5 top-5 z-10 rounded bg-black/75 px-2 py-1 text-[10px] font-bold tracking-[0.14em] text-white/80">
-        {tag}
-      </span>
+    </div>
+  );
+}
+
+/**
+ * A room with the pregame card in it, the way the app shows it: the play feed
+ * above, the card, a message under it, and the composer at the bottom. Styled
+ * to sit beside the real screenshot without looking like a different product.
+ */
+function ChatWithCard() {
+  return (
+    <div className="flex h-full flex-col bg-[#0B0B0D] pt-10">
+      <div className="flex-1 space-y-3 overflow-hidden px-3">
+        <div className="rounded-[10px] border border-white/[0.07] border-l-[3px] border-l-[#FFD700]/60 bg-white/[0.035] px-3 py-2">
+          <p className="text-[12px] leading-snug text-[#8E8E98]">
+            (Shotgun) J.Goff pass short right to A.St. Brown for 9 yards.
+          </p>
+        </div>
+        <PregameCardPreview partner="Joe's Cars" />
+        <div className="flex items-start gap-2">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#C9A8F0] text-[11px] font-bold text-[#2a1a40]">
+            M
+          </div>
+          <p className="text-[13px] text-white/90">
+            <span className="font-semibold text-[#C9A8F0]">Marcus</span> 20 minutes, get in here
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 border-t border-white/5 bg-[#101012] px-3 py-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-lg text-white/60">+</div>
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white">
+          <div className="h-4 w-4 rounded-full border-2 border-black" />
+        </div>
+        <p className="flex-1 text-[13px] text-white/35">Message…</p>
+        <div className="h-8 w-8 rounded-full bg-[#FFD700]/70" />
+      </div>
     </div>
   );
 }

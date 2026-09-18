@@ -34,6 +34,15 @@
   <meta name="twitter:title" content="Side Huddle Sports">
   <meta property="og:description" content="A room for you and your friends, with an AI Coach that brings the news, the photos and the day's lines to you.">
   <meta name="twitter:description" content="A room for you and your friends, with an AI Coach that brings the news, the photos and the day's lines to you.">
+    <script>
+      // Old builds registered a service worker that caches the site. Remove
+      // any that are still installed so nobody is served a stale version.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (rs) {
+          rs.forEach(function (r) { r.unregister(); });
+        });
+      }
+    </script>
 </head>
 
   <body>
