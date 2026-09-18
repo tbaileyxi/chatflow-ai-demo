@@ -236,10 +236,23 @@ export default function Sponsor() {
           <figure className="m-0 w-full max-w-[380px]">
             <PhoneFrame tag="PRODUCT PREVIEW">
               <img
-                src="/sponsor/clip-caption-annotated.png"
+                src="/sponsor/clip-in-room.png"
                 alt="A fan's reaction clip in a room, with a powered-by line under it"
                 className="block h-full w-full object-cover"
               />
+              {/* The screenshot's own caption said "powered by Joe's Cars" — a
+                  test name that reads as a slot already sold. The band is
+                  covered with the reader's typed business name instead, the
+                  same thing the card beside it does. Positioned in percent of
+                  the image, so it tracks the band at every width. */}
+              <div
+                className="absolute inset-x-0 flex items-center justify-center bg-[#0D0D0D]"
+                style={{ top: '81.6%', height: '7.02%' }}
+              >
+                <span className="text-[10px] text-[#9A9A9A] sm:text-[11px]">
+                  powered by {brand.trim() || 'Your business'}
+                </span>
+              </div>
             </PhoneFrame>
             <figcaption className="mt-4 text-center text-white/75">
               Your name under every reaction clip the fans post — the most-shared thing in the room.
@@ -416,12 +429,12 @@ function Field({
 /**
  * An iPhone, drawn: bezel, rounded screen, dynamic island. Both surfaces sit
  * in one so they read as the same product side by side. Screen aspect matches
- * the screenshot (750×1140), so it shows uncropped.
+ * the screenshot (863×1196), so it shows uncropped.
  */
 function PhoneFrame({ tag, children }: { tag: string; children: React.ReactNode }) {
   return (
     <div className="relative rounded-[2.6rem] border border-white/15 bg-[#1A1A1D] p-[10px] shadow-[0_30px_70px_rgba(0,0,0,0.6)]">
-      <div className="relative overflow-hidden rounded-[2rem] bg-black" style={{ aspectRatio: '750 / 1140' }}>
+      <div className="relative overflow-hidden rounded-[2rem] bg-black" style={{ aspectRatio: '863 / 1196' }}>
         {children}
         <div className="pointer-events-none absolute left-1/2 top-2 h-6 w-24 -translate-x-1/2 rounded-full bg-black" />
       </div>
