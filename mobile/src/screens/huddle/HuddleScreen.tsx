@@ -865,12 +865,12 @@ export function HuddleScreen() {
                   Say something to start the room.
                 </Type>
                 {/* A game room is not dead just because nobody has typed:
-                    the bot posts into any occupied room for the game, from
-                    the next play on. Say so, or an empty room at 10-7 in the
-                    first quarter reads as broken. */}
+                    the bot starts calling plays in any room somebody is in,
+                    on its own, within a minute. Nobody has to type first.
+                    Say so, or an empty room at 10-7 reads as broken. */}
                 {huddle?.gameId ? (
                   <Type variant="caption" tone="tertiary" className="mt-1.5 text-center">
-                    The game bot drops in with the next big play.
+                    The game bot starts calling plays on its own — no need to type.
                   </Type>
                 ) : null}
               </View>
