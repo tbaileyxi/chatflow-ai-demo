@@ -24,23 +24,16 @@ function useAdminUsers(search: string) {
   return useQuery({
     queryKey: ["admin-users", search],
     queryFn: async (): Promise<AdminUser[]> => {
-      let query = supabase
-        .from("profiles")
-        .select("user_id, display_name, username, avatar_url, phone_number, status")
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (search.trim()) {
-        query = query.or(
-          `display_name.ilike.%${search}%,username.ilike.%${search}%,phone_number.ilike.%${search}%`,
-        );
-      }
-
-      const { data: profiles, error } = await query;
+      // Phone numbers are not readable off profiles any more — the public
+      // key could read the whole table. Admin-only RPC instead.
+      const { data: profiles, error } = await (supabase.rpc as any)(
+        "admin_user_directory",
+        { p_search: search.trim() || null, p_limit: 50 },
+      );
       if (error || !profiles) return [];
 
       // Fetch roles
-      const userIds = profiles.map((p) => p.user_id);
+      const userIds = (profiles as any[]).map((p) => p.user_id);
       const { data: roles } = await supabase
         .from("user_roles")
         .select("user_id, role")
@@ -48,7 +41,7 @@ function useAdminUsers(search: string) {
 
       const roleMap = new Map((roles ?? []).map((r) => [r.user_id, r.role]));
 
-      return profiles.map((p) => ({
+      return (profiles as any[]).map((p) => ({
         userId: p.user_id,
         displayName: p.display_name,
         username: p.username,

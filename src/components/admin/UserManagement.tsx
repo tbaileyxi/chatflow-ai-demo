@@ -100,10 +100,7 @@ export const UserManagement = () => {
       if (authError) throw authError;
 
       // Get all users from profiles table with new columns
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data: profiles, error: profilesError } = await (supabase.rpc as any)('admin_user_directory', { p_limit: 1000 });
 
       if (profilesError) throw profilesError;
 

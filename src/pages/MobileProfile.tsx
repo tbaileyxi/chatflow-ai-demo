@@ -46,7 +46,7 @@ export const MobileProfile = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, user_id, display_name, username, avatar_url, bio, status, created_at, updated_at, onboarding_completed, is_founding_member, founding_tier, founding_spot_number, has_lifetime_verified_huddle_code, verified_huddle_promo_code, is_premium, premium_since, premium_expires_at')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -66,7 +66,11 @@ export const MobileProfile = () => {
           };
           setProfile(defaultProfile as UserProfile);
       } else {
-        setProfile(data);
+        // phone_number is not readable off profiles; your own comes back from
+        // an auth-scoped function.
+        const { data: priv } = await (supabase.rpc as any)('my_private_profile');
+        const privRow = Array.isArray(priv) ? priv[0] : priv;
+        setProfile({ ...(data as any), phone_number: privRow?.phone_number ?? '' });
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
