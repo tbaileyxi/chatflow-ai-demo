@@ -7,7 +7,6 @@
 // everywhere, so a link can only be wrong in a single place.
 
 import React from 'react';
-import { TEAMS } from '@/lib/teams';
 import { Link } from 'react-router-dom';
 import shLogo from '@/assets/sh-logo-updated.png';
 
@@ -41,37 +40,6 @@ export function SiteNav() {
 export function SiteFooter() {
   return (
     <footer className="border-t border-white/5 px-6 py-8">
-      {/* EVERY TEAM PAGE, LINKED FROM EVERY PAGE.
-          Google finds pages by following links, and nothing on this site linked
-          to /t/<slug> — so 19 team pages existed and were unreachable by a
-          crawler walking the site. A sitemap tells Google they exist; internal
-          links are what tell it they matter, and it gives a visitor a way to
-          find their own team, which is the point of having them. */}
-      <nav aria-label="Team rooms" className="max-w-5xl mx-auto mb-8">
-        <h2 className="text-[11px] uppercase tracking-widest text-white/25 mb-3">
-          Team rooms
-        </h2>
-        <div className="flex flex-wrap gap-x-4 gap-y-2">
-          {Object.entries(TEAMS).map(([slug, t]) => (
-            <Link
-              key={slug}
-              to={`/t/${slug}`}
-              className="text-xs text-white/35 hover:text-white/70 transition-colors"
-            >
-              {t.name}
-            </Link>
-          ))}
-          {/* The other ~160 are one click away rather than all in the footer:
-              a 180-name footer on every page reads as spam to a crawler and is
-              useless to a person. */}
-          <Link
-            to="/teams"
-            className="text-xs text-white/60 hover:text-white transition-colors underline underline-offset-2"
-          >
-            All teams →
-          </Link>
-        </div>
-      </nav>
 
       <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">

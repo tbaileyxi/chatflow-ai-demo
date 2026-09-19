@@ -11,6 +11,14 @@
 
 import { writeFileSync, readFileSync } from "node:fs";
 
+// PAUSED (2026-09-19): every /t/* URL 301s to / (vercel.json) and the team
+// pages are out of the footer and the sitemap. Running this would put 181
+// redirecting URLs back in the sitemap. Remove the redirect first.
+if (!process.env.FORCE_TEAM_PAGES) {
+  console.error("Team pages are redirected to / right now (vercel.json). Remove that rule, then run with FORCE_TEAM_PAGES=1.");
+  process.exit(1);
+}
+
 const URL_BASE = "https://dejuwyeypiggvlyfliap.supabase.co";
 const KEY = (readFileSync("src/integrations/supabase/client.ts", "utf8")
   .match(/eyJ[A-Za-z0-9_.-]{60,}/) || [])[0];
