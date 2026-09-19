@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { BadgeCheck } from "lucide-react-native";
+import { useCreatorBadge } from "@/hooks/useCreatorBadge";
 import { Alert, View, Text, Image, Pressable, ScrollView } from "react-native";
 import { useRoute, useNavigation, type RouteProp } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
@@ -42,6 +44,7 @@ export default function PublicProfileScreen() {
   // still load normally with the button flipped, not fail to load.
   const [blocked, setBlocked] = useState(false);
   const isSelf = !!user && user.id === userId;
+  const { data: creatorHandle } = useCreatorBadge(userId ?? null);
 
   useEffect(() => {
     if (!userId || isSelf) return;
@@ -199,7 +202,17 @@ export default function PublicProfileScreen() {
               </View>
             )}
 
-            <Type variant="title" className="mt-4">{name}</Type>
+            <View className="mt-4 flex-row items-center gap-1.5">
+              <Type variant="title">{name}</Type>
+              {creatorHandle ? (
+                <BadgeCheck color={colors.verified.primary} size={20} accessibilityLabel="Verified creator" />
+              ) : null}
+            </View>
+            {creatorHandle ? (
+              <Type variant="data" tone="primary" className="mt-1">
+                Verified creator · @{creatorHandle}
+              </Type>
+            ) : null}
 
             {/* If their Side Huddle name is nothing useful but you have them in
                 your phone, say so — that is the line that answers "who?". */}

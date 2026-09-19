@@ -22,6 +22,8 @@ export type HuddleDetails = {
   photoUrl: string | null;
   /** The fixture this huddle is about, for game huddles and side huddles. */
   gameId: string | null;
+  /** Set when this is a verified creator's room: their X handle. */
+  creatorHandle: string | null;
   /** Public, nobody created it, one per fixture. */
   isGameRoom: boolean;
   /** Set on a side huddle. Null on everything permanent. */
@@ -55,7 +57,7 @@ export function useHuddleDetails(huddleId: string) {
           is_official_team_huddle, is_verified, owner_id, team_id,
           teams!team_id (name, city, logo_url)
         `;
-      const EXTRA = `official_status, website_url, photo_url, game_id, is_game_room, expires_at, is_dm`;
+      const EXTRA = `official_status, website_url, photo_url, game_id, is_game_room, expires_at, is_dm, x_handle`;
 
       let { data: rawData, error } = await (supabase as any)
         .from("huddles")
@@ -86,6 +88,22 @@ export function useHuddleDetails(huddleId: string) {
         isMember = !!membership;
       }
 
+      // A creator room: the owner is a verified creator and the room carries
+      // their handle. Checked against the profile, never the room alone —
+      // anyone can have a room with a handle on it.
+      let creatorHandle: string | null = null;
+      const roomHandle: string | null = (data as any).x_handle ?? null;
+      if (roomHandle && data.owner_id) {
+        const { data: owner } = await (supabase as any)
+          .from("profiles")
+          .select("x_handle, verified_creator")
+          .eq("user_id", data.owner_id)
+          .maybeSingle();
+        if (owner?.verified_creator && String(owner.x_handle ?? "").toLowerCase() === roomHandle.toLowerCase()) {
+          creatorHandle = owner.x_handle;
+        }
+      }
+
       const team = (data as any).teams;
       const officialStatus = ((data as any).official_status ??
         "inactive") as HuddleDetails["officialStatus"];
@@ -108,6 +126,7 @@ export function useHuddleDetails(huddleId: string) {
         teamLogoUrl: team?.logo_url ?? null,
         photoUrl: (data as any).photo_url ?? null,
         gameId: (data as any).game_id ?? null,
+        creatorHandle,
         isGameRoom: (data as any).is_game_room === true,
         isDm: (data as any).is_dm === true,
         expiresAt: (data as any).expires_at ?? null,

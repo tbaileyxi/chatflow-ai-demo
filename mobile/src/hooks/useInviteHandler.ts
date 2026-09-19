@@ -7,6 +7,7 @@
 // This hook is the only place that should parse invite URLs.
 
 import { useEffect, useRef } from "react";
+import { Alert } from "react-native";
 import * as Linking from "expo-linking";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
@@ -16,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import type { RootStackParamList } from "@/navigation/types";
 
 export const PENDING_INVITE_KEY = "side-huddle-pending-invite-v1";
+export const PENDING_CREATOR_INVITE_KEY = "side-huddle-pending-creator-invite-v1";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -37,6 +39,68 @@ export function extractInviteCode(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * A verified-creator invite token from any of:
+ *   https://sidehuddlesports.com/invite/TOKEN
+ *   sidehuddle://invite/TOKEN
+ */
+export function extractCreatorToken(url: string): string | null {
+  try {
+    const { hostname, path } = Linking.parse(url);
+    let raw: string | null = null;
+    if (hostname === "invite" && path) raw = path;
+    else if (path?.startsWith("invite/")) raw = path.slice("invite/".length);
+    if (!raw) return null;
+    const token = raw.replace(/^\/+|\/+$/g, "").split(/[/?#]/)[0];
+    return /^[A-Za-z0-9_-]{16,64}$/.test(token) ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function storePendingCreatorInvite(token: string): Promise<void> {
+  await AsyncStorage.setItem(PENDING_CREATOR_INVITE_KEY, token);
+}
+
+export async function takePendingCreatorInvite(): Promise<string | null> {
+  const token = await AsyncStorage.getItem(PENDING_CREATOR_INVITE_KEY);
+  if (token) await AsyncStorage.removeItem(PENDING_CREATOR_INVITE_KEY);
+  return token;
+}
+
+const CLAIM_ERRORS: Record<string, string> = {
+  invite_not_found: "That invite link isn't valid. Ask us for a new one.",
+  invite_already_claimed: "That invite link has already been used.",
+  invite_revoked: "That invite link was turned off. Ask us for a new one.",
+};
+
+/**
+ * Claims a creator invite for the signed-in account: the handle is linked,
+ * the verified badge set, and their team room created. Lands them in it.
+ */
+export async function claimCreatorInvite(
+  token: string,
+  navigation: Nav,
+): Promise<{ ok: boolean; huddleId?: string; error?: string }> {
+  const { data, error } = await (supabase.rpc as any)("claim_creator_invite", {
+    p_token: token,
+  });
+  if (error) {
+    const key = Object.keys(CLAIM_ERRORS).find((k) => error.message?.includes(k));
+    Alert.alert("Invite didn't work", key ? CLAIM_ERRORS[key] : "Try the link again in a minute.");
+    return { ok: false, error: error.message };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  const huddleId: string | undefined = row?.huddle_id;
+  if (!huddleId) return { ok: false, error: "no room returned" };
+  navigation.navigate("Huddle", { huddleId });
+  Alert.alert(
+    "You're verified",
+    `@${row?.x_handle ?? ""} is linked. This is your room — your posts on X land here on their own.`,
+  );
+  return { ok: true, huddleId };
 }
 
 function cleanCode(raw: string): string | null {
@@ -104,6 +168,14 @@ export function useInviteHandler() {
     const handle = async (url: string | null) => {
       if (!url || handledRef.current.has(url)) return;
       handledRef.current.add(url);
+
+      const creatorToken = extractCreatorToken(url);
+      if (creatorToken) {
+        if (user) await claimCreatorInvite(creatorToken, navigation);
+        else await storePendingCreatorInvite(creatorToken);
+        return;
+      }
+
       const code = extractInviteCode(url);
       if (!code) return;
       if (user) {

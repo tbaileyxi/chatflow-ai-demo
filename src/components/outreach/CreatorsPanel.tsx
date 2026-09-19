@@ -43,6 +43,14 @@ type Creator = {
 
 const STATUSES: Status[] = ["new", "queued", "sent", "replied", "onboarded", "dead"];
 
+type Team = { id: string; city: string; name: string; league: string | null };
+type Invite = { x_handle: string; status: "pending" | "claimed" | "revoked"; token: string; created_at: string };
+type CreatorProfile = { user_id: string; display_name: string | null; username: string | null; x_handle: string; verified_creator: boolean };
+
+const INVITE_BASE = "https://sidehuddlesports.com/invite/";
+const teamLabel = (t: Team) => `${t.city} ${t.name}`.trim();
+const key = (h: string) => h.replace(/^@/, "").toLowerCase();
+
 function statusBadge(s: Status) {
   const tone: Record<Status, string> = {
     new: "bg-muted text-muted-foreground",
@@ -62,6 +70,85 @@ export default function CreatorsPanel() {
   const [search, setSearch] = useState("");
   const [org, setOrg] = useState("");
 
+  // Verified-creator state, keyed by lowercased handle.
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [invites, setInvites] = useState<Map<string, Invite>>(new Map());
+  const [verified, setVerified] = useState<Map<string, CreatorProfile>>(new Map());
+  const [teamFor, setTeamFor] = useState<Record<string, string>>({});
+  const [grantUser, setGrantUser] = useState<Record<string, string>>({});
+  const [busyHandle, setBusyHandle] = useState<string | null>(null);
+
+  async function loadVerification() {
+    const sb = supabase as any;
+    const [t, inv, prof] = await Promise.all([
+      sb.from("teams").select("id, city, name, league").eq("status", "active").order("name"),
+      sb.from("creator_invites").select("x_handle, status, token, created_at").order("created_at", { ascending: false }),
+      sb.from("profiles").select("user_id, display_name, username, x_handle, verified_creator").not("x_handle", "is", null),
+    ]);
+    setTeams((t.data ?? []) as Team[]);
+    const m = new Map<string, Invite>();
+    for (const i of (inv.data ?? []) as Invite[]) if (!m.has(key(i.x_handle))) m.set(key(i.x_handle), i);
+    setInvites(m);
+    setVerified(new Map(((prof.data ?? []) as CreatorProfile[]).map((p) => [key(p.x_handle), p])));
+  }
+
+  /** The team a row's invite is for: what the admin picked, else a guess from the org. */
+  function teamIdFor(r: Creator): string | null {
+    const typed = teamFor[r.id];
+    const byLabel = (label: string) => teams.find((t) => teamLabel(t).toLowerCase() === label.trim().toLowerCase());
+    if (typed !== undefined) return byLabel(typed)?.id ?? null;
+    const o = (r.org ?? "").trim().toLowerCase();
+    if (!o) return null;
+    return (teams.find((t) => teamLabel(t).toLowerCase() === o) ?? teams.find((t) => t.city.toLowerCase() === o))?.id ?? null;
+  }
+  function teamText(r: Creator): string {
+    if (teamFor[r.id] !== undefined) return teamFor[r.id];
+    const id = teamIdFor(r);
+    const t = teams.find((x) => x.id === id);
+    return t ? teamLabel(t) : "";
+  }
+
+  async function copyInvite(r: Creator) {
+    const teamId = teamIdFor(r);
+    setBusyHandle(r.handle);
+    const { data, error } = await (supabase.rpc as any)("admin_creator_invite", { p_handle: r.handle, p_team_id: teamId });
+    setBusyHandle(null);
+    if (error) return toast({ title: "No link", description: error.message, variant: "destructive" });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row?.status === "claimed") {
+      toast({ title: `@${r.handle} already claimed their link`, description: "Revoke first to issue a new one." });
+    } else {
+      const url = INVITE_BASE + row.token;
+      await navigator.clipboard.writeText(url).catch(() => {});
+      toast({ title: "Invite link copied", description: url });
+    }
+    loadVerification();
+  }
+
+  async function revoke(r: Creator) {
+    if (!window.confirm(`Revoke @${r.handle}? The verified badge comes off and their link stops working.`)) return;
+    setBusyHandle(r.handle);
+    const { error } = await (supabase.rpc as any)("admin_revoke_creator", { p_handle: r.handle });
+    setBusyHandle(null);
+    if (error) return toast({ title: "Revoke failed", description: error.message, variant: "destructive" });
+    toast({ title: `@${r.handle} revoked` });
+    loadVerification();
+  }
+
+  async function grant(r: Creator) {
+    const who = (grantUser[r.id] ?? "").trim();
+    const teamId = teamIdFor(r);
+    if (!who) return toast({ title: "Enter their username or email", variant: "destructive" });
+    if (!teamId) return toast({ title: "Pick a team first", variant: "destructive" });
+    setBusyHandle(r.handle);
+    const { error } = await (supabase.rpc as any)("admin_grant_creator", { p_user: who, p_handle: r.handle, p_team_id: teamId });
+    setBusyHandle(null);
+    if (error) return toast({ title: "Grant failed", description: error.message, variant: "destructive" });
+    toast({ title: `@${r.handle} linked and verified`, description: who });
+    setGrantUser((g) => ({ ...g, [r.id]: "" }));
+    loadVerification();
+  }
+
   async function load() {
     setLoading(true);
     const { data, error } = await supabase
@@ -74,7 +161,7 @@ export default function CreatorsPanel() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); loadVerification(); }, []);
 
   const orgs = useMemo(
     () => [...new Set(rows.map((r) => r.org).filter(Boolean))].sort() as string[],
@@ -151,6 +238,7 @@ export default function CreatorsPanel() {
                 <TableHead>Best post</TableHead>
                 <TableHead>Reach</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="min-w-[260px]">Verified</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -199,17 +287,78 @@ export default function CreatorsPanel() {
                       {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </TableCell>
+                  <TableCell className="align-top">
+                    {(() => {
+                      const inv = invites.get(key(r.handle));
+                      const prof = verified.get(key(r.handle));
+                      const isVerified = !!prof?.verified_creator;
+                      const state = isVerified ? (inv?.status === "claimed" ? "claimed" : "verified") : inv?.status ?? "none";
+                      const tone: Record<string, string> = {
+                        none: "bg-muted text-muted-foreground",
+                        pending: "bg-amber-500/15 text-amber-600",
+                        claimed: "bg-emerald-600 text-white",
+                        verified: "bg-emerald-600 text-white",
+                        revoked: "bg-destructive/15 text-destructive",
+                      };
+                      const busy = busyHandle === r.handle;
+                      return (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge className={`${tone[state]} border-0`}>{state}</Badge>
+                            {isVerified && prof ? (
+                              <span className="text-xs text-muted-foreground">
+                                {prof.display_name ?? prof.username ?? "account linked"}
+                              </span>
+                            ) : null}
+                          </div>
+                          <Input
+                            list="creator-teams"
+                            className="h-8 text-xs"
+                            placeholder="Team"
+                            value={teamText(r)}
+                            onChange={(e) => setTeamFor((m) => ({ ...m, [r.id]: e.target.value }))}
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            <Button size="sm" variant="outline" disabled={busy} onClick={() => copyInvite(r)}>
+                              Copy invite link
+                            </Button>
+                            {state !== "none" && state !== "revoked" ? (
+                              <Button size="sm" variant="outline" disabled={busy} onClick={() => revoke(r)}
+                                className="text-destructive">
+                                Revoke
+                              </Button>
+                            ) : null}
+                          </div>
+                          {/* Fallback: they signed up without tapping the link. */}
+                          {!isVerified ? (
+                            <div className="flex gap-2">
+                              <Input
+                                className="h-8 text-xs"
+                                placeholder="Their username or email"
+                                value={grantUser[r.id] ?? ""}
+                                onChange={(e) => setGrantUser((g) => ({ ...g, [r.id]: e.target.value }))}
+                              />
+                              <Button size="sm" disabled={busy} onClick={() => grant(r)}>Link + verify</Button>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })()}
+                  </TableCell>
                 </TableRow>
               ))}
               {!filtered.length && !loading && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-10">
+                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">
                     No creators yet — run discovery for a team and they'll appear here.
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
+          <datalist id="creator-teams">
+            {teams.map((t) => <option key={t.id} value={teamLabel(t)} />)}
+          </datalist>
         </CardContent>
       </Card>
     </div>

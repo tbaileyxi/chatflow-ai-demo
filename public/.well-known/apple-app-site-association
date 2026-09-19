@@ -2,16 +2,33 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["796XBTP82R.com.sidehuddle.sports"],
+        "appIDs": [
+          "796XBTP82R.com.sidehuddle.sports"
+        ],
         "components": [
-          { "/": "/h/*",  "comment": "room invite — opens straight to the room" },
-          { "/": "/i/*",  "comment": "invite code" },
-          { "/": "/picks/*", "comment": "shared pick" }
+          {
+            "/": "/h/*",
+            "comment": "room invite \u2014 opens straight to the room"
+          },
+          {
+            "/": "/i/*",
+            "comment": "invite code"
+          },
+          {
+            "/": "/picks/*",
+            "comment": "shared pick"
+          },
+          {
+            "/": "/invite/*",
+            "comment": "verified-creator invite \u2014 claimed in the app"
+          }
         ]
       }
     ]
   },
   "webcredentials": {
-    "apps": ["796XBTP82R.com.sidehuddle.sports"]
+    "apps": [
+      "796XBTP82R.com.sidehuddle.sports"
+    ]
   }
 }

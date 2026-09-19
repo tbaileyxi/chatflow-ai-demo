@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, Image, FlatList, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Users, ShieldCheck } from "lucide-react-native";
+import { BadgeCheck, Search, Users, ShieldCheck } from "lucide-react-native";
 import { Type } from "@/components/ui/Type";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,8 @@ type SearchHuddle = {
   isOfficial: boolean;
   knownNames: string[];
   knownCount: number;
+  /** Set on a verified creator's room. */
+  creatorHandle?: string | null;
 };
 
 // "Mike and Sara are in" reads like a reason to tap. "3 members" does not.
@@ -75,10 +77,52 @@ function useHuddleSearch(search: string) {
   });
 }
 
+// VERIFIED CREATORS FIRST. Searching a creator's name or handle finds their
+// room; searching a team puts that team's verified creators at the top.
+// search_creators() only returns verified creators, so listing them ahead of
+// everything else is what makes verified outrank unverified.
+function useCreatorSearch(search: string) {
+  const q = search.trim();
+  return useQuery({
+    queryKey: ["creator-search", q],
+    enabled: q.length >= 2,
+    queryFn: async (): Promise<SearchHuddle[]> => {
+      const { data, error } = await (supabase.rpc as any)("search_creators", {
+        p_search: q,
+        p_limit: 10,
+      });
+      if (error) {
+        console.warn("[search] search_creators failed", error);
+        return [];
+      }
+      return ((data ?? []) as any[]).map((c) => ({
+        id: c.huddle_id,
+        name: c.name,
+        bio: c.creator_name ? `${c.creator_name} · ${c.team_name ?? ""}`.replace(/ · $/, "") : c.team_name ?? null,
+        memberCount: c.member_count ?? 0,
+        teamName: c.team_name ?? null,
+        teamLogoUrl: c.team_logo_url ?? null,
+        isMember: !!c.is_member,
+        isPrivate: false,
+        isOfficial: false,
+        knownNames: [],
+        knownCount: 0,
+        creatorHandle: c.x_handle ?? null,
+      }));
+    },
+  });
+}
+
 export function HuddleSearchScreen() {
   const navigation = useNavigation();
   const [search, setSearch] = useState("");
-  const { data: huddles, isLoading } = useHuddleSearch(search);
+  const { data: rooms, isLoading } = useHuddleSearch(search);
+  const { data: creators } = useCreatorSearch(search);
+  const huddles = useMemo(() => {
+    const top = creators ?? [];
+    const seen = new Set(top.map((c) => c.id));
+    return [...top, ...(rooms ?? []).filter((r) => !seen.has(r.id))];
+  }, [creators, rooms]);
 
   // Tapping the row does what the row's own button says. It used to open
   // HuddleSettings — the admin editor — which is neither entering nor joining,
@@ -117,6 +161,9 @@ export function HuddleSearchScreen() {
           <Type variant="bodyStrong" className="flex-1" numberOfLines={1}>
             {item.name}
           </Type>
+          {item.creatorHandle ? (
+            <BadgeCheck color={colors.verified.primary} size={16} accessibilityLabel="Verified creator" />
+          ) : null}
         </View>
 
         {/* The reason this room is on your screen at all. */}

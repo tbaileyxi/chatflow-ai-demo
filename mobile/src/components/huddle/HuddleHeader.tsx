@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, View, Text, Image, Pressable, Animated, Linking } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
+  BadgeCheck,
   ChevronLeft,
   MoreVertical,
   ShieldCheck,
@@ -285,6 +286,10 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
             </Type>
             {huddle.isVerified ? (
               <ShieldCheck color={colors.primary} size={14} />
+            ) : null}
+            {/* A verified creator's own room. */}
+            {huddle.creatorHandle ? (
+              <BadgeCheck color={colors.verified.primary} size={18} accessibilityLabel="Verified creator" />
             ) : null}
             {/* WHICH KIND OF HUDDLE THIS IS. A public one full of strangers
                 and a side huddle that ends at 2am both behave differently

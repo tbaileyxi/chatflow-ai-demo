@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { BadgeCheck } from "lucide-react-native";
+import { useCreatorBadge } from "@/hooks/useCreatorBadge";
 import { Image, Pressable, ScrollView, View } from "react-native";
 import { Type } from "@/components/ui/Type";
 import { useUserHuddles } from "@/hooks/useUserHuddles";
@@ -34,6 +36,7 @@ export function ProfileHeader({
   onAddTeams: () => void;
 }) {
   const { data: huddles } = useUserHuddles();
+  const { data: creatorHandle } = useCreatorBadge();
   const { data: teams } = useFollowedTeams();
 
   const { data: people } = useKnownPeople();
@@ -91,9 +94,19 @@ export function ProfileHeader({
           </View>
         </Pressable>
 
-        <Type variant="title" className="mt-3" style={{ fontSize: 23 }}>
-          {displayName || "You"}
-        </Type>
+        <View className="mt-3 flex-row items-center gap-1.5">
+          <Type variant="title" style={{ fontSize: 23 }}>
+            {displayName || "You"}
+          </Type>
+          {creatorHandle ? (
+            <BadgeCheck color={colors.verified.primary} size={22} accessibilityLabel="Verified creator" />
+          ) : null}
+        </View>
+        {creatorHandle ? (
+          <Type variant="data" tone="primary" className="mt-1">
+            Verified creator · @{creatorHandle}
+          </Type>
+        ) : null}
         {/* A handle nobody chose is not a handle. Signing up by SMS mints
             one from the phone number — "@12035550142_ffd42b1c" — and printing
             that under somebody's name makes their own profile look like a

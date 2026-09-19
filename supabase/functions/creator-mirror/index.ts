@@ -17,9 +17,11 @@
 //   3. Between games only. No pulling from 6h before kickoff to 2h after the
 //      final whistle for the room's team. This never stands in for the creator
 //      being in the room on gameday.
-//   4. Only rooms the creator owns: the room's owner is registered in
-//      creator_accounts with the same handle. Never team rooms, game huddles,
-//      DMs, or anyone else's room.
+//   4. Only rooms the creator owns: the room's owner is a verified creator
+//      (profiles.verified_creator, granted by a creator invite link or by an
+//      admin) and the room carries their profiles.x_handle. The pull reads
+//      from that profile handle. Never team rooms, game huddles, DMs, or
+//      anyone else's room. Revoking the badge stops the pull.
 //
 // Actions:
 //   {}                        mirror every room that passes rule 4
@@ -421,9 +423,9 @@ serve(async (req) => {
   }
 
   // ── Which rooms to mirror ─────────────────────────────────────────────────
-  // Rule 4: only a room its creator owns. The owner must be registered in
-  // creator_accounts under the same handle the room is wired to — an x_handle
-  // on its own proves nothing, anyone could type a creator's name into it.
+  // Rule 4: only a room its creator owns. The owner must be a verified
+  // creator whose profile handle is the one the room is wired to — an
+  // x_handle on a room proves nothing on its own.
   type Room = { id: string; x_handle: string; name: string | null; team_id: string | null };
   let q = supabase
     .from("huddles")
@@ -436,7 +438,8 @@ serve(async (req) => {
 
   const owners = [...new Set((wired ?? []).map((r: any) => r.owner_id).filter(Boolean))];
   const { data: creators } = owners.length
-    ? await supabase.from("creator_accounts").select("user_id, x_handle").in("user_id", owners)
+    ? await supabase.from("profiles").select("user_id, x_handle")
+        .in("user_id", owners).eq("verified_creator", true).not("x_handle", "is", null)
     : { data: [] as any[] };
   const handleOf = new Map((creators ?? []).map((c: any) => [c.user_id, String(c.x_handle).replace(/^@/, "").toLowerCase()]));
 
@@ -448,7 +451,7 @@ serve(async (req) => {
       r.is_official_team_huddle ? "team room" :
       (r.is_game_room || r.event_id || r.game_id) ? "game huddle" :
       r.is_dm ? "DM" :
-      handleOf.get(r.owner_id) !== h.toLowerCase() ? "owner is not @" + h :
+      handleOf.get(r.owner_id) !== h.toLowerCase() ? "owner is not verified as @" + h :
       body.handle && body.handle.replace(/^@/, "").toLowerCase() !== h.toLowerCase() ? "handle does not match room" :
       null;
     if (why) out_of_scope.push(`${r.name ?? r.id}: ${why}`);

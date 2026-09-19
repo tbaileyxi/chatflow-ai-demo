@@ -10,6 +10,8 @@ import {
   useInviteHandler,
   takePendingInvite,
   consumeInvite,
+  takePendingCreatorInvite,
+  claimCreatorInvite,
 } from "@/hooks/useInviteHandler";
 import { ensureConfigured as configureRevenueCat } from "@/lib/revenuecat";
 import { colors } from "@/theme/colors";
@@ -58,6 +60,12 @@ export function RootNavigator() {
     if (!onboarded || consumedRef.current) return;
     consumedRef.current = true;
     (async () => {
+      // A creator invite first: it is the reason they signed up.
+      const creatorToken = await takePendingCreatorInvite();
+      if (creatorToken) {
+        await claimCreatorInvite(creatorToken, navigation);
+        return;
+      }
       const code = await takePendingInvite();
       if (code) await consumeInvite(code, navigation);
     })();
