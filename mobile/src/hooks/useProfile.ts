@@ -56,8 +56,12 @@ export function useProfile() {
       // is_app_admin added in 20260608000005 — types lag. Cast through any.
       const { data: rawData, error } = await (supabase as any)
         .from("profiles")
+        // phone_number is NOT readable off profiles any more — the app's
+        // public key could read the whole table, so the private columns are
+        // ungranted and asking for one fails the entire select. Your own
+        // comes back from my_private_profile() below.
         .select(
-          "user_id, display_name, username, phone_number, bio, avatar_url, onboarding_completed, is_app_admin",
+          "user_id, display_name, username, bio, avatar_url, onboarding_completed, is_app_admin",
         )
         .eq("user_id", user.id)
         .maybeSingle();
@@ -65,11 +69,14 @@ export function useProfile() {
 
       if (error || !data) return null;
 
+      const { data: priv } = await (supabase.rpc as any)("my_private_profile");
+      const privRow = Array.isArray(priv) ? priv[0] : priv;
+
       return {
         userId: data.user_id,
         displayName: data.display_name,
         username: data.username,
-        phoneNumber: data.phone_number,
+        phoneNumber: privRow?.phone_number ?? null,
         bio: data.bio,
         avatarUrl: data.avatar_url,
         onboardingCompleted: data.onboarding_completed ?? false,
