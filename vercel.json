@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "/t/:path*",
+      "destination": "/",
+      "statusCode": 301
+    }
+  ],
   "rewrites": [
     {
       "source": "/room-photo/:path*",

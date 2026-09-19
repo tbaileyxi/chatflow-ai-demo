@@ -30,24 +30,27 @@ const ROOM_SHOTS = [
 const STEPS = [
   {
     n: '01',
-    title: 'Make a huddle',
-    desc: 'A private room for your team. Name it, pick the team, done.',
-    img: '/landing/step-start.jpg',
-    alt: 'Start a huddle: name it and pick your team',
+    title: "See who's watching",
+    desc: 'Gameday: friends at the game light up, live game huddles show the score. You always know where the party is.',
+    img: '/landing/home.jpg',
+    alt: 'Home: friends at the game and live game huddles with scores',
+    // The friends strip and the live game huddles are the point of this
+    // screen, so the phone crops in on them rather than the whole Home.
+    zoom: true,
   },
   {
     n: '02',
-    title: 'Bring your crew',
-    desc: 'Find who you already know here, or send one link to the rest.',
-    img: '/landing/step-invite.jpg',
-    alt: 'Inviting friends into a huddle',
+    title: 'Jump in',
+    desc: "One tap into the live game huddle. Or spin up your own for your crew — it lives for that game, then it's gone. No invites, no setup.",
+    img: '/landing/step-spinup.jpg',
+    alt: 'A side huddle spun up for the game, the crew already talking',
   },
   {
     n: '03',
-    title: 'Talk through the game',
-    desc: 'Every play, every bad call, every argument — with your people, not strangers.',
+    title: 'Feel every play together',
+    desc: 'Every score, bad call, and celebration lands in the room in real time. React with your face and the field in one clip.',
     img: '/landing/room-chat.jpg',
-    alt: 'Friends talking through the game in a room',
+    alt: 'A lively room reacting to the game, with a dual-cam clip',
   },
 ];
 
@@ -90,8 +93,17 @@ function Phone({ children, className = '' }: { children: React.ReactNode; classN
   );
 }
 
-function Shot({ src, alt }: { src: string; alt: string }) {
-  return <img src={src} alt={alt} className="block h-full w-full object-cover" loading="lazy" />;
+function Shot({ src, alt, zoom = false }: { src: string; alt: string; zoom?: boolean }) {
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      className="block h-full w-full object-cover"
+      // Zoomed: the top of Home (friends + game huddles) fills the screen.
+      style={zoom ? { transform: 'scale(1.15) translateY(-3%)', transformOrigin: '25% 0%' } : undefined}
+    />
+  );
 }
 
 /** The front phone: room screenshots crossfading, with the live "watching" pill. */
@@ -196,7 +208,7 @@ export default function LandingPage() {
           {STEPS.map((s) => (
             <li key={s.n} className="flex flex-col items-center text-center">
               <Phone className="w-[210px]">
-                <Shot src={s.img} alt={s.alt} />
+                <Shot src={s.img} alt={s.alt} zoom={'zoom' in s && s.zoom} />
               </Phone>
               <span className="mt-6 font-mono text-xs tracking-[0.2em]" style={{ color: GOLD }}>
                 {s.n}
