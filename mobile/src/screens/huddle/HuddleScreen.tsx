@@ -864,6 +864,15 @@ export function HuddleScreen() {
                 <Type variant="caption" tone="muted">
                   Say something to start the room.
                 </Type>
+                {/* A game room is not dead just because nobody has typed:
+                    the bot posts into any occupied room for the game, from
+                    the next play on. Say so, or an empty room at 10-7 in the
+                    first quarter reads as broken. */}
+                {huddle?.gameId ? (
+                  <Type variant="caption" tone="tertiary" className="mt-1.5 text-center">
+                    The game bot drops in with the next big play.
+                  </Type>
+                ) : null}
               </View>
             }
             // Bottom-anchored. A two-message room sits just above the
