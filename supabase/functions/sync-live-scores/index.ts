@@ -90,27 +90,32 @@ async function fetchESPNScores(sport: string): Promise<ESPNGame[]> {
   const endpoint = ESPN_ENDPOINTS[sport];
   if (!endpoint) return [];
 
-  // THREE CALLS, because none of them is complete on its own.
+  // ONE CALL PER DAY, because ESPN no longer accepts date ranges.
   //
   // The bare endpoint answers with the current WEEK but only about 25 marquee
   // games — Colorado at Georgia Tech, a Thursday primetime fixture, is not in
-  // it, and neither was South Carolina's opener. The tight day range covers
-  // what is happening now. Neither reaches next weekend's full slate, which is
-  // why fixtures went missing and could not be re-inserted once removed.
+  // it, and neither was South Carolina's opener. The day-by-day calls cover
+  // what is happening now (yesterday through tomorrow: ESPN dates its
+  // scoreboard in Eastern time, so a night kickoff is already tomorrow in UTC)
+  // plus the next eight days, which is what puts upcoming fixtures in the
+  // table and keeps them re-insertable once removed.
   //
-  // The third call asks for the next eight days with a real limit, which is the
-  // one that actually returns everybody.
-  const near = `${espnDate(-1)}-${espnDate(1)}`;
-  const ahead = `${espnDate(0)}-${espnDate(8)}`;
-  const [thisWeek, theseDays, nextWeek] = await Promise.all([
+  // As of 2026-09-19 ESPN answers `dates=A-B` ranges with 400 "Failed to get
+  // events endpoint", in every sport. Single dates still work. The old shape
+  // (bare + near range + ahead range) therefore silently degraded to
+  // bare-only: non-marquee games vanished from the pool, their rows sat at
+  // 0-0 scheduled forever, and the bot went quiet on them too. One call per
+  // day restores full coverage.
+  const days: string[] = [];
+  for (let i = -1; i <= 8; i++) days.push(espnDate(i));
+  const results = await Promise.all([
     fetchOneScoreboard(endpoint, sport),
-    fetchOneScoreboard(`${endpoint}?dates=${near}&limit=300`, sport),
-    fetchOneScoreboard(`${endpoint}?dates=${ahead}&limit=400`, sport),
+    ...days.map((d) => fetchOneScoreboard(`${endpoint}?dates=${d}&limit=300`, sport)),
   ]);
 
-  // Same game can come back from both calls. ESPN's event id is the identity.
+  // Same game can come back from several calls. ESPN's event id is the identity.
   const byId = new Map<string, ESPNGame>();
-  for (const g of [...thisWeek, ...theseDays, ...nextWeek]) {
+  for (const g of results.flat()) {
     if (g?.id) byId.set(g.id, g);
   }
   return [...byId.values()];

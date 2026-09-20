@@ -280,9 +280,14 @@ export class EspnProvider implements SportsDataProvider {
   // and the game being played that afternoon was not in it. The bot had no game
   // to narrate, so a live room stayed silent through an actual live game.
   //
-  // Asking for an explicit date range as well fixes it. Yesterday through
-  // tomorrow rather than just today, because ESPN dates its scoreboard in
+  // Asking for explicit dates as well fixes it. Yesterday through tomorrow
+  // rather than just today, because ESPN dates its scoreboard in
   // Eastern time: a night kickoff is already tomorrow in UTC.
+  //
+  // As of 2026-09-19 ESPN answers `dates=A-B` ranges with 400 "Failed to get
+  // events endpoint", so yesterday-through-tomorrow is three single-date
+  // calls. When the range silently 400d, the pool shrank to the bare
+  // endpoint's marquee games and the bot went quiet on everything else.
   async liveGames(league: League): Promise<Game[]> {
     const p = leaguePath(league);
     if (!p) return [];
@@ -291,15 +296,19 @@ export class EspnProvider implements SportsDataProvider {
       new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10).replace(/-/g, '');
     const base = `${ESPN_BASE}/${p.sport}/${p.league}/scoreboard`;
 
-    const [week, days] = await Promise.all([
+    const [week, ...days] = await Promise.all([
       safeJson(base),
-      safeJson(`${base}?dates=${day(-1)}-${day(1)}&limit=200`),
+      safeJson(`${base}?dates=${day(-1)}&limit=200`),
+      safeJson(`${base}?dates=${day(0)}&limit=200`),
+      safeJson(`${base}?dates=${day(1)}&limit=200`),
     ]);
 
-    // The same game comes back from both calls; ESPN's event id is the identity.
+    // The same game comes back from several calls; ESPN's event id is the identity.
     const byId = new Map<string, any>();
-    for (const e of [...(week?.events ?? []), ...(days?.events ?? [])]) {
-      if (e?.id) byId.set(e.id, e);
+    for (const d of [week, ...days]) {
+      for (const e of (d?.events ?? [])) {
+        if (e?.id) byId.set(e.id, e);
+      }
     }
 
     return [...byId.values()]
