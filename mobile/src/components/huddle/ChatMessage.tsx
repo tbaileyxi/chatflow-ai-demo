@@ -522,8 +522,15 @@ export function ChatMessage({
       <View className="px-5 py-1">
         <View
           style={{
-            borderLeftWidth: 2,
-            borderLeftColor: colors.primary + "40",
+            // The play feed sits on the room's ground — burnt orange, a photo,
+            // the SH watermark — so it gets its own dark chip. Bare gray text
+            // on the ground washed out (founder call 2026-09-20).
+            backgroundColor: "rgba(10,10,11,0.55)",
+            borderRadius: 10,
+            borderLeftWidth: 3,
+            borderLeftColor: colors.primary,
+            paddingVertical: 8,
+            paddingRight: 10,
             paddingLeft: 10,
           }}
         >
@@ -532,7 +539,7 @@ export function ChatMessage({
             style={{
               fontSize: 15,
               lineHeight: 21,
-              color: "#8E8E98",
+              color: colors.foreground,
               // Kept: a room with a photo behind it still has to be readable.
               textShadowColor: "rgba(0,0,0,0.85)",
               textShadowOffset: { width: 0, height: 1 },
