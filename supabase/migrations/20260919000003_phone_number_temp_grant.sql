@@ -1,0 +1,15 @@
+-- TEMPORARY, UNTIL 1.1.0 IS THE FLOOR.
+--
+-- 1.0.9 (build 113) shipped before the column lockdown and its profile query
+-- asks for phone_number. Denying it fails the whole query, and the app reads
+-- that as "no profile" and drops the person into onboarding — every signed-in
+-- user on the App Store build.
+--
+-- So signed-in users can read phone_number again. anon cannot, and anon is
+-- the role the public key carries, which is the hole that mattered: the key
+-- ships in the app and the website and needed no account at all.
+--
+-- 1.1.0 reads its own phone from my_private_profile(). Once it is the oldest
+-- version in the wild:
+--   revoke select (phone_number) on public.profiles from authenticated;
+grant select (phone_number) on public.profiles to authenticated;
