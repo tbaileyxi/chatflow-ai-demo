@@ -558,7 +558,12 @@ export function ChatMessage({
             borderRightColor: "rgba(255,255,255,0.07)",
             borderBottomColor: "rgba(255,255,255,0.07)",
             borderRadius: 10,
-            backgroundColor: "rgba(255,255,255,0.035)",
+            // DARK FILL, NOT A TINT. A 3.5%-white fill disappears over a
+            // room's photo background and takes the grey text with it —
+            // unreadable in Joe's place with a stadium shot behind the
+            // thread. An opaque-enough dark panel reads the same on black
+            // and on a bright photo.
+            backgroundColor: "rgba(9,9,12,0.82)",
             paddingLeft: 11,
             paddingRight: 11,
             paddingVertical: 8,
@@ -569,7 +574,7 @@ export function ChatMessage({
             style={{
               fontSize: 15,
               lineHeight: 21,
-              color: "#8E8E98",
+              color: "#B9B9C4",
               // Kept: a room with a photo behind it still has to be readable.
               textShadowColor: "rgba(0,0,0,0.85)",
               textShadowOffset: { width: 0, height: 1 },
@@ -582,7 +587,7 @@ export function ChatMessage({
                 variant="data"
                 style={{
                   fontSize: 14,
-                  color: "#C9C9D2",
+                  color: "#E4E4EC",
                   fontFamily: fonts.monoMedium,
                 }}
               >
