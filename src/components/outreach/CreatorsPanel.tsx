@@ -48,6 +48,98 @@ type Invite = { x_handle: string; status: "pending" | "claimed" | "revoked"; tok
 type CreatorProfile = { user_id: string; display_name: string | null; username: string | null; x_handle: string; verified_creator: boolean };
 
 const INVITE_BASE = "https://sidehuddlesports.com/invite/";
+
+/**
+ * Paste a list in — a sheet, a discovery export, anything with a header row.
+ *
+ * Headers are matched by name, not position, because every list arrives in a
+ * different order. A blank cell never erases what is already known: the
+ * import coalesces server-side, so a paste that only knows the handle and the
+ * tier leaves the engagement and the email alone.
+ */
+type ImportRow = {
+  handle: string; display_name: string | null; org: string | null; followers: number;
+  bio: string | null; email: string | null; website: string | null;
+  status: string | null; tier: string | null; dm_able: boolean;
+};
+
+const HEADER_ALIASES: Record<string, string> = {
+  handle: "handle", "x handle": "handle", "x-handle": "handle", twitter: "handle", account: "handle",
+  name: "display_name", "display name": "display_name", creator: "display_name",
+  org: "org", team: "org", school: "org",
+  followers: "followers",
+  bio: "bio", notes: "bio", note: "bio",
+  email: "email", website: "website", url: "website",
+  status: "status", tier: "tier",
+  "dm-able": "dm_able", dmable: "dm_able", "dm able": "dm_able", dm: "dm_able",
+};
+
+const LEAD_STATUSES = ["new", "queued", "sent", "replied", "onboarded", "dead"];
+
+/** "~123K" → 123000, "1.2M" → 1200000, "12,345" → 12345. */
+function parseFollowers(v: string): number {
+  const t = (v || "").replace(/[~,\s]/g, "");
+  const m = t.match(/^([\d.]+)([kKmM])?$/);
+  if (!m) return 0;
+  const n = parseFloat(m[1]) || 0;
+  const suffix = (m[2] || "").toLowerCase();
+  return Math.round(n * (suffix === "k" ? 1000 : suffix === "m" ? 1000000 : 1));
+}
+
+/** A CSV parser that survives quoted commas and newlines inside a cell. */
+function parseCSV(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [], cur = "", quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else quoted = false; }
+      else cur += c;
+    } else if (c === '"') quoted = true;
+    else if (c === "," || c === "\t") { row.push(cur); cur = ""; }
+    else if (c === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; }
+    else if (c !== "\r") cur += c;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c.trim() !== ""));
+}
+
+function toRows(text: string): { rows: ImportRow[]; skipped: number; missingHandle: boolean } {
+  const grid = parseCSV(text);
+  if (!grid.length) return { rows: [], skipped: 0, missingHandle: true };
+  const head = grid[0].map((h) => HEADER_ALIASES[h.trim().toLowerCase()] ?? "");
+  if (!head.includes("handle")) return { rows: [], skipped: 0, missingHandle: true };
+  const at = (r: string[], key: string) => {
+    const i = head.indexOf(key);
+    return i === -1 ? "" : (r[i] ?? "").trim();
+  };
+  const rows: ImportRow[] = [];
+  const seen = new Set<string>();
+  let skipped = 0;
+  for (const r of grid.slice(1)) {
+    const handle = at(r, "handle").replace(/^@/, "");
+    if (!handle || seen.has(handle.toLowerCase())) { skipped++; continue; }
+    seen.add(handle.toLowerCase());
+    const bio = at(r, "bio");
+    // Lists tag the team in the notes — "[ohio-state] pure fan content".
+    const tag = (bio.match(/^\[([a-z0-9-]+)\]/i) ?? [])[1] ?? null;
+    const pretty = tag ? tag.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") : null;
+    const status = at(r, "status").toLowerCase();
+    rows.push({
+      handle,
+      display_name: at(r, "display_name") || null,
+      org: at(r, "org") || pretty,
+      followers: parseFollowers(at(r, "followers")),
+      bio: bio || null,
+      email: at(r, "email") || null,
+      website: at(r, "website") || null,
+      status: LEAD_STATUSES.includes(status) ? status : null,
+      tier: at(r, "tier") || null,
+      dm_able: /^(y|yes|true|1)$/i.test(at(r, "dm_able")),
+    });
+  }
+  return { rows, skipped, missingHandle: false };
+}
 const teamLabel = (t: Team) => `${t.city} ${t.name}`.trim();
 const key = (h: string) => h.replace(/^@/, "").toLowerCase();
 
@@ -77,6 +169,29 @@ export default function CreatorsPanel() {
   const [teamFor, setTeamFor] = useState<Record<string, string>>({});
   const [grantUser, setGrantUser] = useState<Record<string, string>>({});
   const [busyHandle, setBusyHandle] = useState<string | null>(null);
+
+  // Paste-a-list importer.
+  const [importOpen, setImportOpen] = useState(false);
+  const [paste, setPaste] = useState("");
+  const [importing, setImporting] = useState(false);
+  const preview = useMemo(() => toRows(paste), [paste]);
+
+  async function runImport() {
+    if (!preview.rows.length) return;
+    setImporting(true);
+    const { data, error } = await (supabase.rpc as any)("admin_import_creator_leads", { p_rows: preview.rows });
+    setImporting(false);
+    if (error) return toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    const row = Array.isArray(data) ? data[0] : data;
+    toast({
+      title: `${row?.inserted ?? 0} added, ${row?.updated ?? 0} updated`,
+      description: preview.skipped ? `${preview.skipped} row(s) skipped — no handle, or a repeat.` : undefined,
+    });
+    setPaste("");
+    setImportOpen(false);
+    load();
+    loadVerification();
+  }
 
   async function loadVerification() {
     const sb = supabase as any;
@@ -217,7 +332,44 @@ export default function CreatorsPanel() {
             <Button variant="outline" onClick={load} disabled={loading}>
               {loading ? "Loading…" : "Refresh"}
             </Button>
+            <Button variant="outline" onClick={() => setImportOpen((v) => !v)}>
+              {importOpen ? "Close import" : "Import list"}
+            </Button>
           </div>
+
+          {importOpen ? (
+            <div className="space-y-2 rounded-lg border border-input p-3">
+              <p className="text-xs text-muted-foreground">
+                Paste a CSV with a header row. <b>handle</b> is the only column that has to be
+                there; name, tier, followers, status, notes, email, website and DM-able are used
+                when present. A blank cell never overwrites what is already known, and an
+                existing lead keeps its pipeline status.
+              </p>
+              <textarea
+                className="h-40 w-full rounded-md border border-input bg-background p-2 font-mono text-xs"
+                placeholder={"handle,name,tier,followers,status,notes,dm-able\n@TheBuckeyeNut,The Buckeye Nut,main,~123K,new,[ohio-state] fan-content machine,yes"}
+                value={paste}
+                onChange={(e) => setPaste(e.target.value)}
+              />
+              <div className="flex flex-wrap items-center gap-3">
+                <Button onClick={runImport} disabled={importing || !preview.rows.length}>
+                  {importing ? "Importing…" : `Import ${preview.rows.length} row${preview.rows.length === 1 ? "" : "s"}`}
+                </Button>
+                {paste.trim() && preview.missingHandle ? (
+                  <span className="text-xs text-destructive">
+                    No handle column found — the header needs "handle" or "X handle".
+                  </span>
+                ) : preview.rows.length ? (
+                  <span className="text-xs text-muted-foreground">
+                    {preview.rows.length} ready
+                    {preview.skipped ? `, ${preview.skipped} skipped` : ""} ·{" "}
+                    {preview.rows.filter((r) => r.dm_able).length} DM-able · first:{" "}
+                    <b>@{preview.rows[0].handle}</b>
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           <p className="text-xs text-muted-foreground">
             {filtered.length} creators · <b>{reachable}</b> with an email in their bio.
