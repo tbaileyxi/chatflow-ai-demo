@@ -9,14 +9,14 @@
   "rewrites": [
     {
       "source": "/i/:code",
-      "destination": "/api/i/:code"
+      "destination": "/api/invite?code=:code"
     },
     {
       "source": "/room-photo/:path*",
       "destination": "https://dejuwyeypiggvlyfliap.supabase.co/storage/v1/object/public/room-photos/:path*"
     },
     {
-      "source": "/((?!\\.well-known/|preview-test\\.html).*)",
+      "source": "/((?!api/|i/|\\.well-known/|preview-test\\.html).*)",
       "destination": "/index.html"
     }
   ],
