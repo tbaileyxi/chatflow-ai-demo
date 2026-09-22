@@ -234,6 +234,7 @@ export function HuddleScreen() {
     return () => setCurrentHuddle(null);
   }, [huddleId, huddle?.name, setCurrentHuddle]);
 
+
   // Everyone in the room, not just whoever is looking at it right now. The
   // presence row shows both — lit for here, dimmed for not — because "nobody
   // else is in here" and "this room has nobody else in it" are different
@@ -250,6 +251,21 @@ export function HuddleScreen() {
   // JUMP pills — the user's other rooms, same-team rooms first. This is the
   // core room-jumping loop; it previously existed only in the dev sandbox.
   const navigation = useNavigation();
+
+  // Leave the keyboard behind.
+  //
+  // The composer keeps focus while the screen unmounts, so the keyboard
+  // survives the transition and lands on top of the list you just went back
+  // to — covering half of it, attached to an input that no longer exists.
+  // The header's back button dismisses it itself; this covers the two ways
+  // out that never touch the header, the iOS edge swipe and the Android back
+  // button. beforeRemove fires for all of them, including a programmatic
+  // goBack, so one listener is the whole fix.
+  useEffect(
+    () => navigation.addListener("beforeRemove", () => Keyboard.dismiss()),
+    [navigation],
+  );
+
   const { data: myHuddles } = useUserHuddles();
   const { presentUsers: everyone } = useGlobalPresence();
 

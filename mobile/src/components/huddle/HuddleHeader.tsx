@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, View, Text, Image, Pressable, Animated, Linking } from "react-native";
+import { Alert, View, Text, Image, Pressable, Animated, Keyboard, Linking } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
   BadgeCheck,
@@ -248,7 +248,15 @@ export function HuddleHeader({ huddle, onInvite }: Props) {
     <View className="border-b border-border" style={{ backgroundColor: colors.huddleGroundAlt }}>
       <View className="flex-row items-center gap-3 px-4 py-2.5">
         <Pressable
-          onPress={() => navigation.goBack()}
+          // Put the keyboard away BEFORE leaving. Without this the composer
+          // hands focus back as the screen tears down and the keyboard rides
+          // along to the list underneath, sitting over it with nothing to type
+          // into. HuddleScreen dismisses on removal too, for the swipe-back
+          // and the Android back button, which never come through here.
+          onPress={() => {
+            Keyboard.dismiss();
+            navigation.goBack();
+          }}
           className="active:opacity-60"
           hitSlop={8}
         >

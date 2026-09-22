@@ -327,20 +327,41 @@ serve(async (req) => {
         // would narrate, so it does not get opened. Halftime is skipped for
         // the same reason: the score cannot change during it.
         //
-        // FAILING OPEN IS DELIBERATE. Any error reading or writing the cursor
-        // falls through to fetching, because one wasted request is a much
-        // cheaper mistake than a missed touchdown.
+        // EXCEPT THAT THE SCORE IS NOT THE ONLY THING WORTH SAYING, and
+        // treating it that way silenced the bot through exactly the stretches
+        // it exists for. A goal-line stand, a turnover on downs, a pick, a
+        // 60-yard drive that stalls at the 12 — none of them move the
+        // scoreboard, all of them are the play everyone is shouting about, and
+        // none of them were ever fetched. Two scoreless possessions is ten
+        // minutes of a bot that looks broken.
+        //
+        // So the cheap check still holds, with a ceiling on how long it can
+        // hold for: a live game gets its plays pulled at least every
+        // QUIET_REFRESH_MS no matter what the scoreboard says. At a two-minute
+        // cron that is one fetch in three for a quiet game — most of the
+        // saving, none of the silence. Halftime is excluded, because there
+        // genuinely are no plays to find.
+        const QUIET_REFRESH_MS = 6 * 60 * 1000;
         const scoreNow = `${game.away?.score ?? 0}-${game.home?.score ?? 0}`;
         let skip = false;
         try {
           const { data: cur } = await supabase
             .from("poller_game_cursor")
-            .select("last_score, last_status")
+            .select("last_score, last_status, seen_at")
             .eq("game_provider_id", game.providerId)
             .maybeSingle();
-          if (cur && cur.last_score === scoreNow && cur.last_status === game.status) {
-            skip = true;
-          } else {
+
+          const unchanged =
+            !!cur && cur.last_score === scoreNow && cur.last_status === game.status;
+          // seen_at is only written when we actually fetch, so it is the age of
+          // the last look at the play feed, not of the last poll. Missing or
+          // unparseable reads as overdue.
+          const since = cur?.seen_at ? Date.now() - Date.parse(cur.seen_at) : NaN;
+          const overdue =
+            game.status === "in_progress" && !(since < QUIET_REFRESH_MS);
+
+          skip = unchanged && !overdue;
+          if (!skip) {
             await supabase.from("poller_game_cursor").upsert(
               {
                 game_provider_id: game.providerId,
@@ -352,6 +373,9 @@ serve(async (req) => {
             );
           }
         } catch (err) {
+          // FAILING OPEN IS DELIBERATE. Any error reading or writing the cursor
+          // falls through to fetching, because one wasted request is a much
+          // cheaper mistake than a missed touchdown.
           console.warn("[live-poller] cursor unavailable, fetching anyway", err);
         }
         if (skip) {
