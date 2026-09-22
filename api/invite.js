@@ -34,6 +34,10 @@ const SUPABASE_ANON_KEY =
 
 const SITE = 'https://www.sidehuddlesports.com';
 
+// Kept in step with src/lib/appStore.ts. A serverless function cannot import
+// from the Vite source tree, so this is the one duplicated constant.
+const APP_STORE_URL = 'https://apps.apple.com/us/app/id6777524558';
+
 // A real PNG on our own domain, measured, so the dimensions below are true.
 // SVG is not a safe og:image — iMessage and Twitter will not render one, which
 // is why public/og-invite.svg (pointed at by HuddleInvitePage) has never shown
@@ -211,7 +215,15 @@ function buildTags({ title, desc, url, image }) {
   return lines.map((line) => `    ${line}`).join('\n');
 }
 
-/** The shell the SPA boots from, fetched off this same deployment. */
+/**
+ * The shell the SPA boots from, fetched off this same deployment.
+ *
+ * The 200 is not enough on its own. A preview deployment sits behind Vercel's
+ * SSO, which answers an unauthenticated fetch with its own login page at
+ * status 200 — and injecting our tags into THAT would serve a card attached to
+ * Vercel's markup. So the body has to actually look like our app before we
+ * will touch it.
+ */
 async function loadShell(req) {
   const host =
     req.headers['x-forwarded-host'] || req.headers.host || 'www.sidehuddlesports.com';
@@ -220,20 +232,49 @@ async function loadShell(req) {
     headers: { 'user-agent': 'side-huddle-og' },
   });
   if (!res.ok) throw new Error(`shell ${res.status}`);
-  return res.text();
+  const html = await res.text();
+  if (!/<div\s+id=["']root["']/i.test(html)) throw new Error('shell is not our app');
+  return html;
 }
 
-/** If the shell cannot be fetched the card still has to be right. */
-function standalone({ title, desc, url, image }) {
+/**
+ * If the shell cannot be fetched, the card still has to be right and the page
+ * still has to go somewhere.
+ *
+ * It must NOT redirect. /i/<code> is this function — sending the browser back
+ * to it, with or without a cache-busting query, lands here again and loops
+ * forever. A query string does not change which route matched. So this is a
+ * real, final page: the two buttons InviteCodePage offers, and nothing that
+ * navigates on its own.
+ */
+function standalone({ title, desc, url, image }, code) {
+  const deep = `sidehuddle://i/${encodeURIComponent(code || '')}`;
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 ${buildTags({ title, desc, url, image })}
-    <meta http-equiv="refresh" content="0;url=${esc(url)}?v=1">
+    <style>
+      body { margin:0; min-height:100vh; display:flex; flex-direction:column;
+             align-items:center; justify-content:center; gap:14px; padding:24px;
+             background:#0A0A0B; color:#F0F0F2; text-align:center;
+             font-family:system-ui,-apple-system,sans-serif; }
+      h1 { margin:0; font-size:26px; }
+      p { margin:0; max-width:24rem; color:#A0A0A8; line-height:1.5; }
+      a { display:block; width:100%; max-width:18rem; box-sizing:border-box;
+          padding:14px 20px; border-radius:999px; font-weight:700;
+          text-decoration:none; }
+      .go { background:#F5C518; color:#0A0A0B; }
+      .get { border:1px solid #2A2A2F; color:#F0F0F2; }
+    </style>
   </head>
-  <body><a href="${esc(url)}?v=1">Open ${esc(title)}</a></body>
+  <body>
+    <h1>${esc(title)}</h1>
+    <p>${esc(desc)}</p>
+    <a class="go" href="${esc(deep)}">Open in the app</a>
+    <a class="get" href="${esc(APP_STORE_URL)}">Get Side Huddle</a>
+  </body>
 </html>`;
 }
 
@@ -258,7 +299,7 @@ export default async function handler(req, res) {
   try {
     body = injectTags(await loadShell(req), buildTags(card));
   } catch {
-    body = standalone(card);
+    body = standalone(card, code);
   }
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
