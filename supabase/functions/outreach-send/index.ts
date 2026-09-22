@@ -202,9 +202,8 @@ function body(step: number, lead: Lead): string {
   if (step === 2) {
     return [
       `Hi ${firstName(lead)},`,
-      `The founding partner slot for ${team} is still open \u2014 no other ${category} has it.`,
-      priceLine(),
-      link,
+      `Nudge on the ${team} founding slot \u2014 still open, no other ${category} has it.`,
+      `Founding window closes Oct 2, then it's $2,500 for the season. $500 until then: ${link}`,
       `Ty`,
       DISCLAIMER,
     ].join("\n\n");
@@ -213,8 +212,8 @@ function body(step: number, lead: Lead): string {
   if (step === 3) {
     return [
       `Hi ${firstName(lead)},`,
-      `Last note on ${team}. If it's not for you, no hard feelings.`,
-      `Whoever takes it is the founding backer of ${team} fans on Side Huddle, and there's only ever one: ${link}`,
+      `Last note on ${team}. After Oct 2 the founding story goes to whoever took the slot \u2014 and the rate goes to $2,500.`,
+      `If it's not for you, no hard feelings: ${link}`,
       `Ty`,
       `Not relevant? Reply "unsubscribe" and I won't follow up.`,
       // ONE disclaimer. It was listed twice here, so step 3 printed it twice.
@@ -224,6 +223,11 @@ function body(step: number, lead: Lead): string {
 
   return [
     `Hi ${firstName(lead)},`,
+    // SAY WHAT THE THING IS BEFORE SELLING A SLOT IN IT. The first letter
+    // opened on "one business per team becomes the founding partner", which
+    // only means something to a reader who already knows what Side Huddle is
+    // \u2014 and at step 1, none of them do.
+    `Side Huddle is where ${team} fans watch the game together \u2014 their own room, the score and big plays landing in it live.`,
     `One business per team becomes the founding partner of ${team} fans on Side Huddle \u2014 the name attached to them from day one. That only happens once.`,
     `I'm holding the ${team} slot for one ${category}. ${priceLine()}`,
     link,

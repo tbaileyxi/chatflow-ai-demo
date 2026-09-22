@@ -641,7 +641,10 @@ export default function Outreach() {
     return [
       `Subject: ${pitchSubject(l)}`,
       `Hi ${who},`,
-      `Side Huddle is where ${where} fans watch the game together — a private room with their own people, the score and the news landing in it as it happens.`,
+      // Word for word what outreach-send's step 1 opens with. Two places
+      // describing the product differently is two products as far as a reader
+      // is concerned, and this one gets pasted into the same inboxes.
+      `Side Huddle is where ${where} fans watch the game together — their own room, the score and big plays landing in it live.`,
       `I am taking one founding partner per team per season, and ${l.company} would be it for ${where}. Nobody else in your category this season.`,
       `What that is: founding partner status and the launch story that goes with it; a pregame card in the room when the game starts, carrying a small "powered by"; the same line under the clips fans post of themselves watching; and co-branded shirts in the team's colours.`,
       priceLine(),
