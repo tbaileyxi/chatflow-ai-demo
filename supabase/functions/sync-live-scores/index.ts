@@ -40,7 +40,11 @@ interface ESPNGame {
     displayClock?: string;
     period?: number;
   };
+  // 1 = preseason, 2 = regular, 3 = postseason. Exhibition games are not
+  // the product: an NHL preseason game in the live feed is noise.
+  season?: { type?: number; slug?: string };
   competitions: Array<{
+    season?: { type?: number; slug?: string };
     competitors: Array<{
       team: {
         displayName: string;
@@ -51,6 +55,19 @@ interface ESPNGame {
       homeAway: string;
     }>;
   }>;
+}
+
+/**
+ * PRESEASON IS NOT A GAME ANYBODY ASKED FOR.
+ *
+ * NHL exhibition games were turning up in the live feed. ESPN labels them on
+ * the event (season.type 1, slug "preseason"); anything we cannot read the
+ * type of is treated as real, so a missing field never hides a live game.
+ */
+function isPreseason(eg: EspnGame): boolean {
+  const t = eg.season?.type ?? eg.competitions?.[0]?.season?.type;
+  const slug = (eg.season?.slug ?? eg.competitions?.[0]?.season?.slug ?? "").toLowerCase();
+  return t === 1 || slug === "preseason" || slug === "pre-season";
 }
 
 // ESPN's scoreboard, asked twice.
@@ -891,6 +908,12 @@ serve(async (req) => {
       if (!sportKey || !league) continue;
 
       for (const eg of espnGames) {
+        // Preseason never enters the feed — and a row from before this rule
+        // goes out on the way past, so the cleanup needs no separate job.
+        if (isPreseason(eg)) {
+          await supabase.from('games').delete().eq('odds_game_id', `espn-${sport}-${eg.id}`);
+          continue;
+        }
         const comps = eg.competitions?.[0]?.competitors || [];
         const home = comps.find((c) => c.homeAway === 'home');
         const away = comps.find((c) => c.homeAway === 'away');
