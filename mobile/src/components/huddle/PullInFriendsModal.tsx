@@ -31,6 +31,8 @@ import {
   personMatches,
   useContactNames,
 } from "@/lib/personName";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserHuddles } from "@/hooks/useUserHuddles";
 
 type CoHuddler = {
   user_id: string;
@@ -38,6 +40,13 @@ type CoHuddler = {
   username: string | null;
   avatar_url: string | null;
   contact_name: string | null;
+};
+
+/** One of your other rooms, with the people in it this sheet could add. */
+type PickableGroup = {
+  id: string;
+  name: string;
+  memberIds: string[];
 };
 
 type Props = {
@@ -58,12 +67,17 @@ export function PullInFriendsModal({
   rallied = false,
 }: Props) {
   const [people, setPeople] = useState<CoHuddler[]>([]);
+  /** Rooms you are already in, offered as one-tap selections. */
+  const [groups, setGroups] = useState<PickableGroup[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   // What you have these people saved as. Local to this device — see lib/personName.
   const contactNames = useContactNames();
   const [sending, setSending] = useState(false);
+  const { user } = useAuth();
+  const me = user?.id ?? null;
+  const { data: myHuddles } = useUserHuddles();
 
   useEffect(() => {
     if (!visible) return;
@@ -103,6 +117,52 @@ export function PullInFriendsModal({
               contact_name: contactNames.get(r.user_id) ?? null,
             })),
         );
+
+        // THE GROUP YOU ALREADY HAVE IS A VALID THING TO PICK.
+        //
+        // Picking the same eight faces every Sunday is the work this sheet
+        // was making people redo. A room you are already in IS that list —
+        // nothing new to create, nothing to name, nothing to maintain. So the
+        // rooms become options here, one tap each, and the faces below stay
+        // exactly as they were: this adds a way in, it does not replace one.
+        //
+        // Failing quietly is right. The grid is the feature; if the group
+        // query falls over, the sheet is simply the sheet it was yesterday.
+        const candidates = (myHuddles ?? []).filter(
+          (h) => h.id !== huddleId && !h.isDm && !h.isGameRoom,
+        );
+        if (candidates.length > 0) {
+          const { data: rows } = await supabase
+            .from("huddle_members")
+            .select("huddle_id, user_id")
+            .in(
+              "huddle_id",
+              candidates.map((h) => h.id),
+            );
+          if (cancelled) return;
+          const byRoom = new Map<string, string[]>();
+          for (const r of (rows ?? []) as any[]) {
+            // Only people this sheet could actually add: not already in the
+            // room, and not you.
+            if (alreadyHere.has(r.user_id) || r.user_id === me) continue;
+            const list = byRoom.get(r.huddle_id) ?? [];
+            list.push(r.user_id);
+            byRoom.set(r.huddle_id, list);
+          }
+          setGroups(
+            candidates
+              .map((h) => ({
+                id: h.id,
+                name: h.name,
+                memberIds: byRoom.get(h.id) ?? [],
+              }))
+              // A group whose members are all in here already adds nobody.
+              .filter((g) => g.memberIds.length > 0)
+              .sort((a, b) => b.memberIds.length - a.memberIds.length),
+          );
+        } else if (!cancelled) {
+          setGroups([]);
+        }
       } catch (err) {
         console.warn("[pull-in] known_people failed", err);
         if (!cancelled) setPeople([]);
@@ -113,7 +173,7 @@ export function PullInFriendsModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, huddleId, contactNames]);
+  }, [visible, huddleId, contactNames, myHuddles, me]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return people;
@@ -136,6 +196,27 @@ export function PullInFriendsModal({
     setSelected((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  /**
+   * A group is selected when every one of its people is. Tapping it adds the
+   * ones that are missing, or clears the lot if they are all already in —
+   * and either way it only ever moves the same set of individual selections
+   * the faces below move, so the two can be mixed freely. Tap The Boys, then
+   * drop one person, then add somebody else: the count at the bottom is still
+   * just how many people are ticked.
+   */
+  const groupState = (g: PickableGroup) => {
+    const on = g.memberIds.filter((id) => selected.has(id)).length;
+    return { on, all: on === g.memberIds.length && on > 0 };
+  };
+
+  const toggleGroup = (g: PickableGroup) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const everyone = g.memberIds.every((id) => next.has(id));
+      for (const id of g.memberIds) everyone ? next.delete(id) : next.add(id);
       return next;
     });
 
@@ -258,6 +339,64 @@ export function PullInFriendsModal({
                 message you still have to write, send, and hope gets opened.
                 The link led because it works for anyone anywhere, which is an
                 argument about coverage, not about what to do first. */}
+            {/* GROUPS FIRST, WHEN THERE ARE ANY.
+                One tap for the eight people you brought last Sunday. It sits
+                above the faces because it is the shortcut past them, and it
+                disappears entirely when you have no other rooms — a new
+                person never sees an empty shelf. */}
+            {!loading && groups.length > 0 ? (
+              <View className="mb-4">
+                <Type variant="eyebrow" tone="muted" className="mb-2">
+                  Bring a group you already have
+                </Type>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {groups.map((g) => {
+                    const { all } = groupState(g);
+                    return (
+                      <Pressable
+                        key={g.id}
+                        onPress={() => toggleGroup(g)}
+                        className="mr-2 flex-row items-center gap-2 rounded-full border px-3.5 py-2.5"
+                        style={{
+                          borderColor: all ? colors.primary : colors.border,
+                          backgroundColor: all ? colors.primary : "transparent",
+                        }}
+                      >
+                        {all ? (
+                          <Check color={colors.primaryForeground} size={15} />
+                        ) : null}
+                        <Type
+                          variant="captionStrong"
+                          style={{
+                            color: all
+                              ? colors.primaryForeground
+                              : colors.foreground,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {g.name}
+                        </Type>
+                        <Type
+                          variant="caption"
+                          style={{
+                            color: all
+                              ? colors.primaryForeground
+                              : colors.mutedForeground,
+                          }}
+                        >
+                          {g.memberIds.length}
+                        </Type>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            ) : null}
+
             <Type variant="eyebrow" tone="muted" className="mb-2">
               Tap friends on Side Huddle
             </Type>
