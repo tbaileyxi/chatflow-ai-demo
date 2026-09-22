@@ -18,13 +18,19 @@ import * as FileSystem from "expo-file-system";
  * screen across a room. See the reaction card in ChatMessage.
  *
  * LIMITS. Cost at expected use is negligible, but a loop uploading video is
- * the one genuinely unbounded case, so: ten seconds, ten megabytes, and a
- * server-side ceiling of twenty an hour that the client cannot talk its way
- * past (RUN_THIS_UGC_POLICY.sql).
+ * the one genuinely unbounded case, so: fifteen seconds, fifteen megabytes,
+ * and a server-side ceiling of twenty an hour that the client cannot talk its
+ * way past (RUN_THIS_UGC_POLICY.sql).
+ *
+ * Ten seconds cut people off mid-sentence on a big play — the reaction worth
+ * keeping is the one that runs a beat long. The byte ceiling moves with it:
+ * at the same quality a fifteen-second clip is half again the file, and
+ * leaving the cap at ten megabytes would have rejected the very clips the
+ * longer limit exists to allow.
  */
 
-export const MAX_SECONDS = 10;
-export const MAX_BYTES = 10 * 1024 * 1024;
+export const MAX_SECONDS = 15;
+export const MAX_BYTES = 15 * 1024 * 1024;
 
 export type FaceReaction = {
   uri: string;

@@ -15,6 +15,7 @@ import * as Clipboard from "expo-clipboard";
 import { useNavigation } from "@react-navigation/native";
 import {
   Copy,
+  Forward,
   Flag,
   MessageSquareReply,
   Mic,
@@ -41,6 +42,7 @@ import { AdminWelcomeCard } from "@/components/huddle/AdminWelcomeCard";
 import { YouTubeEmbed, parseYouTubeId } from "@/components/embeds/YouTubeEmbed";
 import type { HuddleMessage } from "@/hooks/useHuddleMessages";
 import type { ReactionSummary } from "@/hooks/useMessageReactions";
+import { SendToHuddlesSheet } from "@/components/huddle/SendToHuddlesSheet";
 
 const REACTION_PICKER_EMOJIS = ["🔥", "W", "L"] as const;
 
@@ -217,6 +219,7 @@ export function ChatMessage({
 }: Props) {
   const lastTapRef = useRef<number>(0);
   const [showPicker, setShowPicker] = useState(false);
+  const [showSendTo, setShowSendTo] = useState(false);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
 
   // Hooks above, early return below — legacy prediction cards render nothing.
@@ -1092,6 +1095,25 @@ export function ChatMessage({
         </View>
       </Pressable>
 
+      {/* Your own moment, on to your other rooms. Mounted only while open so
+          the huddle list is fetched when it is asked for, not for every
+          message in the thread. */}
+      {showSendTo ? (
+        <SendToHuddlesSheet
+          visible={showSendTo}
+          onClose={() => setShowSendTo(false)}
+          fromHuddleId={huddleId}
+          source={{
+            id: message.id,
+            userId: message.userId,
+            content: message.content,
+            mediaUrl: message.mediaUrl,
+            mediaType: message.mediaType,
+            messageType: message.messageType,
+          }}
+        />
+      ) : null}
+
       {/* Reaction picker modal */}
       <Modal
         visible={showPicker}
@@ -1131,6 +1153,25 @@ export function ChatMessage({
             >
               <Share2 color={colors.mutedForeground} size={20} />
             </Pressable>
+            {/* Send your own moment to your other rooms — the case where
+                somebody at the game has three group chats that all want the
+                shot and sends it three times.
+
+                YOUR OWN ONLY. Passing somebody else's photo into a room they
+                did not choose is the thing this whole model is built to
+                prevent; the person who posted picks who sees it. */}
+            {isOwnMessage && !message.isBotMessage ? (
+              <Pressable
+                onPress={() => {
+                  setShowPicker(false);
+                  setTimeout(() => setShowSendTo(true), 250);
+                }}
+                className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
+                accessibilityLabel="Send to another room"
+              >
+                <Forward color={colors.mutedForeground} size={20} />
+              </Pressable>
+            ) : null}
             {/* Reading something worth keeping with no way to keep it is a
                 small frustration that happens constantly — a score, a name,
                 a line somebody wants to send on elsewhere. */}
