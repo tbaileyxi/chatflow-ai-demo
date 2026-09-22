@@ -13,7 +13,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // version has been through review. 1.0.4 is closed: Transporter rejects any
   // build under it with "Invalid Pre-Release Train", no matter how high the
   // build number goes. New work needs a new version, not a new build.
-  version: "1.1.0",
+  version: "1.1.1",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "dark",
