@@ -23,3 +23,24 @@ export const priceLine = (now = Date.now()) =>
   isFoundingOpen(now)
     ? "$500 founding rate for the season. One partner per team."
     : "$2,500 flat for the season. One partner per team.";
+
+// THE DATE AND THE NUMBERS, SPELLED OUT FROM THE SAME CONSTANTS.
+//
+// The follow-up letters name the deadline and the price in their own
+// sentences rather than using priceLine(), and they were typed in by hand —
+// "Oct 2", "$2,500". A hand-typed date is correct until it is not, and this
+// one goes wrong silently on a Saturday morning while the emails keep going
+// out. Deriving them means the copy cannot drift from the charge.
+
+/** "Oct 2" — the deadline as a reader says it, in the timezone it is set in. */
+export const deadlineDay = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: "America/New_York",
+}).format(FOUNDING_END);
+
+const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US")}`;
+
+/** "$500" and "$2,500", from the cents the checkout actually charges. */
+export const foundingPrice = money(FOUNDING_PRICE_CENTS);
+export const listPrice = money(LIST_PRICE_CENTS);

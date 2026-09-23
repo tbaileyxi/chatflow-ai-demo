@@ -23,7 +23,13 @@ const SCHOOL_PARTNER_VERTICAL = "school partner";
 // no prorating, no deposit, no tiers to explain: $500 at the founding rate,
 // $2,500 after the deadline. priceLine() flips on its own; the page and the
 // checkout read the same deadline.
-import { priceLine } from "../_shared/founding.ts";
+import {
+  priceLine,
+  isFoundingOpen,
+  deadlineDay,
+  foundingPrice,
+  listPrice,
+} from "../_shared/founding.ts";
 
 
 // Trademark posture: we describe who the fans are, never claim affiliation.
@@ -199,11 +205,19 @@ function body(step: number, lead: Lead): string {
   // the merge tags are the only moving parts. Anything that reads oddly here
   // is a copy decision, not a code one, and belongs in the copy rather than
   // in a well-meaning edit at render time.
+  // The deadline sentences read forwards before the date and backwards after
+  // it. Same approved wording either side; only the tense moves, and it moves
+  // on its own, because a letter that still says "closes Oct 2" on October
+  // third is a letter that tells the reader nobody is minding the shop.
+  const open = isFoundingOpen();
+
   if (step === 2) {
     return [
       `Hi ${firstName(lead)},`,
       `Nudge on the ${team} founding slot \u2014 still open, no other ${category} has it.`,
-      `Founding window closes Oct 2, then it's $2,500 for the season. $500 until then: ${link}`,
+      open
+        ? `Founding window closes ${deadlineDay}, then it's ${listPrice} for the season. ${foundingPrice} until then: ${link}`
+        : `Founding window closed ${deadlineDay} \u2014 it's ${listPrice} for the season now: ${link}`,
       `Ty`,
       DISCLAIMER,
     ].join("\n\n");
@@ -212,7 +226,9 @@ function body(step: number, lead: Lead): string {
   if (step === 3) {
     return [
       `Hi ${firstName(lead)},`,
-      `Last note on ${team}. After Oct 2 the founding story goes to whoever took the slot \u2014 and the rate goes to $2,500.`,
+      open
+        ? `Last note on ${team}. After ${deadlineDay} the founding story goes to whoever took the slot \u2014 and the rate goes to ${listPrice}.`
+        : `Last note on ${team}. The founding window closed ${deadlineDay}, so the slot is ${listPrice} for the season now.`,
       `If it's not for you, no hard feelings: ${link}`,
       `Ty`,
       `Not relevant? Reply "unsubscribe" and I won't follow up.`,
@@ -289,7 +305,23 @@ async function selectTargets(
     .select("id,company,domain,website,contact_name,contact_email,vertical,region,market,school,best_package,best_angle,sponsor_signal,sequence_step")
     .eq("bounced", false)
     .eq("unsubscribed", false)
-    .not("contact_email", "is", null);
+    .not("contact_email", "is", null)
+    // SCHOOL PARTNERS ARE NOT SPONSORS, AND THIS IS THE SPONSOR SEQUENCE.
+    //
+    // The three letters sell a founding partner slot for money. A booster
+    // club or alumni chapter is being asked to bring its people into a room,
+    // which is a different conversation entirely, and sending them a price
+    // reads as a solicitation to a group that was never a prospect. They get
+    // their own track later.
+    //
+    // Sits with the other three because it is the same kind of rule — who is
+    // writable at all — and so it holds on EVERY path, the explicit-ids send
+    // from the worklist included, not just the campaign filters below.
+    //
+    // vertical alone is enough: isSchoolPartnerLead also matches best_angle
+    // starting "official side huddle partner", and of the 62 rows that match
+    // that phrase, zero have any other vertical.
+    .neq("vertical", SCHOOL_PARTNER_VERTICAL);
 
   // "vertical:sports bar" — pick by WHO you are writing to.
   //
