@@ -32,6 +32,7 @@ export type RootStackParamList = {
   Huddle: { huddleId: string };
   EventLobby: { eventId: string };
   HuddleSettings: { huddleId: string };
+  GameStory: { huddleId: string };
   HuddleCoachSettings: { huddleId: string };
   JoinHuddle: { huddleId: string };
   HuddleSearch: undefined;

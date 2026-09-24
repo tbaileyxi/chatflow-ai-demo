@@ -33,6 +33,8 @@ import { useHuddleMembers } from "@/hooks/useHuddleMembers";
 import { useGlobalPresence } from "@/contexts/GlobalPresenceContext";
 import { HuddleHeader } from "@/components/huddle/HuddleHeader";
 import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
+import { GameStoryBar } from "@/components/huddle/GameStoryBar";
+import { useGameStory } from "@/hooks/useGameStory";
 import { PresenceBar } from "@/components/huddle/PresenceBar";
 import { FloatingReactions } from "@/components/huddle/ReactionRail";
 import { PregameStrip } from "@/components/huddle/PregameStrip";
@@ -247,6 +249,10 @@ export function HuddleScreen() {
   // Game window for the "Rally the huddle" ping (shown only when a game is near).
   const { data: liveGame } = useLiveGameContext(teamId);
   const pingGameState = getGameState(liveGame ?? null);
+
+  // What the room shot today, if there is enough of it to be a story. Nothing
+  // is fetched for this — it reads the thread that is already loaded.
+  const gameStory = useGameStory(messages, liveGame ?? null);
 
   // JUMP pills — the user's other rooms, same-team rooms first. This is the
   // core room-jumping loop; it previously existed only in the dev sandbox.
@@ -1011,6 +1017,10 @@ export function HuddleScreen() {
                 PregameStrip and huddle_game_rsvps stay in the tree, unmounted,
                 so the work is recoverable if the pre-game screen gets built
                 properly. */}
+          <GameStoryBar
+            story={gameStory}
+            onOpen={() => navigation.navigate("GameStory", { huddleId })}
+          />
           <MessageInput
             onSend={handleSend}
             replyTo={replyTo}
