@@ -12,6 +12,15 @@ export type GameContext = {
   period: string | null;
   status: string; // "scheduled" | "in_progress" | "final" etc.
   startTime: string;
+  /**
+   * When the game was first called over, stamped by a trigger on `games`.
+   *
+   * Null for a game still being played, for the live_events and ESPN
+   * fallbacks that have no such column, and for every game that ended before
+   * the stamp existed. A consumer that wants "N minutes after full time"
+   * treats null as "no delay available" and falls back to status alone.
+   */
+  wentFinalAt: string | null;
   sportKey: string;
   // True only when this game lives in the `games` table — i.e. the fade-settle
   // cron can grade it from a final score. Games sourced from live_events or the
@@ -278,6 +287,7 @@ export function useLiveGameContext(teamId: string | undefined) {
           period: null,
           status: liveEvent.status,
           startTime: liveEvent.start_time,
+          wentFinalAt: null,
           sportKey: "",
           settleable: false, // live_events isn't graded by fade-settle
           homeTeamName: t1?.name ?? null,
@@ -425,6 +435,7 @@ export async function resolveExternalGameForTeam(
           : null,
         status: mapEspnStatus(competition?.status),
         startTime: event.date,
+        wentFinalAt: null,
         sportKey: team.league,
         settleable: false, // ESPN fallback id (espn-…) isn't in `games`
         homeTeamName: home.name,
@@ -475,6 +486,7 @@ async function resolveGame(game: any): Promise<GameContext> {
     period: game.period,
     status: game.status,
     startTime: game.start_time,
+    wentFinalAt: (game as any).went_final_at ?? null,
     sportKey: game.sport_key ?? "",
     settleable: true, // from the `games` table → fade-settle can grade it
     homeTeamName: home?.name ?? null,

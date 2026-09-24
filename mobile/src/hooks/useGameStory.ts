@@ -31,6 +31,20 @@ export const MIN_PEOPLE = 2;
  */
 const ASSUME_OVER_MS = 6 * 60 * 60 * 1000;
 
+/**
+ * The pause between the final whistle and the story offering itself.
+ *
+ * The last shot of a game is taken after it ends — the celebration, the walk
+ * out, the face of whoever lost the bet — so opening the story the instant
+ * the scoreboard settles cuts off the part people most want in it. Measured
+ * from games.went_final_at, stamped by a trigger on the transition.
+ *
+ * A game with no stamp — one that ended before the column existed, or that
+ * came from the live_events or ESPN fallbacks — shows as soon as it reads
+ * final, which is what happened before there was a clock to read.
+ */
+const AFTER_FULL_TIME_MS = 15 * 60 * 1000;
+
 /** A still holds this long; a clip plays, but never for longer than this. */
 export const PHOTO_MS = 4500;
 export const MAX_CLIP_MS = 8000;
@@ -123,8 +137,10 @@ export function useGameStory(
     // back while the thing is still happening. So it waits for full time —
     // or for the game to be old enough that a stuck row is the likelier
     // explanation than a game still being played.
-    const over =
-      getGameState(game ?? null) === "postgame" || Date.now() > to;
+    const finalAt = game?.wentFinalAt ? Date.parse(game.wentFinalAt) : NaN;
+    const over = Number.isFinite(finalAt)
+      ? Date.now() >= finalAt + AFTER_FULL_TIME_MS
+      : getGameState(game ?? null) === "postgame" || Date.now() > to;
 
     const enough = ignoreThreshold
       ? items.length > 0
