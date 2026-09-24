@@ -30,6 +30,7 @@ import { useHuddleDetails } from "@/hooks/useHuddleDetails";
 import { useLiveGameContext } from "@/hooks/useLiveGameContext";
 import { useTeamSponsors, logSponsorTap } from "@/hooks/useTeamSponsor";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { useGameStory, PHOTO_MS, MAX_CLIP_MS } from "@/hooks/useGameStory";
 import type { RootStackParamList } from "@/navigation/types";
 
@@ -43,7 +44,9 @@ export function GameStoryScreen() {
   const { data: huddle } = useHuddleDetails(huddleId);
   const { data: messages } = useHuddleMessages(huddleId);
   const { data: game } = useLiveGameContext(huddle?.teamId ?? undefined);
-  const story = useGameStory(messages, game);
+  const { data: profile } = useProfile();
+  // Same bypass as the bar, or an admin taps in and watches a spinner.
+  const story = useGameStory(messages, game, !!profile?.isAppAdmin);
   const { data: sponsors } = useTeamSponsors(huddle?.teamId ?? null);
   const sponsor = sponsors?.[0] ?? null;
 

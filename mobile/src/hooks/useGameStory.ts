@@ -62,6 +62,16 @@ function windowFor(game: GameContext | null | undefined): [number, number] | nul
 export function useGameStory(
   messages: HuddleMessage[] | undefined,
   game: GameContext | null | undefined,
+  /**
+   * App admins see the story at any size.
+   *
+   * The threshold is right for everyone else and wrong for the one person who
+   * has to check the thing works: a feature that hides itself below five
+   * pieces from two people cannot be tested on a TestFlight build by someone
+   * sitting on their own. This is the only way in without shipping a debug
+   * menu or editing the constant before every build.
+   */
+  ignoreThreshold = false,
 ): GameStory {
   return useMemo(() => {
     const empty: GameStory = { items: [], people: 0, ready: false, key: null };
@@ -96,7 +106,9 @@ export function useGameStory(
     items.sort((a, b) => Date.parse(a.takenAt) - Date.parse(b.takenAt));
 
     const people = new Set(items.map((i) => i.authorId)).size;
-    const ready = items.length >= MIN_ITEMS && people >= MIN_PEOPLE;
+    const ready = ignoreThreshold
+      ? items.length > 0
+      : items.length >= MIN_ITEMS && people >= MIN_PEOPLE;
 
     return {
       items,
@@ -104,5 +116,5 @@ export function useGameStory(
       ready,
       key: game?.id ? `story-${game.id}` : null,
     };
-  }, [messages, game]);
+  }, [messages, game, ignoreThreshold]);
 }

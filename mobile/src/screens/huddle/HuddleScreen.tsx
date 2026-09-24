@@ -252,7 +252,7 @@ export function HuddleScreen() {
 
   // What the room shot today, if there is enough of it to be a story. Nothing
   // is fetched for this — it reads the thread that is already loaded.
-  const gameStory = useGameStory(messages, liveGame ?? null);
+  const gameStory = useGameStory(messages, liveGame ?? null, !!profile?.isAppAdmin);
 
   // JUMP pills — the user's other rooms, same-team rooms first. This is the
   // core room-jumping loop; it previously existed only in the dev sandbox.
