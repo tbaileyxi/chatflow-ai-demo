@@ -14,11 +14,22 @@
 
 import { useMemo } from "react";
 import type { HuddleMessage } from "@/hooks/useHuddleMessages";
-import type { GameContext } from "@/hooks/useLiveGameContext";
+import { getGameState, type GameContext } from "@/hooks/useLiveGameContext";
 
 /** Enough to be a story, and enough to prove somebody else was in the room. */
 export const MIN_ITEMS = 5;
 export const MIN_PEOPLE = 2;
+
+/**
+ * How long after kickoff a game is assumed over even if nobody said so.
+ *
+ * Doing double duty. It bounds which media belongs to this game rather than
+ * next week's, and it is the fallback for a row that never flips to final —
+ * which happens: useLiveGameContext carries a note about a Mets room stuck on
+ * "Padres 1 — Mets 4, 9 · 0:00" because one row was never closed out. Without
+ * this those rooms would never get a story at all.
+ */
+const ASSUME_OVER_MS = 6 * 60 * 60 * 1000;
 
 /** A still holds this long; a clip plays, but never for longer than this. */
 export const PHOTO_MS = 4500;
@@ -56,7 +67,7 @@ function windowFor(game: GameContext | null | undefined): [number, number] | nul
   if (!game?.startTime) return null;
   const start = Date.parse(game.startTime);
   if (!Number.isFinite(start)) return null;
-  return [start, start + 6 * 60 * 60 * 1000];
+  return [start, start + ASSUME_OVER_MS];
 }
 
 export function useGameStory(
@@ -106,9 +117,19 @@ export function useGameStory(
     items.sort((a, b) => Date.parse(a.takenAt) - Date.parse(b.takenAt));
 
     const people = new Set(items.map((i) => i.authorId)).size;
-    const ready = ignoreThreshold
+
+    // A STORY IS THE RECAP, NOT A RUNNING TOTAL. Offering it in the third
+    // quarter competes with the room it is made of, and asks people to look
+    // back while the thing is still happening. So it waits for full time —
+    // or for the game to be old enough that a stuck row is the likelier
+    // explanation than a game still being played.
+    const over =
+      getGameState(game ?? null) === "postgame" || Date.now() > to;
+
+    const enough = ignoreThreshold
       ? items.length > 0
       : items.length >= MIN_ITEMS && people >= MIN_PEOPLE;
+    const ready = enough && (over || ignoreThreshold);
 
     return {
       items,
