@@ -38,6 +38,38 @@ function sportKeyToLeague(sportKey: string | null | undefined): League | null {
   return null;
 }
 
+// HOW MANY CLIPS ONE GAME CAN PRODUCE, by sport.
+//
+// Three was a single number across every league, and a single number is wrong
+// in both directions at once. A football game has six or eight scoring plays
+// and the cap was cutting most of them; a baseball game earns its three and
+// does not want more. The excitement gate already decides WHICH plays deserve
+// a clip — this only bounds how many one game can spend.
+//
+// Basketball stays low on purpose despite scoring constantly: at a hundred-odd
+// buckets a night the gate is doing the real work, and a high cap here would
+// turn one game into the whole budget.
+//
+// XLIVE_PER_GAME_<LEAGUE> overrides any single sport, XLIVE_PER_GAME moves
+// anything not listed, and both are read per call so a Saturday can be tuned
+// without a deploy.
+const CLIPS_PER_GAME: Partial<Record<League, number>> = {
+  NFL: 8,
+  NCAAF: 8,
+  NHL: 6,
+  NBA: 4,
+  NCAAB: 4,
+  MLB: 3,
+};
+
+function clipsPerGame(league: League): number {
+  const override = Number(Deno.env.get(`XLIVE_PER_GAME_${league}`));
+  if (Number.isFinite(override) && override > 0) return override;
+  const fallback = Number(Deno.env.get("XLIVE_PER_GAME"));
+  return CLIPS_PER_GAME[league]
+    ?? (Number.isFinite(fallback) && fallback > 0 ? fallback : 3);
+}
+
 // Which leagues to poll this tick.
 //   • ENABLED_LEAGUES env set → honor it verbatim (manual override / TEST_MODE).
 //   • otherwise → derive from the games the score-sync has marked live right
@@ -904,7 +936,7 @@ serve(async (req) => {
             // second game's touchdown was dropped on the floor rather than
             // waiting its turn.
             const XLIVE_MIN = Number(Deno.env.get("XLIVE_MIN_EXCITEMENT") || 0);
-            const XLIVE_PER_GAME = Number(Deno.env.get("XLIVE_PER_GAME") || 3);
+            const XLIVE_PER_GAME = clipsPerGame(league);
             // THE BIG ONES AGAINST YOU COUNT TOO — but they cost more to be
             // worth it.
             //
