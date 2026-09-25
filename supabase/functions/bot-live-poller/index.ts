@@ -1044,10 +1044,23 @@ async function processPendingClips(supabase: any, summary: any) {
       // second read, and xAI is out of the in-game path completely.
       const { data: handleRows } = await supabase
         .from("team_x_accounts")
-        .select("handle")
+        .select("handle, kind")
         .eq("team_id", row.team_id)
         .order("priority", { ascending: true });
       const handles = (handleRows ?? []).map((h: any) => h.handle);
+      // Who is trustworthy BY CONSTRUCTION, and who has to prove it.
+      //
+      // A club's own account only ever posts its own game, so anything it put
+      // up since the play is about the play. An aggregator posts every game in
+      // the league at once — and pickClip takes the most-liked footage, which
+      // on a Sunday slate is somebody else's touchdown. Same query, same cost,
+      // completely different confidence, so the two are separated here and the
+      // non-official ones are checked against the play below.
+      const official = new Set(
+        (handleRows ?? [])
+          .filter((h: any) => (h.kind ?? "official") === "official")
+          .map((h: any) => String(h.handle).replace(/^@/, "").toLowerCase()),
+      );
 
       if (handles.length === 0) {
         // No handle for this team is not a failure to retry — it is a gap in
@@ -1075,7 +1088,36 @@ async function processPendingClips(supabase: any, summary: any) {
       // What we were actually billed for, so spend is visible in the run.
       summary.x_moment_reads += found.postsRead;
 
-      const best = pickClip(found.media);
+      // An aggregator's clip has to mention this game before it can be this
+      // game's highlight. The mascot, the opponent's mascot, or whoever
+      // scored — all three are already on the queued play. It is a heuristic
+      // and it errs toward dropping: a room with no clip is a room that is
+      // merely quiet, while a room with the wrong team's touchdown in it is a
+      // room that looks broken.
+      const mascot = (name: string | null) => {
+        const w = String(name ?? "").trim().split(/\s+/).pop() ?? "";
+        return w.length >= 4 ? w.toLowerCase() : null;
+      };
+      const surname = (name: string | null) => {
+        const w = String(name ?? "").trim().split(/\s+/).pop() ?? "";
+        return w.length >= 3 ? w.toLowerCase() : null;
+      };
+      const marks = [mascot(row.team_name), mascot(row.opponent), surname(row.scorer)]
+        .filter(Boolean) as string[];
+
+      const vetted = found.media.filter((m) => {
+        const from = String(m.authorHandle ?? "").replace(/^@/, "").toLowerCase();
+        if (official.has(from)) return true;
+        if (marks.length === 0) return false; // nothing to check against — do not guess
+        const t = (m.text ?? "").toLowerCase();
+        return marks.some((k) => t.includes(k));
+      });
+      if (vetted.length < found.media.length) {
+        summary.x_offgame_dropped =
+          (summary.x_offgame_dropped ?? 0) + (found.media.length - vetted.length);
+      }
+
+      const best = pickClip(vetted);
 
       // The same clip, twice.
       //
