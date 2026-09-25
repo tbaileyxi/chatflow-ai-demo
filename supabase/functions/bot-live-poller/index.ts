@@ -300,6 +300,21 @@ serve(async (req) => {
     }
 
 
+    // WHICH TEAMS HAVE SOMEBODY WHO COVERS THE WHOLE LEAGUE.
+    //
+    // Read once per run rather than per play. It decides whether a score
+    // AGAINST a team is worth looking for: a club's own account will never
+    // post the touchdown it just conceded, so without an aggregator on that
+    // team the search is guaranteed to come back empty and the queue row is
+    // pure waste. With one, the video exists and is findable.
+    const { data: aggRows } = await supabase
+      .from("team_x_accounts")
+      .select("team_id, kind")
+      .neq("kind", "official");
+    const teamsWithLeagueWideSource = new Set(
+      (aggRows ?? []).map((r: any) => r.team_id as string),
+    );
+
     // ESPN reachability probe. games_seen: 0 is ambiguous on its own — it reads
     // the same whether there are genuinely no games or ESPN refused us. This
     // reports the raw HTTP status so the two can be told apart from the summary
@@ -890,18 +905,35 @@ serve(async (req) => {
             // waiting its turn.
             const XLIVE_MIN = Number(Deno.env.get("XLIVE_MIN_EXCITEMENT") || 0);
             const XLIVE_PER_GAME = Number(Deno.env.get("XLIVE_PER_GAME") || 3);
+            // THE BIG ONES AGAINST YOU COUNT TOO — but they cost more to be
+            // worth it.
+            //
+            // A score emits twice, once for each side. Only the scoring side
+            // used to queue a clip, because the conceding club's own account
+            // is guaranteed not to post the touchdown it just gave up: half
+            // the spend, looking in the wrong place. That was true of club
+            // accounts and is not true of an account that covers the league,
+            // which posts every team's highlights — so the video now exists,
+            // and the room watching the game most wants the seventy-yard bomb
+            // that just beat them.
+            //
+            // Two conditions keep it from undoing the saving it replaces.
+            // Somebody league-wide has to be on that team, or we are back to
+            // searching an account that will never have it. And it has to
+            // clear a higher bar than your own scores do: the per-game cap is
+            // three, and an opponent's chip-shot field goal taking a slot from
+            // your own touchdown would be a worse room, not a better one.
+            const CONCEDED_MIN = Number(
+              Deno.env.get("XLIVE_CONCEDED_MIN_EXCITEMENT") || 80,
+            );
+            const excitement = g.facts.excitementScore ?? 0;
+            const clipWorthy = t.conceded
+              ? teamsWithLeagueWideSource.has(dbTeam.id) && excitement >= CONCEDED_MIN
+              : excitement >= XLIVE_MIN;
+
             if (
               Deno.env.get("X_API_BEARER_TOKEN") &&
-              // THE SIDE THAT SCORED, only.
-              //
-              // Every score emits twice — once for the team that scored and
-              // once for the team it happened to. Both used to queue a clip,
-              // so the same touchdown was searched for on BOTH accounts, and
-              // the conceding team's account is the one guaranteed not to be
-              // posting a highlight of it. Half the spend, looking in the
-              // wrong place.
-              !t.conceded &&
-              (g.facts.excitementScore ?? 0) >= XLIVE_MIN &&
+              clipWorthy &&
               result.huddleIdsPosted.length > 0 &&
               clipsThisGame < XLIVE_PER_GAME
             ) {
