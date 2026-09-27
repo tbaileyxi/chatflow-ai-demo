@@ -79,11 +79,29 @@ export type GameStory = {
  * it and those pieces silently fell out of their own story. A room with no game has
  * no game story — it is a room, not an occasion.
  */
+/**
+ * How long after the whistle a shot still belongs to that game.
+ *
+ * The grace is the point rather than an allowance: the pictures people most
+ * want in a story get taken once it is over.
+ */
+const POSTGAME_GRACE_MS = 3 * 60 * 60 * 1000;
+
 function windowFor(game: GameContext | null | undefined): [number, number] | null {
   if (!game?.startTime) return null;
   const start = Date.parse(game.startTime);
   if (!Number.isFinite(start)) return null;
-  return [start, start + ASSUME_OVER_MS];
+  // Anchored to the actual whistle when we have it. Kickoff plus a fixed
+  // number of hours has to be loose enough for extra innings and tight
+  // enough to exclude tomorrow, and no single number is both — a four-hour
+  // baseball game and a three-hour football game were held to the same
+  // guess. Without a stamp it falls back to that guess, which is what this
+  // was before there was anything better.
+  const finalAt = game.wentFinalAt ? Date.parse(game.wentFinalAt) : NaN;
+  const end = Number.isFinite(finalAt)
+    ? finalAt + POSTGAME_GRACE_MS
+    : start + ASSUME_OVER_MS;
+  return [start, end];
 }
 
 export function useGameStory(
