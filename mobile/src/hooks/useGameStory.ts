@@ -29,7 +29,7 @@ export const MIN_PEOPLE = 2;
  * "Padres 1 — Mets 4, 9 · 0:00" because one row was never closed out. Without
  * this those rooms would never get a story at all.
  */
-const ASSUME_OVER_MS = 6 * 60 * 60 * 1000;
+const ASSUME_OVER_MS = 9 * 60 * 60 * 1000;
 
 /**
  * The pause between the final whistle and the story offering itself.
@@ -73,8 +73,10 @@ export type GameStory = {
 /**
  * The window a game's story covers.
  *
- * From kickoff to six hours after it, which covers a long game plus the hour
- * afterwards when the good ones actually get posted. A room with no game has
+ * From kickoff to nine hours after it — the same bound the rest of the app
+ * uses for "this is still today's game". Six was too tight: an evening game
+ * plus the hour afterwards, when the good shots actually get posted, ran past
+ * it and those pieces silently fell out of their own story. A room with no game has
  * no game story — it is a room, not an occasion.
  */
 function windowFor(game: GameContext | null | undefined): [number, number] | null {

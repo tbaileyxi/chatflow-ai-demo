@@ -32,6 +32,7 @@ import { useTeamSponsors, logSponsorTap } from "@/hooks/useTeamSponsor";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useGameStory, PHOTO_MS, MAX_CLIP_MS } from "@/hooks/useGameStory";
+import { useStoryGame } from "@/hooks/useStoryGame";
 import type { RootStackParamList } from "@/navigation/types";
 
 type Route = RouteProp<RootStackParamList, "GameStory">;
@@ -43,7 +44,10 @@ export function GameStoryScreen() {
 
   const { data: huddle } = useHuddleDetails(huddleId);
   const { data: messages } = useHuddleMessages(huddleId);
-  const { data: game } = useLiveGameContext(huddle?.teamId ?? undefined);
+  const { data: liveGame } = useLiveGameContext(huddle?.teamId ?? undefined);
+  // Same choice the bar made, or tapping it opens a different game's story.
+  const { data: finishedGame } = useStoryGame(huddle?.teamId ?? null);
+  const game = finishedGame ?? liveGame ?? null;
   const { data: profile } = useProfile();
   // Same bypass as the bar, or an admin taps in and watches a spinner.
   const story = useGameStory(messages, game, !!profile?.isAppAdmin);

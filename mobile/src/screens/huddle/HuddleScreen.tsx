@@ -35,6 +35,7 @@ import { HuddleHeader } from "@/components/huddle/HuddleHeader";
 import { PullInFriendsModal } from "@/components/huddle/PullInFriendsModal";
 import { GameStoryBar } from "@/components/huddle/GameStoryBar";
 import { useGameStory } from "@/hooks/useGameStory";
+import { useStoryGame } from "@/hooks/useStoryGame";
 import { PresenceBar } from "@/components/huddle/PresenceBar";
 import { FloatingReactions } from "@/components/huddle/ReactionRail";
 import { PregameStrip } from "@/components/huddle/PregameStrip";
@@ -252,7 +253,15 @@ export function HuddleScreen() {
 
   // What the room shot today, if there is enough of it to be a story. Nothing
   // is fetched for this — it reads the thread that is already loaded.
-  const gameStory = useGameStory(messages, liveGame ?? null, !!profile?.isAppAdmin);
+  // The game that just ended, if there was one — liveGame has already moved
+  // on to next week by then. Falls back to the live one so an admin checking
+  // mid-match still gets a story.
+  const { data: finishedGame } = useStoryGame(teamId);
+  const gameStory = useGameStory(
+    messages,
+    finishedGame ?? liveGame ?? null,
+    !!profile?.isAppAdmin,
+  );
 
   // JUMP pills — the user's other rooms, same-team rooms first. This is the
   // core room-jumping loop; it previously existed only in the dev sandbox.
