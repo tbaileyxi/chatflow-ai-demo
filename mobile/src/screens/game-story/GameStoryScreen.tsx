@@ -17,12 +17,13 @@ import {
   Image,
   Linking,
   Pressable,
+  Share,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import { Video, ResizeMode, type AVPlaybackStatus } from "expo-av";
-import { X } from "lucide-react-native";
+import { Share2, X } from "lucide-react-native";
 import { Type } from "@/components/ui/Type";
 import { colors } from "@/theme/colors";
 import { useHuddleMessages } from "@/hooks/useHuddleMessages";
@@ -104,6 +105,29 @@ export function GameStoryScreen() {
     // Cut a long reaction off at the cap rather than letting one clip eat the
     // story; didJustFinish covers the short ones.
     if (s.didJustFinish || (s.positionMillis ?? 0) >= dur) next();
+  };
+
+  // SHARE THE ROOM, NOT THE PICTURES.
+  //
+  // The link carries a teaser — room, team, how much there is — and the
+  // story itself stays inside the app. Publishing the frames to the web
+  // would make one member's tap expose everyone else's photos, and the whole
+  // model here is that the person who posted picks who sees it.
+  //
+  // message and url passed separately: both together makes iOS send the link
+  // twice and stops Messages building a preview card at all.
+  const shareStory = async () => {
+    setPaused(true);
+    try {
+      await Share.share({
+        message: `Our game story from ${huddle?.name ?? "the room"}.`,
+        url: `https://www.sidehuddlesports.com/h/${huddleId}?story=1`,
+      });
+    } catch {
+      // Dismissing the sheet is not an error.
+    } finally {
+      setPaused(false);
+    }
   };
 
   if (!story.ready || !item) {
@@ -203,6 +227,14 @@ export function GameStoryScreen() {
               {huddle?.name ?? "The room"}
             </Type>
           </View>
+          <Pressable
+            onPress={shareStory}
+            hitSlop={10}
+            accessibilityLabel="Share this story"
+            className="h-9 w-9 items-center justify-center"
+          >
+            <Share2 color="#FFFFFF" size={20} />
+          </Pressable>
           <Pressable
             onPress={() => navigation.goBack()}
             hitSlop={10}

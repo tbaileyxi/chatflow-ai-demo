@@ -45,7 +45,16 @@ export default async function middleware(request: Request) {
         ? `team=${encodeURIComponent(team)}`
         : "";
 
-  const upstream = await fetch(`${OG}?${q}`, {
+  // Query the sender actually chose, forwarded.
+  //
+  // This rebuilds the upstream query from the PATH, so anything after the ?
+  // was being dropped — a story link and a plain room link arrived at
+  // og-preview identical, and both unfurled as the room. The flag is what
+  // tells the card to describe what is in the story rather than where it
+  // came from.
+  const extra = url.searchParams.get("story") === "1" ? "&story=1" : "";
+
+  const upstream = await fetch(`${OG}?${q}${extra}`, {
     headers: { accept: "text/html" },
   });
   const html = await upstream.text();

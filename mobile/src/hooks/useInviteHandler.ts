@@ -42,6 +42,35 @@ export function extractInviteCode(url: string): string | null {
 }
 
 /**
+ * A room link, and whether it points at that room's game story.
+ *
+ *   https://sidehuddlesports.com/h/<id>            → the room
+ *   https://sidehuddlesports.com/h/<id>?story=1    → the room, then its story
+ *   sidehuddle://h/<id>?story=1                    → the same
+ *
+ * /h/ links have always opened the app and then done nothing, so a shared
+ * room landed whoever tapped it on whatever screen they left behind. That is
+ * the leak in every share: the link travels, the person arrives, and the
+ * thing they were sent is nowhere.
+ */
+export function extractRoomTarget(
+  url: string,
+): { huddleId: string; story: boolean } | null {
+  try {
+    const { hostname, path, queryParams } = Linking.parse(url);
+    const story = String(queryParams?.story ?? "") === "1";
+    if (hostname === "h" && path) return { huddleId: path.split("/")[0], story };
+    if (path?.startsWith("h/")) {
+      const id = path.slice(2).split("/")[0];
+      return id ? { huddleId: id, story } : null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * A verified-creator invite token from any of:
  *   https://sidehuddlesports.com/invite/TOKEN
  *   sidehuddle://invite/TOKEN
@@ -173,6 +202,19 @@ export function useInviteHandler() {
       if (creatorToken) {
         if (user) await claimCreatorInvite(creatorToken, navigation);
         else await storePendingCreatorInvite(creatorToken);
+        return;
+      }
+
+      // A room link needs no claiming — it is a destination, not a grant.
+      const room = extractRoomTarget(url);
+      if (room) {
+        if (!user) return; // signing in lands them on Home; nothing to consume
+        navigation.navigate("Huddle", { huddleId: room.huddleId });
+        // The story sits on top of the room, so backing out of it leaves you
+        // where the link said you were going rather than on Home.
+        if (room.story) {
+          navigation.navigate("GameStory", { huddleId: room.huddleId });
+        }
         return;
       }
 

@@ -328,6 +328,8 @@ Deno.serve(async (req) => {
   const roomId = url.searchParams.get("room");
   const teamSlug = url.searchParams.get("team");
   const inviteCode = url.searchParams.get("invite");
+  // ?story=1 — the room link a game story was shared from.
+  const wantsStory = url.searchParams.get("story") === "1";
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -402,9 +404,43 @@ Deno.serve(async (req) => {
           ? ` ${members} people are already in.`
           : "";
 
+      // A SHARED STORY SAYS WHAT IS IN IT.
+      //
+      // Without this a story link unfurls as the room it came from — "A
+      // Giants room. Talk through the game with the people in it." — which
+      // describes a place rather than the thing somebody just sent you.
+      // Counting the media is one query on a service-role client, and the
+      // number IS the pitch: eleven shots is a reason to tap, a room is not.
+      //
+      // Deliberately no frame from the story as the image. One member
+      // sharing must not publish everyone else's photos to the open web, so
+      // the card keeps the room's own picture and the story stays in the app.
+      let storyLine: string | null = null;
+      if (wantsStory) {
+        const since = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+        const { data: shots } = await supabase
+          .from("huddle_messages")
+          .select("media_type, user_id")
+          .eq("huddle_id", resolvedRoom)
+          .in("media_type", ["image", "video"])
+          .eq("is_bot_message", false)
+          .gte("created_at", since);
+        const n = (shots ?? []).length;
+        if (n > 0) {
+          const clips = (shots ?? []).filter((r: any) => r.media_type === "video").length;
+          const people = new Set((shots ?? []).map((r: any) => r.user_id)).size;
+          const bits = [
+            `${n - clips} ${n - clips === 1 ? "shot" : "shots"}`,
+            clips > 0 ? `${clips} ${clips === 1 ? "clip" : "clips"}` : null,
+          ].filter(Boolean).join(" and ");
+          storyLine = `${bits} from ${people} of them, from today's game.`;
+        }
+      }
+
       return page({
-        title: `${room.name} · Side Huddle`,
-        description: sharedText
+        title: wantsStory ? `${room.name} — the game story` : `${room.name} · Side Huddle`,
+        description: storyLine
+          ?? sharedText
           ?? (team
             ? `A ${team} room. Talk through the game with the people in it.${crowd}`
             : `Talk through the game with the people in it.${crowd}`),
@@ -414,7 +450,9 @@ Deno.serve(async (req) => {
         image: sharedImage || landscape(sameOrigin((room as any).photo_url)) || teamCardImage(team),
         // Point at the link that was actually shared, so the preview and the
         // destination agree.
-        canonical: inviteCode ? `${SITE}/i/${inviteCode}` : `${SITE}/h/${resolvedRoom}`,
+        canonical: inviteCode
+          ? `${SITE}/i/${inviteCode}`
+          : `${SITE}/h/${resolvedRoom}${wantsStory ? "?story=1" : ""}`,
       });
     }
 
