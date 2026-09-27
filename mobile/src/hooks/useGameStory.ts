@@ -144,10 +144,15 @@ export function useGameStory(
       ? Date.now() >= finalAt + AFTER_FULL_TIME_MS
       : getGameState(game ?? null) === "postgame" || Date.now() > to;
 
+    // The admin bypass drops the SIZE rule and nothing else. Skipping full
+    // time too meant the bar appeared after a single selfie in the second
+    // quarter — which is not the feature, and made testing it actively
+    // misleading. A finished game is easy to point at now, so there is no
+    // reason to fake the one gate that defines when a story exists.
     const enough = ignoreThreshold
       ? items.length > 0
       : items.length >= MIN_ITEMS && people >= MIN_PEOPLE;
-    const ready = enough && (over || ignoreThreshold);
+    const ready = enough && over;
 
     return {
       items,
