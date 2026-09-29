@@ -66,6 +66,10 @@ export default function GameStoryPage() {
   // real time, so a fifty-second story takes fifty seconds and the person
   // needs to be told that rather than left looking at a dead button.
   const [building, setBuilding] = useState<number | null>(null);
+  // Muted to start because every browser blocks autoplay with sound, and a
+  // story that needs a tap before anything happens is a story nobody watches.
+  // One tap turns it on and it stays on for the rest of the run.
+  const [muted, setMuted] = useState(true);
 
   useEffect(() => {
     if (!huddleId) return;
@@ -193,9 +197,7 @@ export default function GameStoryPage() {
             src={item.url}
             autoPlay
             playsInline
-            // Muted, because a browser blocks autoplay with sound and a story
-            // that needs a second tap to start is a story nobody watches.
-            muted
+            muted={muted}
             className="h-full w-full object-cover"
             onTimeUpdate={(e) => {
               const v = e.currentTarget;
@@ -227,6 +229,14 @@ export default function GameStoryPage() {
           onPointerUp={() => setPaused(false)}
         />
       </div>
+
+      <button
+        onClick={() => setMuted((m) => !m)}
+        aria-label={muted ? 'Turn sound on' : 'Turn sound off'}
+        className="absolute right-3 top-14 z-10 rounded-full bg-black/60 px-3 py-2 text-xs font-semibold text-white"
+      >
+        {muted ? 'Sound off' : 'Sound on'}
+      </button>
 
       <div className="pointer-events-none absolute inset-x-0 top-0 p-3">
         <div className="flex gap-1">

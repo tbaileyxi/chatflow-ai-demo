@@ -11,10 +11,16 @@
 // tainted the moment a frame was drawn and nothing could be read back out.
 // crossOrigin must be set BEFORE src on every element for that to hold.
 //
-// SILENT, DELIBERATELY. Canvas capture carries no audio, and mixing the
-// clips' sound back in means Web Audio graphs and a second recorder track for
-// a story that is watched muted in a group chat anyway. If sound turns out to
-// matter it is a known, separate piece of work.
+// WITH SOUND. A canvas emits video and nothing else, so the clips' audio is
+// routed through a Web Audio graph into a second track on the same stream:
+// each clip's element becomes a MediaElementSource wired to a
+// MediaStreamDestination, and the recorder is handed video + audio together.
+//
+// The sources are connected to the recording destination ONLY, never to the
+// speakers, so building a video does not blast a room's audio out of the
+// phone that is making it. Stills contribute silence, which keeps the audio
+// track continuous — a track that stops and starts is a file some players
+// refuse to scrub.
 
 export type RenderItem = {
   url: string;
@@ -35,10 +41,12 @@ const H = 1920;
 
 /** The first of these the browser admits to supporting. */
 const CANDIDATES = [
-  'video/mp4;codecs=avc1',
+  // Audio codec named explicitly first: some browsers will happily report
+  // support for a bare container and then record a file with no audio track.
+  'video/mp4;codecs=avc1,mp4a.40.2',
   'video/mp4',
-  'video/webm;codecs=vp9',
-  'video/webm;codecs=vp8',
+  'video/webm;codecs=vp9,opus',
+  'video/webm;codecs=vp8,opus',
   'video/webm',
 ];
 
@@ -87,7 +95,10 @@ function loadVideo(url: string, signal?: AbortSignal): Promise<HTMLVideoElement>
   return new Promise((resolve, reject) => {
     const v = document.createElement('video');
     v.crossOrigin = 'anonymous';
-    v.muted = true;
+    // NOT muted. Muting silences the element, and the Web Audio tap below
+    // reads the element — a muted clip records a silent clip. Nothing is
+    // audible anyway, because the graph goes to the recorder and not to the
+    // speakers.
     v.playsInline = true;
     v.preload = 'auto';
     v.onloadeddata = () => resolve(v);
@@ -120,11 +131,34 @@ export async function renderStory(
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, W, H);
 
-  const stream = canvas.captureStream(30);
+  // Video from the canvas, audio from the clips, one stream.
+  const videoStream = canvas.captureStream(30);
+  let actx: AudioContext | null = null;
+  let audioDest: MediaStreamAudioDestinationNode | null = null;
+  try {
+    const AC = (window as any).AudioContext ?? (window as any).webkitAudioContext;
+    if (AC) {
+      actx = new AC() as AudioContext;
+      // The caller is a click handler, which is the gesture that allows this.
+      await actx.resume().catch(() => undefined);
+      audioDest = actx.createMediaStreamDestination();
+    }
+  } catch {
+    // No audio context is a silent video, not a failed one.
+    actx = null;
+    audioDest = null;
+  }
+
+  const stream = new MediaStream([
+    ...videoStream.getVideoTracks(),
+    ...(audioDest ? audioDest.stream.getAudioTracks() : []),
+  ]);
+
   const chunks: BlobPart[] = [];
   const rec = new (window as any).MediaRecorder(stream, {
     mimeType: mime,
     videoBitsPerSecond: 6_000_000,
+    audioBitsPerSecond: 128_000,
   }) as MediaRecorder;
   rec.ondataavailable = (e) => {
     if (e.data.size > 0) chunks.push(e.data);
@@ -145,6 +179,18 @@ export async function renderStory(
       if (it.kind === 'video') {
         const v = await loadVideo(it.url, opts.signal);
         const ms = Math.min((v.duration || maxClipMs / 1000) * 1000, maxClipMs);
+        // Tap this clip's audio into the recording. One source per element —
+        // createMediaElementSource can only ever be called once on the same
+        // element, which is why each clip gets a fresh one.
+        let src: MediaElementAudioSourceNode | null = null;
+        if (actx && audioDest) {
+          try {
+            src = actx.createMediaElementSource(v);
+            src.connect(audioDest);
+          } catch {
+            src = null; // this clip records silent rather than not at all
+          }
+        }
         await v.play().catch(() => undefined);
         const started = performance.now();
         // Draw every frame the recorder will see. A video element is not
@@ -161,6 +207,7 @@ export async function renderStory(
           };
           tick();
         });
+        src?.disconnect();
       } else {
         const img = await loadImage(it.url, opts.signal);
         const started = performance.now();
@@ -185,6 +232,8 @@ export async function renderStory(
     // than leaving a recorder running and a caller waiting forever.
     if (rec.state !== 'inactive') rec.stop();
     stream.getTracks().forEach((t) => t.stop());
+    videoStream.getTracks().forEach((t) => t.stop());
+    await actx?.close().catch(() => undefined);
   }
 
   return done;
