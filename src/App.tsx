@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { HelmetProvider } from "react-helmet-async";
 import LandingPage from "./pages/LandingPage";
 import HuddleInvitePage from "./pages/HuddleInvitePage";
+import GameStoryPage from "./pages/GameStoryPage";
 import InviteCodePage from "./pages/InviteCodePage";
 import CreatorInvitePage from "./pages/CreatorInvitePage";
 import AdminEventsPage from "./pages/AdminEventsPage";
@@ -70,7 +71,10 @@ const AppContent = () => {
     <div className="min-h-screen w-full bg-background">
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/h/:huddleId" element={<HuddleInvitePage />} />
+        {/* One path, two things: the room, and the room's story. ?story=1
+            is what the share button sends and what og-preview describes, so
+            the card, the page and the app all agree on where the link goes. */}
+        <Route path="/h/:huddleId" element={<RoomOrStory />} />
         <Route path="/i/:code" element={<InviteCodePage />} />
         <Route path="/invite/:token" element={<CreatorInvitePage />} />
         <Route path="/admin/events" element={<AdminEventsPage />} />
@@ -93,6 +97,12 @@ const AppContent = () => {
     </div>
   );
 };
+
+/** ?story=1 plays the story; anything else is the room invite. */
+function RoomOrStory() {
+  const isStory = new URLSearchParams(window.location.search).get("story") === "1";
+  return isStory ? <GameStoryPage /> : <HuddleInvitePage />;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
