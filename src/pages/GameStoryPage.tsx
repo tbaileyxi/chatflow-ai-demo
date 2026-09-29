@@ -15,6 +15,7 @@ import { useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { supabase } from '@/integrations/supabase/client';
 import { appStoreUrl, STORE_CAMPAIGN } from '@/lib/appStore';
+import { renderStory, saveBlob, canRenderStory } from '@/lib/renderStory';
 
 const PHOTO_MS = 4500;
 const MAX_CLIP_MS = 8000;
@@ -61,6 +62,10 @@ export default function GameStoryPage() {
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // null = idle, 0..1 = building. Rendering plays the story onto a canvas in
+  // real time, so a fifty-second story takes fifty seconds and the person
+  // needs to be told that rather than left looking at a dead button.
+  const [building, setBuilding] = useState<number | null>(null);
 
   useEffect(() => {
     if (!huddleId) return;
@@ -70,6 +75,26 @@ export default function GameStoryPage() {
   }, [huddleId]);
 
   const items = story?.items ?? [];
+
+  const download = async () => {
+    if (building !== null) return;
+    setPaused(true);
+    setBuilding(0);
+    try {
+      const blob = await renderStory(
+        items.map((it) => ({ url: it.url, kind: it.kind })),
+        { photoMs: PHOTO_MS, maxClipMs: MAX_CLIP_MS, onProgress: setBuilding },
+      );
+      const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+      saveBlob(blob, `${(story?.room ?? 'game-story').replace(/[^\w -]/g, '')}.${ext}`);
+    } catch {
+      // Nothing to explain that the person can act on — the button simply
+      // goes back to being a button.
+    } finally {
+      setBuilding(null);
+      setPaused(false);
+    }
+  };
   const item = items[i] ?? null;
 
   const next = useCallback(() => {
@@ -134,9 +159,25 @@ export default function GameStoryPage() {
         >
           Get Side Huddle
         </a>
+        {canRenderStory() ? (
+          <button
+            onClick={download}
+            disabled={building !== null}
+            className="rounded-full border border-[#2A2A2F] px-6 py-3 font-semibold text-white disabled:opacity-60"
+          >
+            {building === null
+              ? 'Save the video'
+              : `Building… ${Math.round(building * 100)}%`}
+          </button>
+        ) : null}
         <button onClick={() => { setI(0); setProgress(0); }} className="text-sm text-[#6A6A74] underline">
           Watch again
         </button>
+        {building !== null ? (
+          <p className="max-w-xs text-xs text-[#6A6A74]">
+            It plays through once to record. Leave this on screen.
+          </p>
+        ) : null}
       </div>
     );
   }
