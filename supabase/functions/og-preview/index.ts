@@ -365,7 +365,7 @@ Deno.serve(async (req) => {
     if (resolvedRoom) {
       const { data: room } = await supabase
         .from("huddles")
-        .select("name, photo_url, member_count, teams:team_id (name)")
+        .select("name, photo_url, member_count, seat_cap, teams:team_id (name)")
         .eq("id", resolvedRoom)
         .maybeSingle();
 
@@ -399,10 +399,24 @@ Deno.serve(async (req) => {
 
       const team = (room as any).teams?.name as string | undefined;
       const members = (room as any).member_count as number | null;
+      const cap = (room as any).seat_cap as number | null;
+
+      // SEATS LEFT IS THE URGENCY, AND IT BELONGS IN THE CARD.
+      //
+      // "3 people are already in" is a fact. "12 of 50 seats left" is a
+      // reason to tap now, and "Sold out" is the best advert a room can
+      // have — both only exist because the room has a cap, and neither can
+      // be worked out from a member count on its own. An uncapped room keeps
+      // the line it had.
+      const left = cap && cap > 0 ? cap - (members ?? 0) : null;
       const crowd =
-        typeof members === "number" && members > 1
-          ? ` ${members} people are already in.`
-          : "";
+        left !== null
+          ? left > 0
+            ? ` ${left} of ${cap} seats left.`
+            : " Sold out."
+          : typeof members === "number" && members > 1
+            ? ` ${members} people are already in.`
+            : "";
 
       // A SHARED STORY SAYS WHAT IS IN IT.
       //
