@@ -15,6 +15,7 @@ import {
   Trash2,
   Unlock,
   UserPlus,
+  Users,
   X,
   Share2,
 } from "lucide-react-native";
@@ -226,6 +227,49 @@ export function HuddleSettingsScreen() {
       .eq("id", huddleId);
     queryClient.invalidateQueries({ queryKey: ["huddle-details", huddleId] });
     queryClient.invalidateQueries({ queryKey: ["huddle-search"] });
+  };
+
+  // HOW MANY SEATS. The cap is the room's shape, not a restriction on it —
+  // fifty people where somebody might answer you is a different room from ten
+  // thousand where nobody can. The host picks the number; we only stop them
+  // picking one that is already impossible.
+  const editCap = () => {
+    if (!isRoomAdmin) return;
+    Alert.prompt(
+      "How many seats?",
+      "Anyone can take a free seat until they run out. Clear it to remove the cap.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Save",
+          onPress: async (value?: string) => {
+            const n = Math.floor(Number(String(value ?? "").trim()));
+            const next = Number.isFinite(n) && n > 0 ? n : null;
+            // A cap never removes anybody, so one below the current count is a
+            // number that can only confuse: the room reads "sold out" while
+            // holding more people than it claims to allow.
+            if (next !== null && next < huddle.memberCount) {
+              Alert.alert(
+                "That's fewer than are already here",
+                `${huddle.memberCount} are in the room, and a cap never removes anyone. Pick ${huddle.memberCount} or more.`,
+              );
+              return;
+            }
+            // seat_cap is newer than the generated types, same as photo_url
+            // was. Cast rather than wait for a regen.
+            await (supabase as any)
+              .from("huddles")
+              .update({ seat_cap: next })
+              .eq("id", huddleId);
+            queryClient.invalidateQueries({ queryKey: ["huddle-details", huddleId] });
+            queryClient.invalidateQueries({ queryKey: ["huddle-search"] });
+          },
+        },
+      ],
+      "plain-text",
+      huddle.seatCap ? String(huddle.seatCap) : "50",
+      "number-pad",
+    );
   };
 
   const approveRequest = async (request: any) => {
@@ -842,6 +886,23 @@ export function HuddleSettingsScreen() {
                 </View>
                 <Button variant="outline" size="sm" onPress={togglePrivate}>
                   {huddle.isPrivate ? "Unlock it" : "Lock it"}
+                </Button>
+              </View>
+
+              <View className="flex-row items-center gap-3">
+                <Users color={colors.mutedForeground} size={18} />
+                <View className="flex-1">
+                  <Type variant="captionStrong">
+                    {huddle.seatCap ? `${huddle.seatCap} seats` : "No cap"}
+                  </Type>
+                  <Type variant="caption" tone="muted" className="leading-5">
+                    {huddle.seatCap
+                      ? `${Math.max(0, huddle.seatCap - huddle.memberCount)} left — anyone can take one without asking.`
+                      : "As many people as find it."}
+                  </Type>
+                </View>
+                <Button variant="outline" size="sm" onPress={editCap}>
+                  {huddle.seatCap ? "Change" : "Set a cap"}
                 </Button>
               </View>
 

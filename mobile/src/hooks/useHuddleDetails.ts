@@ -20,6 +20,8 @@ export type HuddleDetails = {
   teamLogoUrl: string | null;
   /** Full-bleed picture behind the chat. Null = plain theme background. */
   photoUrl: string | null;
+  /** Null when the room is uncapped, which is every room made before seats. */
+  seatCap: number | null;
   /** The fixture this huddle is about, for game huddles and side huddles. */
   gameId: string | null;
   /** Set when this is a verified creator's room: their X handle. */
@@ -57,7 +59,7 @@ export function useHuddleDetails(huddleId: string) {
           is_official_team_huddle, is_verified, owner_id, team_id,
           teams!team_id (name, city, logo_url)
         `;
-      const EXTRA = `official_status, website_url, photo_url, game_id, is_game_room, expires_at, is_dm, x_handle`;
+      const EXTRA = `official_status, website_url, photo_url, game_id, is_game_room, expires_at, is_dm, x_handle, seat_cap`;
 
       let { data: rawData, error } = await (supabase as any)
         .from("huddles")
@@ -125,6 +127,7 @@ export function useHuddleDetails(huddleId: string) {
         teamCity: team?.city ?? null,
         teamLogoUrl: team?.logo_url ?? null,
         photoUrl: (data as any).photo_url ?? null,
+        seatCap: (data as any).seat_cap ?? null,
         gameId: (data as any).game_id ?? null,
         creatorHandle,
         isGameRoom: (data as any).is_game_room === true,

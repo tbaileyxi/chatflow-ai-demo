@@ -128,7 +128,16 @@ export function JoinHuddleScreen() {
       .insert({ huddle_id: huddleId, user_id: user.id });
 
     if (error) {
-      Alert.alert("Error", "Failed to join Side Huddle.");
+      // A full room is not a failure, it is the answer. The cap raises this
+      // by name from a trigger so every join path reports it the same way,
+      // and "sold out" is the thing the host wants people to see anyway.
+      const full = /room_full/i.test(error.message ?? "");
+      Alert.alert(
+        full ? "That room is full" : "Error",
+        full
+          ? "Every seat has gone. The host can add more if they want to."
+          : "Failed to join Side Huddle.",
+      );
       return;
     }
 

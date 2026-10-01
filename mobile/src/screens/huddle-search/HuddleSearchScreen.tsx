@@ -26,7 +26,23 @@ type SearchHuddle = {
   knownCount: number;
   /** Set on a verified creator's room. */
   creatorHandle?: string | null;
+  /** Null on an uncapped room, which is most of them. */
+  seatCap?: number | null;
 };
+
+/**
+ * What a capped room says about itself in a list.
+ *
+ * Seats left is the urgency and sold out is the marketing — neither can be
+ * read off a member count, which is why the cap comes back from search at
+ * all. An uncapped room says nothing extra and keeps the old line.
+ */
+function seatLine(memberCount: number, cap?: number | null): string | null {
+  if (!cap || cap <= 0) return null;
+  const left = cap - memberCount;
+  if (left <= 0) return "Sold out";
+  return `${left} of ${cap} seats left`;
+}
 
 // "Mike and Sara are in" reads like a reason to tap. "3 members" does not.
 function knownLine(names: string[], count: number): string | null {
@@ -65,6 +81,7 @@ function useHuddleSearch(search: string) {
         name: h.name,
         bio: h.bio ?? null,
         memberCount: h.member_count ?? 0,
+        seatCap: h.seat_cap ?? null,
         teamName: h.team_name ?? null,
         teamLogoUrl: h.team_logo_url ?? null,
         isMember: !!h.is_member,
@@ -183,13 +200,20 @@ export function HuddleSearchScreen() {
         <View className="flex-row items-center gap-1">
           <Users color={colors.mutedForeground} size={12} />
           <Type variant="caption" tone="muted">
-            {pluralize(item.memberCount, "member")}
+            {seatLine(item.memberCount, item.seatCap) ??
+              pluralize(item.memberCount, "member")}
           </Type>
         </View>
       </View>
 
       <Button variant="outline" size="xs" onPress={() => openHuddle(item)}>
-        {item.isMember ? "Enter" : item.isPrivate ? "Request" : "Join"}
+        {item.isMember
+          ? "Enter"
+          : seatLine(item.memberCount, item.seatCap) === "Sold out"
+            ? "Full"
+            : item.isPrivate
+              ? "Request"
+              : "Join"}
       </Button>
     </Pressable>
   );
