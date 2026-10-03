@@ -5,15 +5,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "Side Huddle Sports",
   slug: "side-huddle-sports",
   scheme: "sidehuddle",
-  // 1.0.8 (103) is in review, so that train is spoken for: anything new is
-  // 1.0.9. Uploading under a version that is sitting in review is how you end
-  // up replacing the binary a reviewer is halfway through.
+  // 1.1.4 is APPROVED AND ON THE STORE (build 126, Ready for Distribution),
+  // so that train is closed: anything new is 1.1.5. Uploading under a version
+  // that is sitting in review is how you end up replacing the binary a
+  // reviewer is halfway through, and uploading under a released one is
+  // rejected outright.
   //
   // A version is a "pre-release train", and Apple closes a train once that
   // version has been through review. 1.0.4 is closed: Transporter rejects any
   // build under it with "Invalid Pre-Release Train", no matter how high the
   // build number goes. New work needs a new version, not a new build.
-  version: "1.1.4",
+  //
+  // 1.1.5 carries the story counting — a completed share is recorded, and
+  // #SideHuddle rides on the share text so a post can be found by hand.
+  version: "1.1.5",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "dark",
