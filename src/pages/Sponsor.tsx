@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useCanonical } from '@/hooks/useCanonical';
 import { Ticker, useTicker } from '@/components/site/GamedayTicker';
-import { FOUNDING_END, FOUNDING_PRICE, LIST_PRICE, isFoundingOpen } from '@/lib/founding';
+import { COLLEGE_MONTHLY, PRO_MONTHLY, PRO_SEASON, monthlyForLeague, monthlyTotal } from '@/lib/founding';
 
 /**
  * ONE SPONSOR PAGE, personalised by ?team=slug.
@@ -68,31 +68,8 @@ const PACKAGE = [
   'Co-branded shirts in the team\u2019s colors.',
 ];
 
-/**
- * True until the founding deadline, then false — flipping while the page is
- * open, so nobody sits on a $500 page after the window has shut. Re-armed at
- * most a day at a time (a timer cannot be set weeks out).
- */
-function useFoundingOpen(): boolean {
-  const [open, setOpen] = useState(() => isFoundingOpen());
-  useEffect(() => {
-    if (!open) return;
-    let t: ReturnType<typeof setTimeout>;
-    const arm = () => {
-      const ms = FOUNDING_END - Date.now();
-      if (ms <= 0) return setOpen(false);
-      t = setTimeout(arm, Math.min(ms + 50, 86_400_000));
-    };
-    arm();
-    return () => clearTimeout(t);
-  }, [open]);
-  return open;
-}
-
 export default function Sponsor() {
   useCanonical('/sponsor');
-  const open = useFoundingOpen();
-  const PRICE = open ? FOUNDING_PRICE : LIST_PRICE;
 
   const [params] = useSearchParams();
   const slug = (params.get('team') || '').trim().toLowerCase();
@@ -197,7 +174,9 @@ export default function Sponsor() {
   const team = linkTeam?.name ?? null;
   const pickedTeams = teams.filter((t) => picked.has(t.id));
   const n = pickedTeams.length;
-  const total = n * PRICE;
+  // Per month, and a mixed cart adds up — a pro side and a college one in the
+  // same basket are $500 and $250, not two of anything.
+  const total = monthlyTotal(pickedTeams.map((t) => t.league));
 
   const byLeague = useMemo(() => {
     const m = new Map<string, Team[]>();
@@ -307,18 +286,17 @@ export default function Sponsor() {
           </p>
 
           <div className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1 sm:mt-7">
-            {open ? (
-              <>
-                <s className="text-2xl font-bold text-white/45 decoration-white/70">{money(LIST_PRICE)}</s>
-                <span className="text-5xl font-black leading-none text-[#FFD60A]">{money(FOUNDING_PRICE)}</span>
-                <span className="text-base font-semibold text-white">Founding rate — one per team.</span>
-              </>
-            ) : (
-              <>
-                <span className="text-5xl font-black leading-none text-[#FFD60A]">{money(LIST_PRICE)}</span>
-                <span className="text-base font-semibold text-white">Flat for the season — one per team.</span>
-              </>
-            )}
+            {/* The season figure is the price; the monthly one is the terms.
+                Nothing is struck through — this is not a sale, it is the same
+                money on terms a bar owner can say yes to without asking. */}
+            <span className="text-5xl font-black leading-none text-[#FFD60A]">{money(PRO_MONTHLY)}</span>
+            <span className="text-2xl font-bold text-white/70">/mo</span>
+            <span className="text-base font-semibold text-white">
+              per team, or {money(PRO_SEASON)} for the season. One partner per team.
+            </span>
+            <span className="w-full text-[15px] text-white/70">
+              College teams are {money(COLLEGE_MONTHLY)}/mo. Cancel any time.
+            </span>
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 sm:mt-6">
@@ -330,7 +308,6 @@ export default function Sponsor() {
               Claim your team
             </button>
             {open ? (
-              <Countdown />
             ) : (
               <p className="text-sm font-semibold text-[#FFD60A]">The founding window has closed.</p>
             )}
@@ -428,7 +405,10 @@ export default function Sponsor() {
         <section className="border-t border-white/10 py-14">
           <h2 className="text-xl font-black">Terms</h2>
           <ul className="mt-5 space-y-2 text-white/75">
-            <li>{money(PRICE)} per team, flat for the season, no prorating.</li>
+            <li>
+              {money(PRO_MONTHLY)} per team per month ({money(COLLEGE_MONTHLY)} for a college),
+              billed monthly, cancel any time.
+            </li>
             <li>This season only.</li>
             <li>Each sport-season is its own unit.</li>
           </ul>
@@ -519,9 +499,17 @@ export default function Sponsor() {
             </div>
 
             <p className="mt-6 text-sm text-white/85">
-              Total: {money(PRICE)} × {n} {n === 1 ? 'team' : 'teams'} ={' '}
-              <span className="font-black text-[#FFD60A]">{money(total)}</span>
+              {n} {n === 1 ? 'team' : 'teams'} ={' '}
+              <span className="font-black text-[#FFD60A]">{money(total)}</span> a month
             </p>
+            {/* Spelled out per team, because a mixed cart's total is not any
+                one number times anything and an unexplained figure is the
+                thing people email about instead of paying. */}
+            {n > 1 ? (
+              <p className="mt-1 text-xs text-white/55">
+                {pickedTeams.map((t) => `${t.name} ${money(monthlyForLeague(t.league))}`).join(' · ')}
+              </p>
+            ) : null}
 
             {err ? <p className="mt-3 text-sm text-red-400">{err}</p> : null}
 
@@ -531,7 +519,7 @@ export default function Sponsor() {
               className="mt-4 w-full rounded-lg px-5 py-3.5 font-black text-[#0A0A0A] disabled:opacity-60"
               style={{ backgroundColor: '#FFD60A' }}
             >
-              {busy ? 'Opening checkout…' : `Pay ${money(total)} with Square`}
+              {busy ? 'Opening checkout…' : `Start ${money(total)}/mo with Square`}
             </button>
 
             <p className="mt-4 text-sm text-white/50">
@@ -574,29 +562,6 @@ function Field({
   );
 }
 
-/** Time left on the founding rate. Renders nothing once the deadline passes. */
-function Countdown() {
-  const end = FOUNDING_END;
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const left = Math.floor((end - now) / 1000);
-  if (!(left > 0)) return null;
-  const pad = (v: number) => String(v).padStart(2, '0');
-  const d = Math.floor(left / 86400);
-  const h = Math.floor((left % 86400) / 3600);
-  const m = Math.floor((left % 3600) / 60);
-  return (
-    <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-white">
-      <span className="font-semibold">Founding rate ends in:</span>
-      <span className="font-mono text-lg font-bold tabular-nums text-[#FFD60A]">
-        {d}d {pad(h)}h {pad(m)}m {pad(left % 60)}s
-      </span>
-    </p>
-  );
-}
 
 /**
  * A full-size iPhone: bezel, rounded screen, dynamic island. The screen is the

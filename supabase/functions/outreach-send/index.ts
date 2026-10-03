@@ -19,17 +19,17 @@ const SCHOOL_PARTNER_VERTICAL = "school partner";
 // each of which outlived the page it linked to — an email quoting a price the
 // landing page contradicts loses a buyer who was otherwise ready.
 //
-// One founding partner per team per season, category exclusive. One price,
-// no prorating, no deposit, no tiers to explain: $500 at the founding rate,
-// $2,500 after the deadline. priceLine() flips on its own; the page and the
-// checkout read the same deadline.
-import {
-  priceLine,
-  isFoundingOpen,
-  deadlineDay,
-  foundingPrice,
-  listPrice,
-} from "../_shared/founding.ts";
+// One partner per team, category exclusive. One price, no prorating, no
+// deposit, no tiers to explain: $2,500 a season, or $500 a month billed by
+// Square until they stop. The season figure is the price and the monthly one
+// is the terms — lead with the month and it reads as what the thing costs,
+// which makes the reply a negotiation down from a floor.
+//
+// THE FOUNDING DEADLINE IS GONE. It closed Oct 2 2026 having sold nothing,
+// and these letters used to be built on it: a window, a countdown, a rate
+// that rose. None of that is true now, and a letter quoting a deadline that
+// no longer exists is a letter the reader can check and catch.
+import { priceLine, proPrice, proSeasonPrice } from "../_shared/founding.ts";
 
 
 // Trademark posture: we describe who the fans are, never claim affiliation.
@@ -209,15 +209,15 @@ function body(step: number, lead: Lead): string {
   // it. Same approved wording either side; only the tense moves, and it moves
   // on its own, because a letter that still says "closes Oct 2" on October
   // third is a letter that tells the reader nobody is minding the shop.
-  const open = isFoundingOpen();
+  // NO DEADLINE, SO SCARCITY IS THE SLOT ITSELF. There is one partner per
+  // team and somebody else can take it — that is true all year and needs no
+  // date to administer, which is the whole reason the countdown is gone.
 
   if (step === 2) {
     return [
       `Hi ${firstName(lead)},`,
-      `Nudge on the ${team} founding slot \u2014 still open, no other ${category} has it.`,
-      open
-        ? `Founding window closes ${deadlineDay}, then it's ${listPrice} for the season. ${foundingPrice} until then: ${link}`
-        : `Founding window closed ${deadlineDay} \u2014 it's ${listPrice} for the season now: ${link}`,
+      `Nudge on the ${team} slot \u2014 still open, no other ${category} has it.`,
+      `${proSeasonPrice} for the season, or ${proPrice} a month and stop whenever you like: ${link}`,
       `Ty`,
       DISCLAIMER,
     ].join("\n\n");
@@ -226,10 +226,8 @@ function body(step: number, lead: Lead): string {
   if (step === 3) {
     return [
       `Hi ${firstName(lead)},`,
-      open
-        ? `Last note on ${team}. After ${deadlineDay} the founding story goes to whoever took the slot \u2014 and the rate goes to ${listPrice}.`
-        : `Last note on ${team}. The founding window closed ${deadlineDay}, so the slot is ${listPrice} for the season now.`,
-      `If it's not for you, no hard feelings: ${link}`,
+      `Last note on ${team}. One ${category} gets the room, and when it goes it's gone for the season.`,
+      `${proPrice} a month, cancel any time. If it's not for you, no hard feelings: ${link}`,
       `Ty`,
       `Not relevant? Reply "unsubscribe" and I won't follow up.`,
       // ONE disclaimer. It was listed twice here, so step 3 printed it twice.

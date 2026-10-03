@@ -1,46 +1,74 @@
-// THE FOUNDING RATE, server side: the checkout charges from this and the
+// PARTNER PRICING, server side: the checkout charges from this and the
 // outreach emails quote it.
 //
-// Until FOUNDING_DEADLINE a team is $500; after it, $2,500 flat — no manual
-// change at the deadline. The web app has its own copy in src/lib/founding.ts
-// (the page shows it). Move the date in BOTH files, or the page and the charge
-// disagree.
-
-/** When the founding rate ends, Eastern time. */
-export const FOUNDING_DEADLINE = "2026-10-02T23:59:59-04:00";
-export const FOUNDING_END = Date.parse(FOUNDING_DEADLINE);
-
-/** Per team, per season, in cents. */
-export const FOUNDING_PRICE_CENTS = 50000;
-export const LIST_PRICE_CENTS = 250000;
-
-export const isFoundingOpen = (now = Date.now()) => now < FOUNDING_END;
-export const seasonPriceCents = (now = Date.now()) =>
-  isFoundingOpen(now) ? FOUNDING_PRICE_CENTS : LIST_PRICE_CENTS;
-
-/** The one pricing sentence every pitch uses. */
-export const priceLine = (now = Date.now()) =>
-  isFoundingOpen(now)
-    ? "$500 founding rate for the season. One partner per team."
-    : "$2,500 flat for the season. One partner per team.";
-
-// THE DATE AND THE NUMBERS, SPELLED OUT FROM THE SAME CONSTANTS.
+// MONTHLY, NOT PER SEASON. The season rate died on its own evidence — zero
+// sold at $500 for a whole season, and the arithmetic never worked anyway:
+// one partner per team, a hundred teams, $50k a year is not a business. A
+// season is also the wrong unit to ask a bar to commit to in September.
 //
-// The follow-up letters name the deadline and the price in their own
-// sentences rather than using priceLine(), and they were typed in by hand —
-// "Oct 2", "$2,500". A hand-typed date is correct until it is not, and this
-// one goes wrong silently on a Saturday morning while the emails keep going
-// out. Deriving them means the copy cannot drift from the charge.
+// $500 a month for a pro team, $250 for a college. Billed by Square on a real
+// subscription, cancellable, no prorating and no deadline to administer. The
+// founding window is gone: it closed on Oct 2 2026 having sold nothing, and
+// re-opening a deadline you already announced is how a deadline stops meaning
+// anything.
+//
+// The web app has its own copy in src/lib/founding.ts (the page shows it).
+// Change BOTH, or the page and the charge disagree.
 
-/** "Oct 2" — the deadline as a reader says it, in the timezone it is set in. */
-export const deadlineDay = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  timeZone: "America/New_York",
-}).format(FOUNDING_END);
+// THE PRICE WENT UP. MONTHLY IS HOW YOU PAY IT, NOT A DISCOUNT.
+//
+// The season rate is $2,500 and that is the number in the pitch — it rose on
+// Oct 2 and it stays risen. $500 a month is the same money said in a way a bar
+// owner can agree to without asking anyone: five months of an NFL season,
+// $2,500 either way. Nobody is being offered less than the last person was.
+/** Per team, per month, in cents. */
+export const PRO_MONTHLY_CENTS = 50000;
+export const COLLEGE_MONTHLY_CENTS = 25000;
+
+/** The list price the monthly rate is measured against. */
+export const PRO_SEASON_CENTS = 250000;
+export const COLLEGE_SEASON_CENTS = 125000;
+
+// College is half because the buyer is different, not because the audience is
+// worse. A shop two blocks from campus has a smaller budget than a regional
+// brand — but a big school runs football into February and basketball into
+// March, so eight months at $250 lands near five at $500 anyway. It is an
+// opening price, and it moves when there are share numbers to argue from.
+const COLLEGE_LEAGUES = new Set(["NCAAF", "NCAAB", "NCAA"]);
+
+export const isCollegeLeague = (league: unknown) =>
+  COLLEGE_LEAGUES.has(String(league ?? "").trim().toUpperCase());
+
+export const monthlyCentsForLeague = (league: unknown) =>
+  isCollegeLeague(league) ? COLLEGE_MONTHLY_CENTS : PRO_MONTHLY_CENTS;
+
+/**
+ * What a cart costs every month.
+ *
+ * Mixed carts just add up — three pro teams and a college is $1,750/mo. There
+ * is no bundle discount, because a discount is a second number to explain and
+ * the whole point of one-partner-one-price is that there is nothing to
+ * negotiate.
+ */
+export const monthlyTotalCents = (leagues: unknown[]) =>
+  leagues.reduce<number>((sum, league) => sum + monthlyCentsForLeague(league), 0);
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US")}`;
 
-/** "$500" and "$2,500", from the cents the checkout actually charges. */
-export const foundingPrice = money(FOUNDING_PRICE_CENTS);
-export const listPrice = money(LIST_PRICE_CENTS);
+/** "$500" and "$250", from the cents the subscription actually charges. */
+export const proPrice = money(PRO_MONTHLY_CENTS);
+export const collegePrice = money(COLLEGE_MONTHLY_CENTS);
+/** "$2,500" — the season figure the monthly rate is measured against. */
+export const proSeasonPrice = money(PRO_SEASON_CENTS);
+export const collegeSeasonPrice = money(COLLEGE_SEASON_CENTS);
+
+/**
+ * The one pricing sentence every pitch uses.
+ *
+ * Season first, month second, in that order — the season number is the price
+ * and the monthly one is the terms. Lead with $500 and it reads as what the
+ * thing costs, which makes the next conversation a negotiation down from a
+ * number that was already the floor.
+ */
+export const priceLine = () =>
+  `${proSeasonPrice} a season, or ${proPrice} a month. One partner per team.`;
