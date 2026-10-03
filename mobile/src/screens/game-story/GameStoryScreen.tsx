@@ -34,6 +34,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useGameStory, PHOTO_MS, MAX_CLIP_MS } from "@/hooks/useGameStory";
 import { useStoryGame } from "@/hooks/useStoryGame";
+import { supabase } from "@/integrations/supabase/client";
 import type { RootStackParamList } from "@/navigation/types";
 
 type Route = RouteProp<RootStackParamList, "GameStory">;
@@ -116,13 +117,25 @@ export function GameStoryScreen() {
   //
   // message and url passed separately: both together makes iOS send the link
   // twice and stops Messages building a preview card at all.
+  // #SideHuddle RIDES ALONG, because it is the only way to see where this
+  // goes. iOS tells us a share completed and never which app took it, so a
+  // hashtag in the text is the one thread that survives into TikTok or X —
+  // searchable by hand, which beats a number nobody can produce.
   const shareStory = async () => {
     setPaused(true);
     try {
-      await Share.share({
-        message: `Our game story from ${huddle?.name ?? "the room"}.`,
+      const result = await Share.share({
+        message: `Our game story from ${huddle?.name ?? "the room"}. #SideHuddle`,
         url: `https://www.sidehuddlesports.com/h/${huddleId}?story=1`,
       });
+      // sharedAction only. A dismissed sheet is somebody changing their mind,
+      // and counting it would inflate the one number we intend to sell.
+      if (result.action === Share.sharedAction && huddleId) {
+        void (supabase.rpc as any)("log_story_event", {
+          p_huddle_id: huddleId,
+          p_kind: "shared",
+        }).then(undefined, () => {});
+      }
     } catch {
       // Dismissing the sheet is not an error.
     } finally {

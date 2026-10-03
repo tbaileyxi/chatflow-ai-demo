@@ -74,7 +74,21 @@ export default function GameStoryPage() {
   useEffect(() => {
     if (!huddleId) return;
     (supabase.rpc as any)('game_story', { p_huddle_id: huddleId })
-      .then(({ data }: { data: Story | null }) => setStory(data ?? { found: false }))
+      .then(({ data }: { data: Story | null }) => {
+        setStory(data ?? { found: false });
+        // COUNTED ONLY WHEN THERE WAS SOMETHING TO WATCH.
+        //
+        // This is the one number that measures a stranger rather than a
+        // member, which is exactly why it has to be honest: a dead link, a
+        // private room or an empty story is not reach, and counting those
+        // would quietly inflate the figure a sponsor is being sold.
+        if (data?.found && data.shareable !== false && (data.items?.length ?? 0) > 0) {
+          void (supabase.rpc as any)('log_story_event', {
+            p_huddle_id: huddleId,
+            p_kind: 'link_opened',
+          }).then(undefined, () => {});
+        }
+      })
       .catch(() => setStory({ found: false }));
   }, [huddleId]);
 
@@ -91,6 +105,15 @@ export default function GameStoryPage() {
       );
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
       saveBlob(blob, `${(story?.room ?? 'game-story').replace(/[^\w -]/g, '')}.${ext}`);
+      // The last moment we can see. After this the file is on somebody's
+      // phone and whatever it does there is invisible to us — which is worth
+      // remembering before quoting this as anything other than downloads.
+      if (huddleId) {
+        void (supabase.rpc as any)('log_story_event', {
+          p_huddle_id: huddleId,
+          p_kind: 'downloaded',
+        }).then(undefined, () => {});
+      }
     } catch {
       // Nothing to explain that the person can act on — the button simply
       // goes back to being a button.
