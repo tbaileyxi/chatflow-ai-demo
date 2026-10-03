@@ -35,6 +35,8 @@ type Story = {
   room?: string;
   roomPhoto?: string | null;
   people?: number;
+  /** This season's partner for the room's team, or null when the slot is open. */
+  partner?: string | null;
   items?: Item[];
 };
 
@@ -101,7 +103,15 @@ export default function GameStoryPage() {
     try {
       const blob = await renderStory(
         items.map((it) => ({ url: it.url, kind: it.kind })),
-        { photoMs: PHOTO_MS, maxClipMs: MAX_CLIP_MS, onProgress: setBuilding },
+        {
+          photoMs: PHOTO_MS,
+          maxClipMs: MAX_CLIP_MS,
+          onProgress: setBuilding,
+          // No partner, no card. The video simply ends, as it does now.
+          endCard: story?.partner
+            ? { partner: story.partner, room: story.room ?? null }
+            : undefined,
+        },
       );
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
       saveBlob(blob, `${(story?.room ?? 'game-story').replace(/[^\w -]/g, '')}.${ext}`);

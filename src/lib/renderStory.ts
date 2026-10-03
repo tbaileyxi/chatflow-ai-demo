@@ -27,17 +27,39 @@ export type RenderItem = {
   kind: 'image' | 'video';
 };
 
+/**
+ * The two seconds that make an off-platform view worth money.
+ *
+ * Everything else we own — the page, the download button, the app — is
+ * behind the moment the file leaves. A name burned into the last frames is
+ * the only part of a sponsorship that survives onto somebody's TikTok.
+ *
+ * An end card, not a corner watermark: a watermark looks like a cheap export
+ * and is the first thing a reposter crops. This reads as the outro of the
+ * thing you just watched, which is where a sponsor belongs anyway.
+ */
+export type EndCard = {
+  /** Omit the whole object when the team has no partner. No empty adverts. */
+  partner: string;
+  room?: string | null;
+};
+
 export type RenderOpts = {
   photoMs?: number;
   maxClipMs?: number;
   /** 0..1, for a progress label — rendering runs in real time. */
   onProgress?: (fraction: number) => void;
   signal?: AbortSignal;
+  endCard?: EndCard;
 };
 
 /** 9:16, which is what a phone and every story surface expects. */
 const W = 1080;
 const H = 1920;
+
+/** Long enough to read, short enough that nobody scrubs past it. */
+const END_CARD_MS = 2000;
+const GOLD = '#F5C518';
 
 /** The first of these the browser admits to supporting. */
 const CANDIDATES = [
@@ -78,6 +100,46 @@ function drawCover(
   const w = sw * scale;
   const h = sh * scale;
   ctx.drawImage(src, (W - w) / 2, (H - h) / 2, w, h);
+}
+
+/**
+ * Paint the end card. Called every frame, because a canvas that stops
+ * changing can stop handing frames to the recorder.
+ *
+ * Deliberately plain: black, one name, no logo we would have to fetch. A
+ * remote image here would taint the canvas unless it came back with the
+ * right CORS headers, and losing the whole video to a sponsor's logo host is
+ * not a trade worth making.
+ */
+function drawEndCard(ctx: CanvasRenderingContext2D, card: EndCard) {
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+
+  if (card.room) {
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.font = '500 44px system-ui, -apple-system, Helvetica, Arial, sans-serif';
+    ctx.fillText(card.room, W / 2, H / 2 - 190);
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.font = '500 46px system-ui, -apple-system, Helvetica, Arial, sans-serif';
+  ctx.fillText('brought to you by', W / 2, H / 2 - 70);
+
+  // Shrink rather than overflow: a long name running off both edges is worse
+  // than a smaller one that fits.
+  let size = 104;
+  ctx.font = `800 ${size}px system-ui, -apple-system, Helvetica, Arial, sans-serif`;
+  while (ctx.measureText(card.partner).width > W - 140 && size > 44) {
+    size -= 4;
+    ctx.font = `800 ${size}px system-ui, -apple-system, Helvetica, Arial, sans-serif`;
+  }
+  ctx.fillStyle = GOLD;
+  ctx.fillText(card.partner, W / 2, H / 2 + 40);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.font = '600 38px system-ui, -apple-system, Helvetica, Arial, sans-serif';
+  ctx.fillText('Side Huddle', W / 2, H / 2 + 200);
 }
 
 function loadImage(url: string, signal?: AbortSignal): Promise<HTMLImageElement> {
@@ -225,6 +287,24 @@ export async function renderStory(
           tick();
         });
       }
+    }
+
+    // The sponsor, last, over silence. The audio track keeps running the way
+    // it does over a still, so the file stays one continuous stream rather
+    // than one some players refuse to scrub.
+    if (opts.endCard && !opts.signal?.aborted) {
+      const started = performance.now();
+      await new Promise<void>((resolve) => {
+        const tick = () => {
+          if (opts.signal?.aborted || performance.now() - started >= END_CARD_MS) {
+            resolve();
+            return;
+          }
+          drawEndCard(ctx, opts.endCard!);
+          requestAnimationFrame(tick);
+        };
+        tick();
+      });
     }
     opts.onProgress?.(1);
   } finally {
