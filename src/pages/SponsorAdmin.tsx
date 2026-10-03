@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { monthlyForLeague } from '@/lib/founding';
 
 // Protected seed/management path for founding sponsorships closed offline,
 // and for editing the sponsor contact on any claim. Gated to admins.
@@ -13,27 +14,41 @@ interface Claim {
   team_key: string;
   team_name: string;
   league: string;
-  status: 'open' | 'reserved' | 'claimed';
+  // 'lapsed' is a sponsor who stopped paying. Setting it here is not just a
+  // label: a trigger pulls their founding_partners row and deactivates the
+  // team_sponsors one, so the name comes off the pregame card and the story
+  // end card too.
+  status: 'open' | 'reserved' | 'claimed' | 'lapsed';
   plan: string | null;
   business_name: string | null;
   sponsor_email: string | null;
   sponsor_phone: string | null;
   amount_paid_cents: number;
+  monthly_cents: number | null;
+  square_subscription_id: string | null;
   reserved_at: string | null;
   created_at: string;
 }
 
-const STATUSES: Claim['status'][] = ['open', 'reserved', 'claimed'];
+const STATUSES: Claim['status'][] = ['open', 'reserved', 'claimed', 'lapsed'];
+
+/** The three things a story can be seen to do. Nothing else is countable. */
+type Reach = { shared: number; link_opened: number; downloaded: number };
 
 export default function SponsorAdmin() {
   const { isAdmin, loading, user } = useAuth();
   const [claims, setClaims] = useState<Claim[]>([]);
+  const [reach, setReach] = useState<Reach | null>(null);
   const [busy, setBusy] = useState(false);
   const [add, setAdd] = useState({ teamKey: '', teamName: '', league: 'NFL', business: '', email: '', phone: '', status: 'reserved' as Claim['status'] });
 
   async function load() {
     const { data } = await supabase.from('sponsor_claims').select('*').order('created_at', { ascending: false });
-    if (data) setClaims(data as Claim[]);
+    if (data) setClaims(data as unknown as Claim[]);
+    // Null room = the whole app, which is the figure a first conversation
+    // actually turns on: does any of this travel at all.
+    const { data: r } = await (supabase.rpc as any)('story_counts', { p_huddle_id: null, p_days: 30 });
+    setReach(Array.isArray(r) ? (r[0] as Reach) ?? null : (r as Reach) ?? null);
   }
 
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
@@ -59,7 +74,10 @@ export default function SponsorAdmin() {
     setBusy(true);
     await supabase.from('sponsor_claims').upsert({
       team_key: add.teamKey, team_name: add.teamName, league: add.league,
-      status: add.status, plan: 'reserve',
+      // 'reserve' was the old deposit plan and has not been sold in months.
+      // An offline close is on the same monthly terms as an online one.
+      status: add.status, plan: 'monthly',
+      monthly_cents: monthlyForLeague(add.league) * 100,
       business_name: add.business || null, sponsor_email: add.email || null, sponsor_phone: add.phone || null,
       reserved_at: add.status !== 'open' ? new Date().toISOString() : null,
     }, { onConflict: 'team_key' });
@@ -80,6 +98,37 @@ export default function SponsorAdmin() {
     <div style={{ maxWidth: 1080, margin: '0 auto', padding: 32, color: '#fff', background: '#0a0a0a', minHeight: '100vh' }}>
       <h1 style={{ fontSize: 26, fontWeight: 800 }}>Sponsor claim admin</h1>
       <p style={{ color: '#999', marginTop: 4, fontSize: 14 }}>Mark teams reserved/claimed for offline deals and edit sponsor contacts.</p>
+
+      {/* REACH — the number the pitch now turns on.
+          Three figures, never summed, and labelled as what they literally
+          are. "Opens" is not "views" and neither is "shares": a sponsor who
+          is quoted a number eventually asks to see it. */}
+      <div style={{ marginTop: 24, padding: 20, border: '1px solid #222', borderRadius: 10, background: '#111' }}>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>Reach · last 30 days</div>
+        <p style={{ color: '#666', fontSize: 12, marginTop: 0, marginBottom: 14 }}>
+          Every room. What we can actually witness — nothing here is a view on TikTok or X, which we cannot see at all.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12 }}>
+          {([
+            ['Stories sent', reach?.shared, 'Share sheet completed. Where it went is not knowable.'],
+            ['Links opened', reach?.link_opened, 'Someone loaded the story page. The only count that is a stranger.'],
+            ['Videos saved', reach?.downloaded, 'Render finished and handed over. The last thing we can see.'],
+          ] as const).map(([label, value, note]) => (
+            <div key={label} style={{ border: '1px solid #1c1c1c', borderRadius: 8, padding: 14, background: '#0d0d0d' }}>
+              <div style={{ fontSize: 30, fontWeight: 800, color: '#FFD60A', lineHeight: 1.1 }}>
+                {value ?? '—'}
+              </div>
+              <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{label}</div>
+              <div style={{ color: '#666', fontSize: 11, marginTop: 4 }}>{note}</div>
+            </div>
+          ))}
+        </div>
+        {reach && reach.shared === 0 && reach.link_opened === 0 && reach.downloaded === 0 ? (
+          <p style={{ color: '#666', fontSize: 12, marginTop: 12 }}>
+            Nothing yet. Sends only start counting from the build that ships them.
+          </p>
+        ) : null}
+      </div>
 
       {/* Manual add */}
       <div style={{ marginTop: 24, padding: 20, border: '1px solid #222', borderRadius: 10, background: '#111' }}>
@@ -109,6 +158,20 @@ export default function SponsorAdmin() {
                 <div style={{ fontWeight: 700 }}>{c.team_name} <span style={{ color: '#666', fontWeight: 400 }}>· {c.league}</span></div>
                 <div style={{ color: '#666', fontSize: 12 }}>{c.team_key}</div>
                 {c.amount_paid_cents > 0 && <div style={{ color: '#7ec85f', fontSize: 12 }}>paid ${(c.amount_paid_cents / 100).toFixed(0)} · {c.plan}</div>}
+                {c.monthly_cents ? (
+                  <div style={{ color: '#888', fontSize: 12 }}>
+                    ${(c.monthly_cents / 100).toFixed(0)}/mo
+                    {/* A claimed row with no subscription id is the one shape
+                        worth noticing: the money arrived but the recurring
+                        half never attached, so a cancellation would never
+                        find this team. */}
+                    {c.square_subscription_id
+                      ? ' · subscribed'
+                      : c.status === 'claimed'
+                        ? ' · ⚠ no subscription linked'
+                        : ''}
+                  </div>
+                ) : null}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                 <Input placeholder='Business' defaultValue={c.business_name ?? ''} onBlur={e => e.target.value !== (c.business_name ?? '') && update(c.id, { business_name: e.target.value })} />
