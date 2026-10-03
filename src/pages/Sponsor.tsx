@@ -8,12 +8,15 @@ import { COLLEGE_MONTHLY, PRO_MONTHLY, PRO_SEASON, monthlyForLeague, monthlyTota
 /**
  * ONE SPONSOR PAGE, personalised by ?team=slug.
  *
- * Sells one thing: a partner per team per season. Until the founding deadline
- * (src/lib/founding.ts) that is $500 with $2,500 struck through; after it the
- * page flips on its own to $2,500 flat and says the window has closed. The
- * partner's name sits under every reaction clip fans post and on the pregame
- * card at kickoff — and nowhere else. No logos (the marks are not ours), no
- * audience numbers (we do not have them), never "official" (we are not).
+ * Sells one thing: one partner per team. $2,500 a season is the price and
+ * $500 a month is how you pay it (src/lib/founding.ts), college at half.
+ * Nothing is struck through — this is terms, not a discount, and the
+ * founding window is gone for good.
+ *
+ * The partner's name sits under every reaction clip fans post, on the
+ * pregame card at kickoff, and on the last two seconds of a downloaded game
+ * story — and nowhere else. No logos (the marks are not ours), no audience
+ * numbers (we do not have them), never "official" (we are not).
  */
 
 const AUDIENCE = ['Alumni', 'Fraternities', 'Influencers', 'Tailgate groups', 'Fan club chapters'];
