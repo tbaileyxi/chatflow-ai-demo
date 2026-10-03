@@ -307,10 +307,7 @@ export default function Sponsor() {
             >
               Claim your team
             </button>
-            {open ? (
-            ) : (
-              <p className="text-sm font-semibold text-[#FFD60A]">The founding window has closed.</p>
-            )}
+            <p className="text-sm font-semibold text-[#FFD60A]">Cancel any time. One partner per team.</p>
           </div>
         </div>
       </section>
